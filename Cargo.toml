@@ -4,6 +4,7 @@ members = [
     "crates/diagram-core",
     "crates/diagram-format-drawio",
     "crates/diagram-compat-testkit",
+    "crates/diagram-commands",
 ]
 
 [workspace.package]

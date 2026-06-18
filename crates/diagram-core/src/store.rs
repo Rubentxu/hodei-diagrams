@@ -389,7 +389,10 @@ mod tests {
         store.replace_page(pid, page_fixed);
 
         // Insert vertex V on page P
-        let v = Vertex { page_id: Some(pid), ..Default::default() };
+        let v = Vertex {
+            page_id: Some(pid),
+            ..Default::default()
+        };
         let vid = store.insert_vertex(v.clone());
 
         // Insert edge E on page P
@@ -402,7 +405,10 @@ mod tests {
         let _eid = store.insert_edge(e.clone());
 
         // Insert group G on page P
-        let g = Group { page_id: Some(pid), ..Default::default() };
+        let g = Group {
+            page_id: Some(pid),
+            ..Default::default()
+        };
         let _gid = store.insert_group(g.clone());
 
         assert_eq!(store.page_count(), 1);
@@ -448,11 +454,17 @@ mod tests {
         store.replace_page(pid2, p2_fixed);
 
         // Insert vertex V1 on page 1
-        let v1 = Vertex { page_id: Some(pid1), ..Default::default() };
+        let v1 = Vertex {
+            page_id: Some(pid1),
+            ..Default::default()
+        };
         let _vid1 = store.insert_vertex(v1);
 
         // Insert vertex V2 on page 2
-        let v2 = Vertex { page_id: Some(pid2), ..Default::default() };
+        let v2 = Vertex {
+            page_id: Some(pid2),
+            ..Default::default()
+        };
         let _vid2 = store.insert_vertex(v2);
 
         assert_eq!(store.page_count(), 2);
