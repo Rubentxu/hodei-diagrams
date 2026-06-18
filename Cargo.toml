@@ -7,8 +7,8 @@ members = [
 ]
 
 [workspace.package]
-edition = "2021"
-rust-version = "1.83"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/hodei-diagrams/hodei-diagrams"
 
@@ -31,5 +31,18 @@ walkdir = "2"
 ignore = "0.4"
 
 [profile.release]
-lto = "thin"
+lto = false
 codegen-units = 1
+
+# Dev profile optimized for fast compile/test cycles
+[profile.dev]
+opt-level = 0
+debug = false
+split-debuginfo = "unpacked"
+incremental = true
+codegen-units = 16
+
+[profile.dev.build-override]
+opt-level = 0
+codegen-units = 16
+debug = false
