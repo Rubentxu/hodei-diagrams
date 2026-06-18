@@ -124,12 +124,19 @@ sddk-verify → commit fixes si necesario
     ↓
 sddk-archive → commit final de cierre si aplica
     ↓
-git push origin feat/nombre-del-cambio (ya está en remote, solo actualizar)
+git push origin feat/nombre-del-cambio
 gh pr create --title "feat(nombre): descripción" --body "Cierra #<issue>"
     ↓
 Review y merge (merge commit, no fast-forward)
     ↓
+# NO borrar la rama — preservar trazabilidad completa
+# La rama vive en el remote como registro histórico
+    ↓
 git checkout main && git pull
+    ↓
+# Versionado semántico después de cada milestone completado
+git tag -a v0.X.0 -m "feat: hito completado — descripción"
+git push origin v0.X.0
     ↓
 Siguiente cambio SDDK
 ```
@@ -145,6 +152,8 @@ Siguiente cambio SDDK
 7. **main protegida**: nadie commitea directo a main. Todo pasa por PR con al menos un reviewer.
 8. **Commits atómicos**: cada commit debe compilar (`cargo check`) y pasar tests (`cargo test`). No commitear código roto.
 9. **Cerrar antes de abrir** (INVARIANTE): no se arranca un nuevo cambio SDDK hasta que el cambio anterior esté mergeado a `main` y se haya hecho `git checkout main && git pull`. No hay dos ciclos SDDK abiertos al mismo tiempo. Si una PR está en review, se espera. Si hay bloqueo, se documenta en ROADMAP.md.
+10. **Preservar ramas en el remote** (INVARIANTE): NUNCA borrar la rama después del merge. `gh pr merge --merge` sin `--delete-branch`. La rama vive en el remote como registro histórico completo del cambio: commits, PR, review, merge. GitHub mantiene el link PR↔rama incluso después del merge.
+11. **Versionado semántico por milestone** (INVARIANTE): después de cada milestone completado del ROADMAP, se crea un tag anotado siguiendo semver. `git tag -a v0.X.0 -m "feat: hito completado — descripción"` y `git push origin v0.X.0`. El versionado refleja el estado de `main` post-merge, no el estado de una rama de feature. La versión en `Cargo.toml` (`workspace.package.version`) se actualiza ANTES del tag.
 
 **Regla de oro**: *el código nunca vive sin commitear entre iteraciones SDDK*. Si el código existe y no está en un commit, es deuda técnica.
 
