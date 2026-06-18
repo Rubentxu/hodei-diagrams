@@ -33,6 +33,12 @@ la compatibilidad `.drawio` y futuros clientes automatizados son clientes de ese
   `rmcp`, `sqlx`, `serde_yaml`, `notify`, `bincode` como decisión base
 - **wasm32 target**: verificar soporte real antes de añadir crates con bindings wasm
 
+### 2.4 Librerías JS/TS (web-shell)
+
+- **Regla general**: última versión estable de paquetes npm verificada en `npmjs.com`
+- **Excepciones documentadas**: cualquier paquete pinned a versión específica requiere ADR
+- Verificar compatibilidad con el build tool (Vite o el que se elija) antes de actualizar
+
 ### 2.3 Formato y Linting
 
 ```bash
