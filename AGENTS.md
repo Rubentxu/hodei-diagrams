@@ -98,23 +98,49 @@ refactor(core): extract Geometry into its own store module
 
 ```
 main (protected)
-├── feat/drawio-roundtrip-v1
-├── feat/diagram-scene
-├── feat/svg-renderer
-├── fix/label-parsing-nullgeo
-├── chore/add-ci
-├── docs/adr-0029-spatial-index
+├── feat/drawio-raw-roundtrip-v1
+├── feat/domain-mapping-v1
+├── feat/diagram-commands
 └── ...
 ```
 
-### 3.4 Reglas del Flux
+> Las ramas de feature se crean DESPUÉS de archive SDDK, no antes. Cada cambio SDDK
+> completado tiene su propia rama. Ver §5.3 regla #7 (commit after archive).
 
-1. Cada `feat` o `fix` significativo = una PR contra `main`
-2. Commits atómicos dentro de la rama de feature
-3. Rebase interactivo sobre `main` antes de PR solo para limpiar commits (no obligatorio)
-4. Merge commit obligatorio en PR — no fast-forward
-5. Si el PR es grande (>400 líneas), usar skill `chained-pr` para partirlo
-6. Mensaje de PR: referencia al ADR o issue si existe
+### 3.4 Flujo Git Completo (INVARIANTE)
+
+El ciclo completo desde que se cierra un cambio SDDK hasta que se mergea a main:
+
+```
+SDDK archive
+    ↓
+git checkout -b feat/nombre-del-cambio
+    ↓
+git add ... && git commit -m "feat(formato): descripción corta"
+    ↓ (repetir por cada funcionalidad atómica)
+git push -u origin feat/nombre-del-cambio
+    ↓
+gh pr create --title "feat(nombre): descripción" --body "Cierra #<issue>"
+    ↓
+Review y merge (merge commit, no fast-forward)
+    ↓
+git checkout main && git pull
+    ↓
+Siguiente cambio SDDK
+```
+
+**Reglas INVARIANTES del flujo:**
+
+1. **Rama por cambio SDDK**: cada cambio SDDK archiveado vive en su propia rama de feature. No se mezclan dos cambios SDDK distintos en la misma rama.
+2. **Commits convencionales por funcionalidad**: un commit = una funcionalidad atómica. Ejemplo: no hacer un commit que incluya "parseo Y tipos del dominio" en el mismo commit; partirlo en dos.
+3. **Mensaje de commit**: `<tipo>(<alcance>): <descripción>`. Usar tipos de §3.2. Body opcional con contexto. Footer con ADR si aplica.
+4. **Merge a main**: siempre merge commit ( `--no-ff`). No rebase sobre main. Preserva el historial del debate de review.
+5. **Volver a main antes del siguiente cambio**: `git checkout main && git pull` antes de iniciar el siguiente ciclo SDDK.
+6. **PR grande (>400 LOC)**: usar skill `chained-pr` para partirla en múltiples PRs encadenadas.
+7. **main protegida**: nadie commitea directo a main. Todo pasa por PR con al menos un reviewer.
+8. **Commits atómicos**: cada commit debe compilar (`cargo check`) y pasar tests (`cargo test`). No commitear código roto.
+
+**Regla de oro**: *el código nunca vive sin commitear entre iteraciones SDDK*. Si el código existe y no está en un commit, es deuda técnica.
 
 ---
 
@@ -138,7 +164,8 @@ main (protected)
 │   └── diagram-wasm/      # thin wasm adapter: boundary APIs, shared buffers, events
 ├── web-shell/             # TypeScript minimal shell (outside crates/)
 └── docs/
-    ├── adr/               # 0001-0028+ decisions
+    ├── adr/               # decisiones 0001-0029
+    ├── ROADMAP.md         # estado vivo del proyecto
     └── ...
 ```
 
@@ -206,6 +233,26 @@ explore → propose → spec → design → tasks → apply → verify → archi
 4. **Lentes obligatorias**: `entropy-sdd` (siempre), `cognicode-sdd` (si disponible), `chronos-sdd` (para runtime bugs)
 5. **Sin skip de fase**: no saltarse `verify` antes de `archive`
 6. **Test-first en bootstrap**: el primer test es un round-trip `.drawio` fixture
+7. **Commit after archive** (INVARIANTE): cada cambio SDDK completado se commitea en su propia rama de feature antes de comenzar el siguiente cambio. El código nunca vive sin commitear entre iteraciones SDDK. Flujo:
+   ```bash
+   # 1. Después de archive, crear rama de feature
+   git checkout -b feat/nombre-del-cambio
+
+   # 2. Hacer commits convencionales por funcionalidad (no por archivo)
+   git add ...
+   git commit -m "feat(format): add parse_drawio and write_drawio shims"
+   git add ...
+   git commit -m "feat(core): add Vertex, Edge, Group payload types"
+   # ... etc
+
+   # 3. Merge a main vía PR (merge commit, no fast-forward)
+   # 4. Volver a main antes del siguiente cambio
+   git checkout main && git pull
+   ```
+   - Una rama por cada cambio SDDK (`feat/drawio-raw-roundtrip`, `feat/domain-mapping-v1`, etc.)
+   - Commits atómicos por funcionalidad, no por archivo
+   - Siempre merge commit a main
+   - El código de dos cambios SDDK distintos NO se mezcla en la misma rama
 
 ---
 
@@ -295,73 +342,38 @@ Usar SOLO `sddk-*` agentes listados arriba.
 
 ---
 
-## 8. Fuentes de Conocimiento y Prioridad
+## 8. Documentos del Workflow
 
-| Prioridad | Fuente | Descripción |
-|-----------|--------|-------------|
-| 1 | Código / Tests | La realidad del sistema |
-| 2 | Specs / Tasks | Requisitos documentados |
-| 3 | ADRs | Decisiones tomadas y su rationale |
-| 4 | CONTEXT.md | Glosario y lenguaje del proyecto |
-| 5 | Memorias Engram | Aprendizajes persistidos |
-| 6 | Conversación / Chat | Solo si no hay fuente durable |
+Este proyecto mantiene varios documentos vivos. Cada uno tiene un rol claro y una fuente de verdad distinta.
 
-**Regla**: si el código contradice la documentación, el código manda.
-Si la documentación contradice la conversación, verificar con código.
+| Documento | Rol | Actualizado por |
+|-----------|-----|-----------------|
+| `AGENTS.md` | Este archivo. Norma operativa del proyecto. Reglas, workflow, arquitectura, toolchain. | Manual — cambiar solo cuando cambie una regla |
+| `docs/ROADMAP.md` | Estado vivo del proyecto: milestones, track activo, bloqueos, siguiente paso. | SDDK workflow después de cada phase |
+| `docs/adr/` | Decisiones arquitectónicas hard-to-reverse. Una decisión = un archivo. | SDDK workflow cuando se cierra un ADR |
+| `CONTEXT.md` | Glosario de dominio. Solo términos canónicos. | `grill-with-docs` inline, cuando se cierra un término |
+| `sddk/` | Artefactos de ejecución SDDK: init, proposals, specs, designs, tasks. | Agentes `sddk-*` automáticamente |
+| Código / Tests | La verdad final del sistema. Lo que compila y pasa tests = lo que existe. | Siempre — toda implementación |
 
----
+### Prioridad de fuentes (para resolver conflictos)
 
-## 9. Roadmap y Trazabilidad
+1. **Código / Tests** — la realidad del sistema
+2. **Specs / Tasks** — requisitos documentados
+3. **ADRs** — decisiones tomadas y su rationale
+4. **CONTEXT.md** — glosario y lenguaje del proyecto
+5. **Memorias Engram** — aprendizajes persistidos
+6. **Conversación / Chat** — solo si no hay fuente durable
 
-### Estado actual (bootstrapped)
+> **Regla**: si el código contradice la documentación, el código manda.
+> Si la documentación contradice la conversación, verificar con código.
 
-```
-[✓] ADRs 0001-0028: Arquitectura y estrategia
-[✓] Workspace: crates/ con 3 crates iniciales
-[✓] Git: inicializado con conventional commits
-[✓] CI local: clippy + fmt + check
-[ ] diagram-commands (pendiente)
-[ ] diagram-scene (pendiente)
-[ ] diagram-layout (pendiente)
-[ ] diagram-routing (pendiente)
-[ ] diagram-render-svg (pendiente)
-[ ] diagram-render-wgpu (futuro)
-[ ] diagram-wasm (pendiente)
-[ ] web-shell TypeScript (pendiente)
-```
+### Regents de actualización
 
-### ADR Inventory (0001-0028)
-
-| ADR | Tema |
-|-----|------|
-| 0001 | Semantic Port with .drawio Compatibility |
-| 0002 | TypeScript Web Shell over Rust Engine |
-| 0003 | SVG First Render Backend, WebGPU Later |
-| 0004 | Minimal WASM Boundary with Shared Buffers |
-| 0005 | Command-Driven Engine, Not Literal Redux Store |
-| 0006 | Behavior First, Upstream Code Second |
-| 0007 | v1 Targets Solid Basic-to-Medium Compatibility |
-| 0008 | Import .drawio Before Rich Authoring |
-| 0009 | Rust-Native Model with .drawio Mapping |
-| 0010 | Foundational Crate Matrix by Layer |
-| 0011 | Multi-crate Workspace with Hexagonal Boundaries |
-| 0012 | Separate Core from Commands and Keep Web Outside crates/ |
-| 0013 | Keep Layout and Routing Outside diagram-core |
-| 0014 | diagram-format-drawio Depends Only on diagram-core |
-| 0015 | Renderers Consume Scene, Not Core Model |
-| 0016 | diagram-scene as Separate Projection Crate |
-| 0017 | diagram-wasm as Thin Technical Adapter |
-| 0018 | Shared Compatibility Testkit Early |
-| 0019 | Bootstrap with Core, Format, and Compat Testkit |
-| 0020 | Core Model Starts with Pages, Groups, Styles, and Labels |
-| 0021 | Start Styles as Flexible Map, Then Type Gradually |
-| 0022 | Model Labels as Potentially Rich Content |
-| 0023 | Engine-Owned Stable IDs with External ID Mapping |
-| 0024 | Preserve Unknown When Safe, Degrade Explicitly |
-| 0025 | Compatibility Diagnostics from Bootstrap |
-| 0026 | Parse .drawio into Raw Model Before Domain Mapping |
-| 0027 | Keep Raw Drawio Model Inside Format Crate for Now |
-| 0028 | Bootstrap with Separated Pieces Before Engine Facade |
+- `AGENTS.md`: cambia poco. Solo cuando cambia una regla o un flujo.
+- `docs/ROADMAP.md`: cambia con frecuencia. Después de cada milestone o cambio de dirección.
+- `docs/adr/`: se añade, nunca se modifica una decisión tomada.
+- `CONTEXT.md`: glill-with-docs lo mantiene. No escribir en él sin haber hecho una sesión.
+- `sddk/`: los agentes lo generan. No editar a mano.
 
 ---
 
@@ -562,5 +574,5 @@ cargo +wasm32 build -p diagram-wasm  # verificar soporte primero
 
 ---
 
-*Este documento es la norma viva del proyecto. Actualizar cuando se tome una nueva decisión o se cambie un flujo.*
-*Documentos hermanos: `CONTEXT.md`, `docs/adr/*`, `sddk/hodei-diagrams/init`*
+*Este documento es la norma operativa del proyecto. Reglas y workflow viven aquí — el estado vivo está en `docs/ROADMAP.md`.*
+*Documentos hermanos: `CONTEXT.md`, `docs/adr/`, `docs/ROADMAP.md`, `sddk/`*
