@@ -16,7 +16,7 @@ la compatibilidad `.drawio` y futuros clientes automatizados son clientes de ese
 
 ### 2.1 Rust
 
-- **Versión mínima**: `rustc 1.95.0` (2026) — verificar con `rustc --version`
+- **Versión mínima**: `rustc 1.96.0` (2026) — verificar con `rustc --version`
 - **Edition**: `2024` — NO usar `2018` ni `2021` sin ADR que lo justifique
 - **MSRV**: 1.85 (edition 2024 requirement; el repo puede exigir más cuando sea necesario)
 - Verificar toolchain antes de cualquier `cargo build`:
