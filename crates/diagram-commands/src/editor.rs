@@ -95,8 +95,12 @@ impl Editor {
     }
 
     /// Replace the model atomically (used for WASM import).
+    ///
+    /// The undo/redo history is cleared because the new model has no relationship
+    /// to the previous model's command history.
     pub fn replace_model(&mut self, model: DiagramModel) {
         self.model = model;
+        self.history = History::default();
     }
 
     /// Check if undo is available.
