@@ -26,6 +26,22 @@ impl SvgRenderer {
         Ok(self.render_page(page))
     }
 
+    /// Render all pages to a vector of (PageId, SVG string) pairs.
+    ///
+    /// Each page produces an independent, self-contained SVG document.
+    /// Pages are rendered in [`Scene::pages`] iteration order.
+    /// Clip-path counters reset per page.
+    pub fn render_pages(&self, scene: &Scene) -> Result<Vec<(PageId, String)>, RenderError> {
+        Ok(scene
+            .pages
+            .iter()
+            .map(|page| {
+                let svg = self.render_page(page);
+                (page.page_id, svg)
+            })
+            .collect())
+    }
+
     fn render_page(&self, page: &PageScene) -> String {
         let mut clip = ClipPathManager::new();
         let mut output = String::new();
