@@ -104,22 +104,27 @@ main (protected)
 └── ...
 ```
 
-> Las ramas de feature se crean DESPUÉS de archive SDDK, no antes. Cada cambio SDDK
-> completado tiene su propia rama. Ver §5.3 regla #7 (commit after archive).
+> Las ramas de feature se crean DESPUÉS de `sddk-tasks` y ANTES de `sddk-apply`. Cada cambio SDDK
+> completado tiene su propia rama. Ver §5.3 regla #7 (rama antes de apply, push inmediato al remote).
 
 ### 3.4 Flujo Git Completo (INVARIANTE)
 
-El ciclo completo desde que se cierra un cambio SDDK hasta que se mergea a main:
+El ciclo completo de un cambio SDDK:
 
 ```
-SDDK archive
+sddk-tasks (último artefacto antes de código)
     ↓
 git checkout -b feat/nombre-del-cambio
-    ↓
-git add ... && git commit -m "feat(formato): descripción corta"
-    ↓ (repetir por cada funcionalidad atómica)
 git push -u origin feat/nombre-del-cambio
     ↓
+sddk-apply → commits atómicos por funcionalidad
+git commit -m "feat(alcance): descripción"
+    ↓ (repetir apply + commit por cada PR/tarea)
+sddk-verify → commit fixes si necesario
+    ↓
+sddk-archive → commit final de cierre si aplica
+    ↓
+git push origin feat/nombre-del-cambio (ya está en remote, solo actualizar)
 gh pr create --title "feat(nombre): descripción" --body "Cierra #<issue>"
     ↓
 Review y merge (merge commit, no fast-forward)
@@ -139,6 +144,7 @@ Siguiente cambio SDDK
 6. **PR grande (>400 LOC)**: usar skill `chained-pr` para partirla en múltiples PRs encadenadas.
 7. **main protegida**: nadie commitea directo a main. Todo pasa por PR con al menos un reviewer.
 8. **Commits atómicos**: cada commit debe compilar (`cargo check`) y pasar tests (`cargo test`). No commitear código roto.
+9. **Cerrar antes de abrir** (INVARIANTE): no se arranca un nuevo cambio SDDK hasta que el cambio anterior esté mergeado a `main` y se haya hecho `git checkout main && git pull`. No hay dos ciclos SDDK abiertos al mismo tiempo. Si una PR está en review, se espera. Si hay bloqueo, se documenta en ROADMAP.md.
 
 **Regla de oro**: *el código nunca vive sin commitear entre iteraciones SDDK*. Si el código existe y no está en un commit, es deuda técnica.
 
@@ -233,20 +239,21 @@ explore → propose → spec → design → tasks → apply → verify → archi
 4. **Lentes obligatorias**: `entropy-sdd` (siempre), `cognicode-sdd` (si disponible), `chronos-sdd` (para runtime bugs)
 5. **Sin skip de fase**: no saltarse `verify` antes de `archive`
 6. **Test-first en bootstrap**: el primer test es un round-trip `.drawio` fixture
-7. **Commit after archive** (INVARIANTE): cada cambio SDDK completado se commitea en su propia rama de feature antes de comenzar el siguiente cambio. El código nunca vive sin commitear entre iteraciones SDDK. Flujo:
+7. **Rama antes de apply, push inmediato al remote** (INVARIANTE): la rama de feature se crea y se pushea al remote DESPUÉS de `sddk-tasks` y ANTES de `sddk-apply`. Esto asegura que el código de `apply` nunca viva sin commitear y que haya trazabilidad completa en el remote desde el primer momento. Flujo:
    ```bash
-   # 1. Después de archive, crear rama de feature
+   # 1. Después de tasks, crear rama de feature y pushear al remote
    git checkout -b feat/nombre-del-cambio
+   git push -u origin feat/nombre-del-cambio
 
-   # 2. Hacer commits convencionales por funcionalidad (no por archivo)
-   git add ...
+   # 2. sddk-apply → commits atómicos por funcionalidad (no por archivo)
    git commit -m "feat(format): add parse_drawio and write_drawio shims"
-   git add ...
    git commit -m "feat(core): add Vertex, Edge, Group payload types"
    # ... etc
 
-   # 3. Merge a main vía PR (merge commit, no fast-forward)
-   # 4. Volver a main antes del siguiente cambio
+   # 3. sddk-verify → commit fixes si necesario
+   # 4. sddk-archive → commit final de cierre si aplica
+   # 5. PR + merge a main (merge commit, no fast-forward)
+   # 6. Volver a main antes del siguiente cambio
    git checkout main && git pull
    ```
    - Una rama por cada cambio SDDK (`feat/drawio-raw-roundtrip`, `feat/domain-mapping-v1`, etc.)

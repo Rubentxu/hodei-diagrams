@@ -4,7 +4,7 @@
 //! never produces a partial edge — dangling source/target references are
 //! dropped with a `Diagnostic` in `DrawioMapping`.
 
-use crate::id::{StyleId, VertexId};
+use crate::id::{PageId, StyleId, VertexId};
 use crate::label::Label;
 use serde::{Deserialize, Serialize};
 
@@ -23,4 +23,6 @@ pub struct Edge {
     pub source: VertexId,
     /// The target vertex ID.
     pub target: VertexId,
+    /// The page this edge belongs to, if any.
+    pub page_id: Option<PageId>,
 }

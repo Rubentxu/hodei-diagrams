@@ -328,7 +328,7 @@ mod tests {
         let raw = parse_drawio(xml).expect("vertex-rect.drawio should parse");
 
         let mapper = DrawioMapping::new();
-        let mut model = mapper.to_domain(&raw).expect("to_domain should succeed");
+        let (mut model, _id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
 
         assert_eq!(model.store.len_vertex(), 1, "should have exactly 1 vertex");
 
@@ -362,7 +362,7 @@ mod tests {
         let raw = parse_drawio(xml).expect("edge-connect.drawio should parse");
 
         let mapper = DrawioMapping::new();
-        let mut model = mapper.to_domain(&raw).expect("to_domain should succeed");
+        let (mut model, _id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
 
         assert_eq!(model.store.len_vertex(), 2, "should have 2 vertices");
         assert_eq!(model.store.len_edge(), 1, "should have 1 edge");
@@ -392,7 +392,7 @@ mod tests {
         let raw = parse_drawio(xml).expect("group-nested.drawio should parse");
 
         let mapper = DrawioMapping::new();
-        let mut model = mapper.to_domain(&raw).expect("to_domain should succeed");
+        let (mut model, _id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
 
         assert_eq!(model.store.len_group(), 1, "should have 1 group");
         assert_eq!(model.store.len_vertex(), 1, "should have 1 vertex");
@@ -435,7 +435,7 @@ mod tests {
         let raw = parse_drawio(xml).expect("two-pages.drawio should parse");
 
         let mapper = DrawioMapping::new();
-        let model = mapper.to_domain(&raw).expect("to_domain should succeed");
+        let (model, _id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
 
         assert_eq!(model.page_count(), 2, "should have 2 pages");
 
@@ -456,7 +456,7 @@ mod tests {
 
         let mapper = DrawioMapping::new();
         let mut diags = Vec::new();
-        let model = mapper
+        let (model, _id_map) = mapper
             .to_domain_with_diagnostics(&raw, &mut diags)
             .expect("to_domain_with_diagnostics should succeed");
 
@@ -470,6 +470,254 @@ mod tests {
         assert!(
             has_ghost_ref,
             "diagnostic should mention the dangling source 'ghost'"
+        );
+    }
+
+    // =============================================================================
+    // Task 28 — Domain round-trip integration tests
+    // =============================================================================
+
+    #[test]
+    fn roundtrip_domain_simple_rect() {
+        let xml = include_str!("../fixtures/simple-rect.drawio");
+        let raw = parse_drawio(xml).expect("simple-rect.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+        assert_eq!(model.store.len_vertex(), 1, "should have 1 vertex");
+
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        assert_eq!(
+            raw.diagrams.len(),
+            roundtrip_raw.diagrams.len(),
+            "diagram count must be preserved"
+        );
+        let first_cells = &raw.diagrams[0].cells;
+        let second_cells = &roundtrip_raw.diagrams[0].cells;
+        assert_eq!(
+            first_cells.len(),
+            second_cells.len(),
+            "cell count must be preserved through domain round-trip"
+        );
+    }
+
+    #[test]
+    fn roundtrip_domain_vertex_rect() {
+        let xml = include_str!("../fixtures/vertex-rect.drawio");
+        let raw = parse_drawio(xml).expect("vertex-rect.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        assert_eq!(raw.diagrams.len(), roundtrip_raw.diagrams.len());
+        let first_cell = &raw.diagrams[0].cells[0];
+        let second_cell = &roundtrip_raw.diagrams[0].cells[0];
+        assert_eq!(
+            first_cell.value, second_cell.value,
+            "label must be preserved through domain round-trip"
+        );
+        // Verify style contains the fillColor
+        let first_style = first_cell.style.as_deref().unwrap_or("");
+        let second_style = second_cell.style.as_deref().unwrap_or("");
+        assert!(
+            first_style.contains("fillColor=#dae8fc"),
+            "first style should contain fillColor"
+        );
+        assert_eq!(
+            first_style.contains("fillColor=#dae8fc"),
+            second_style.contains("fillColor=#dae8fc"),
+            "fillColor style must be preserved through domain round-trip"
+        );
+    }
+
+    #[test]
+    fn roundtrip_domain_edge_connect() {
+        let xml = include_str!("../fixtures/edge-connect.drawio");
+        let raw = parse_drawio(xml).expect("edge-connect.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        // Find the edge in both versions
+        let first_edge = raw.diagrams[0].cells.iter().find(|c| c.edge).unwrap();
+        let second_edge = roundtrip_raw.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .unwrap();
+        assert_eq!(
+            first_edge.source, second_edge.source,
+            "edge source must be preserved through domain round-trip"
+        );
+        assert_eq!(
+            first_edge.target, second_edge.target,
+            "edge target must be preserved through domain round-trip"
+        );
+        assert_eq!(
+            first_edge.value, second_edge.value,
+            "edge label must be preserved through domain round-trip"
+        );
+    }
+
+    #[test]
+    fn roundtrip_domain_group_nested() {
+        let xml = include_str!("../fixtures/group-nested.drawio");
+        let raw = parse_drawio(xml).expect("group-nested.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        // Find the child vertex v1 in both versions
+        let first_v1 = raw.diagrams[0].cells.iter().find(|c| c.id == "v1").unwrap();
+        let second_v1 = roundtrip_raw.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "v1")
+            .unwrap();
+        assert_eq!(
+            first_v1.parent, second_v1.parent,
+            "parent reference must be preserved through domain round-trip"
+        );
+        // Group container should be present in both
+        assert!(
+            raw.diagrams[0].cells.iter().any(|c| c.id == "g1"),
+            "group g1 should exist in first parse"
+        );
+        assert!(
+            roundtrip_raw.diagrams[0].cells.iter().any(|c| c.id == "g1"),
+            "group g1 should exist in round-trip"
+        );
+    }
+
+    #[test]
+    fn roundtrip_domain_two_pages() {
+        let xml = include_str!("../fixtures/two-pages.drawio");
+        let raw = parse_drawio(xml).expect("two-pages.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        assert_eq!(
+            raw.diagrams.len(),
+            roundtrip_raw.diagrams.len(),
+            "page count must be preserved"
+        );
+        let names: Vec<_> = raw
+            .diagrams
+            .iter()
+            .filter_map(|d| d.name.as_deref())
+            .collect();
+        let names2: Vec<_> = roundtrip_raw
+            .diagrams
+            .iter()
+            .filter_map(|d| d.name.as_deref())
+            .collect();
+        assert_eq!(
+            names, names2,
+            "page names must be preserved through domain round-trip"
+        );
+    }
+
+    #[test]
+    fn roundtrip_domain_dangling_edge() {
+        let xml = include_str!("../fixtures/dangling-edge.drawio");
+        let raw = parse_drawio(xml).expect("dangling-edge.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, _id_map) = mapper
+            .to_domain_with_diagnostics(&raw, &mut Vec::new())
+            .expect("to_domain should succeed");
+
+        // Dangling edge should be dropped from model
+        assert_eq!(model.store.len_edge(), 0, "dangling edge should be dropped");
+    }
+
+    #[test]
+    fn roundtrip_domain_empty_page() {
+        let xml = include_str!("../fixtures/empty-page.drawio");
+        let raw = parse_drawio(xml).expect("empty-page.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        assert_eq!(model.page_count(), 1, "should have 1 page");
+        let page = model.store.pages().next().expect("should have a page");
+        assert_eq!(
+            page.name.as_ref().map(|l| l.text.as_str()),
+            Some("Empty Page"),
+            "page name should be preserved"
+        );
+
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        assert_eq!(roundtrip_raw.diagrams.len(), 1);
+        assert_eq!(
+            roundtrip_raw.diagrams[0].name.as_deref(),
+            Some("Empty Page"),
+            "page name must be preserved through domain round-trip"
+        );
+        assert!(
+            roundtrip_raw.diagrams[0].cells.is_empty(),
+            "empty page should remain empty through round-trip"
+        );
+    }
+
+    #[test]
+    fn roundtrip_domain_multi_segment_style() {
+        let xml = include_str!("../fixtures/multi-segment-style.drawio");
+        let raw = parse_drawio(xml).expect("multi-segment-style.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        assert_eq!(model.store.len_vertex(), 1, "should have 1 vertex");
+
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        let first_cell = &raw.diagrams[0].cells[0];
+        let second_cell = &roundtrip_raw.diagrams[0].cells[0];
+        // The style string should round-trip through the domain
+        let first_style = first_cell.style.as_deref().unwrap_or("");
+        let second_style = second_cell.style.as_deref().unwrap_or("");
+        // Both should contain the key segments (order may vary due to BTreeMap)
+        assert!(
+            first_style.contains("fillColor=#dae8fc"),
+            "first style should contain fillColor"
+        );
+        assert_eq!(
+            first_style.contains("fillColor=#dae8fc"),
+            second_style.contains("fillColor=#dae8fc"),
+            "fillColor must be preserved through domain round-trip"
         );
     }
 

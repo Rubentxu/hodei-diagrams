@@ -46,6 +46,11 @@ impl ModelStore {
         self.pages.get(id)
     }
 
+    /// Borrow all pages with their IDs in insertion order.
+    pub fn pages_with_ids(&self) -> impl Iterator<Item = (PageId, &Page)> {
+        self.pages.iter()
+    }
+
     /// Insert a page, returning its engine-assigned ID.
     pub fn insert_page(&mut self, page: Page) -> PageId {
         self.pages.insert(page)
@@ -78,6 +83,11 @@ impl ModelStore {
         self.vertices.len()
     }
 
+    /// Borrow all vertices with their IDs in insertion order.
+    pub fn vertices_with_ids(&self) -> impl Iterator<Item = (VertexId, &Vertex)> {
+        self.vertices.iter()
+    }
+
     /// Look up an edge by its engine ID.
     pub fn edge(&self, id: EdgeId) -> Option<&Edge> {
         self.edges.get(id)
@@ -108,6 +118,11 @@ impl ModelStore {
         self.edges.len()
     }
 
+    /// Borrow all edges with their IDs in insertion order.
+    pub fn edges_with_ids(&self) -> impl Iterator<Item = (EdgeId, &Edge)> {
+        self.edges.iter()
+    }
+
     /// Look up a group by its engine ID.
     pub fn group(&self, id: GroupId) -> Option<&Group> {
         self.groups.get(id)
@@ -131,6 +146,11 @@ impl ModelStore {
     /// Number of groups currently in the store.
     pub fn len_group(&self) -> usize {
         self.groups.len()
+    }
+
+    /// Borrow all groups with their IDs in insertion order.
+    pub fn groups_with_ids(&self) -> impl Iterator<Item = (GroupId, &Group)> {
+        self.groups.iter()
     }
 
     /// Look up a style entry by its engine ID.
