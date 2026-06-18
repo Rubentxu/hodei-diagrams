@@ -1,21 +1,62 @@
 # Build artifacts
-/target
+target/
 **/target/
 
+# Rust
+# Cargo.lock IS committed — do NOT add it here
+.cargo/
+*.pdb                    # Windows debug symbols
+
+# WASM builds (trunk)
+web-shell/dist/
+web-shell/.parcel-cache/
+
 # Node / Web artifacts
-**/node_modules/
-**/dist/
-**/.cache/
+node_modules/
+dist/
+.cache/
+.parcel-cache/
+
+# JS/TS logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log
+pnpm-debug.log*
+
+# Environment — NEVER commit secrets
+.env
+.env.*
+.env*.local
+
+# Test reports
+playwright-report/
+playwright/.cache/
+test-results/
+coverage/
+*.lcov
+
+# Bundler / framework caches
+.turbo/
+.next/
+.nuxt/
+.vite/
+.rollup.cache/
 
 # Editor / OS
 .DS_Store
 .idea/
 .vscode/
+*.swp
+*.swo
 
-# Logs / coverage
+# Logs
 *.log
-coverage/
-*.lcov
 
 # Local Engram caches
-.atl/.skill-registry.cache.json
+.atl/
+
+# Local docs — not published until public
+docs/
+
+# sccache (dev-only, not for release)
+# (sccache data lives in ~/.cache/sccache by default — keep that way)
