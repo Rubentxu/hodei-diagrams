@@ -4,9 +4,10 @@
 //! This stub exists to keep the workspace compiling during the skeleton PR.
 
 use diagram_core::StyleMap;
+use serde::{Deserialize, Serialize};
 
 /// The resolved style with typed hot-key fields and a `remaining` tail.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ResolvedStyle {
     /// Fill color — raw string, e.g. `"#dae8fc"`.
     pub fill_color: Option<String>,
@@ -47,7 +48,7 @@ impl ResolvedStyle {
 }
 
 /// The shape kind of a vertex, classified from its style.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ShapeKind {
     /// A rectangle.

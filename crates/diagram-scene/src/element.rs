@@ -5,9 +5,10 @@
 
 use diagram_core::geometry::{Point, Rect};
 use diagram_core::{EdgeId, GroupId, VertexId};
+use serde::{Deserialize, Serialize};
 
 /// A stable engine-owned identifier for a vertex, edge, or group.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum EntityId {
     /// Identifies a vertex.
@@ -25,7 +26,7 @@ pub const DEFAULT_ROUNDED_RADIUS: f64 = 8.0;
 ///
 /// Each variant carries typed engine IDs and resolved styles, ready for any
 /// render backend to consume.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum VisualElement {
     /// A rectangle element.
@@ -45,7 +46,7 @@ pub enum VisualElement {
 }
 
 /// A rectangle element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RectElement {
     /// The vertex ID.
     pub id: VertexId,
@@ -56,7 +57,7 @@ pub struct RectElement {
 }
 
 /// A rectangle with rounded corners.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoundedRectElement {
     /// The vertex ID.
     pub id: VertexId,
@@ -69,7 +70,7 @@ pub struct RoundedRectElement {
 }
 
 /// An ellipse element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EllipseElement {
     /// The vertex ID.
     pub id: VertexId,
@@ -80,7 +81,7 @@ pub struct EllipseElement {
 }
 
 /// A text label element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextElement {
     /// The entity that owns this text.
     pub owner: EntityId,
@@ -93,7 +94,7 @@ pub struct TextElement {
 }
 
 /// A straight line element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineElement {
     /// The edge ID.
     pub id: EdgeId,
@@ -108,7 +109,7 @@ pub struct LineElement {
 /// A polyline/polygon path element.
 ///
 /// Reserved for future `diagram-routing` output. In v1, edges produce `Line` elements.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PathElement {
     /// The edge ID.
     pub id: EdgeId,
@@ -119,7 +120,7 @@ pub struct PathElement {
 }
 
 /// A group element containing nested children.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupElement {
     /// The group ID.
     pub id: GroupId,
