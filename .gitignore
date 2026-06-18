@@ -1,0 +1,21 @@
+# Build artifacts
+/target
+**/target/
+
+# Node / Web artifacts
+**/node_modules/
+**/dist/
+**/.cache/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Logs / coverage
+*.log
+coverage/
+*.lcov
+
+# Local Engram caches
+.atl/.skill-registry.cache.json

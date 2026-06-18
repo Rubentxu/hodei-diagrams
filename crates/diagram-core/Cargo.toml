@@ -1,0 +1,18 @@
+[package]
+name = "diagram-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Diagram Engine core: domain model, slotmap stores, geometry, styles, labels."
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+slotmap = { workspace = true, features = ["serde"] }
+smallvec = { workspace = true }
+bitflags = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"

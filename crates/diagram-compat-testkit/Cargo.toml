@@ -1,0 +1,20 @@
+[package]
+name = "diagram-compat-testkit"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared compatibility testkit: corpus, round-trip helpers, golden files, compatibility assertions."
+
+[dependencies]
+diagram-core = { path = "../diagram-core" }
+diagram-format-drawio = { path = "../diagram-format-drawio" }
+thiserror = { workspace = true }
+serde = { workspace = true }
+similar = { workspace = true }
+walkdir = { workspace = true }
+ignore = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"

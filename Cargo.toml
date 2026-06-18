@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/diagram-core",
+    "crates/diagram-format-drawio",
+    "crates/diagram-compat-testkit",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.83"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/hodei-diagrams/hodei-diagrams"
+
+[workspace.dependencies]
+# Diagram core foundations
+thiserror = "2.0"
+serde = { version = "1", features = ["derive"] }
+slotmap = "1.0"
+smallvec = "1"
+bitflags = "2"
+
+# .drawio format crate
+quick-xml = "0.40"
+flate2 = "1"
+base64 = "0.22"
+
+# Compatibility testkit
+similar = "2"
+walkdir = "2"
+ignore = "0.4"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
