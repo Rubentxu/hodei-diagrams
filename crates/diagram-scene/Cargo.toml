@@ -10,6 +10,7 @@ description = "Render-agnostic projection layer for the Diagram Engine. Depends 
 [dependencies]
 diagram-core = { path = "../diagram-core" }
 thiserror = { workspace = true }
+serde = "1"
 
 [lints.rust]
 unsafe_code = "forbid"
