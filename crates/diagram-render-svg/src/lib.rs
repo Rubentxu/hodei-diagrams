@@ -10,6 +10,7 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
+pub mod clip;
 pub mod element;
 pub mod error;
 pub mod escape;

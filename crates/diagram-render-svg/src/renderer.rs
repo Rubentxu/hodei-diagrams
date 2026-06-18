@@ -2,6 +2,7 @@
 
 use diagram_scene::{PageId, PageScene, Scene};
 
+use crate::clip::ClipPathManager;
 use crate::element::element_to_svg;
 use crate::error::RenderError;
 use crate::escape::escape_text;
@@ -26,13 +27,13 @@ impl SvgRenderer {
     }
 
     fn render_page(&self, page: &PageScene) -> String {
+        let mut clip = ClipPathManager::new();
         let mut output = String::new();
 
         // Open svg tag with viewBox
         output.push_str(&format!(
             "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {} {}\">\n",
-            page.width,
-            page.height
+            page.width, page.height
         ));
 
         // Title
@@ -46,7 +47,14 @@ impl SvgRenderer {
 
         // Walk display list
         for elem in &page.display_list {
-            output.push_str(&element_to_svg(elem, 1));
+            output.push_str(&element_to_svg(elem, &mut clip, 1));
+            output.push('\n');
+        }
+
+        // Emit defs block if there are clip paths
+        let defs = clip.render_defs(1);
+        if !defs.is_empty() {
+            output.push_str(&defs);
             output.push('\n');
         }
 
