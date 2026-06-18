@@ -94,6 +94,11 @@ impl Editor {
         self.model
     }
 
+    /// Replace the model atomically (used for WASM import).
+    pub fn replace_model(&mut self, model: DiagramModel) {
+        self.model = model;
+    }
+
     /// Check if undo is available.
     pub fn can_undo(&self) -> bool {
         self.history.can_undo()
