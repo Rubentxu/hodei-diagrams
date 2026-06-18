@@ -1,24 +1,31 @@
 //! Visual element to SVG conversion.
 
 use diagram_scene::{
-    EllipseElement, LineElement, RectElement, RoundedRectElement, TextElement, VisualElement,
+    EllipseElement, GroupElement, LineElement, PathElement, RectElement, RoundedRectElement,
+    TextElement, VisualElement,
 };
 
+use crate::clip::ClipPathManager;
 use crate::escape::escape_text;
 use crate::style::{AttrContext, style_to_attrs};
 
 /// Converts a `VisualElement` to an SVG string.
 ///
 /// Returns the SVG representation of the element, indented with 2 spaces per
-/// depth level. Path and Group elements are handled in a future PR.
-pub(crate) fn element_to_svg(elem: &VisualElement, indent: usize) -> String {
+/// depth level. Takes a `ClipPathManager` to register clip paths for groups.
+pub(crate) fn element_to_svg(
+    elem: &VisualElement,
+    clip: &mut ClipPathManager,
+    indent: usize,
+) -> String {
     match elem {
         VisualElement::Rect(r) => rect_to_svg(r, indent),
         VisualElement::RoundedRect(r) => rounded_rect_to_svg(r, indent),
         VisualElement::Ellipse(e) => ellipse_to_svg(e, indent),
         VisualElement::Text(t) => text_to_svg(t, indent),
         VisualElement::Line(l) => line_to_svg(l, indent),
-        // Path and Group are handled in PR 2; catch-all for non-exhaustive enum
+        VisualElement::Path(p) => path_to_svg(p, indent),
+        VisualElement::Group(g) => group_to_svg(g, clip, indent),
         _ => String::new(),
     }
 }
@@ -33,12 +40,7 @@ fn rect_to_svg(r: &RectElement, indent: usize) -> String {
     let style = style_to_attrs(&r.style, AttrContext::Shape);
     format!(
         "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}/>",
-        ind,
-        r.bounds.origin.x,
-        r.bounds.origin.y,
-        r.bounds.size.width,
-        r.bounds.size.height,
-        style
+        ind, r.bounds.origin.x, r.bounds.origin.y, r.bounds.size.width, r.bounds.size.height, style
     )
 }
 
@@ -77,11 +79,7 @@ fn text_to_svg(t: &TextElement, indent: usize) -> String {
     let escaped = escape_text(&t.text);
     format!(
         "{}<text x=\"{}\" y=\"{}\"{}>{}</text>",
-        ind,
-        t.anchor.x,
-        t.anchor.y,
-        style,
-        escaped
+        ind, t.anchor.x, t.anchor.y, style, escaped
     )
 }
 
@@ -90,13 +88,68 @@ fn line_to_svg(l: &LineElement, indent: usize) -> String {
     let style = style_to_attrs(&l.style, AttrContext::Edge);
     format!(
         "{}<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{}/>",
-        ind,
-        l.from.x,
-        l.from.y,
-        l.to.x,
-        l.to.y,
-        style
+        ind, l.from.x, l.from.y, l.to.x, l.to.y, style
     )
+}
+
+fn path_to_svg(p: &PathElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = style_to_attrs(&p.style, AttrContext::Edge);
+
+    let d = if p.points.is_empty() {
+        String::new()
+    } else {
+        let mut d = String::from("M ");
+        for (i, pt) in p.points.iter().enumerate() {
+            if i > 0 {
+                d.push_str(" L ");
+            }
+            d.push_str(&pt.x.to_string());
+            d.push(' ');
+            d.push_str(&pt.y.to_string());
+        }
+        d
+    };
+
+    format!("{}<path d=\"{}\"{}/>", ind, d, style)
+}
+
+fn group_to_svg(g: &GroupElement, clip: &mut ClipPathManager, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let child_indent = indent + 1;
+
+    // Render children first
+    let children_svg: Vec<String> = g
+        .children
+        .iter()
+        .map(|child| element_to_svg(child, clip, child_indent))
+        .collect();
+
+    let (open_tag, close_tag) = if g.clip {
+        let clip_id = clip.register(
+            g.bounds.origin.x,
+            g.bounds.origin.y,
+            g.bounds.size.width,
+            g.bounds.size.height,
+        );
+        (
+            format!("<g clip-path=\"url(#clip_{})\">", clip_id),
+            format!("{}</g>", ind),
+        )
+    } else {
+        ("<g>".to_string(), format!("{}</g>", ind))
+    };
+
+    let mut result = String::new();
+    result.push_str(&ind);
+    result.push_str(&open_tag);
+    result.push('\n');
+    for child_svg in &children_svg {
+        result.push_str(child_svg);
+        result.push('\n');
+    }
+    result.push_str(&close_tag);
+    result
 }
 
 #[cfg(test)]
@@ -219,13 +272,37 @@ mod tests {
     }
 
     #[test]
-    fn path_and_group_return_empty() {
-        // These are handled in PR 2, they should return empty string
+    fn path_empty_points_emits_empty_d() {
+        // Empty path should emit empty d attribute
         let path = VisualElement::Path(diagram_scene::PathElement {
             id: EdgeId::default(),
             points: vec![],
             style: empty_style(),
         });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&path, &mut clip, 0);
+        assert!(result.contains("d=\"\""));
+    }
+
+    #[test]
+    fn path_with_points_emits_m_and_l() {
+        use diagram_core::geometry::Point;
+        let path = VisualElement::Path(diagram_scene::PathElement {
+            id: EdgeId::default(),
+            points: vec![
+                Point { x: 10.0, y: 10.0 },
+                Point { x: 50.0, y: 30.0 },
+                Point { x: 90.0, y: 10.0 },
+            ],
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&path, &mut clip, 0);
+        assert!(result.contains("M 10 10 L 50 30 L 90 10"));
+    }
+
+    #[test]
+    fn group_without_clip_emits_g_tag() {
         let group = VisualElement::Group(diagram_scene::GroupElement {
             id: GroupId::default(),
             bounds: Rect {
@@ -239,7 +316,65 @@ mod tests {
             children: vec![],
             clip: false,
         });
-        assert_eq!(element_to_svg(&path, 0), "");
-        assert_eq!(element_to_svg(&group, 0), "");
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&group, &mut clip, 0);
+        assert!(result.contains("<g>"));
+        assert!(result.contains("</g>"));
+        assert!(!result.contains("clip-path"));
+    }
+
+    #[test]
+    fn group_with_clip_emits_clip_path() {
+        use diagram_core::geometry::Point;
+        let group = VisualElement::Group(diagram_scene::GroupElement {
+            id: GroupId::default(),
+            bounds: Rect {
+                origin: Point { x: 50.0, y: 50.0 },
+                size: Size {
+                    width: 200.0,
+                    height: 150.0,
+                },
+            },
+            style: empty_style(),
+            children: vec![],
+            clip: true,
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&group, &mut clip, 0);
+        assert!(result.contains("clip-path=\"url(#clip_0)\""));
+    }
+
+    #[test]
+    fn group_nested_with_child() {
+        use diagram_core::geometry::Point;
+        let child_rect = VisualElement::Rect(RectElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 10.0, y: 10.0 },
+                size: Size {
+                    width: 80.0,
+                    height: 40.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let group = VisualElement::Group(diagram_scene::GroupElement {
+            id: GroupId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 200.0,
+                    height: 200.0,
+                },
+            },
+            style: empty_style(),
+            children: vec![child_rect],
+            clip: false,
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&group, &mut clip, 0);
+        assert!(result.contains("<g>"));
+        assert!(result.contains("</g>"));
+        assert!(result.contains("<rect"));
     }
 }
