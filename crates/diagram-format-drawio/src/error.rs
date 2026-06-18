@@ -52,3 +52,22 @@ pub enum FormatError {
 
 /// Convenience alias for `Result<T, FormatError>` in the format crate.
 pub type FormatResult<T> = Result<T, FormatError>;
+
+impl From<std::io::Error> for FormatError {
+    fn from(e: std::io::Error) -> Self {
+        FormatError::InvalidStructure(format!("I/O error: {e}"))
+    }
+}
+
+/// A compatibility diagnostic produced during parsing.
+///
+/// Unlike [`FormatError`], a diagnostic is not a hard failure — callers may
+/// collect these in a vector and surface them as warnings without aborting the
+/// parse.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic {
+    /// Path-like location in the document, e.g. `mxfile/diagram[0]/mxCell[2]`.
+    pub location: String,
+    /// Human-readable message describing the diagnostic.
+    pub message: String,
+}

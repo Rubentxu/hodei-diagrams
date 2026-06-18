@@ -19,8 +19,33 @@ pub mod parser;
 pub mod raw;
 pub mod writer;
 
-pub use error::{FormatError, FormatResult};
+pub use error::{Diagnostic, FormatError, FormatResult};
 pub use mapping::DrawioMapping;
 pub use parser::DrawioParser;
-pub use raw::{RawDrawioCell, RawDrawioDiagram, RawDrawioDocument};
+pub use raw::{RawDrawioCell, RawDrawioDiagram, RawDrawioDocument, RawDrawioGeometry};
 pub use writer::DrawioWriter;
+
+/// Parse a `.drawio` XML string into a [`RawDrawioDocument`].
+///
+/// See [`DrawioParser::parse_str`] for the underlying implementation.
+pub fn parse_drawio(xml: &str) -> FormatResult<RawDrawioDocument> {
+    DrawioParser::new().parse_str(xml)
+}
+
+/// Parse with optional diagnostic collection.
+///
+/// Callers that want to collect compatibility diagnostics without failing can pass
+/// a `&mut Vec<Diagnostic>`; those that don't care can pass `&mut Vec::new()`.
+pub fn parse_drawio_with_diagnostics(
+    xml: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> FormatResult<RawDrawioDocument> {
+    DrawioParser::new().parse_str_with_diagnostics(xml, diagnostics)
+}
+
+/// Serialize a [`RawDrawioDocument`] to a `.drawio` XML string.
+///
+/// See [`DrawioWriter::write_string`] for the underlying implementation.
+pub fn write_drawio(doc: &RawDrawioDocument) -> FormatResult<String> {
+    DrawioWriter::new().write_string(doc)
+}

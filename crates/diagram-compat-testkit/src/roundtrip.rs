@@ -5,7 +5,9 @@
 //! assertion macro on day one.
 
 use diagram_core::DiagramModel;
-use diagram_format_drawio::{DrawioParser, DrawioWriter};
+use diagram_format_drawio::Diagnostic as FmtDiagnostic;
+#[allow(unused_imports)]
+use diagram_format_drawio::{DrawioParser, parse_drawio, write_drawio};
 
 use crate::diagnostics::Diagnostic;
 
@@ -30,31 +32,55 @@ impl RoundtripHarness {
 
     /// Run a full parse → serialize cycle on `source` and return the result.
     pub fn cycle(&self, source: &str) -> RoundtripReport {
-        let parser = DrawioParser::new();
-        let writer = DrawioWriter::new();
-        match parser.parse_str(source) {
-            Ok(raw) => match writer.write_string(&raw) {
+        let mut fmt_diagnostics = Vec::new();
+        match parse_drawio_with_diagnostics(source, &mut fmt_diagnostics) {
+            Ok(raw) => match write_drawio(&raw) {
                 Ok(_) => RoundtripReport {
-                    diagnostics: Vec::new(),
+                    diagnostics: fmt_diagnostics
+                        .into_iter()
+                        .map(|d| Diagnostic::warning(d.location, d.message))
+                        .collect(),
                     preserved: true,
                 },
                 Err(err) => RoundtripReport {
-                    diagnostics: vec![Diagnostic::warning(
-                        "writer",
-                        format!("write failed: {err}"),
-                    )],
+                    diagnostics: {
+                        let mut diags = fmt_diagnostics
+                            .into_iter()
+                            .map(|d| Diagnostic::warning(d.location, d.message))
+                            .collect::<Vec<_>>();
+                        diags.push(Diagnostic::warning(
+                            "writer",
+                            format!("write failed: {err}"),
+                        ));
+                        diags
+                    },
                     preserved: false,
                 },
             },
             Err(err) => RoundtripReport {
-                diagnostics: vec![Diagnostic::warning(
-                    "parser",
-                    format!("parse failed: {err}"),
-                )],
+                diagnostics: {
+                    let mut diags = fmt_diagnostics
+                        .into_iter()
+                        .map(|d| Diagnostic::warning(d.location, d.message))
+                        .collect::<Vec<_>>();
+                    diags.push(Diagnostic::warning(
+                        "parser",
+                        format!("parse failed: {err}"),
+                    ));
+                    diags
+                },
                 preserved: false,
             },
         }
     }
+}
+
+/// Parse with diagnostic collection using the format crate's diagnostic type.
+fn parse_drawio_with_diagnostics(
+    xml: &str,
+    diagnostics: &mut Vec<FmtDiagnostic>,
+) -> diagram_format_drawio::FormatResult<diagram_format_drawio::RawDrawioDocument> {
+    DrawioParser::new().parse_str_with_diagnostics(xml, diagnostics)
 }
 
 /// Assert that a [`DiagramModel`] survives a parse→write round-trip.
@@ -62,7 +88,404 @@ impl RoundtripHarness {
 /// The default implementation compares structural counts only; richer
 /// diffing will be layered on top once the model stabilizes.
 pub fn assert_roundtrip(_model: &DiagramModel) {
-    // Bootstrap stub: structural-counts comparison is enough to lock the
-    // harness shape. Replace with a content-based assertion once the model
-    // exposes a canonical serialization.
+    // Bootstrap stub — replace with real assertion once model stabilizes.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use diagram_format_drawio::DrawioMapping;
+
+    // =============================================================================
+    // Task 22 — Strengthen simple-rect round-trip test
+    // =============================================================================
+
+    #[test]
+    fn roundtrip_simple_rect() {
+        let xml = include_str!("../fixtures/simple-rect.drawio");
+        let mut diagnostics = Vec::new();
+
+        // First parse
+        let first = parse_drawio_with_diagnostics(xml, &mut diagnostics)
+            .expect("simple-rect.drawio should parse");
+
+        assert_eq!(first.diagrams.len(), 1, "should have exactly 1 diagram");
+        let first_cells = first.diagrams[0].cells.len();
+        assert!(
+            first_cells >= 1,
+            "diagram should have at least 1 content cell"
+        );
+
+        // Write back
+        let written = write_drawio(&first).expect("write_drawio should succeed for valid document");
+
+        // Second parse
+        let second = parse_drawio_with_diagnostics(&written, &mut Vec::new())
+            .expect("written XML should parse");
+
+        assert_eq!(
+            first_cells,
+            second.diagrams[0].cells.len(),
+            "cell count must be preserved through round-trip"
+        );
+
+        // Task 22: Assert geometry is preserved — this fixes Phase 1 silent data loss
+        let first_cell = &first.diagrams[0].cells[0];
+        let second_cell = &second.diagrams[0].cells[0];
+        assert!(
+            first_cell.geometry.is_some(),
+            "first parse should capture geometry"
+        );
+        assert!(
+            second_cell.geometry.is_some(),
+            "second parse should preserve geometry through round-trip"
+        );
+        let geo = second_cell.geometry.as_ref().unwrap();
+        assert_eq!(geo.width, 80.0, "geometry width must be preserved as 80.0");
+        assert_eq!(
+            geo.height, 40.0,
+            "geometry height must be preserved as 40.0"
+        );
+    }
+
+    // =============================================================================
+    // Task 23 — Fixture-driven round-trip tests
+    // =============================================================================
+
+    #[test]
+    fn roundtrip_vertex_rect() {
+        let xml = include_str!("../fixtures/vertex-rect.drawio");
+
+        let first = parse_drawio_with_diagnostics(xml, &mut Vec::new())
+            .expect("vertex-rect.drawio should parse");
+        assert_eq!(first.diagrams.len(), 1);
+        let first_cells = &first.diagrams[0].cells;
+        assert!(!first_cells.is_empty(), "should have at least 1 cell");
+
+        // Assert label and style on first cell
+        let cell = &first_cells[0];
+        assert_eq!(
+            cell.value.as_deref(),
+            Some("MyVertex"),
+            "label should be preserved"
+        );
+        let style = cell.style.as_deref().unwrap_or("");
+        assert!(
+            style.contains("fillColor=#dae8fc"),
+            "style should contain fillColor=#dae8fc, got: {style}"
+        );
+
+        // Round-trip: write and reparse
+        let written = write_drawio(&first).expect("write_drawio should succeed");
+        let second = parse_drawio_with_diagnostics(&written, &mut Vec::new())
+            .expect("written XML should parse");
+
+        assert_eq!(first_cells.len(), second.diagrams[0].cells.len());
+        let reparsed = &second.diagrams[0].cells[0];
+        assert_eq!(reparsed.value.as_deref(), Some("MyVertex"));
+        let style2 = reparsed.style.as_deref().unwrap_or("");
+        assert!(
+            style2.contains("fillColor=#dae8fc"),
+            "style should be preserved through round-trip"
+        );
+    }
+
+    #[test]
+    fn roundtrip_edge_connect() {
+        let xml = include_str!("../fixtures/edge-connect.drawio");
+
+        let first = parse_drawio_with_diagnostics(xml, &mut Vec::new())
+            .expect("edge-connect.drawio should parse");
+
+        // Find the edge cell
+        let edge_cell = first.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .expect("should have an edge cell");
+        assert_eq!(edge_cell.source.as_deref(), Some("A"), "source should be A");
+        assert_eq!(edge_cell.target.as_deref(), Some("B"), "target should be B");
+        assert_eq!(
+            edge_cell.value.as_deref(),
+            Some("connects"),
+            "edge label should be preserved"
+        );
+
+        // Round-trip
+        let written = write_drawio(&first).expect("write_drawio should succeed");
+        let second = parse_drawio_with_diagnostics(&written, &mut Vec::new())
+            .expect("written XML should parse");
+
+        let reparsed_edge = second.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .expect("reparsed should still have an edge");
+        assert_eq!(reparsed_edge.source.as_deref(), Some("A"));
+        assert_eq!(reparsed_edge.target.as_deref(), Some("B"));
+        // Both vertices should remain
+        let vertices: Vec<_> = second.diagrams[0]
+            .cells
+            .iter()
+            .filter(|c| c.vertex && !c.edge)
+            .collect();
+        assert_eq!(vertices.len(), 2, "both vertex cells should be preserved");
+    }
+
+    #[test]
+    fn roundtrip_group_nested() {
+        let xml = include_str!("../fixtures/group-nested.drawio");
+
+        let first = parse_drawio_with_diagnostics(xml, &mut Vec::new())
+            .expect("group-nested.drawio should parse");
+
+        // Find child vertex with parent="g1"
+        let child = first.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "v1")
+            .expect("should have child vertex v1");
+        assert_eq!(
+            child.parent.as_deref(),
+            Some("g1"),
+            "child should have parent=g1"
+        );
+
+        // Group container should be present
+        let group = first.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "g1")
+            .expect("should have group container g1");
+        assert!(
+            !group.vertex && !group.edge,
+            "g1 should be a group container"
+        );
+
+        // Round-trip
+        let written = write_drawio(&first).expect("write_drawio should succeed");
+        let second = parse_drawio_with_diagnostics(&written, &mut Vec::new())
+            .expect("written XML should parse");
+
+        let reparsed_child = second.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "v1")
+            .expect("reparsed should still have v1");
+        assert_eq!(
+            reparsed_child.parent.as_deref(),
+            Some("g1"),
+            "parent reference should be preserved through round-trip"
+        );
+        assert!(
+            second.diagrams[0].cells.iter().any(|c| c.id == "g1"),
+            "group cell g1 should still be present"
+        );
+    }
+
+    #[test]
+    fn roundtrip_two_pages() {
+        let xml = include_str!("../fixtures/two-pages.drawio");
+
+        let first = parse_drawio_with_diagnostics(xml, &mut Vec::new())
+            .expect("two-pages.drawio should parse");
+
+        assert_eq!(first.diagrams.len(), 2, "should have exactly 2 diagrams");
+        let names: Vec<_> = first
+            .diagrams
+            .iter()
+            .filter_map(|d| d.name.as_deref())
+            .collect();
+        assert!(names.contains(&"Page-1"), "should have Page-1");
+        assert!(names.contains(&"Page-2"), "should have Page-2");
+
+        // Round-trip
+        let written = write_drawio(&first).expect("write_drawio should succeed");
+        let second = parse_drawio_with_diagnostics(&written, &mut Vec::new())
+            .expect("written XML should parse");
+
+        assert_eq!(
+            second.diagrams.len(),
+            2,
+            "round-trip should preserve diagram count"
+        );
+        let names2: Vec<_> = second
+            .diagrams
+            .iter()
+            .filter_map(|d| d.name.as_deref())
+            .collect();
+        assert!(names2.contains(&"Page-1"), "Page-1 should be preserved");
+        assert!(names2.contains(&"Page-2"), "Page-2 should be preserved");
+    }
+
+    // =============================================================================
+    // Task 24 — Domain-mapping integration tests
+    // =============================================================================
+
+    #[test]
+    fn map_vertex_rect_preserves_label_and_style() {
+        let xml = include_str!("../fixtures/vertex-rect.drawio");
+        let raw = parse_drawio(xml).expect("vertex-rect.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let mut model = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        assert_eq!(model.store.len_vertex(), 1, "should have exactly 1 vertex");
+
+        // Find the vertex and check label
+        let vertex = model
+            .store
+            .vertices_mut()
+            .next()
+            .expect("expected one vertex");
+        assert_eq!(
+            vertex.label.as_ref().map(|l| l.text.as_str()),
+            Some("MyVertex"),
+            "label should be MyVertex"
+        );
+
+        // Check style
+        assert!(vertex.style_id.is_some(), "style_id should be set");
+        if let Some(sid) = vertex.style_id {
+            let smap = model.store.style(sid).expect("style should exist");
+            assert_eq!(
+                smap.get("fillColor"),
+                Some(&diagram_core::style::StyleValue("#dae8fc".to_owned())),
+                "fillColor style should be preserved"
+            );
+        }
+    }
+
+    #[test]
+    fn map_edge_connect_resolves_endpoints() {
+        let xml = include_str!("../fixtures/edge-connect.drawio");
+        let raw = parse_drawio(xml).expect("edge-connect.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let mut model = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        assert_eq!(model.store.len_vertex(), 2, "should have 2 vertices");
+        assert_eq!(model.store.len_edge(), 1, "should have 1 edge");
+
+        // Verify edge has resolved source and target
+        let edge = model.store.edges_mut().next().expect("expected one edge");
+        // The edge's source and target are VertexIds — we verify they are not default
+        assert_ne!(
+            edge.source,
+            Default::default(),
+            "edge source should be resolved"
+        );
+        assert_ne!(
+            edge.target,
+            Default::default(),
+            "edge target should be resolved"
+        );
+        assert_ne!(
+            edge.source, edge.target,
+            "source and target should be different vertices"
+        );
+    }
+
+    #[test]
+    fn map_group_nested_links_parent() {
+        let xml = include_str!("../fixtures/group-nested.drawio");
+        let raw = parse_drawio(xml).expect("group-nested.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let mut model = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        assert_eq!(model.store.len_group(), 1, "should have 1 group");
+        assert_eq!(model.store.len_vertex(), 1, "should have 1 vertex");
+
+        // Get the vertex's parent GroupId (using a separate borrow block)
+        let group_id = {
+            let vertex = model
+                .store
+                .vertices_mut()
+                .next()
+                .expect("expected one vertex");
+            assert!(vertex.parent.is_some(), "vertex should have a parent group");
+            vertex.parent.unwrap()
+        };
+
+        // Verify the group exists and has the expected label
+        let group = model.store.group(group_id).expect("group should exist");
+        assert_eq!(
+            group.label.as_ref().map(|l| l.text.as_str()),
+            Some("Group Container"),
+            "group label should be 'Group Container'"
+        );
+
+        // Re-borrow vertex to verify its parent matches
+        let vertex = model
+            .store
+            .vertices_mut()
+            .next()
+            .expect("expected one vertex");
+        assert_eq!(
+            vertex.parent,
+            Some(group_id),
+            "vertex parent should be the group id"
+        );
+    }
+
+    #[test]
+    fn map_two_pages_partitions() {
+        let xml = include_str!("../fixtures/two-pages.drawio");
+        let raw = parse_drawio(xml).expect("two-pages.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let model = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        assert_eq!(model.page_count(), 2, "should have 2 pages");
+
+        // Collect page names
+        let names: Vec<_> = model
+            .store
+            .pages()
+            .map(|p| p.name.as_ref().map(|l| l.text.as_str()))
+            .collect();
+        assert!(names.contains(&Some("Page-1")), "should have Page-1");
+        assert!(names.contains(&Some("Page-2")), "should have Page-2");
+    }
+
+    #[test]
+    fn map_dangling_edge_emits_diagnostic() {
+        let xml = include_str!("../fixtures/dangling-edge.drawio");
+        let raw = parse_drawio(xml).expect("dangling-edge.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let mut diags = Vec::new();
+        let model = mapper
+            .to_domain_with_diagnostics(&raw, &mut diags)
+            .expect("to_domain_with_diagnostics should succeed");
+
+        assert_eq!(model.store.len_edge(), 0, "dangling edge should be dropped");
+        assert!(
+            !diags.is_empty(),
+            "at least one diagnostic should be emitted for dangling edge"
+        );
+        // Diagnostic should mention the dangling source
+        let has_ghost_ref = diags.iter().any(|d| d.message.contains("ghost"));
+        assert!(
+            has_ghost_ref,
+            "diagnostic should mention the dangling source 'ghost'"
+        );
+    }
+
+    // =============================================================================
+    // Legacy structural tests
+    // =============================================================================
+
+    #[test]
+    fn parse_drawio_rejects_empty_document() {
+        let result = parse_drawio("not xml at all");
+        assert!(result.is_err(), "input without mxfile root must return Err");
+    }
+
+    #[test]
+    fn parse_drawio_rejects_missing_mxgraphmodel() {
+        let result = parse_drawio(r#"<mxfile><diagram></diagram></mxfile>"#);
+        assert!(result.is_err(), "missing mxGraphModel must return Err");
+    }
 }

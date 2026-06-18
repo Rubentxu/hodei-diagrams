@@ -7,6 +7,28 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Geometry for a cell (vertex or group) in user-space coordinates.
+///
+/// The `relative` flag encodes the `as` attribute from draw.io XML:
+/// - `relative = false` when `as == "geometry"` (absolute positioning)
+/// - `relative = true` when `as` is missing or any other value
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CellGeometry {
+    /// Horizontal coordinate.
+    pub x: f64,
+    /// Vertical coordinate.
+    pub y: f64,
+    /// Width in user-space units.
+    pub width: f64,
+    /// Height in user-space units.
+    pub height: f64,
+    /// Whether the geometry is relative to the parent.
+    ///
+    /// `relative = true` when the raw `as` attribute is missing or ≠ `"geometry"`.
+    /// `relative = false` when `as == "geometry"`.
+    pub relative: bool,
+}
+
 /// A 2D point in the diagram's user-space coordinate system.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Point {

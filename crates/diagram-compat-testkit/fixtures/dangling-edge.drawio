@@ -1,0 +1,12 @@
+<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="valid" value="Valid Vertex" vertex="1">
+          <mxGeometry x="10" y="20" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="Dangling Edge" edge="1" source="ghost" target="valid"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
