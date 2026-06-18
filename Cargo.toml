@@ -20,7 +20,7 @@ repository = "https://github.com/hodei-diagrams/hodei-diagrams"
 # Diagram core foundations
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
-slotmap = "1.0"
+slotmap = { version = "1.0", features = ["serde"] }
 smallvec = "1"
 bitflags = "2"
 
