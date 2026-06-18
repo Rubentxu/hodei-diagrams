@@ -12,19 +12,26 @@
 
 #![deny(missing_docs)]
 
+pub mod edge;
 pub mod error;
 pub mod geometry;
+pub mod group;
 pub mod id;
 pub mod label;
 pub mod model;
 pub mod page;
 pub mod store;
 pub mod style;
+pub mod vertex;
 
+pub use edge::Edge;
 pub use error::CoreError;
+pub use geometry::CellGeometry;
+pub use group::Group;
 pub use id::{EdgeId, GroupId, PageId, StyleId, VertexId};
 pub use label::Label;
 pub use model::DiagramModel;
 pub use page::Page;
 pub use store::ModelStore;
 pub use style::{StyleMap, StyleValue};
+pub use vertex::Vertex;

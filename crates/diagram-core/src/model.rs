@@ -7,7 +7,6 @@
 
 use crate::page::Page;
 use crate::store::ModelStore;
-use crate::style::StyleMap;
 
 /// The semantic model of a diagram: pages plus shared style metadata.
 ///
@@ -19,8 +18,6 @@ use crate::style::StyleMap;
 pub struct DiagramModel {
     /// Storage for pages, vertices, edges, groups, and styles.
     pub store: ModelStore,
-    /// Style key→value metadata shared across the model.
-    pub styles: StyleMap,
 }
 
 impl DiagramModel {
