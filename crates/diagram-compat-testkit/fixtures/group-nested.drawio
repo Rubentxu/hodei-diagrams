@@ -1,0 +1,14 @@
+<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="g1" value="Group Container">
+          <mxGeometry x="10" y="10" width="300" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="v1" value="Child Vertex" vertex="1" parent="g1">
+          <mxGeometry x="20" y="20" width="100" height="60" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
