@@ -1,0 +1,919 @@
+//! The `Command` enum and its `apply`/`undo` operations.
+//!
+//! Each variant carries a payload that holds forward execution data plus
+//! inverse data slots populated by `apply` and consumed by `undo`.
+
+use diagram_core::DiagramModel;
+
+use crate::error::CommandResult;
+use crate::payload::{
+    AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
+    EditLabelPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
+    RemoveVertexPayload, RenamePagePayload,
+};
+
+/// A reversible mutation command for the diagram model.
+///
+/// The enum is `#[non_exhaustive]` so new variants can be added without
+/// breaking existing match arms in downstream code.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum Command {
+    /// Add a vertex to the diagram.
+    AddVertex(AddVertexPayload),
+    /// Remove a vertex from the diagram.
+    RemoveVertex(RemoveVertexPayload),
+    /// Move a vertex to a new position.
+    MoveVertex(MoveVertexPayload),
+    /// Edit a vertex's label.
+    EditVertexLabel(EditLabelPayload),
+    /// Add an edge between two vertices.
+    AddEdge(AddEdgePayload),
+    /// Remove an edge from the diagram.
+    RemoveEdge(RemoveEdgePayload),
+    /// Change a vertex's style.
+    ChangeStyle(ChangeStylePayload),
+    /// Add a group to the diagram.
+    AddGroup(AddGroupPayload),
+    /// Remove a group from the diagram.
+    RemoveGroup(RemoveGroupPayload),
+    /// Add a page to the diagram.
+    AddPage(AddPagePayload),
+    /// Remove a page and all its cells from the diagram.
+    RemovePage(RemovePagePayload),
+    /// Rename a page.
+    RenamePage(RenamePagePayload),
+}
+
+impl Command {
+    /// Apply this command to the model, returning `Ok(())` on success.
+    ///
+    /// On error the model state is unchanged (commands are idempotent for rollback).
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        match self {
+            Command::AddVertex(p) => p.apply(model),
+            Command::RemoveVertex(p) => p.apply(model),
+            Command::MoveVertex(p) => p.apply(model),
+            Command::EditVertexLabel(p) => p.apply(model),
+            Command::AddEdge(p) => p.apply(model),
+            Command::RemoveEdge(p) => p.apply(model),
+            Command::ChangeStyle(p) => p.apply(model),
+            Command::AddGroup(p) => p.apply(model),
+            Command::RemoveGroup(p) => p.apply(model),
+            Command::AddPage(p) => p.apply(model),
+            Command::RemovePage(p) => p.apply(model),
+            Command::RenamePage(p) => p.apply(model),
+        }
+    }
+
+    /// Undo this command, restoring the model to its previous state.
+    ///
+    /// Returns `Err(CommandError::NotApplied)` if the command has not been applied.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        match self {
+            Command::AddVertex(p) => p.undo(model),
+            Command::RemoveVertex(p) => p.undo(model),
+            Command::MoveVertex(p) => p.undo(model),
+            Command::EditVertexLabel(p) => p.undo(model),
+            Command::AddEdge(p) => p.undo(model),
+            Command::RemoveEdge(p) => p.undo(model),
+            Command::ChangeStyle(p) => p.undo(model),
+            Command::AddGroup(p) => p.undo(model),
+            Command::RemoveGroup(p) => p.undo(model),
+            Command::AddPage(p) => p.undo(model),
+            Command::RemovePage(p) => p.undo(model),
+            Command::RenamePage(p) => p.undo(model),
+        }
+    }
+}
+
+/// Result of applying a command.
+///
+/// Contains the original command (with inverse data populated) and
+/// a flag indicating whether a subsequent `undo` is meaningful.
+#[derive(Debug)]
+pub struct CompletedCommand {
+    /// The applied command with inverse data filled in.
+    pub command: Command,
+    /// Whether this command has a meaningful inverse to undo.
+    pub has_inverse: bool,
+}
+
+impl CompletedCommand {
+    /// Create a new completed command.
+    pub fn new(command: Command, has_inverse: bool) -> Self {
+        Self {
+            command,
+            has_inverse,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use diagram_core::geometry::CellGeometry;
+    use diagram_core::label::Label;
+    use diagram_core::page::Page;
+    use diagram_core::style::{StyleMap, StyleValue};
+    use diagram_core::{Edge, EdgeId, Group, PageId, Vertex, VertexId};
+
+    use super::*;
+
+    fn make_model_with_page() -> (DiagramModel, PageId) {
+        let mut model = DiagramModel::new();
+        let page = Page::new(PageId::default());
+        let pid = model.store.insert_page(page);
+        // Fix up the page's id field to match the slotmap key
+        if let Some(p) = model.store.page_mut(pid) {
+            p.id = pid;
+        }
+        (model, pid)
+    }
+
+    // ─── AddVertex ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_add_vertex_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v = Vertex {
+            geometry: Some(CellGeometry {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 50.0,
+                relative: false,
+            }),
+            label: Some(Label::new("Test")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddVertex(AddVertexPayload::new(v.clone()));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_vertex(), 1);
+        let stored = model.store.vertex(vid_from_model(&model, 0)).unwrap();
+        assert_eq!(stored.label.as_ref().unwrap().as_str(), "Test");
+    }
+
+    #[test]
+    fn undo_add_vertex_restores_structural_equivalence() {
+        let (mut model, pid) = make_model_with_page();
+        let v = Vertex {
+            geometry: Some(CellGeometry {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 50.0,
+                relative: false,
+            }),
+            label: Some(Label::new("Test")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddVertex(AddVertexPayload::new(v));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.len_vertex(), 1);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_vertex(), 0);
+    }
+
+    #[test]
+    fn redo_add_vertex_via_apply() {
+        let (mut model, pid) = make_model_with_page();
+        let v = Vertex {
+            label: Some(Label::new("Test")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddVertex(AddVertexPayload::new(v));
+        cmd.apply(&mut model).unwrap();
+        let id_after_first = vid_from_model(&model, 0);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_vertex(), 0);
+
+        cmd.apply(&mut model).unwrap();
+        let id_after_redo = vid_from_model(&model, 0);
+
+        // IDs differ because slotmap reissues keys after removal
+        assert_ne!(id_after_first, id_after_redo);
+        assert_eq!(model.store.len_vertex(), 1);
+    }
+
+    // ─── RemoveVertex ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_remove_vertex_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Test");
+        assert_eq!(model.store.len_vertex(), 1);
+
+        let mut cmd = Command::RemoveVertex(RemoveVertexPayload::new(vid));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_vertex(), 0);
+    }
+
+    #[test]
+    fn undo_remove_vertex_restores_structural_equivalence() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Test");
+        let orig_label = model.store.vertex(vid).unwrap().label.clone();
+
+        let mut cmd = Command::RemoveVertex(RemoveVertexPayload::new(vid));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.len_vertex(), 0);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_vertex(), 1);
+        // Label restored
+        let restored = model.store.vertex(vid_from_model(&model, 0)).unwrap();
+        assert_eq!(restored.label, orig_label);
+    }
+
+    #[test]
+    fn undo_remove_vertex_rewrites_edge_references() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _eid = model.store.insert_edge(edge);
+
+        // Remove v1 - should orphan the edge
+        let mut cmd = Command::RemoveVertex(RemoveVertexPayload::new(v1));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_vertex(), 1);
+        assert_eq!(model.store.len_edge(), 0); // edge was removed with vertex
+
+        // Undo - edge should be re-inserted with rewritten source
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_vertex(), 2);
+        assert_eq!(model.store.len_edge(), 1);
+
+        // The new vertex id should be used in the restored edge
+        let new_v1_id = vid_from_model(&model, 0);
+        let restored_edge = model.store.edge(eid_from_model(&model, 0)).unwrap();
+        assert_eq!(restored_edge.source, new_v1_id);
+        assert_eq!(restored_edge.target, v2);
+    }
+
+    // ─── MoveVertex ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_move_vertex_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Test");
+
+        let new_geom = CellGeometry {
+            x: 100.0,
+            y: 200.0,
+            width: 50.0,
+            height: 50.0,
+            relative: false,
+        };
+
+        let mut cmd = Command::MoveVertex(MoveVertexPayload::new(vid, new_geom));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(vid).unwrap();
+        assert_eq!(v.geometry.as_ref().unwrap().x, 100.0);
+        assert_eq!(v.geometry.as_ref().unwrap().y, 200.0);
+    }
+
+    #[test]
+    fn undo_move_vertex_restores_original_position() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Test");
+
+        // Capture original geometry BEFORE apply
+        let original_geom = model.store.vertex(vid).unwrap().geometry;
+
+        let new_geom = CellGeometry {
+            x: 100.0,
+            y: 200.0,
+            width: 50.0,
+            height: 50.0,
+            relative: false,
+        };
+
+        let mut cmd = Command::MoveVertex(MoveVertexPayload::new(vid, new_geom));
+        cmd.apply(&mut model).unwrap();
+
+        // Verify geometry changed
+        let after_apply = model.store.vertex(vid).unwrap().geometry;
+        assert_ne!(original_geom, after_apply);
+
+        cmd.undo(&mut model).unwrap();
+
+        // After undo, geometry should be restored to original
+        let after_undo = model.store.vertex(vid).unwrap().geometry;
+        assert_eq!(original_geom, after_undo);
+    }
+
+    // ─── EditVertexLabel ───────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_edit_vertex_label_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Original");
+
+        let mut cmd = Command::EditVertexLabel(EditLabelPayload::new(vid, Some(Label::new("New"))));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(vid).unwrap();
+        assert_eq!(v.label.as_ref().unwrap().as_str(), "New");
+    }
+
+    #[test]
+    fn undo_edit_vertex_label_restores_original() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Original");
+
+        let mut cmd = Command::EditVertexLabel(EditLabelPayload::new(vid, Some(Label::new("New"))));
+        cmd.apply(&mut model).unwrap();
+        cmd.undo(&mut model).unwrap();
+
+        let v = model.store.vertex(vid).unwrap();
+        assert_eq!(v.label.as_ref().unwrap().as_str(), "Original");
+    }
+
+    // ─── AddEdge ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_add_edge_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddEdge(AddEdgePayload::new(edge));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_edge(), 1);
+    }
+
+    #[test]
+    fn apply_add_edge_dangling_guard() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let bogus = VertexId::default();
+
+        let edge = Edge {
+            source: v1,
+            target: bogus,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddEdge(AddEdgePayload::new(edge));
+        let err = cmd.apply(&mut model).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::error::CommandError::DanglingEdge(_, _)
+        ));
+        assert_eq!(model.store.len_edge(), 0); // model unchanged
+    }
+
+    #[test]
+    fn undo_add_edge_removes_edge() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddEdge(AddEdgePayload::new(edge));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 1);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 0);
+    }
+
+    // ─── RemoveEdge ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_remove_edge_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+
+        let mut cmd = Command::RemoveEdge(RemoveEdgePayload::new(eid));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_edge(), 0);
+    }
+
+    #[test]
+    fn undo_remove_edge_restores_edge() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            label: Some(Label::new("MyEdge")),
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+        let orig_label = model.store.edge(eid).unwrap().label.clone();
+
+        let mut cmd = Command::RemoveEdge(RemoveEdgePayload::new(eid));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 0);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 1);
+        let restored = model.store.edge(eid_from_model(&model, 0)).unwrap();
+        assert_eq!(restored.label, orig_label);
+    }
+
+    // ─── ChangeStyle ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_change_style_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Test");
+
+        let mut style = StyleMap::new();
+        style.insert("fillColor", StyleValue::from("red"));
+
+        let mut cmd = Command::ChangeStyle(ChangeStylePayload::new(vid, style));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(vid).unwrap();
+        assert!(v.style_id.is_some());
+    }
+
+    #[test]
+    fn undo_change_style_restores_original() {
+        let (mut model, pid) = make_model_with_page();
+        let vid = insert_vertex(&mut model, pid, "Test");
+
+        // Capture original style BEFORE apply
+        let orig_style = model.store.vertex(vid).unwrap().style_id;
+
+        let mut style = StyleMap::new();
+        style.insert("fillColor", StyleValue::from("red"));
+
+        let mut cmd = Command::ChangeStyle(ChangeStylePayload::new(vid, style));
+        cmd.apply(&mut model).unwrap();
+
+        // After apply, style is set
+        let after_apply = model.store.vertex(vid).unwrap().style_id;
+        assert_ne!(orig_style, after_apply);
+
+        cmd.undo(&mut model).unwrap();
+
+        // After undo, style should be restored to original
+        let v = model.store.vertex(vid).unwrap();
+        assert_eq!(v.style_id, orig_style);
+    }
+
+    // ─── AddGroup / RemoveGroup ────────────────────────────────────────────────
+
+    #[test]
+    fn apply_add_group_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let g = Group {
+            label: Some(Label::new("Group")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddGroup(AddGroupPayload::new(g));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_group(), 1);
+    }
+
+    #[test]
+    fn undo_add_group_removes_group() {
+        let (mut model, pid) = make_model_with_page();
+        let g = Group {
+            label: Some(Label::new("Group")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddGroup(AddGroupPayload::new(g));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.len_group(), 1);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_group(), 0);
+    }
+
+    #[test]
+    fn apply_remove_group_orphans_children() {
+        let (mut model, pid) = make_model_with_page();
+        let gid = insert_group(&mut model, pid, "Group");
+        let vid = insert_vertex_with_parent(&mut model, pid, gid, "Child");
+
+        let mut cmd = Command::RemoveGroup(RemoveGroupPayload::new(gid));
+        cmd.apply(&mut model).unwrap();
+
+        // Group is gone
+        assert_eq!(model.store.len_group(), 0);
+        // Child vertex is still there but parent is now None
+        assert_eq!(model.store.len_vertex(), 1);
+        let child = model.store.vertex(vid).unwrap();
+        assert_eq!(child.parent, None);
+    }
+
+    #[test]
+    fn undo_remove_group_restores_parent_link() {
+        let (mut model, pid) = make_model_with_page();
+        let gid = insert_group(&mut model, pid, "Group");
+        let vid = insert_vertex_with_parent(&mut model, pid, gid, "Child");
+
+        let mut cmd = Command::RemoveGroup(RemoveGroupPayload::new(gid));
+        cmd.apply(&mut model).unwrap();
+        cmd.undo(&mut model).unwrap();
+
+        // Group is back with NEW id
+        assert_eq!(model.store.len_group(), 1);
+        let new_gid = gid_from_model(&model, 0);
+        let child = model.store.vertex(vid).unwrap();
+        assert_eq!(child.parent, Some(new_gid));
+    }
+
+    // ─── AddPage / RemovePage ──────────────────────────────────────────────────
+
+    #[test]
+    fn apply_add_page_succeeds() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(PageId::default());
+
+        let mut cmd = Command::AddPage(AddPagePayload::new(page));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.page_count(), 1);
+    }
+
+    #[test]
+    fn undo_add_page_removes_page() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(PageId::default());
+
+        let mut cmd = Command::AddPage(AddPagePayload::new(page));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.page_count(), 1);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.page_count(), 0);
+    }
+
+    #[test]
+    fn apply_remove_page_cascades() {
+        let (mut model, pid) = make_model_with_page();
+        insert_vertex(&mut model, pid, "V1");
+        insert_vertex(&mut model, pid, "V2");
+        insert_group(&mut model, pid, "Group");
+
+        let mut cmd = Command::RemovePage(RemovePagePayload::new(pid));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.page_count(), 0);
+        assert_eq!(model.store.len_vertex(), 0);
+        assert_eq!(model.store.len_group(), 0);
+    }
+
+    #[test]
+    fn undo_remove_page_restores_all_cells_with_new_ids() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let _gid = insert_group(&mut model, pid, "Group");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _eid = model.store.insert_edge(edge);
+
+        let mut cmd = Command::RemovePage(RemovePagePayload::new(pid));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.page_count(), 0);
+        assert_eq!(model.store.len_vertex(), 0);
+        assert_eq!(model.store.len_edge(), 0);
+        assert_eq!(model.store.len_group(), 0);
+
+        // Undo restores everything with new IDs
+        cmd.undo(&mut model).unwrap();
+
+        assert_eq!(model.store.page_count(), 1);
+        assert_eq!(model.store.len_vertex(), 2);
+        assert_eq!(model.store.len_edge(), 1);
+        assert_eq!(model.store.len_group(), 1);
+
+        // New page id
+        let new_pid = pid_from_model(&model, 0);
+
+        // All cells should be on the new page
+        for (_vid, v) in model.store.vertices_with_ids() {
+            assert_eq!(v.page_id, Some(new_pid));
+        }
+        for (_gid, g) in model.store.groups_with_ids() {
+            assert_eq!(g.page_id, Some(new_pid));
+        }
+
+        // Edge should reference the new vertex IDs (look up IDs AFTER undo)
+        let restored_edge = model.store.edge(eid_from_model(&model, 0)).unwrap();
+
+        // Verify the edge's source and target are valid vertices in the model
+        assert!(model.store.vertex(restored_edge.source).is_some());
+        assert!(model.store.vertex(restored_edge.target).is_some());
+
+        // Verify both vertices are on the new page
+        assert_eq!(
+            model.store.vertex(restored_edge.source).unwrap().page_id,
+            Some(new_pid)
+        );
+        assert_eq!(
+            model.store.vertex(restored_edge.target).unwrap().page_id,
+            Some(new_pid)
+        );
+
+        // Verify there are exactly 2 vertices and the edge connects them
+        assert_eq!(model.store.len_vertex(), 2);
+        let vertices: Vec<_> = model.store.vertices_with_ids().collect();
+        assert_eq!(vertices.len(), 2);
+        // Edge should reference the two vertices
+        let refs = [restored_edge.source, restored_edge.target];
+        for v_ref in refs {
+            assert!(vertices.iter().any(|(id, _)| *id == v_ref));
+        }
+    }
+
+    // ─── RenamePage ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_rename_page_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+
+        let mut cmd = Command::RenamePage(RenamePagePayload::new(pid, Label::new("New Name")));
+        cmd.apply(&mut model).unwrap();
+
+        let page = model.store.page(pid).unwrap();
+        assert_eq!(page.name.as_ref().unwrap().as_str(), "New Name");
+    }
+
+    #[test]
+    fn undo_rename_page_restores_original_name() {
+        let (mut model, pid) = make_model_with_page();
+
+        let mut cmd = Command::RenamePage(RenamePagePayload::new(pid, Label::new("New Name")));
+        cmd.apply(&mut model).unwrap();
+        cmd.undo(&mut model).unwrap();
+
+        let page = model.store.page(pid).unwrap();
+        assert!(page.name.is_none()); // Original had no name
+    }
+
+    // ─── Fuzz test (structural equivalence) ────────────────────────────────────
+
+    #[test]
+    fn fuzz_random_command_sequence_structural_equivalence() {
+        // Simple splitmix64 RNG
+        struct Rng {
+            state: u64,
+        }
+        impl Rng {
+            fn new(seed: u64) -> Self {
+                Self { state: seed }
+            }
+            fn next(&mut self) -> u64 {
+                self.state = self.state.wrapping_add(0x9e3779b97f4a7c15);
+                let mut z = self.state;
+                z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+                z ^ (z >> 31)
+            }
+            fn next_usize(&mut self, bound: usize) -> usize {
+                (self.next() as usize) % bound
+            }
+        }
+
+        let seeds = [
+            0x12345678ABCDEFu64,
+            0xDEADBEEF12345678u64,
+            0xCAFEBABE1991A91Fu64,
+        ];
+
+        for &seed in &seeds {
+            let mut rng = Rng::new(seed);
+
+            let (mut model, pid) = make_model_with_page();
+
+            // Build a shadow model with direct store access
+            let mut shadow_vid_counter = 0usize;
+
+            // We'll track that after undo chain, counts match
+            let initial_counts = (
+                model.store.page_count(),
+                model.store.len_vertex(),
+                model.store.len_edge(),
+                model.store.len_group(),
+            );
+
+            // Generate and apply some commands
+            let num_commands = 20;
+            let mut commands: Vec<Command> = Vec::with_capacity(num_commands);
+
+            for i in 0..num_commands {
+                let r = rng.next_usize(6);
+                match r {
+                    0 => {
+                        let v = Vertex {
+                            label: Some(Label::new(format!("V{}", shadow_vid_counter))),
+                            page_id: Some(pid),
+                            ..Default::default()
+                        };
+                        shadow_vid_counter += 1;
+                        commands.push(Command::AddVertex(AddVertexPayload::new(v)));
+                    }
+                    1 => {
+                        if model.store.len_vertex() > 0 {
+                            let vid =
+                                vid_from_model(&model, rng.next_usize(model.store.len_vertex()));
+                            commands.push(Command::RemoveVertex(RemoveVertexPayload::new(vid)));
+                        }
+                    }
+                    2 => {
+                        if model.store.len_vertex() > 0 {
+                            let vid =
+                                vid_from_model(&model, rng.next_usize(model.store.len_vertex()));
+                            let geom = CellGeometry {
+                                x: rng.next() as f64,
+                                y: rng.next() as f64,
+                                width: 100.0,
+                                height: 50.0,
+                                relative: false,
+                            };
+                            commands.push(Command::MoveVertex(MoveVertexPayload::new(vid, geom)));
+                        }
+                    }
+                    3 => {
+                        if model.store.len_vertex() > 0 {
+                            let vid =
+                                vid_from_model(&model, rng.next_usize(model.store.len_vertex()));
+                            commands.push(Command::EditVertexLabel(EditLabelPayload::new(
+                                vid,
+                                Some(Label::new(format!("Label{}", i))),
+                            )));
+                        }
+                    }
+                    4 => {
+                        if model.store.len_vertex() >= 2 {
+                            let v1 =
+                                vid_from_model(&model, rng.next_usize(model.store.len_vertex()));
+                            let v2 =
+                                vid_from_model(&model, rng.next_usize(model.store.len_vertex()));
+                            if v1 != v2 {
+                                let edge = Edge {
+                                    source: v1,
+                                    target: v2,
+                                    page_id: Some(pid),
+                                    ..Default::default()
+                                };
+                                commands.push(Command::AddEdge(AddEdgePayload::new(edge)));
+                            }
+                        }
+                    }
+                    5 if model.store.len_group() < 5 => {
+                        let g = Group {
+                            label: Some(Label::new(format!("G{}", i))),
+                            page_id: Some(pid),
+                            ..Default::default()
+                        };
+                        commands.push(Command::AddGroup(AddGroupPayload::new(g)));
+                    }
+                    _ => {}
+                }
+            }
+
+            // Apply all commands
+            for cmd in &mut commands {
+                let _ = cmd.apply(&mut model);
+            }
+
+            // Undo all commands in reverse
+            for cmd in commands.iter_mut().rev() {
+                let _ = cmd.undo(&mut model);
+            }
+
+            // Structural equivalence: counts should match initial
+            assert_eq!(
+                model.store.page_count(),
+                initial_counts.0,
+                "seed {:?}: page count mismatch",
+                seed
+            );
+            assert_eq!(
+                model.store.len_vertex(),
+                initial_counts.1,
+                "seed {:?}: vertex count mismatch",
+                seed
+            );
+            assert_eq!(
+                model.store.len_edge(),
+                initial_counts.2,
+                "seed {:?}: edge count mismatch",
+                seed
+            );
+            assert_eq!(
+                model.store.len_group(),
+                initial_counts.3,
+                "seed {:?}: group count mismatch",
+                seed
+            );
+        }
+    }
+
+    // ─── Helpers ───────────────────────────────────────────────────────────────
+
+    fn insert_vertex(model: &mut DiagramModel, pid: PageId, label: &str) -> VertexId {
+        let v = Vertex {
+            label: Some(Label::new(label)),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        model.store.insert_vertex(v)
+    }
+
+    fn insert_group(model: &mut DiagramModel, pid: PageId, label: &str) -> diagram_core::GroupId {
+        let g = Group {
+            label: Some(Label::new(label)),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        model.store.insert_group(g)
+    }
+
+    fn insert_vertex_with_parent(
+        model: &mut DiagramModel,
+        pid: PageId,
+        parent: diagram_core::GroupId,
+        label: &str,
+    ) -> VertexId {
+        let v = Vertex {
+            label: Some(Label::new(label)),
+            page_id: Some(pid),
+            parent: Some(parent),
+            ..Default::default()
+        };
+        model.store.insert_vertex(v)
+    }
+
+    fn vid_from_model(model: &DiagramModel, index: usize) -> VertexId {
+        model.store.vertices_with_ids().nth(index).unwrap().0
+    }
+
+    fn eid_from_model(model: &DiagramModel, index: usize) -> EdgeId {
+        model.store.edges_with_ids().nth(index).unwrap().0
+    }
+
+    fn gid_from_model(model: &DiagramModel, index: usize) -> diagram_core::GroupId {
+        model.store.groups_with_ids().nth(index).unwrap().0
+    }
+
+    fn pid_from_model(model: &DiagramModel, index: usize) -> PageId {
+        model.store.pages_with_ids().nth(index).unwrap().0
+    }
+}

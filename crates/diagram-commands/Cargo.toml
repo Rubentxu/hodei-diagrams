@@ -1,0 +1,10 @@
+[package]
+name = "diagram-commands"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+diagram-core = { path = "../diagram-core" }
+thiserror = { workspace = true }
