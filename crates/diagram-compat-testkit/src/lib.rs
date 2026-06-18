@@ -18,4 +18,4 @@ pub mod roundtrip;
 pub use corpus::{CorpusEntry, CorpusWalker};
 pub use diagnostics::Diagnostic;
 pub use golden::{GoldenFixture, GoldenStore};
-pub use roundtrip::{assert_roundtrip, RoundtripReport};
+pub use roundtrip::{RoundtripReport, assert_roundtrip};
