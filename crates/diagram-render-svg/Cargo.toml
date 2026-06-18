@@ -1,0 +1,15 @@
+[package]
+name = "diagram-render-svg"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+description = "SVG rendering backend for the Hodei diagram engine."
+
+[dependencies]
+diagram-scene = { path = "../diagram-scene" }
+
+[lints.rust]
+unsafe_code = "forbid"

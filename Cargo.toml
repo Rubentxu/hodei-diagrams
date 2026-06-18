@@ -6,6 +6,7 @@ members = [
     "crates/diagram-compat-testkit",
     "crates/diagram-commands",
     "crates/diagram-scene",
+    "crates/diagram-render-svg",
 ]
 
 [workspace.package]
