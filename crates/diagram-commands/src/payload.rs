@@ -7,6 +7,7 @@ use diagram_core::{
     CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, StyleId,
     StyleMap, Vertex, VertexId,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::error::{CommandError, CommandResult};
@@ -24,13 +25,15 @@ type RemovedPage = (
 );
 
 /// Payload for adding a vertex.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddVertexPayload {
     /// The vertex to insert.
     pub vertex: Vertex,
     /// The ID assigned by the store during `apply`. Used by `undo`.
+    #[serde(skip)]
     pub inserted_id: Option<VertexId>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -65,13 +68,15 @@ impl AddVertexPayload {
 }
 
 /// Payload for removing a vertex.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoveVertexPayload {
     /// The ID of the vertex to remove.
     pub id: VertexId,
     /// The removed vertex and any edges that referenced it. Populated by `apply`.
+    #[serde(skip)]
     pub removed: Option<(Vertex, Vec<(EdgeId, Edge)>)>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -143,15 +148,17 @@ impl RemoveVertexPayload {
 }
 
 /// Payload for moving a vertex.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoveVertexPayload {
     /// The ID of the vertex to move.
     pub id: VertexId,
     /// The new geometry.
     pub geometry: CellGeometry,
     /// The previous geometry. Populated by `apply`.
+    #[serde(skip)]
     pub prev_geometry: Option<CellGeometry>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -200,15 +207,17 @@ impl MoveVertexPayload {
 }
 
 /// Payload for editing a vertex's label.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditLabelPayload {
     /// The ID of the vertex whose label to edit.
     pub id: VertexId,
     /// The new label.
     pub label: Option<Label>,
     /// The previous label. Populated by `apply`.
+    #[serde(skip)]
     pub prev_label: Option<Label>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -257,13 +266,15 @@ impl EditLabelPayload {
 }
 
 /// Payload for adding an edge.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddEdgePayload {
     /// The edge to insert.
     pub edge: Edge,
     /// The ID assigned by the store during `apply`. Used by `undo`.
+    #[serde(skip)]
     pub inserted_id: Option<EdgeId>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -312,13 +323,15 @@ impl AddEdgePayload {
 }
 
 /// Payload for removing an edge.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoveEdgePayload {
     /// The ID of the edge to remove.
     pub id: EdgeId,
     /// The removed edge. Populated by `apply`.
+    #[serde(skip)]
     pub removed: Option<Edge>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -356,17 +369,20 @@ impl RemoveEdgePayload {
 }
 
 /// Payload for changing a vertex's style (v1: vertex-scoped only).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeStylePayload {
     /// The ID of the vertex whose style to change.
     pub id: VertexId,
     /// The new style map.
     pub style: StyleMap,
     /// The previous style ID. Populated by `apply`.
+    #[serde(skip)]
     pub prev_style_id: Option<StyleId>,
     /// The style ID assigned during apply (for cleanup on undo).
+    #[serde(skip)]
     pub inserted_style_id: Option<StyleId>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -428,13 +444,15 @@ impl ChangeStylePayload {
 }
 
 /// Payload for adding a group.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddGroupPayload {
     /// The group to insert.
     pub group: Group,
     /// The ID assigned by the store during `apply`. Used by `undo`.
+    #[serde(skip)]
     pub inserted_id: Option<GroupId>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -469,14 +487,16 @@ impl AddGroupPayload {
 }
 
 /// Payload for removing a group.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoveGroupPayload {
     /// The ID of the group to remove.
     pub id: GroupId,
     /// The removed group and its former children's previous parent assignments.
     /// Populated by `apply`.
+    #[serde(skip)]
     pub removed: Option<(Group, OrphanedChildren)>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -548,13 +568,15 @@ impl RemoveGroupPayload {
 }
 
 /// Payload for adding a page.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddPagePayload {
     /// The page to insert.
     pub page: Page,
     /// The ID assigned by the store during `apply`. Used by `undo`.
+    #[serde(skip)]
     pub inserted_id: Option<PageId>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -589,14 +611,16 @@ impl AddPagePayload {
 }
 
 /// Payload for removing a page (cascade: removes all cells on that page).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemovePagePayload {
     /// The ID of the page to remove.
     pub id: PageId,
     /// The removed page and all its cells. Populated by `apply`.
     #[allow(clippy::type_complexity)]
+    #[serde(skip)]
     pub removed: Option<RemovedPage>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 
@@ -693,15 +717,17 @@ impl RemovePagePayload {
 }
 
 /// Payload for renaming a page.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenamePagePayload {
     /// The ID of the page to rename.
     pub id: PageId,
     /// The new name.
     pub name: Label,
     /// The previous name. Populated by `apply`.
+    #[serde(skip)]
     pub prev_name: Option<Label>,
     /// Whether this command has been applied.
+    #[serde(skip)]
     applied: bool,
 }
 

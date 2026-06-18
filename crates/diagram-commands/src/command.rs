@@ -4,6 +4,7 @@
 //! inverse data slots populated by `apply` and consumed by `undo`.
 
 use diagram_core::DiagramModel;
+use serde::{Deserialize, Serialize};
 
 use crate::error::CommandResult;
 use crate::payload::{
@@ -16,7 +17,7 @@ use crate::payload::{
 ///
 /// The enum is `#[non_exhaustive]` so new variants can be added without
 /// breaking existing match arms in downstream code.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Command {
     /// Add a vertex to the diagram.

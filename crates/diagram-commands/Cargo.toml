@@ -8,3 +8,4 @@ repository.workspace = true
 [dependencies]
 diagram-core = { path = "../diagram-core" }
 thiserror = { workspace = true }
+serde = "1"
