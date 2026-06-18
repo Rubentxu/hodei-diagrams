@@ -211,6 +211,107 @@ Siguiente cambio SDDK
 
 ---
 
+## 4.5. Multi-Agent Orchestration Patterns
+
+El proyecto aplica 4 de los 5 patrones canónicos de orquestración multi-agente ([Rahul Sharma, 2026](https://levelup.gitconnected.com/your-multi-agent-system-works-in-a-demo-production-is-a-different-story-2f8ff6350664)):
+
+### Patrón 1: Orchestrator-Worker
+El `orchestrator` coordina el ciclo SDDK completo. Decide qué fase ejecutar, construye el launch plan, y delega a `sdd-kernel-*` workers. El orchestrator NUNCA ejecuta trabajo de fase inline — solo coordina.
+
+```
+orchestrator
+  ├── sdd-kernel-explore
+  ├── sdd-kernel-propose
+  ├── sdd-kernel-spec      ──┐
+  ├── sdd-kernel-design    ──┤ paralelo
+  ├── sdd-kernel-tasks
+  ├── sdd-kernel-apply
+  ├── sdd-kernel-verify
+  └── sdd-kernel-archive
+```
+
+### Patrón 2: Chaining (Sequential)
+Las fases SDDK se encadenan secuencialmente: `explore → propose → spec/design → tasks → apply → verify → archive`. Cada fase consume el output de la anterior. El launch plan del orchestrator inyecta el contexto acumulado.
+
+### Patrón 3: Parallelization (Fork-Join)
+`spec` y `design` se ejecutan en paralelo después de `propose`. Ambas consumen la propuesta pero producen artefactos independientes (spec de comportamiento, design técnico). `tasks` espera a ambas (`join`).
+
+### Patrón 4: Evaluator-Optimizer
+`verify` evalúa el output de `apply` contra specs, diseño, y lentes del kernel. Si encuentra desviaciones, dispara un ciclo de corrección (`apply → verify → apply`). `archive` solo procede con un verify report aprobatorio.
+
+### Patrón 5: Routing (deferido)
+No aplicado actualmente. Se usará cuando haya múltiples tipos de cambios (bugfix, feature, refactor) que requieran distintos pipelines de agentes.
+
+## 4.6. Workflow DAG (Human + AI readable)
+
+```mermaid
+graph TD
+    A[ROADMAP] -->|next milestone| B[sddk-explore]
+    B -->|explore-report| C[sddk-propose]
+    C -->|proposal| D[sddk-spec]
+    C -->|proposal| E[sddk-design]
+    D -->|spec| F[sddk-tasks]
+    E -->|design| F
+    F -->|tasks| G{git branch + push}
+    G -->|feat/*| H[sddk-apply]
+    H -->|commits| I[sddk-verify]
+    I -->|pass| J[sddk-archive]
+    I -->|fail| H
+    J -->|archive-report| K{git tag + release}
+    K -->|v0.X.0| A
+    
+    O[orchestrator] -.->|delega| B
+    O -.->|delega| C
+    O -.->|delega| D
+    O -.->|delega| E
+    O -.->|delega| F
+    O -.->|delega| H
+    O -.->|delega| I
+    O -.->|delega| J
+```
+
+**Legibilidad**: El DAG usa Mermaid (renderizable en GitHub, VS Code, y Markdown preview). Los agentes lo interpretan como un grafo de dependencias: `→` es dependencia secuencial, `→|label|` es output nombrado, `{ }` es decision point, `-.->` es relación de delegación.
+
+## 4.7. Agent Registry
+
+Registro canónico de agentes disponibles para delegación. El orchestrator consulta esta tabla para decidir qué agente lanzar en cada fase.
+
+| Agent ARN | Fase | Input | Output | Trigger |
+|-----------|------|-------|--------|---------|
+| `sdd-kernel-init` | init | workspace | init.md, testing capabilities | `/sddk-init` |
+| `sdd-kernel-explore` | explore | ROADMAP, codebase, ADRs | explore-report.md | `/sddk-explore`, `/sddk-new` |
+| `sdd-kernel-propose` | propose | explore-report | proposal.md | `/sddk-new`, `/sddk-ff` |
+| `sdd-kernel-spec` | spec | proposal | spec.md (Given/When/Then) | después de propose |
+| `sdd-kernel-design` | design | proposal, codebase | design.md (types, contracts) | después de propose |
+| `sdd-kernel-tasks` | tasks | spec + design | tasks.md (PRs, commits) | después de spec+design |
+| `sdd-kernel-apply` | apply | tasks.md | código commiteado | `/sddk-apply` |
+| `sdd-kernel-verify` | verify | specs, código, lentes | verify-report.md | después de apply |
+| `sdd-kernel-archive` | archive | verify-report | archive-report.md, ROADMAP update | después de verify |
+
+### Agentes Especializados (bajo demanda)
+
+| Agent / Skill | Trigger | Propósito |
+|---------------|---------|-----------|
+| `grill-with-docs` | Lenguaje ambiguo, conflictos con glosario | Cerrar terminología, actualizar CONTEXT.md y ADRs |
+| `improve-codebase-architecture` | Post-implementación, señales de deuda | Refactor, desacoplar, mejorar testabilidad |
+| `auto-grill-loop` | Propuesta/plan/diseño necesita validación adversarial | Múltiples pasadas de análisis y veredicto |
+| `design-an-interface` | Diseño de API nueva, shape de módulo | Explorar opciones de interfaz |
+| `chained-pr` | PR > 400 LOC, cambios encadenados | Partir en PRs reviewables |
+| `judgment-day` | Revisión dual a ciegas antes de merge | Code review adversarial |
+| `test-pyramid` | Diseñar estrategia de tests, auditoría | Cobertura, integración, E2E |
+| `entropy-sdd` | Análisis de connascence, SOLID | Calidad de diseño (obligatorio en todas las fases) |
+| `cognicode-sdd` | Análisis de impacto, safe refactoring | Validación de arquitectura |
+| `chronos-sdd` | Runtime bugs, data races, memoria | Tracing de ejecución |
+
+### Reglas del Registry
+
+1. El orchestrator resuelve el agente por ARN (`agents-workflows_agent_get`).
+2. Si un agente no está en el registry, requiere ADR para agregarlo.
+3. Los skills listados aquí son los recomendados por contexto (§7). El skill-registry (`skill-registry`) mantiene la lista completa de skills instaladas.
+4. Nuevos agentes se registran en `docs/agents/REGISTRY.md` y se referencian desde aquí.
+
+---
+
 ## 5. SDDK — SDD Kernel Workflow
 
 El proyecto usa **SDD Kernel** para planificar, ejecutar y documentar cambios.
