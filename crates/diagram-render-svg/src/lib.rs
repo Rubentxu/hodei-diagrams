@@ -10,7 +10,11 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
+pub mod element;
 pub mod error;
 pub mod escape;
+pub mod renderer;
+pub mod style;
 
 pub use error::RenderError;
+pub use renderer::SvgRenderer;
