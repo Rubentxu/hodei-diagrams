@@ -7,7 +7,7 @@
 //! ADR-0023 (engine-owned stable IDs).
 
 use crate::geometry::CellGeometry;
-use crate::id::{GroupId, StyleId};
+use crate::id::{GroupId, PageId, StyleId};
 use crate::label::Label;
 use serde::{Deserialize, Serialize};
 
@@ -25,4 +25,6 @@ pub struct Vertex {
     pub style_id: Option<StyleId>,
     /// The parent group this vertex belongs to, if any.
     pub parent: Option<GroupId>,
+    /// The page this vertex belongs to, if any.
+    pub page_id: Option<PageId>,
 }

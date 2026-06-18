@@ -5,7 +5,7 @@
 //! matching draw.io's `parent` semantics.
 
 use crate::geometry::CellGeometry;
-use crate::id::StyleId;
+use crate::id::{PageId, StyleId};
 use crate::label::Label;
 use serde::{Deserialize, Serialize};
 
@@ -22,4 +22,6 @@ pub struct Group {
     pub label: Option<Label>,
     /// The style ID referencing shared style metadata.
     pub style_id: Option<StyleId>,
+    /// The page this group belongs to, if any.
+    pub page_id: Option<PageId>,
 }
