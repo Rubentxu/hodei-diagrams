@@ -8,9 +8,10 @@
 use crate::geometry::Size;
 use crate::id::PageId;
 use crate::label::Label;
+use serde::{Deserialize, Serialize};
 
 /// A page inside a diagram model.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Page {
     /// Engine-owned identifier for this page.
     pub id: PageId,

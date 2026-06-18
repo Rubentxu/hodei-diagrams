@@ -1,0 +1,37 @@
+# diagram-wasm — Thin WASM boundary adapter for the Hodei diagram engine
+
+[package]
+name = "diagram-wasm"
+version = "0.4.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+description = "Thin WASM boundary adapter for the Hodei diagram engine"
+
+[dependencies]
+# Engine crates
+diagram-core = { path = "../diagram-core" }
+diagram-commands = { path = "../diagram-commands" }
+diagram-scene = { path = "../diagram-scene" }
+diagram-render-svg = { path = "../diagram-render-svg" }
+diagram-format-drawio = { path = "../diagram-format-drawio" }
+
+# Bridge
+wasm-bindgen = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+slab = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = "0.12"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[features]
+default = []
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
