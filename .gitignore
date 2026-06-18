@@ -60,3 +60,4 @@ docs/
 
 # sccache (dev-only, not for release)
 # (sccache data lives in ~/.cache/sccache by default — keep that way)
+sddk/
