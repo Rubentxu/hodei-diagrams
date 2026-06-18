@@ -11,5 +11,8 @@ description = "SVG rendering backend for the Hodei diagram engine."
 [dependencies]
 diagram-scene = { path = "../diagram-scene" }
 
+[dev-dependencies]
+diagram-core = { path = "../diagram-core" }
+
 [lints.rust]
 unsafe_code = "forbid"

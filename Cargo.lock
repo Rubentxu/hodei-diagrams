@@ -127,6 +127,7 @@ dependencies = [
 name = "diagram-render-svg"
 version = "0.3.0"
 dependencies = [
+ "diagram-core",
  "diagram-scene",
 ]
 
