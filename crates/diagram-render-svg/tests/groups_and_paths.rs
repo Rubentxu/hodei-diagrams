@@ -3,9 +3,7 @@
 use diagram_core::geometry::{Point, Rect, Size};
 use diagram_core::{EdgeId, GroupId, VertexId};
 use diagram_scene::ResolvedStyle;
-use diagram_scene::{
-    GroupElement, LineElement, PathElement, RectElement, VisualElement,
-};
+use diagram_scene::{GroupElement, LineElement, PathElement, RectElement, VisualElement};
 
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::{PageId, PageScene, Scene};
