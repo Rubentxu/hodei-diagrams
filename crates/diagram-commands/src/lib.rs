@@ -11,5 +11,7 @@ pub mod history;
 pub mod payload;
 
 pub use command::{Command, CompletedCommand};
+pub use editor::{Editor, Transaction};
 pub use error::{CommandError, CommandResult};
+pub use history::History;
 pub use payload::*;
