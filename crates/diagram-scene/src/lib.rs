@@ -33,7 +33,10 @@ pub mod resolver;
 pub mod scene;
 
 pub use builder::SceneBuilder;
-pub use element::VisualElement;
+pub use element::{
+    DEFAULT_ROUNDED_RADIUS, EllipseElement, EntityId, GroupElement, LineElement, PathElement,
+    RectElement, RoundedRectElement, TextElement, VisualElement,
+};
 pub use error::{SceneError, SceneResult};
 pub use resolver::{ResolvedStyle, ShapeKind, StyleResolver};
 pub use scene::{PageScene, Scene};
