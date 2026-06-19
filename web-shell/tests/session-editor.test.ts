@@ -10,6 +10,7 @@ function createMockWasm() {
     render_svg: vi.fn(),
     render_pages: vi.fn(),
     import_drawio: vi.fn(),
+    export_drawio: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     engine_can_undo: vi.fn(),

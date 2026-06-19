@@ -1,4 +1,4 @@
-//! Drawio import: parse and replace engine model.
+//! Drawio import: parse, replace engine model, and retain IdMap for export.
 
 use crate::engine::with_editor_mut;
 use diagram_format_drawio::DrawioMapping;
@@ -29,12 +29,12 @@ pub fn import_drawio(handle: u32, xml: &str) -> Result<(), JsValue> {
         })?;
 
         // Map to domain model
-        let (model, _id_map) = DrawioMapping::new().to_domain(&raw).map_err(|e| {
+        let (model, id_map) = DrawioMapping::new().to_domain(&raw).map_err(|e| {
             Box::leak(format!("ImportFailed: mapping: {e:?}").into_boxed_str()) as &str
         })?;
 
-        // Replace model atomically
-        e.replace_model(model);
+        // Replace model atomically, storing the IdMap for later export
+        e.replace_model(model, Some(id_map));
         Ok(())
     })
     .and_then(|r| r)

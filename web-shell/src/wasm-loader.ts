@@ -9,7 +9,7 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
 
     const mod = await import('./wasm/diagram_wasm.js');
     // wasm-pack --target web: default export is the async init() function
-    // Named exports are the 11 WASM functions
+    // Named exports are the 12 WASM functions
     await mod.default();
 
     const wasm: WasmModule = {
@@ -20,6 +20,7 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       render_svg: mod.render_svg,
       render_pages: mod.render_pages,
       import_drawio: mod.import_drawio,
+      export_drawio: mod.export_drawio,
       undo: mod.undo,
       redo: mod.redo,
       engine_can_undo: mod.engine_can_undo,
