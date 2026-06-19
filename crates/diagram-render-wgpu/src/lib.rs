@@ -11,6 +11,8 @@
 //! - `#![deny(unsafe_code)]` except the documented `bytemuck` carve-out in
 //!   `buffers.rs` (ADR-0046)
 
+pub mod context;
 pub mod error;
 
+pub use context::WgpuContext;
 pub use error::WgpuError;
