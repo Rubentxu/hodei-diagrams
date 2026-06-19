@@ -19,6 +19,13 @@ export function buildNavbar(): NavbarControls {
   container.className = 'navbar';
   container.setAttribute('data-testid', 'navbar');
 
+  // ─── Brand ───────────────────────────────────────────────────────────────
+  const brand = document.createElement('span');
+  brand.className = 'navbar-brand';
+  brand.textContent = 'Hodei';
+  brand.setAttribute('data-testid', 'navbar-brand');
+  container.appendChild(brand);
+
   // ─── Menu bar ────────────────────────────────────────────────────────────
   const menuBar = document.createElement('div');
   menuBar.className = 'menu-bar';

@@ -72,7 +72,24 @@ async function bootstrap(): Promise<void> {
   const inspector = buildInspector(activeSession);
 
   // ─── 4. Build 5-zone UI with inspector ────────────────────────────────────
-  const ui = buildEmptyUi(root, inspector.container);
+  const ui = buildEmptyUi(root, inspector.container, {
+    onSelectTool: () => {
+      activeEditor?.setActiveTool(null);
+      ui.rectToolButton.classList.remove('active-tool');
+      ui.ellipseToolButton.classList.remove('active-tool');
+    },
+    onShapesTool: () => {
+      // Shapes tool activates the rectangle by default
+      if (activeEditor) {
+        activeEditor.setActiveTool('rectangle');
+        ui.rectToolButton.classList.add('active-tool');
+        ui.ellipseToolButton.classList.remove('active-tool');
+      }
+    },
+    onConnectorTool: () => {
+      // Connector tool not yet implemented
+    },
+  });
 
   // ─── 5. Zoom/Pan on canvas container ──────────────────────────────────────
   const zoomPan = setupZoomPan(ui.canvasContainer, ui.viewer);

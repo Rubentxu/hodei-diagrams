@@ -8,8 +8,12 @@
 import type { PageRender } from './types.js';
 import { buildNavbar } from './navbar.js';
 import { buildSidebar } from './sidebar.js';
+import { buildRail, type RailCallbacks } from './rail.js';
 
 export interface UiElements {
+  // Zone 0: Rail
+  railContainer: HTMLElement;
+
   // Zone 1: Navbar
   fileInput: HTMLInputElement;
   undoButton: HTMLButtonElement;
@@ -43,15 +47,25 @@ export interface UiElements {
 }
 
 /**
- * Build the empty 5-zone UI layout.
+ * Build the empty 5-zone UI layout (with rail).
  * Returns references to all zones and critical elements for wiring.
  */
 export function buildEmptyUi(
   root: HTMLElement,
   inspectorContainer?: HTMLElement,
+  railCallbacks?: RailCallbacks,
 ): UiElements {
   root.innerHTML = '';
   root.setAttribute('data-testid', 'app-grid');
+
+  // ─── Zone 0: Rail ────────────────────────────────────────────────────────
+  const rail = railCallbacks
+    ? buildRail(railCallbacks)
+    : buildRail({
+        onSelectTool: () => {},
+        onShapesTool: () => {},
+        onConnectorTool: () => {},
+      });
 
   // ─── Zone 1: Navbar ──────────────────────────────────────────────────────
   const navbar = buildNavbar();
@@ -117,6 +131,7 @@ export function buildEmptyUi(
   bottomBar.appendChild(errorBanner);
 
   // ─── Assemble into grid ──────────────────────────────────────────────────
+  root.appendChild(rail.container);
   root.appendChild(navbar.container);
   root.appendChild(sidebar.container);
   root.appendChild(canvasContainer);
@@ -149,6 +164,9 @@ export function buildEmptyUi(
   }
 
   return {
+    // Zone 0
+    railContainer: rail.container,
+
     // Zone 1
     fileInput: navbar.fileInput,
     undoButton: navbar.undoBtn,

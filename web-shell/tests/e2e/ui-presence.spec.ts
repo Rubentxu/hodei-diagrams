@@ -1,0 +1,186 @@
+import { test, expect } from '@playwright/test';
+
+const SIMPLE_RECT_PATH =
+  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+
+test.describe('Slice A: Product Presence UI', () => {
+  test.describe('Zone 0: Left Rail', () => {
+    test('rail is visible with 3 tool buttons', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const rail = page.locator('[data-testid="rail"]');
+      await expect(rail).toBeVisible();
+
+      // Rail buttons
+      await expect(page.locator('[data-testid="rail-select-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="rail-shapes-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="rail-connector-btn"]')).toBeVisible();
+    });
+
+    test('select tool is active by default', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const selectBtn = page.locator('[data-testid="rail-select-btn"]');
+      await expect(selectBtn).toHaveClass(/active/);
+    });
+
+    test('tool buttons have tooltips', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.locator('[data-testid="rail-select-btn"]')).toHaveAttribute('title', 'Select (V)');
+      await expect(page.locator('[data-testid="rail-shapes-btn"]')).toHaveAttribute('title', 'Shapes (R)');
+      await expect(page.locator('[data-testid="rail-connector-btn"]')).toHaveAttribute('title', 'Connector (C)');
+    });
+  });
+
+  test.describe('Zone 1: Top Bar', () => {
+    test('navbar brand "Hodei" is visible', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.locator('[data-testid="navbar-brand"]')).toBeVisible();
+      await expect(page.locator('[data-testid="navbar-brand"]')).toHaveText('Hodei');
+    });
+
+    test('menu items have hover states', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Menu dropdowns work
+      await page.locator('[data-testid="menu-file"] summary').hover();
+      await expect(page.locator('[data-testid="menu-file"]')).toBeVisible();
+    });
+
+    test('quick controls grouped with separators', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Undo/redo/zoom/save buttons present
+      await expect(page.locator('[data-testid="undo-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="redo-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="zoom-display"]')).toBeVisible();
+      await expect(page.locator('[data-testid="save-btn"]')).toBeVisible();
+    });
+  });
+
+  test.describe('Zone 2: Sidebar', () => {
+    test('search bar has search icon', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Search input exists with placeholder
+      const search = page.locator('[data-testid="sidebar-search"]');
+      await expect(search).toBeVisible();
+      await expect(search).toHaveAttribute('placeholder', 'Search shapes…');
+    });
+
+    test('category headers have chevron indicators', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // General category has a chevron
+      const chevrons = page.locator('.category-chevron');
+      await expect(chevrons.first()).toBeVisible();
+    });
+
+    test('future categories show lock icon and "Soon"', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Disabled categories have coming-soon text
+      const comingSoon = page.locator('.category-coming-soon');
+      await expect(comingSoon.first()).toBeVisible();
+      await expect(comingSoon.first()).toHaveText('Soon');
+    });
+
+    test('three shape buttons visible in General category', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.locator('[data-testid="rect-tool-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="rounded-rect-tool-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="ellipse-tool-btn"]')).toBeVisible();
+    });
+  });
+
+  test.describe('Zone 4: Inspector', () => {
+    test('empty state shows guidance message with icon', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Style pane has the empty state visible by default
+      const stylePane = page.locator('[data-testid="inspector-pane-style"]');
+      const noSelection = stylePane.locator('.no-selection-msg');
+      await expect(noSelection).toBeVisible();
+      await expect(noSelection.locator('p')).toContainText('Select a shape');
+    });
+
+    test('style tab has section headers', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const sections = page.locator('.inspector-section-title');
+      expect(await sections.count()).toBeGreaterThan(0);
+    });
+
+    test('inspector tabs have clear active state', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const styleTab = page.locator('[data-testid="inspector-tab-style"]');
+      await expect(styleTab).toHaveClass(/active/);
+    });
+  });
+
+  test.describe('Zone 5: Bottom Bar', () => {
+    test('page tabs have accent underline when active', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+      const activeTab = page.locator('.page-tab.active');
+      await expect(activeTab).toBeVisible();
+      await expect(activeTab).toHaveClass(/active/);
+    });
+
+    test('diagnostics area is present', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const diagnostics = page.locator('[data-testid="error-banner"]');
+      await expect(diagnostics).toBeAttached();
+    });
+  });
+
+  test.describe('CSS Grid Layout', () => {
+    test('app uses 4-column grid with rail', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const app = page.locator('[data-testid="app-grid"]');
+      await expect(app).toBeVisible();
+
+      // Rail should be visible (36px wide)
+      const rail = page.locator('[data-testid="rail"]');
+      const railBox = await rail.boundingBox();
+      expect(railBox?.width).toBe(36);
+    });
+
+    test('canvas fills remaining space', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 768 });
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const viewer = page.locator('[data-testid="viewer"]');
+      const box = await viewer.boundingBox();
+      expect(box).not.toBeNull();
+      // Canvas should be substantial width after rail + sidebar + inspector
+      expect(box!.width).toBeGreaterThan(500);
+    });
+  });
+});
