@@ -1,4 +1,11 @@
-import type { EngineHandle, PageToken, Result, PageRender, EngineError } from './types.js';
+import type {
+  EngineHandle,
+  PageToken,
+  Result,
+  PageRender,
+  EngineError,
+  ScenePage,
+} from './types.js';
 import { ok, err } from './types.js';
 import type { WasmModule } from './types.js';
 
@@ -102,6 +109,99 @@ export class DiagramEngineSession {
   getLastError(): EngineError | null {
     // v1: WASM bridge does not expose a persistent error queue
     return null;
+  }
+
+  // ─── Editor Methods ───────────────────────────────────────────────────────
+
+  /** Execute a command on the engine. */
+  executeCommand(cmdJson: string): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.execute_command(this.handle as number, cmdJson);
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** Undo the last command. */
+  undo(): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.undo(this.handle as number);
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** Redo the last undone command. */
+  redo(): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.redo(this.handle as number);
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** Check if undo is available. */
+  canUndo(): boolean {
+    if (this.disposed) return false;
+    try {
+      return this.wasm.engine_can_undo(this.handle as number);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Check if redo is available. */
+  canRedo(): boolean {
+    if (this.disposed) return false;
+    try {
+      return this.wasm.engine_can_redo(this.handle as number);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Get the full scene snapshot as typed pages. */
+  getScene(): Result<ScenePage[], EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const raw = this.wasm.get_scene(this.handle as number);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return err('SceneParse: ' + (e instanceof Error ? e.message : String(e)));
+      }
+      const obj = parsed as Record<string, unknown>;
+      const pages = obj['pages'];
+      if (!Array.isArray(pages)) {
+        return err('SceneParse: pages is not an array');
+      }
+      return ok(pages as ScenePage[]);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** Render a single page by flat index. Returns SVG string. */
+  renderPage(pageIdx: number): Result<string, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const svg = this.wasm.render_svg(this.handle as number, BigInt(pageIdx));
+      return ok(svg);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
   }
 
   categorizeError(msg: string): {
