@@ -275,6 +275,7 @@ impl DrawioMapping {
                                     style_id,
                                     source,
                                     target,
+                                    waypoints: Vec::new(),
                                     page_id,
                                 };
                                 model.store.replace_edge(eid, edge);

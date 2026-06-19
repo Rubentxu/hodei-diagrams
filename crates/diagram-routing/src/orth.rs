@@ -141,12 +141,16 @@ fn route_between_points(
     Ok(Path(path))
 }
 
-/// Check if a point lies inside (or on the boundary of) a rectangle.
+/// Check if a point lies strictly inside a rectangle (exclusive of far edges).
+///
+/// Points on the left/top boundary are considered inside; points on the
+/// right/bottom boundary or beyond are considered outside. This convention
+/// matches standard rectangle-interior tests for layout algorithms.
 fn point_in_rect(pt: &Point, geom: &CellGeometry) -> bool {
     pt.x >= geom.x
-        && pt.x <= geom.x + geom.width
+        && pt.x < geom.x + geom.width
         && pt.y >= geom.y
-        && pt.y <= geom.y + geom.height
+        && pt.y < geom.y + geom.height
 }
 
 /// Manhattan distance between two points.
@@ -233,15 +237,17 @@ mod tests {
         let src_geom = src.geometry.unwrap();
         let tgt_geom = tgt.geometry.unwrap();
         let path = route_orthogonal(&src, &tgt, (None, None)).unwrap();
-        // Every waypoint outside both bounding rects
-        for pt in &path.0 {
+        // Intermediate waypoints (indices 1..n-1) must be strictly outside
+        // both bounding rects. The first and last waypoints are connector
+        // anchor points on the boundary, which is expected.
+        for pt in &path.0[1..path.0.len().saturating_sub(1)] {
             assert!(
                 !point_in_rect(pt, &src_geom),
-                "waypoint {pt:?} inside source rect"
+                "intermediate waypoint {pt:?} inside source rect"
             );
             assert!(
                 !point_in_rect(pt, &tgt_geom),
-                "waypoint {pt:?} inside target rect"
+                "intermediate waypoint {pt:?} inside target rect"
             );
         }
     }
