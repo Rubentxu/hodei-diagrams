@@ -5,7 +5,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.8.0 — Motor completo (11 crates) + web-shell viewer/editor.** 347 tests Rust + 83 tests Vitest + 21 tests Playwright E2E. 48 ADRs (0001-0048). 25 PRs mergeados. `DESIGN.md` establece la visión de producto.
+**v0.9.0 — Motor completo (11 crates) + 5-zone UI v1.** 347 tests Rust + 83 tests Vitest + 30 tests Playwright E2E. 49 ADRs (0001-0049). 26 PRs mergeados. `DESIGN.md` establece la visión de producto; ADR-0049 captura el gap visual/funcional hacia ese target.
 
 | Crate | Capa | Status |
 |-------|------|--------|
@@ -19,16 +19,16 @@ Para rationale de decisiones, ver `docs/adr/`.
 | `diagram-wasm` | WASM Bridge | ✅ |
 | `diagram-routing` | Routing | ✅ |
 | `diagram-layout` | Layout | ✅ |
-| `web-shell/` | UI (TypeScript) | ✅ viewer + editor básico |
+| `web-shell/` | UI (TypeScript) | ✅ 5-zone layout v1 |
 
 ---
 
-## 🎯 Active Track: UI v1 — 5-Zone Application Layout
+## 🎯 Active Track: UI Evolution — From v0.9.0 to DESIGN.md Target
 
 > **ADR-0047**: Web Shell UI v1 Architecture
 > **DESIGN.md**: Layout philosophy, design system, visual personality
 
-### Fase 1: web-shell-ui-layout (ahora)
+### Fase 0: web-shell-ui-layout (completada)
 
 **5 zonas tipo draw.io con motor real atrás. Nada fake.**
 
@@ -40,10 +40,25 @@ Para rationale de decisiones, ver `docs/adr/`.
 | Right Inspector | Style tab (6 controles) + Text tab (5 controles). Arrange gris. | `ChangeStyle` via `execute_command` |
 | Bottom | Page tabs (draw.io-style) + Diagnostics toast | `parse_drawio_with_diagnostics` |
 
-- [ ] `feat/web-shell-ui-layout` — 5-zone skeleton + NavBar + Canvas zoom/pan + page tabs
-- [ ] `feat/web-shell-ui-sidebar` — Left Sidebar con categorías + shape grid + drag-to-canvas
-- [ ] `feat/web-shell-ui-inspector` — Right Inspector Style + Text tabs → `ChangeStyle`
-- [ ] `feat/web-shell-ui-polish` — Design system (DESIGN.md colors/spacing/typography/motion), E2E tests, ADR-0047 final
+- [x] `feat/web-shell-ui-layout` — 5-zone skeleton + NavBar + Canvas zoom/pan + page tabs ✅ (PR #26, v0.9.0)
+- [x] `feat/web-shell-ui-sidebar` — Left Sidebar con categorías + shape grid + drag-to-canvas ✅ (PR #26)
+- [x] `feat/web-shell-ui-inspector` — Right Inspector Style + Text tabs → `ChangeStyle` ✅ (PR #26)
+- [x] `feat/web-shell-ui-polish` — Design system base + 30 E2E tests + ADR-0047 final ✅ (PR #26)
+
+### Fase 1: Slice A — Product Presence
+
+> **ADR-0049**: UI Gap Alignment Against DESIGN.md and draw.io Reference
+> **docs/ui/ui-gap-slice-plan.md**: execution slices
+
+- [ ] `feat/web-shell-ui-presence` — stronger top bar grouping, left rail, richer sidebar hierarchy, meaningful empty states, intentional bottom area
+
+### Fase 2: Slice B — Professional Density
+
+- [ ] `feat/web-shell-ui-density` — grid toggle, status strip/HUD, compact inspector forms, stronger typography/spacing rhythm
+
+### Fase 3: Slice C — Platform Surface
+
+- [ ] `feat/web-shell-ui-platform-surface` — version history, properties dialog, presentation mode, richer stencils/export surfaces
 
 ### Fase 2: UI v1.1 — Shapes + Interactividad
 
@@ -120,6 +135,7 @@ Ubicación de upstream: `/var/home/rubentxu/Proyectos/rust/_upstream/mxgraph/` (
 | 0046 | WebGPU Renderer Architecture | Engine |
 | 0047 | **Web Shell UI v1 — 5-Zone Application Layout** 🆕 | UI |
 | 0048 | **Deferred Innovations (History, Properties, Presentation)** 🆕 | v2 |
+| 0049 | **UI Gap Alignment + Slice Plan** 🆕 | UI |
 
 ## Reglas de Actualización
 
