@@ -32,9 +32,7 @@ impl<'window> WgpuContext<'window> {
     ///
     /// Returns [`WgpuError::DeviceLost`] if adapter or device creation fails.
     /// Returns [`WgpuError::SurfaceError`] if surface creation fails.
-    pub async fn new(
-        window: &'window winit::window::Window,
-    ) -> Result<Self, WgpuError> {
+    pub async fn new(window: &'window winit::window::Window) -> Result<Self, WgpuError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             flags: wgpu::InstanceFlags::default(),

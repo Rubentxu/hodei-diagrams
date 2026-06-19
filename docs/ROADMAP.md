@@ -45,7 +45,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 - [x] `diagram-wasm` (export_drawio) — enable "Save as .drawio" ✅
 - [x] `diagram-routing` — orthogonal edge routing v1 ✅
 - [x] `diagram-layout` — Sugiyama HierarchicalLayout v1 (4-stage pipeline, TopToBottom + LeftToRight) ✅
-- [ ] `diagram-render-wgpu` — renderer WebGPU
+- [x] `diagram-render-wgpu` — renderer WebGPU 🔄 (ADR-0046) — code complete, merge pending
 
 ## External Study Triggers
 
@@ -105,6 +105,8 @@ Ubicación prevista de clones: `/var/home/rubentxu/Proyectos/rust/_upstream/` (i
 | 0042 | Web Shell Editor Surface v1.1 |
 | 0043 | diagram-commands depends on diagram-format-drawio for IdMap storage |
 | 0044 | Routing Architecture — Data vs Algorithm |
+| 0045 | diagram-layout Architecture |
+| 0046 | WebGPU Renderer Architecture |
 
 ## Reglas de Actualización
 

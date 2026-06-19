@@ -3,16 +3,16 @@
 //! Walks a [`Scene`]'s display list, collects [`ShapeInstance`]s, uploads them
 //! to GPU buffers, and issues a single instanced draw call per scissor region.
 
-use diagram_scene::{PageId, PageScene, Scene, VisualElement};
 use diagram_scene::ResolvedStyle;
+use diagram_scene::{PageId, PageScene, Scene, VisualElement};
 
 use wgpu::util::DeviceExt;
 
 use crate::buffers::{ShapeInstance, UNIT_QUAD_VERTICES};
 use crate::context::WgpuContext;
 use crate::error::WgpuError;
-use crate::pipeline::{build_shape_pipeline, create_viewport_bind_group, ShapePipeline};
-use crate::shapes::{parse_hex_color, SHAPE_ELLIPSE, SHAPE_LINE, SHAPE_RECT, SHAPE_ROUNDED};
+use crate::pipeline::{ShapePipeline, build_shape_pipeline, create_viewport_bind_group};
+use crate::shapes::{SHAPE_ELLIPSE, SHAPE_LINE, SHAPE_RECT, SHAPE_ROUNDED, parse_hex_color};
 
 /// The WebGPU renderer, owning the context, pipeline, and quad vertex buffer.
 pub struct WgpuRenderer<'window> {
@@ -31,20 +31,18 @@ impl<'window> WgpuRenderer<'window> {
     ///
     /// Returns [`WgpuError`] if context creation, pipeline building, or vertex
     /// buffer creation fails.
-    pub async fn new(
-        window: &'window winit::window::Window,
-    ) -> Result<Self, WgpuError> {
+    pub async fn new(window: &'window winit::window::Window) -> Result<Self, WgpuError> {
         let context = WgpuContext::new(window).await?;
         let pipeline = build_shape_pipeline(&context.device, context.config.format)?;
 
         // Upload unit quad vertices to GPU
-        let quad_vb = context.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
+        let quad_vb = context
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("quad_vertex_buffer"),
                 contents: bytemuck::cast_slice(&UNIT_QUAD_VERTICES),
                 usage: wgpu::BufferUsages::VERTEX,
-            },
-        );
+            });
 
         Ok(Self {
             context,
@@ -59,11 +57,7 @@ impl<'window> WgpuRenderer<'window> {
     ///
     /// Returns [`WgpuError::PageNotFound`] if the page ID is not in the scene.
     /// Returns [`WgpuError::SurfaceError`] if the surface texture cannot be acquired.
-    pub fn render(
-        &mut self,
-        scene: &Scene,
-        page_id: PageId,
-    ) -> Result<(), WgpuError> {
+    pub fn render(&mut self, scene: &Scene, page_id: PageId) -> Result<(), WgpuError> {
         let page = scene
             .pages
             .iter()
@@ -92,7 +86,9 @@ impl<'window> WgpuRenderer<'window> {
                 return Err(WgpuError::SurfaceError("surface lost".to_owned()));
             }
             wgpu::CurrentSurfaceTexture::Validation => {
-                return Err(WgpuError::SurfaceError("surface validation error".to_owned()));
+                return Err(WgpuError::SurfaceError(
+                    "surface validation error".to_owned(),
+                ));
             }
         };
 
@@ -100,22 +96,22 @@ impl<'window> WgpuRenderer<'window> {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self
-            .context
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("render_encoder"),
-            });
+        let mut encoder =
+            self.context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("render_encoder"),
+                });
 
         // Upload instance buffer
-        let instance_buffer = self
-            .context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("instance_buffer"),
-                contents: bytemuck::cast_slice(&instances),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        let instance_buffer =
+            self.context
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("instance_buffer"),
+                    contents: bytemuck::cast_slice(&instances),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
         let viewport_bg = create_viewport_bind_group(
             &self.context.device,

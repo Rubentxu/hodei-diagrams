@@ -4,10 +4,10 @@
 //! list configurations, verifying that the scene walker produces correct
 //! [`ShapeInstance`] vectors without any GPU hardware.
 
-use diagram_render_wgpu::renderer::collect_instances_for_page;
-use diagram_render_wgpu::shapes::{SHAPE_ELLIPSE, SHAPE_LINE, SHAPE_RECT, SHAPE_ROUNDED};
 use diagram_core::geometry::{Point, Rect, Size};
 use diagram_core::{EdgeId, GroupId, VertexId};
+use diagram_render_wgpu::renderer::collect_instances_for_page;
+use diagram_render_wgpu::shapes::{SHAPE_ELLIPSE, SHAPE_LINE, SHAPE_RECT, SHAPE_ROUNDED};
 use diagram_scene::{
     EllipseElement, GroupElement, LineElement, PageId, PageScene, RectElement, ResolvedStyle,
     RoundedRectElement, VisualElement,
@@ -26,7 +26,10 @@ fn make_rect(
         id: VertexId::default(),
         bounds: Rect {
             origin: Point { x, y },
-            size: Size { width: w, height: h },
+            size: Size {
+                width: w,
+                height: h,
+            },
         },
         style: ResolvedStyle {
             fill_color: fill.map(String::from),
@@ -49,12 +52,23 @@ fn make_page(display_list: Vec<VisualElement>) -> PageScene {
 
 #[test]
 fn four_elements_produce_4_instances() {
-    let rect = make_rect(10.0, 20.0, 80.0, 40.0, Some("#dae8fc"), Some("#6c8ebf"), Some(2.0));
+    let rect = make_rect(
+        10.0,
+        20.0,
+        80.0,
+        40.0,
+        Some("#dae8fc"),
+        Some("#6c8ebf"),
+        Some(2.0),
+    );
     let rounded = VisualElement::RoundedRect(RoundedRectElement {
         id: VertexId::default(),
         bounds: Rect {
             origin: Point { x: 100.0, y: 50.0 },
-            size: Size { width: 60.0, height: 60.0 },
+            size: Size {
+                width: 60.0,
+                height: 60.0,
+            },
         },
         radius: 8.0,
         style: ResolvedStyle {
@@ -66,7 +80,10 @@ fn four_elements_produce_4_instances() {
         id: VertexId::default(),
         bounds: Rect {
             origin: Point { x: 200.0, y: 100.0 },
-            size: Size { width: 50.0, height: 50.0 },
+            size: Size {
+                width: 50.0,
+                height: 50.0,
+            },
         },
         style: ResolvedStyle {
             fill_color: Some("#dae8fc".to_owned()),
@@ -104,7 +121,10 @@ fn nested_groups_flatten_children() {
         id: GroupId::default(),
         bounds: Rect {
             origin: Point { x: 0.0, y: 0.0 },
-            size: Size { width: 100.0, height: 100.0 },
+            size: Size {
+                width: 100.0,
+                height: 100.0,
+            },
         },
         style: ResolvedStyle::default(),
         children: vec![inner_rect],
@@ -114,7 +134,10 @@ fn nested_groups_flatten_children() {
         id: GroupId::default(),
         bounds: Rect {
             origin: Point { x: 0.0, y: 0.0 },
-            size: Size { width: 200.0, height: 200.0 },
+            size: Size {
+                width: 200.0,
+                height: 200.0,
+            },
         },
         style: ResolvedStyle::default(),
         children: vec![inner_group],
@@ -143,7 +166,10 @@ fn scissor_group_with_child_rect() {
         id: GroupId::default(),
         bounds: Rect {
             origin: Point { x: 50.0, y: 50.0 },
-            size: Size { width: 100.0, height: 100.0 },
+            size: Size {
+                width: 100.0,
+                height: 100.0,
+            },
         },
         style: ResolvedStyle::default(),
         children: vec![child_rect],

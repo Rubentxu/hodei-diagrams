@@ -11,9 +11,9 @@
 #![cfg(feature = "visual-tests")]
 #![cfg(not(target_arch = "wasm32"))]
 
-use diagram_render_wgpu::{shapes::SHAPE_RECT, renderer::collect_instances_for_page};
-use diagram_core::geometry::{Point, Rect, Size};
 use diagram_core::VertexId;
+use diagram_core::geometry::{Point, Rect, Size};
+use diagram_render_wgpu::{renderer::collect_instances_for_page, shapes::SHAPE_RECT};
 use diagram_scene::{PageId, PageScene, RectElement, ResolvedStyle, VisualElement};
 
 /// Create a simple 4-shape fixture: rect, rounded rect, ellipse, and line.
@@ -25,7 +25,10 @@ fn four_shape_fixture() -> PageScene {
         id: VertexId::default(),
         bounds: Rect {
             origin: Point { x: 10.0, y: 20.0 },
-            size: Size { width: 80.0, height: 40.0 },
+            size: Size {
+                width: 80.0,
+                height: 40.0,
+            },
         },
         style: ResolvedStyle {
             fill_color: Some("#dae8fc".to_owned()),
@@ -38,7 +41,10 @@ fn four_shape_fixture() -> PageScene {
         id: VertexId::default(),
         bounds: Rect {
             origin: Point { x: 100.0, y: 20.0 },
-            size: Size { width: 60.0, height: 50.0 },
+            size: Size {
+                width: 60.0,
+                height: 50.0,
+            },
         },
         radius: 8.0,
         style: ResolvedStyle {
@@ -52,7 +58,10 @@ fn four_shape_fixture() -> PageScene {
         id: VertexId::default(),
         bounds: Rect {
             origin: Point { x: 180.0, y: 20.0 },
-            size: Size { width: 60.0, height: 40.0 },
+            size: Size {
+                width: 60.0,
+                height: 40.0,
+            },
         },
         style: ResolvedStyle {
             fill_color: Some("#d5e8d4".to_owned()),
@@ -110,7 +119,10 @@ fn group_clipping_visual_regression() {
         id: VertexId::default(),
         bounds: Rect {
             origin: Point { x: 90.0, y: 90.0 },
-            size: Size { width: 80.0, height: 80.0 },
+            size: Size {
+                width: 80.0,
+                height: 80.0,
+            },
         },
         style: ResolvedStyle {
             fill_color: Some("#ff0000".to_owned()),
@@ -121,7 +133,10 @@ fn group_clipping_visual_regression() {
         id: GroupId::default(),
         bounds: Rect {
             origin: Point { x: 50.0, y: 50.0 },
-            size: Size { width: 100.0, height: 100.0 },
+            size: Size {
+                width: 100.0,
+                height: 100.0,
+            },
         },
         style: ResolvedStyle::default(),
         children: vec![child],
