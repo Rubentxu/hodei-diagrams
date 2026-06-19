@@ -8,6 +8,8 @@ export default defineConfig({
     exclude: ['diagram_wasm'],
   },
   server: {
+    port: 4100,
+    strictPort: true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
