@@ -1,0 +1,33 @@
+import type { WasmModule, Result, EngineError } from './types.js';
+import { ok, err } from './types.js';
+
+export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
+  try {
+    if (typeof WebAssembly === 'undefined') {
+      return err('This browser does not support WebAssembly');
+    }
+
+    const mod = await import('./wasm/diagram_wasm.js');
+    // wasm-pack --target web: default export is the async init() function
+    // Named exports are the 11 WASM functions
+    await mod.default();
+
+    const wasm: WasmModule = {
+      create_engine: mod.create_engine,
+      dispose_engine: mod.dispose_engine,
+      execute_command: mod.execute_command,
+      get_scene: mod.get_scene,
+      render_svg: mod.render_svg,
+      render_pages: mod.render_pages,
+      import_drawio: mod.import_drawio,
+      undo: mod.undo,
+      redo: mod.redo,
+      engine_can_undo: mod.engine_can_undo,
+      engine_can_redo: mod.engine_can_redo,
+    };
+
+    return ok(wasm);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e));
+  }
+}

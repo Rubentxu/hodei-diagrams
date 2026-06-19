@@ -36,6 +36,18 @@ _Avoid_: Direct mutation from arbitrary callers, Redux-as-framework, reducer-eve
 A pluggable renderer that consumes scene data produced by the Diagram Engine. Backend choice affects performance and ergonomics, but it must not redefine diagram behavior or file semantics.
 _Avoid_: Renderer-owned behavior, UI-driven rendering rules
 
+**DiagramEngineSession**:
+A TypeScript class in the Web Shell that wraps the `diagram-wasm` WASM bridge. It is the sole importer of the WASM module and abstracts the engine handle lifecycle, JSON serialization, and error mapping. All other shell code communicates through the session, never directly with WASM exports.
+_Avoid_: Direct wasm_bindgen calls in UI code, raw JsValue handling outside session.ts
+
+**PageToken**:
+An opaque branded TypeScript type (`number & { readonly __brand: unique symbol }`) representing a page descriptor returned by `render_pages`. v1 treats it as a display-only token to avoid the PageId wire-format inconsistency between `render_pages` (flat u64) and `render_svg` (slotmap object).
+_Avoid_: Raw number, parsing PageId shape in the shell
+
+**MountedSvg**:
+The result of injecting an SVG string from the engine into the DOM via `innerHTML`. The engine is the trust boundary — SVG strings are treated as trusted content since the engine owns all rendering logic.
+_Avoid_: User-supplied innerHTML, client-side SVG parsing, DOM manipulation of engine output
+
 ## Flagged Ambiguities
 
 - **Editor vs Engine**: In this project, the editor is not the product core. The canonical term for the core product is **Diagram Engine**.
