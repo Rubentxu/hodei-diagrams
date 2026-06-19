@@ -80,6 +80,7 @@ pub fn parse_hex_color(hex: &str) -> [f32; 4] {
 /// - `SHAPE_ROUNDED`: Inigo Quilez rounded-box SDF
 /// - `SHAPE_ELLIPSE`: normalized ellipse SDF
 /// - `SHAPE_LINE`: segment distance SDF
+///
 /// Applies anti-aliasing via `smoothstep` and composites fill + stroke.
 pub const SHAPE_WGSL: &str = r##"
 struct VertexInput {
