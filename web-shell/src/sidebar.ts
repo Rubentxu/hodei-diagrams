@@ -2,7 +2,7 @@
  * sidebar.ts — Zone 2: Left Sidebar (collapsible)
  *
  * Shape palette with categories. "General" has 3 functional shapes.
- * Future categories are grayed out with v1.1 tooltip.
+ * Future categories are grayed out with lock icon + "Soon".
  * Collapse state persisted in localStorage.
  */
 
@@ -59,6 +59,11 @@ const FUTURE_CATEGORIES = [
   'Mockups',
 ];
 
+const LOCK_ICON = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+  <rect x="2" y="4.5" width="6" height="4" rx="0.5"/>
+  <path d="M3 4.5V3a2 2 0 0 1 4 0v1.5"/>
+</svg>`;
+
 export function buildSidebar(): SidebarControls {
   const container = document.createElement('div');
   container.className = 'sidebar';
@@ -94,21 +99,43 @@ export function buildSidebar(): SidebarControls {
   }
 
   // ─── Search bar ──────────────────────────────────────────────────────────
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'sidebar-search-wrap';
+
+  const searchIcon = document.createElement('span');
+  searchIcon.className = 'search-icon';
+  searchIcon.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+    <circle cx="5" cy="5" r="3.5"/>
+    <line x1="7.5" y1="7.5" x2="11" y2="11"/>
+  </svg>`;
+  searchWrap.appendChild(searchIcon);
+
   const searchInput = document.createElement('input');
   searchInput.className = 'sidebar-search';
   searchInput.type = 'search';
   searchInput.placeholder = 'Search shapes…';
   searchInput.setAttribute('data-testid', 'sidebar-search');
-  container.appendChild(searchInput);
+  searchWrap.appendChild(searchInput);
+  container.appendChild(searchWrap);
 
   // ─── General category ────────────────────────────────────────────────────
   const generalCat = document.createElement('div');
   generalCat.className = 'shape-category';
 
-  const generalTitle = document.createElement('div');
+  const generalHeader = document.createElement('div');
+  generalHeader.className = 'category-header';
+
+  const generalTitle = document.createElement('span');
   generalTitle.className = 'category-title';
   generalTitle.textContent = 'General';
-  generalCat.appendChild(generalTitle);
+  generalHeader.appendChild(generalTitle);
+
+  const generalChevron = document.createElement('span');
+  generalChevron.className = 'category-chevron';
+  generalChevron.textContent = '▼';
+  generalHeader.appendChild(generalChevron);
+
+  generalCat.appendChild(generalHeader);
 
   const shapeGrid = document.createElement('div');
   shapeGrid.className = 'shape-grid';
@@ -141,19 +168,28 @@ export function buildSidebar(): SidebarControls {
   generalCat.appendChild(shapeGrid);
   container.appendChild(generalCat);
 
-  // ─── Future categories (grayed out) ──────────────────────────────────────
+  // ─── Future categories (grayed out with lock) ───────────────────────────
   for (const cat of FUTURE_CATEGORIES) {
     const catEl = document.createElement('div');
     catEl.className = 'shape-category disabled';
 
-    const catTitle = document.createElement('div');
+    const catHeader = document.createElement('div');
+    catHeader.className = 'category-header';
+
+    const catTitle = document.createElement('span');
     catTitle.className = 'category-title';
     catTitle.textContent = cat;
-    catEl.appendChild(catTitle);
+    catHeader.appendChild(catTitle);
+
+    const lockIcon = document.createElement('span');
+    lockIcon.innerHTML = LOCK_ICON;
+    catHeader.appendChild(lockIcon);
+
+    catEl.appendChild(catHeader);
 
     const msg = document.createElement('div');
     msg.className = 'category-coming-soon';
-    msg.textContent = 'Disponible en v1.1';
+    msg.textContent = 'Soon';
     catEl.appendChild(msg);
 
     container.appendChild(catEl);

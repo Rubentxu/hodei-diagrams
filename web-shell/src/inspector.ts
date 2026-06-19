@@ -70,12 +70,26 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   const noSelectionMsg = document.createElement('div');
   noSelectionMsg.className = 'no-selection-msg';
-  noSelectionMsg.textContent = 'No selection';
+  noSelectionMsg.innerHTML = `
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6" y="6" width="20" height="20" rx="2"/>
+      <path d="M12 16h8M12 12h8M12 20h4"/>
+    </svg>
+    <p>Select a shape to edit its properties</p>
+  `;
   stylePane.appendChild(noSelectionMsg);
 
   const styleFields = document.createElement('div');
   styleFields.className = 'inspector-fields';
   styleFields.hidden = true;
+
+  // Section: Appearance
+  const appearanceSection = document.createElement('div');
+  appearanceSection.className = 'inspector-section';
+  const appearanceTitle = document.createElement('div');
+  appearanceTitle.className = 'inspector-section-title';
+  appearanceTitle.textContent = 'Appearance';
+  appearanceSection.appendChild(appearanceTitle);
 
   // Fill color
   const fillGroup = createFieldGroup('Fill', 'color');
@@ -84,7 +98,8 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   fillInput.value = '#ffffff';
   fillInput.setAttribute('data-testid', 'inspector-fill');
   fillGroup.field.appendChild(fillInput);
-  styleFields.appendChild(fillGroup.container);
+  appearanceSection.appendChild(fillGroup.container);
+  styleFields.appendChild(appearanceSection);
 
   // Stroke color
   const strokeGroup = createFieldGroup('Stroke', 'color');
@@ -93,7 +108,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   strokeInput.value = '#000000';
   strokeInput.setAttribute('data-testid', 'inspector-stroke');
   strokeGroup.field.appendChild(strokeInput);
-  styleFields.appendChild(strokeGroup.container);
+  appearanceSection.appendChild(strokeGroup.container);
 
   // Stroke width
   const widthGroup = createFieldGroup('Width', 'slider');
@@ -112,7 +127,15 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   });
   widthGroup.field.appendChild(widthInput);
   widthGroup.field.appendChild(widthValue);
-  styleFields.appendChild(widthGroup.container);
+  appearanceSection.appendChild(widthGroup.container);
+
+  // Options section
+  const optionsSection = document.createElement('div');
+  optionsSection.className = 'inspector-section';
+  const optionsTitle = document.createElement('div');
+  optionsTitle.className = 'inspector-section-title';
+  optionsTitle.textContent = 'Options';
+  optionsSection.appendChild(optionsTitle);
 
   // Dashed toggle
   const dashedGroup = createFieldGroup('Dashed', 'toggle');
@@ -120,7 +143,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   dashedInput.type = 'checkbox';
   dashedInput.setAttribute('data-testid', 'inspector-dashed');
   dashedGroup.field.appendChild(dashedInput);
-  styleFields.appendChild(dashedGroup.container);
+  optionsSection.appendChild(dashedGroup.container);
 
   // Rounded toggle
   const roundedGroup = createFieldGroup('Rounded', 'toggle');
@@ -128,7 +151,9 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   roundedInput.type = 'checkbox';
   roundedInput.setAttribute('data-testid', 'inspector-rounded');
   roundedGroup.field.appendChild(roundedInput);
-  styleFields.appendChild(roundedGroup.container);
+  optionsSection.appendChild(roundedGroup.container);
+
+  styleFields.appendChild(optionsSection);
 
   stylePane.appendChild(styleFields);
   container.appendChild(stylePane);
@@ -139,15 +164,28 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   textPane.setAttribute('data-testid', 'inspector-pane-text');
   const textNoSelMsg = document.createElement('div');
   textNoSelMsg.className = 'no-selection-msg';
-  textNoSelMsg.textContent = 'No selection';
+  textNoSelMsg.innerHTML = `
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 8h20M6 14h14M6 20h17"/>
+    </svg>
+    <p>Select a shape to edit text properties</p>
+  `;
   textPane.appendChild(textNoSelMsg);
 
   const textFields = document.createElement('div');
   textFields.className = 'inspector-fields';
   textFields.hidden = true;
 
+  // Font section
+  const fontSection = document.createElement('div');
+  fontSection.className = 'inspector-section';
+  const fontSectionTitle = document.createElement('div');
+  fontSectionTitle.className = 'inspector-section-title';
+  fontSectionTitle.textContent = 'Font';
+  fontSection.appendChild(fontSectionTitle);
+
   // Font family
-  const fontGroup = createFieldGroup('Font', 'select');
+  const fontGroup = createFieldGroup('Family', 'select');
   const fontSelect = document.createElement('select');
   fontSelect.setAttribute('data-testid', 'inspector-font-family');
   for (const font of ['Inter', 'Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'JetBrains Mono']) {
@@ -157,7 +195,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
     fontSelect.appendChild(opt);
   }
   fontGroup.field.appendChild(fontSelect);
-  textFields.appendChild(fontGroup.container);
+  fontSection.appendChild(fontGroup.container);
 
   // Font size
   const sizeGroup = createFieldGroup('Size', 'number');
@@ -168,7 +206,17 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   sizeInput.value = '14';
   sizeInput.setAttribute('data-testid', 'inspector-font-size');
   sizeGroup.field.appendChild(sizeInput);
-  textFields.appendChild(sizeGroup.container);
+  fontSection.appendChild(sizeGroup.container);
+
+  textFields.appendChild(fontSection);
+
+  // Style section
+  const styleSection = document.createElement('div');
+  styleSection.className = 'inspector-section';
+  const styleSectionTitle = document.createElement('div');
+  styleSectionTitle.className = 'inspector-section-title';
+  styleSectionTitle.textContent = 'Style';
+  styleSection.appendChild(styleSectionTitle);
 
   // Font color
   const fontColorGroup = createFieldGroup('Color', 'color');
@@ -177,7 +225,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   fontColorInput.value = '#000000';
   fontColorInput.setAttribute('data-testid', 'inspector-font-color');
   fontColorGroup.field.appendChild(fontColorInput);
-  textFields.appendChild(fontColorGroup.container);
+  styleSection.appendChild(fontColorGroup.container);
 
   // Bold toggle
   const boldGroup = createFieldGroup('Bold', 'toggle');
@@ -185,7 +233,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   boldInput.type = 'checkbox';
   boldInput.setAttribute('data-testid', 'inspector-bold');
   boldGroup.field.appendChild(boldInput);
-  textFields.appendChild(boldGroup.container);
+  styleSection.appendChild(boldGroup.container);
 
   // Italic toggle
   const italicGroup = createFieldGroup('Italic', 'toggle');
@@ -193,7 +241,9 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   italicInput.type = 'checkbox';
   italicInput.setAttribute('data-testid', 'inspector-italic');
   italicGroup.field.appendChild(italicInput);
-  textFields.appendChild(italicGroup.container);
+  styleSection.appendChild(italicGroup.container);
+
+  textFields.appendChild(styleSection);
 
   textPane.appendChild(textFields);
   container.appendChild(textPane);
