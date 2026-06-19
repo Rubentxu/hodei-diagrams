@@ -9,6 +9,7 @@ import type { PageRender } from './types.js';
 import { buildNavbar } from './navbar.js';
 import { buildSidebar } from './sidebar.js';
 import { buildRail, type RailCallbacks } from './rail.js';
+import { buildHud, type HudControls } from './hud.js';
 
 export interface UiElements {
   // Zone 0: Rail
@@ -29,6 +30,9 @@ export interface UiElements {
   // Zone 3: Canvas
   viewer: HTMLElement;
   canvasContainer: HTMLElement;
+
+  // Zone 3.5: HUD
+  hud: HudControls;
 
   // Zone 4: Inspector
   inspectorContainer: HTMLElement;
@@ -83,6 +87,9 @@ export function buildEmptyUi(
   viewer.setAttribute('data-testid', 'viewer');
   canvasContainer.appendChild(viewer);
 
+  // ─── Zone 3.5: HUD ───────────────────────────────────────────────────────
+  const hud = buildHud();
+
   // ─── Zone 4: Inspector ───────────────────────────────────────────────────
   const inspContainer = inspectorContainer ?? document.createElement('div');
   if (!inspectorContainer) {
@@ -135,6 +142,7 @@ export function buildEmptyUi(
   root.appendChild(navbar.container);
   root.appendChild(sidebar.container);
   root.appendChild(canvasContainer);
+  root.appendChild(hud.container);
   root.appendChild(inspContainer);
   root.appendChild(bottomBar);
 
@@ -182,6 +190,9 @@ export function buildEmptyUi(
     // Zone 3
     viewer,
     canvasContainer,
+
+    // Zone 3.5
+    hud,
 
     // Zone 4
     inspectorContainer: inspContainer,

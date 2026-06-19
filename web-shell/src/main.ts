@@ -17,13 +17,32 @@ import {
 } from './ui.js';
 import { buildInspector } from './inspector.js';
 import { Editor } from './editor.js';
-import type { PageToken, PageRender, SlotmapId } from './types.js';
+import type { PageToken, PageRender, SlotmapId, ScenePage } from './types.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
 let activePages: PageRender[] = [];
 let activeEditor: Editor | null = null;
 let activeEditorIdx = 0;
+
+// ─── Grid overlay state ───────────────────────────────────────────────────────
+const GRID_LS_KEY = 'hodei:grid-visible';
+
+function isGridVisible(): boolean {
+  try {
+    return localStorage.getItem(GRID_LS_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setGridVisible(visible: boolean): void {
+  try {
+    localStorage.setItem(GRID_LS_KEY, String(visible));
+  } catch {
+    // localStorage may be unavailable
+  }
+}
 
 function updateUndoRedoButtons(
   undoBtn: HTMLButtonElement | undefined,
@@ -43,6 +62,37 @@ function downloadDrawio(xml: string, filename: string): void {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Get human-readable selection label from scene data */
+function getSelectionLabel(id: SlotmapId | null, sceneData: ScenePage[]): string {
+  if (!id) return 'Nothing selected';
+  // Find the vertex in scene data
+  for (const page of sceneData) {
+    for (const elem of page.display_list) {
+      const e = elem as Record<string, unknown>;
+      for (const key of ['Rect', 'RoundedRect', 'Ellipse'] as const) {
+        const variant = e[key] as Record<string, unknown> | undefined;
+        if (!variant) continue;
+        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+        if (!idField) continue;
+        if (idField.idx === id.idx && idField.version === id.version) {
+          const bounds = variant['bounds'] as
+            | { origin?: Record<string, number>; size?: Record<string, number> }
+            | undefined;
+          if (bounds?.origin && bounds?.size) {
+            const w = bounds.size['width'] ?? 0;
+            const h = bounds.size['height'] ?? 0;
+            const shapeType = key === 'Rect' ? 'Rect' : key === 'RoundedRect' ? 'RoundedRect' : 'Ellipse';
+            return `${shapeType} ${Math.round(w)}×${Math.round(h)}`;
+          }
+          const shapeType = key === 'Rect' ? 'Rect' : key === 'RoundedRect' ? 'RoundedRect' : 'Ellipse';
+          return shapeType;
+        }
+      }
+    }
+  }
+  return 'Shape selected';
 }
 
 async function bootstrap(): Promise<void> {
@@ -91,6 +141,31 @@ async function bootstrap(): Promise<void> {
     },
   });
 
+  // ─── 4.5. Restore grid state ────────────────────────────────────────────────
+  const gridMenuItem = document.getElementById('menu-item-grid');
+  if (isGridVisible()) {
+    ui.canvasContainer.classList.add('show-grid');
+    gridMenuItem?.classList.add('has-checkmark');
+  }
+
+  function toggleGrid(): void {
+    const visible = ui.canvasContainer.classList.toggle('show-grid');
+    setGridVisible(visible);
+    gridMenuItem?.classList.toggle('has-checkmark', visible);
+  }
+
+  gridMenuItem?.addEventListener('click', () => {
+    toggleGrid();
+  });
+
+  // ─── 14.7. Ctrl+G keyboard shortcut for grid toggle ──────────────────────
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+      e.preventDefault();
+      toggleGrid();
+    }
+  });
+
   // ─── 5. Zoom/Pan on canvas container ──────────────────────────────────────
   const zoomPan = setupZoomPan(ui.canvasContainer, ui.viewer);
 
@@ -103,16 +178,20 @@ async function bootstrap(): Promise<void> {
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
   };
 
-  // Selection change → inspector update
+  // Selection change → inspector update + HUD update
   const onSelectionChange = (id: SlotmapId | null) => {
     // Update inspector with current selection and scene data
     if (activeEditor) {
       const scene = activeEditor.getSceneCache();
       const sceneData = scene.ok ? scene.value : [];
       inspector.update(id, sceneData, activeEditor.activePageIdx);
+      // Update HUD selection label
+      ui.hud.setSelection(getSelectionLabel(id, sceneData));
     }
     // Update zoom display
     ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+    // Update HUD zoom
+    ui.hud.setZoom(zoomPan.getZoom() * 100);
   };
 
   // ─── 6. Import handler ────────────────────────────────────────────────────
@@ -151,6 +230,10 @@ async function bootstrap(): Promise<void> {
     activeEditorIdx = 0;
     if (activeEditor) activeEditor.activePageIdx = 0;
 
+    // Update HUD page info
+    ui.hud.setPage(1, activePages.length);
+    ui.hud.setMode('Edit');
+
     // Enable Save button
     ui.saveButton.disabled = false;
 
@@ -159,6 +242,8 @@ async function bootstrap(): Promise<void> {
     // Reset zoom on import
     zoomPan.resetView();
     ui.zoomDisplay.textContent = '100%';
+    ui.hud.setZoom(100);
+    ui.canvasContainer.style.setProperty('--zoom', '1');
   }
 
   // ─── 7. Page switch handler ───────────────────────────────────────────────
@@ -177,9 +262,13 @@ async function bootstrap(): Promise<void> {
           // Refresh editor scene for new page
           activeEditor.refreshScene();
         }
+        // Update HUD page info
+        ui.hud.setPage(idx + 1, activePages.length);
         // Reset zoom on page switch
         zoomPan.resetView();
         ui.zoomDisplay.textContent = '100%';
+        ui.hud.setZoom(100);
+        ui.canvasContainer.style.setProperty('--zoom', '1');
       }
     }
   }
@@ -295,7 +384,23 @@ async function bootstrap(): Promise<void> {
   // ─── 14. Listen for zoom changes from wheel events ────────────────────────
   ui.canvasContainer.addEventListener('zoomchange', ((e: CustomEvent) => {
     ui.zoomDisplay.textContent = `${Math.round(e.detail.zoom * 100)}%`;
+    ui.hud.setZoom(e.detail.zoom * 100);
+    // Update grid scale CSS variable for zoom-responsive grid
+    ui.canvasContainer.style.setProperty('--zoom', String(e.detail.zoom));
   }) as EventListener);
+
+  // ─── 14.5. Wire HUD zoom reset button ─────────────────────────────────────
+  ui.hud.onZoomClick(() => {
+    zoomPan.resetView();
+    ui.zoomDisplay.textContent = '100%';
+    ui.hud.setZoom(100);
+    ui.canvasContainer.style.setProperty('--zoom', '1');
+  });
+
+  // ─── 14.6. Initialize HUD page info ────────────────────────────────────────
+  ui.hud.setPage(1, 1);
+  ui.hud.setMode('Edit');
+  ui.canvasContainer.style.setProperty('--zoom', '1');
 
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
   (window as unknown as Record<string, unknown>).__hodeiDebug = {
