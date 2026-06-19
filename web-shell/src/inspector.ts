@@ -98,6 +98,22 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   fillInput.value = '#ffffff';
   fillInput.setAttribute('data-testid', 'inspector-fill');
   fillGroup.field.appendChild(fillInput);
+  // Hex text input for fill color
+  const fillHex = document.createElement('input');
+  fillHex.type = 'text';
+  fillHex.value = '#ffffff';
+  fillHex.className = 'hex-input';
+  fillHex.title = 'Hex color';
+  fillHex.setAttribute('data-testid', 'inspector-fill-hex');
+  fillGroup.field.appendChild(fillHex);
+  fillInput.addEventListener('input', () => {
+    fillHex.value = fillInput.value;
+  });
+  fillHex.addEventListener('input', () => {
+    if (/^#[0-9A-Fa-f]{6}$/.test(fillHex.value)) {
+      fillInput.value = fillHex.value;
+    }
+  });
   appearanceSection.appendChild(fillGroup.container);
   styleFields.appendChild(appearanceSection);
 
@@ -108,6 +124,22 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   strokeInput.value = '#000000';
   strokeInput.setAttribute('data-testid', 'inspector-stroke');
   strokeGroup.field.appendChild(strokeInput);
+  // Hex text input for stroke color
+  const strokeHex = document.createElement('input');
+  strokeHex.type = 'text';
+  strokeHex.value = '#000000';
+  strokeHex.className = 'hex-input';
+  strokeHex.title = 'Hex color';
+  strokeHex.setAttribute('data-testid', 'inspector-stroke-hex');
+  strokeGroup.field.appendChild(strokeHex);
+  strokeInput.addEventListener('input', () => {
+    strokeHex.value = strokeInput.value;
+  });
+  strokeHex.addEventListener('input', () => {
+    if (/^#[0-9A-Fa-f]{6}$/.test(strokeHex.value)) {
+      strokeInput.value = strokeHex.value;
+    }
+  });
   appearanceSection.appendChild(strokeGroup.container);
 
   // Stroke width
@@ -225,23 +257,66 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   fontColorInput.value = '#000000';
   fontColorInput.setAttribute('data-testid', 'inspector-font-color');
   fontColorGroup.field.appendChild(fontColorInput);
+  // Hex text input for font color
+  const fontColorHex = document.createElement('input');
+  fontColorHex.type = 'text';
+  fontColorHex.value = '#000000';
+  fontColorHex.className = 'hex-input';
+  fontColorHex.title = 'Hex color';
+  fontColorHex.setAttribute('data-testid', 'inspector-font-color-hex');
+  fontColorGroup.field.appendChild(fontColorHex);
+  // Sync color picker with hex input
+  fontColorInput.addEventListener('input', () => {
+    fontColorHex.value = fontColorInput.value;
+  });
+  fontColorHex.addEventListener('input', () => {
+    if (/^#[0-9A-Fa-f]{6}$/.test(fontColorHex.value)) {
+      fontColorInput.value = fontColorHex.value;
+    }
+  });
   styleSection.appendChild(fontColorGroup.container);
 
-  // Bold toggle
+  // Bold toggle as button
   const boldGroup = createFieldGroup('Bold', 'toggle');
-  const boldInput = document.createElement('input');
-  boldInput.type = 'checkbox';
-  boldInput.setAttribute('data-testid', 'inspector-bold');
-  boldGroup.field.appendChild(boldInput);
+  const boldBtn = document.createElement('button');
+  boldBtn.className = 'style-toggle';
+  boldBtn.textContent = 'B';
+  boldBtn.title = 'Bold';
+  boldBtn.setAttribute('data-testid', 'inspector-bold');
+  boldBtn.type = 'button';
+  boldGroup.field.appendChild(boldBtn);
+
+  // Italic toggle as button
+  const italicBtn = document.createElement('button');
+  italicBtn.className = 'style-toggle';
+  italicBtn.textContent = 'I';
+  italicBtn.title = 'Italic';
+  italicBtn.setAttribute('data-testid', 'inspector-italic');
+  italicBtn.type = 'button';
+  boldGroup.field.appendChild(italicBtn);
+
   styleSection.appendChild(boldGroup.container);
 
-  // Italic toggle
-  const italicGroup = createFieldGroup('Italic', 'toggle');
+  // Hidden inputs for state (for command dispatch)
+  const boldInput = document.createElement('input');
+  boldInput.type = 'hidden';
+  boldInput.value = 'false';
   const italicInput = document.createElement('input');
-  italicInput.type = 'checkbox';
-  italicInput.setAttribute('data-testid', 'inspector-italic');
-  italicGroup.field.appendChild(italicInput);
-  styleSection.appendChild(italicGroup.container);
+  italicInput.type = 'hidden';
+  italicInput.value = 'false';
+
+  // Bold/Italic button click handlers
+  boldBtn.addEventListener('click', () => {
+    const isActive = boldBtn.classList.toggle('active');
+    boldInput.value = String(isActive);
+    boldInput.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  italicBtn.addEventListener('click', () => {
+    const isActive = italicBtn.classList.toggle('active');
+    italicInput.value = String(isActive);
+    italicInput.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 
   textFields.appendChild(styleSection);
 
