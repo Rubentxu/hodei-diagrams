@@ -14,6 +14,7 @@
 pub mod buffers;
 pub mod context;
 pub mod error;
+pub mod pipeline;
 pub mod shapes;
 
 pub use context::WgpuContext;
