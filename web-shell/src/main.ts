@@ -27,6 +27,17 @@ function updateUndoRedoButtons(
   if (redoBtn) redoBtn.disabled = !activeSession.canRedo();
 }
 
+/** Create a Blob download of a .drawio XML string. */
+function downloadDrawio(xml: string, filename: string): void {
+  const blob = new Blob([xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function bootstrap(): Promise<void> {
   const root = document.getElementById('app');
   if (!root) {
@@ -97,6 +108,9 @@ async function bootstrap(): Promise<void> {
     // We need to call getScene to populate the cache for drag geometry
     (activeEditor as unknown as Record<string, unknown>)['activePageIdx'] = 0;
 
+    // Enable Save button after successful import
+    if (saveBtn) saveBtn.disabled = false;
+
     // Update undo/redo button states
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
   });
@@ -124,6 +138,20 @@ async function bootstrap(): Promise<void> {
   wireDismiss(ui.dismissButton, () => {
     hideError(ui.errorBanner);
   });
+
+  // Wire Save button
+  const saveBtn = ui.saveButton;
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      if (!activeSession) return;
+      const result = activeSession.exportDrawio();
+      if (result.ok) {
+        downloadDrawio(result.value, 'diagram.drawio');
+      } else {
+        showError(ui.errorBanner, ui.errorMessage, 'Export failed: ' + result.error);
+      }
+    });
+  }
 
   // Wire toolbar buttons
   if (ui.undoButton) {

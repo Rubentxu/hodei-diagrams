@@ -9,6 +9,7 @@ export interface UiElements {
   dismissButton: HTMLButtonElement;
   undoButton?: HTMLButtonElement;
   redoButton?: HTMLButtonElement;
+  saveButton?: HTMLButtonElement;
   rectToolButton?: HTMLButtonElement;
   ellipseToolButton?: HTMLButtonElement;
 }
@@ -68,6 +69,19 @@ export function buildEmptyUi(root: HTMLElement): UiElements {
   ellipseToolButton.setAttribute('data-testid', 'ellipse-tool-btn');
   toolbar.appendChild(ellipseToolButton);
 
+  // Separator
+  const saveSep = document.createElement('span');
+  saveSep.className = 'toolbar-sep';
+  saveSep.textContent = '|';
+  toolbar.appendChild(saveSep);
+
+  // Save / Export button
+  const saveButton = document.createElement('button');
+  saveButton.textContent = 'Save .drawio';
+  saveButton.disabled = true;
+  saveButton.setAttribute('data-testid', 'save-btn');
+  toolbar.appendChild(saveButton);
+
   // Error banner
   const errorBanner = document.createElement('div');
   errorBanner.className = 'error-banner';
@@ -102,6 +116,7 @@ export function buildEmptyUi(root: HTMLElement): UiElements {
     dismissButton,
     undoButton,
     redoButton,
+    saveButton,
     rectToolButton,
     ellipseToolButton,
   };

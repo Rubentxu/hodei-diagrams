@@ -206,6 +206,7 @@ export class DiagramEngineSession {
 
   categorizeError(msg: string): {
     kind:
+      | 'ExportFailed'
       | 'ImportFailed'
       | 'InvalidCommand'
       | 'InvalidHandle'
@@ -214,6 +215,7 @@ export class DiagramEngineSession {
       | 'Unknown';
     raw: string;
   } {
+    if (msg.startsWith('ExportFailed')) return { kind: 'ExportFailed', raw: msg };
     if (msg.startsWith('ImportFailed')) return { kind: 'ImportFailed', raw: msg };
     if (msg.startsWith('InvalidCommand')) return { kind: 'InvalidCommand', raw: msg };
     if (msg === 'InvalidHandle') return { kind: 'InvalidHandle', raw: msg };
@@ -222,5 +224,17 @@ export class DiagramEngineSession {
     if (msg === 'TooManyEngines') return { kind: 'TooManyEngines', raw: msg };
     if (msg.startsWith('TooManyEngines')) return { kind: 'TooManyEngines', raw: msg };
     return { kind: 'Unknown', raw: msg };
+  }
+
+  /** Export the current diagram as a `.drawio` XML string. */
+  exportDrawio(): Result<string, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const xml = this.wasm.export_drawio(this.handle as number);
+      return ok(xml);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
   }
 }
