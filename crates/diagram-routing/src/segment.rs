@@ -6,7 +6,7 @@
 
 use diagram_core::geometry::Point;
 
-use crate::error::{RoutingResult, RoutingError};
+use crate::error::{RoutingError, RoutingResult};
 
 /// Route an edge by returning the given waypoints unchanged.
 ///
@@ -15,7 +15,9 @@ use crate::error::{RoutingResult, RoutingError};
 /// There is no mutation, rounding, or adjustment.
 pub fn route_segment(waypoints: &[Point]) -> RoutingResult<crate::Path> {
     if waypoints.is_empty() {
-        return Err(RoutingError::InvalidGeometry("no waypoints for segment".into()));
+        return Err(RoutingError::InvalidGeometry(
+            "no waypoints for segment".into(),
+        ));
     }
     Ok(crate::Path(waypoints.to_vec()))
 }
@@ -43,7 +45,10 @@ mod tests {
 
     #[test]
     fn exact_values_no_rounding() {
-        let pts = vec![Point { x: 100.5, y: 200.75 }];
+        let pts = vec![Point {
+            x: 100.5,
+            y: 200.75,
+        }];
         let path = route_segment(&pts).unwrap();
         assert!((path.0[0].x - 100.5).abs() < f64::EPSILON);
         assert!((path.0[0].y - 200.75).abs() < f64::EPSILON);

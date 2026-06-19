@@ -1,0 +1,19 @@
+<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="A" value="A" vertex="1">
+          <mxGeometry x="0" y="0" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="BLOCKER" value="BLOCKER" vertex="1">
+          <mxGeometry x="50" y="-10" width="20" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="B" value="B" vertex="1">
+          <mxGeometry x="100" y="0" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <!-- Edge: east(20,10) → detour → west(100,10) -->
+        <mxCell id="e1" edge="1" source="A" target="B"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

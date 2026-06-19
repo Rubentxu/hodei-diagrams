@@ -30,17 +30,17 @@
 
 #![deny(missing_docs)]
 
-mod orth;
-mod segment;
-mod port;
-mod perimeter;
 mod error;
+mod orth;
+mod perimeter;
+mod port;
+mod segment;
 
 pub use diagram_core::geometry::Point;
 pub use error::{RoutingError, RoutingResult};
 pub use orth::route_orthogonal;
 pub use perimeter::{auto_perimeter_points, perimeter_point};
-pub use port::{parse_port_constraint, port_constraint_from_style, Direction};
+pub use port::{Direction, parse_port_constraint, port_constraint_from_style};
 pub use segment::route_segment;
 
 use diagram_core::style::StyleMap;
@@ -111,7 +111,13 @@ mod tests {
 
     fn vertex_at(x: f64, y: f64, w: f64, h: f64) -> Vertex {
         Vertex {
-            geometry: Some(CellGeometry { x, y, width: w, height: h, relative: false }),
+            geometry: Some(CellGeometry {
+                x,
+                y,
+                width: w,
+                height: h,
+                relative: false,
+            }),
             ..Vertex::default()
         }
     }

@@ -121,10 +121,11 @@ dependencies = [
 
 [[package]]
 name = "diagram-compat-testkit"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
+ "diagram-routing",
  "ignore",
  "serde",
  "similar",
@@ -134,7 +135,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-core"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "bitflags",
  "serde",
@@ -145,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-format-drawio"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "base64",
  "diagram-core",
@@ -157,7 +158,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-render-svg"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
@@ -167,7 +168,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-routing"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "diagram-core",
  "pathfinding",
@@ -178,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-scene"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "diagram-core",
  "serde",

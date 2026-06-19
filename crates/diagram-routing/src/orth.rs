@@ -15,11 +15,11 @@ use diagram_core::geometry::{CellGeometry, Point};
 use diagram_core::id::VertexId;
 use diagram_core::vertex::Vertex;
 
+use crate::Path;
+use crate::PortPair;
 use crate::error::{RoutingError, RoutingResult};
 use crate::perimeter::{auto_perimeter_points, perimeter_point};
 use crate::port::Direction;
-use crate::PortPair;
-use crate::Path;
 
 /// Route an orthogonal edge between two vertices.
 ///
@@ -31,11 +31,7 @@ use crate::Path;
 /// 3. Resolves port constraints (if any) or auto-selects perimeter sides.
 /// 4. Computes perimeter points for source and target.
 /// 5. Delegates to straight → single-bend → multi-bend tiers.
-pub fn route_orthogonal(
-    source: &Vertex,
-    target: &Vertex,
-    ports: PortPair,
-) -> RoutingResult<Path> {
+pub fn route_orthogonal(source: &Vertex, target: &Vertex, ports: PortPair) -> RoutingResult<Path> {
     // ── Validate geometry ──────────────────────────────────────────────
     let src_geom = source
         .geometry
@@ -117,8 +113,14 @@ fn route_between_points(
     // ── Tier 2: Single-bend (L-shape) ─────────────────────────────────
     // Compute the two possible L-shape elbows and pick the one whose
     // bend corner lies outside both bounding rectangles (or the shorter one).
-    let elbow_h = Point { x: tgt_pt.x, y: src_pt.y }; // horizontal then vertical
-    let elbow_v = Point { x: src_pt.x, y: tgt_pt.y }; // vertical then horizontal
+    let elbow_h = Point {
+        x: tgt_pt.x,
+        y: src_pt.y,
+    }; // horizontal then vertical
+    let elbow_v = Point {
+        x: src_pt.x,
+        y: tgt_pt.y,
+    }; // vertical then horizontal
 
     let h_inside = point_in_rect(&elbow_h, src_geom) || point_in_rect(&elbow_h, tgt_geom);
     let v_inside = point_in_rect(&elbow_v, src_geom) || point_in_rect(&elbow_v, tgt_geom);
@@ -147,10 +149,7 @@ fn route_between_points(
 /// right/bottom boundary or beyond are considered outside. This convention
 /// matches standard rectangle-interior tests for layout algorithms.
 fn point_in_rect(pt: &Point, geom: &CellGeometry) -> bool {
-    pt.x >= geom.x
-        && pt.x < geom.x + geom.width
-        && pt.y >= geom.y
-        && pt.y < geom.y + geom.height
+    pt.x >= geom.x && pt.x < geom.x + geom.width && pt.y >= geom.y && pt.y < geom.y + geom.height
 }
 
 /// Manhattan distance between two points.
@@ -172,13 +171,22 @@ mod tests {
 
     fn vertex(x: f64, y: f64, w: f64, h: f64) -> Vertex {
         Vertex {
-            geometry: Some(CellGeometry { x, y, width: w, height: h, relative: false }),
+            geometry: Some(CellGeometry {
+                x,
+                y,
+                width: w,
+                height: h,
+                relative: false,
+            }),
             ..Vertex::default()
         }
     }
 
     fn vertex_no_geom() -> Vertex {
-        Vertex { geometry: None, ..Vertex::default() }
+        Vertex {
+            geometry: None,
+            ..Vertex::default()
+        }
     }
 
     // ── Straight edges ─────────────────────────────────────────────
@@ -224,8 +232,7 @@ mod tests {
         // Points form a valid 90° elbow
         let (a, b, c) = (path.0[0], path.0[1], path.0[2]);
         // Axis-aligned: either a.x == b.x and b.y == c.y, or a.y == b.y and b.x == c.x
-        let valid_elbow =
-            (a.x == b.x && b.y == c.y) || (a.y == b.y && b.x == c.x);
+        let valid_elbow = (a.x == b.x && b.y == c.y) || (a.y == b.y && b.x == c.x);
         assert!(valid_elbow, "elbow not orthogonal: {a:?} → {b:?} → {c:?}");
     }
 
@@ -275,7 +282,10 @@ mod tests {
         let src = vertex(100.0, 100.0, 30.0, 30.0);
         let tgt = vertex(100.0, 100.0, 30.0, 30.0);
         let result = route_orthogonal(&src, &tgt, (None, None));
-        assert!(matches!(result, Err(RoutingError::OverlappingVertices(_, _))));
+        assert!(matches!(
+            result,
+            Err(RoutingError::OverlappingVertices(_, _))
+        ));
     }
 
     #[test]
@@ -301,7 +311,10 @@ mod tests {
         let tgt = vertex(0.0, 0.0, 20.0, 20.0);
         let result = route_orthogonal(&src, &tgt, (None, None));
         // These overlap (same center) → error
-        assert!(matches!(result, Err(RoutingError::OverlappingVertices(_, _))));
+        assert!(matches!(
+            result,
+            Err(RoutingError::OverlappingVertices(_, _))
+        ));
     }
 
     // ── Port constraint tests ──────────────────────────────────────
@@ -311,12 +324,8 @@ mod tests {
         // Source east = (75, 125), target west = (375, 125)
         let src = vertex(50.0, 100.0, 50.0, 50.0);
         let tgt = vertex(350.0, 50.0, 50.0, 100.0);
-        let path = route_orthogonal(
-            &src,
-            &tgt,
-            (Some(Direction::East), Some(Direction::West)),
-        )
-        .unwrap();
+        let path =
+            route_orthogonal(&src, &tgt, (Some(Direction::East), Some(Direction::West))).unwrap();
         assert_eq!(path.0[0], Point { x: 100.0, y: 125.0 }); // source east
         assert_eq!(path.0.last().unwrap(), &Point { x: 350.0, y: 100.0 }); // target west
     }
