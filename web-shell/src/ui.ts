@@ -7,6 +7,10 @@ export interface UiElements {
   errorBanner: HTMLElement;
   errorMessage: HTMLElement;
   dismissButton: HTMLButtonElement;
+  undoButton?: HTMLButtonElement;
+  redoButton?: HTMLButtonElement;
+  rectToolButton?: HTMLButtonElement;
+  ellipseToolButton?: HTMLButtonElement;
 }
 
 export function buildEmptyUi(root: HTMLElement): UiElements {
@@ -27,6 +31,42 @@ export function buildEmptyUi(root: HTMLElement): UiElements {
 
   toolbar.appendChild(fileInput);
   toolbar.appendChild(pageSelect);
+
+  // Spacer
+  const spacer = document.createElement('span');
+  spacer.className = 'toolbar-spacer';
+  toolbar.appendChild(spacer);
+
+  // Undo / Redo buttons
+  const undoButton = document.createElement('button');
+  undoButton.textContent = 'Undo';
+  undoButton.disabled = true;
+  undoButton.setAttribute('data-testid', 'undo-btn');
+  toolbar.appendChild(undoButton);
+
+  const redoButton = document.createElement('button');
+  redoButton.textContent = 'Redo';
+  redoButton.disabled = true;
+  redoButton.setAttribute('data-testid', 'redo-btn');
+  toolbar.appendChild(redoButton);
+
+  // Separator
+  const sep = document.createElement('span');
+  sep.className = 'toolbar-sep';
+  sep.textContent = '|';
+  toolbar.appendChild(sep);
+
+  // Palette: Rectangle tool
+  const rectToolButton = document.createElement('button');
+  rectToolButton.textContent = 'Rect';
+  rectToolButton.setAttribute('data-testid', 'rect-tool-btn');
+  toolbar.appendChild(rectToolButton);
+
+  // Palette: Ellipse tool
+  const ellipseToolButton = document.createElement('button');
+  ellipseToolButton.textContent = 'Ellipse';
+  ellipseToolButton.setAttribute('data-testid', 'ellipse-tool-btn');
+  toolbar.appendChild(ellipseToolButton);
 
   // Error banner
   const errorBanner = document.createElement('div');
@@ -53,7 +93,18 @@ export function buildEmptyUi(root: HTMLElement): UiElements {
   root.appendChild(errorBanner);
   root.appendChild(viewer);
 
-  return { fileInput, pageSelect, viewer, errorBanner, errorMessage, dismissButton };
+  return {
+    fileInput,
+    pageSelect,
+    viewer,
+    errorBanner,
+    errorMessage,
+    dismissButton,
+    undoButton,
+    redoButton,
+    rectToolButton,
+    ellipseToolButton,
+  };
 }
 
 export function populatePageSelect(

@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-compat-testkit"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-core"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "bitflags",
  "serde",
@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-format-drawio"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "base64",
  "diagram-core",
@@ -132,16 +132,17 @@ dependencies = [
 
 [[package]]
 name = "diagram-render-svg"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
  "diagram-scene",
+ "serde_json",
 ]
 
 [[package]]
 name = "diagram-scene"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "diagram-core",
  "serde",

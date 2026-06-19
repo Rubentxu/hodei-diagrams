@@ -5,7 +5,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.5.1 — 7 crates + web-shell viewer.** 26 unit tests + 6 E2E tests en web-shell. 41 ADRs (0001-0041). 19 PRs mergeados.
+**v0.5.2 — 7 crates + web-shell viewer + editor v1.1.** 83 unit tests + 12 E2E tests en web-shell. 42 ADRs (0001-0042). 20 PRs mergeados.
 
 | Crate | Status |
 |-------|--------|
@@ -39,7 +39,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 - [x] `diagram-render-svg` — renderer SVG ✅
 - [x] `diagram-wasm` — thin WASM adapter ✅
 - [x] `web-shell` (viewer v1) ✅
-- [ ] `web-shell` (editor surface v1.1) — click, drag, palette, command execution
+- [x] `web-shell` (editor surface v1.1) — click, drag, palette, command execution ✅
 - [ ] `diagram-wasm` (export_drawio) — enable "Save as .drawio"
 - [ ] `diagram-routing` — connector routing _(requiere estudio upstream, ADR-0029)_
 - [ ] `diagram-layout` — layout algorithms _(requiere estudio upstream, ADR-0029)_
@@ -100,6 +100,7 @@ Ubicación prevista de clones: `/var/home/rubentxu/Proyectos/rust/_upstream/` (i
 | 0039 | Remaining StyleMap to Style Attribute |
 | 0040 | Diagram-WASM Dependency Clarification |
 | 0041 | Web Shell Vite + Vitest + Playwright Toolchain |
+| 0042 | Web Shell Editor Surface v1.1 |
 
 ## Reglas de Actualización
 

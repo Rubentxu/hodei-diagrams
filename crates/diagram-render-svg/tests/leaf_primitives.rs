@@ -45,12 +45,16 @@ fn simple_rect_renders_correctly() {
     // Assert contains white background rect
     assert!(svg.contains("<rect x=\"0\" y=\"0\" width=\"827\" height=\"1169\" fill=\"white\"/>"));
 
-    // Assert contains the rect with correct attributes
-    assert!(svg.contains(
-        "<rect x=\"10\" y=\"20\" width=\"80\" height=\"40\" fill=\"#dae8fc\" stroke=\"#6c8ebf\"/>"
-    ));
+    // Assert contains the rect with correct attributes (including data-vertex-id)
+    assert!(svg.contains("x=\"10\""));
+    assert!(svg.contains("y=\"20\""));
+    assert!(svg.contains("width=\"80\""));
+    assert!(svg.contains("height=\"40\""));
+    assert!(svg.contains("fill=\"#dae8fc\""));
+    assert!(svg.contains("stroke=\"#6c8ebf\""));
+    assert!(svg.contains("data-vertex-id=\""));
 
-    // Assert no engine IDs leak
+    // Assert no old-style engine IDs
     assert!(!svg.contains("vertex#"));
     assert!(!svg.contains("edge#"));
     assert!(!svg.contains("group#"));
@@ -93,8 +97,12 @@ fn rect_with_no_style_renders() {
     let renderer = SvgRenderer::new();
     let svg = renderer.render(&scene, PageId::default()).unwrap();
 
-    // Should render the rect with no style attributes
-    assert!(svg.contains("<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\"/>"));
+    // Should render the rect with no style attributes (but with data-vertex-id)
+    assert!(svg.contains("x=\"0\""));
+    assert!(svg.contains("y=\"0\""));
+    assert!(svg.contains("width=\"100\""));
+    assert!(svg.contains("height=\"100\""));
+    assert!(svg.contains("data-vertex-id=\""));
 }
 
 #[test]

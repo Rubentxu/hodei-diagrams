@@ -41,3 +41,24 @@ body {
 .page-select {
   min-width: 12rem;
 }
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-sep {
+  color: #ccc;
+  margin: 0 0.25rem;
+}
+
+/* Selection highlight: blue dashed outline */
+.viewer .selected {
+  outline: 2px dashed #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Toolbar button active state */
+.toolbar button.active-tool {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}

@@ -10,11 +10,22 @@ import {
   wirePageSelect,
   wireDismiss,
 } from './ui.js';
+import { Editor } from './editor.js';
 import type { PageToken, PageRender } from './types.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
 let activePages: PageRender[] = [];
+let activeEditor: Editor | null = null;
+
+function updateUndoRedoButtons(
+  undoBtn: HTMLButtonElement | undefined,
+  redoBtn: HTMLButtonElement | undefined,
+): void {
+  if (!activeSession) return;
+  if (undoBtn) undoBtn.disabled = !activeSession.canUndo();
+  if (redoBtn) redoBtn.disabled = !activeSession.canRedo();
+}
 
 async function bootstrap(): Promise<void> {
   const root = document.getElementById('app');
@@ -24,6 +35,11 @@ async function bootstrap(): Promise<void> {
   }
 
   const ui = buildEmptyUi(root);
+
+  // Error display callback for Editor
+  const onEditorError = (msg: string) => {
+    showError(ui.errorBanner, ui.errorMessage, msg);
+  };
 
   const wasmResult = await loadWasm();
   if (!wasmResult.ok) {
@@ -65,6 +81,24 @@ async function bootstrap(): Promise<void> {
       mountSvg(ui.viewer, activePages[0]!.svg);
       populatePageSelect(ui.pageSelect, activePages, 0);
     }
+
+    // Wire editor after successful import
+    if (!activeEditor) {
+      activeEditor = new Editor(
+        activeSession,
+        ui.viewer,
+        onEditorError,
+        () => updateUndoRedoButtons(ui.undoButton, ui.redoButton),
+      );
+      activeEditor.attach();
+    }
+
+    // Seed editor scene cache
+    // We need to call getScene to populate the cache for drag geometry
+    (activeEditor as unknown as Record<string, unknown>)['activePageIdx'] = 0;
+
+    // Update undo/redo button states
+    updateUndoRedoButtons(ui.undoButton, ui.redoButton);
   });
 
   wirePageSelect(ui.pageSelect, (pageIdNum) => {
@@ -73,10 +107,16 @@ async function bootstrap(): Promise<void> {
     const svg = activeSession.getPage(token);
     if (svg) {
       mountSvg(ui.viewer, svg);
-      // Update active index
       const idx = activePages.findIndex((p) => p.pageId === token);
       if (idx >= 0) {
         populatePageSelect(ui.pageSelect, activePages, idx);
+        // Update editor active page index
+        if (activeEditor) {
+          (activeEditor as unknown as Record<string, unknown>)['activePageIdx'] = idx;
+          // Clear selection on page switch
+          // Use public replay to refresh scene cache
+          // For now, we rely on the editor to re-apply correctly
+        }
       }
     }
   });
@@ -84,6 +124,50 @@ async function bootstrap(): Promise<void> {
   wireDismiss(ui.dismissButton, () => {
     hideError(ui.errorBanner);
   });
+
+  // Wire toolbar buttons
+  if (ui.undoButton) {
+    ui.undoButton.addEventListener('click', () => {
+      activeEditor?.undoCmd();
+      updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+    });
+  }
+  if (ui.redoButton) {
+    ui.redoButton.addEventListener('click', () => {
+      activeEditor?.redoCmd();
+      updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+    });
+  }
+  const rectBtn = ui.rectToolButton;
+  if (rectBtn) {
+    const ellipseBtn = ui.ellipseToolButton;
+    rectBtn.addEventListener('click', () => {
+      if (!activeEditor) return;
+      activeEditor.setActiveTool('rectangle');
+      ellipseBtn?.classList.remove('active-tool');
+      rectBtn.classList.toggle('active-tool', activeEditor.activeTool === 'rectangle');
+    });
+  }
+  const ellipseBtn = ui.ellipseToolButton;
+  if (ellipseBtn) {
+    const rectBtn2 = ui.rectToolButton;
+    ellipseBtn.addEventListener('click', () => {
+      if (!activeEditor) return;
+      activeEditor.setActiveTool('ellipse');
+      rectBtn2?.classList.remove('active-tool');
+      ellipseBtn.classList.toggle('active-tool', activeEditor.activeTool === 'ellipse');
+    });
+  }
+
+  // Expose debug API for E2E tests
+  (window as unknown as Record<string, unknown>).__hodeiDebug = {
+    getScene: () => {
+      const result = activeEditor?.getSceneCache();
+      if (!result || !result.ok) return [];
+      return result.value;
+    },
+    getSession: () => activeSession,
+  };
 }
 
 bootstrap().catch((e) => {

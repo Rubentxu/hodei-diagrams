@@ -1,4 +1,4 @@
-import type { PageRender, PageToken } from './types.js';
+import type { PageRender, PageToken, SlotmapId } from './types.js';
 
 /**
  * Mount an SVG string into a container.
@@ -25,4 +25,25 @@ export function showPage(
 
 export function clear(container: HTMLElement): void {
   container.innerHTML = '';
+}
+
+/**
+ * Apply or clear the `.selected` CSS class on elements with `data-vertex-id`.
+ * Called after re-render to restore selection highlight.
+ */
+export function applySelectionClass(
+  viewer: HTMLElement,
+  id: SlotmapId | null,
+): void {
+  // Remove .selected from all elements
+  viewer.querySelectorAll('[data-vertex-id]').forEach((el) => {
+    el.classList.remove('selected');
+  });
+  if (id !== null) {
+    const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
+    const el = viewer.querySelector(selector);
+    if (el) {
+      el.classList.add('selected');
+    }
+  }
 }

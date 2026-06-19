@@ -260,9 +260,10 @@ fn render_svg_contains_label_text() {
         let vertex_cmd = cmd_add_vertex(page_id, "Node A", 10.0, 20.0, 100.0, 50.0);
         execute_command(handle, &vertex_cmd).expect("add vertex should succeed");
 
-        // Serialize PageId using its serde impl (produces {"idx":..., "version":...})
-        let page_id_json = serde_json::to_string(&page_id).unwrap();
-        let svg = render_svg(handle, &page_id_json).expect("render_svg should succeed");
+        // Extract flat idx from PageId for the new flat render_svg signature
+        let page_id_value = serde_json::to_value(page_id).expect("PageId should serialize");
+        let page_idx = page_id_value["idx"].as_u64().expect("idx should be u64");
+        let svg = render_svg(handle, page_idx).expect("render_svg should succeed");
         assert!(
             svg.contains("Node A"),
             "SVG should contain label text 'Node A': {}",
