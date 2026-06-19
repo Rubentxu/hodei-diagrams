@@ -1,6 +1,7 @@
 //! Editor façade and Transaction builder.
 
 use diagram_core::DiagramModel;
+use diagram_format_drawio::IdMap;
 
 use crate::Command;
 use crate::error::{CommandError, CommandResult};
@@ -19,6 +20,7 @@ use diagram_core::{
 pub struct Editor {
     model: DiagramModel,
     history: History,
+    id_map: Option<IdMap>,
 }
 
 impl Editor {
@@ -27,6 +29,7 @@ impl Editor {
         Self {
             model,
             history: History::new(),
+            id_map: None,
         }
     }
 
@@ -98,9 +101,13 @@ impl Editor {
     ///
     /// The undo/redo history is cleared because the new model has no relationship
     /// to the previous model's command history.
-    pub fn replace_model(&mut self, model: DiagramModel) {
+    ///
+    /// The `id_map` stores the import-time raw-ID mapping for later export.
+    /// Pass `None` when no import context exists (e.g., programmatic model creation).
+    pub fn replace_model(&mut self, model: DiagramModel, id_map: Option<IdMap>) {
         self.model = model;
         self.history = History::default();
+        self.id_map = id_map;
     }
 
     /// Check if undo is available.
@@ -111,6 +118,14 @@ impl Editor {
     /// Check if redo is available.
     pub fn can_redo(&self) -> bool {
         self.history.can_redo()
+    }
+
+    /// Borrow the stored import-time IdMap, if any.
+    ///
+    /// Returns `None` if no import has occurred, or if the model was created
+    /// programmatically (not imported from a `.drawio` file).
+    pub fn id_map(&self) -> Option<&IdMap> {
+        self.id_map.as_ref()
     }
 }
 

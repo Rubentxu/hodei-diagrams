@@ -7,5 +7,6 @@ repository.workspace = true
 
 [dependencies]
 diagram-core = { path = "../diagram-core" }
+diagram-format-drawio = { path = "../diagram-format-drawio" }
 thiserror = { workspace = true }
 serde = "1"
