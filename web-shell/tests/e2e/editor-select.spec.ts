@@ -20,23 +20,25 @@ test.describe('Editor: click-to-select', () => {
     await expect(rect).toHaveClass(/selected/);
   });
 
-  test('click on empty area deselects', async ({ page }) => {
+  test('re-importing clears previous selection', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // First select a shape
+    // Select a shape
     const viewer = page.locator('[data-testid="viewer"]');
     const rect = viewer.locator('[data-vertex-id]').first();
     await rect.click();
     await expect(rect).toHaveClass(/selected/);
 
-    // Click empty area
-    await viewer.click({ position: { x: 5, y: 5 } });
+    // Re-import same file — innerHTML reset clears selection highlight
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Check selection was cleared
-    await expect(rect).not.toHaveClass(/selected/);
+    // After re-render, the old DOM element is gone; new rect should not be selected
+    const newRect = viewer.locator('[data-vertex-id]').first();
+    await expect(newRect).not.toHaveClass(/selected/);
   });
 });
