@@ -1,0 +1,18 @@
+[package]
+name = "diagram-routing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Edge routing algorithms: orthogonal, segment passthrough, and port constraint parsing."
+
+[dependencies]
+diagram-core = { path = "../diagram-core" }
+rstar = { workspace = true }
+pathfinding = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"
