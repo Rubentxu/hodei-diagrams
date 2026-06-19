@@ -5,8 +5,10 @@ import type {
   PageRender,
   EngineError,
   ScenePage,
+  SlotmapId,
+  StyleChanges,
 } from './types.js';
-import { ok, err } from './types.js';
+import { ok, err, slotmapIdToField } from './types.js';
 import type { WasmModule } from './types.js';
 
 export class DiagramEngineSession {
@@ -224,6 +226,17 @@ export class DiagramEngineSession {
     if (msg === 'TooManyEngines') return { kind: 'TooManyEngines', raw: msg };
     if (msg.startsWith('TooManyEngines')) return { kind: 'TooManyEngines', raw: msg };
     return { kind: 'Unknown', raw: msg };
+  }
+
+  /** Change the style of a vertex. Dispatches a ChangeStyle command. */
+  changeStyle(id: SlotmapId, changes: StyleChanges): Result<void, EngineError> {
+    const cmd = JSON.stringify({
+      ChangeStyle: {
+        id: slotmapIdToField(id),
+        changes,
+      },
+    });
+    return this.executeCommand(cmd);
   }
 
   /** Export the current diagram as a `.drawio` XML string. */

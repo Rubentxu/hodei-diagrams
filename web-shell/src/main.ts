@@ -1,22 +1,29 @@
+/**
+ * main.ts — Bootstrap and wire the 5-zone web shell UI.
+ *
+ * Coordinates: engine session, editor, zoom/pan, inspector, menu actions.
+ */
+
 import { loadWasm } from './wasm-loader.js';
 import { DiagramEngineSession } from './session.js';
-import { mountSvg, clear } from './renderer.js';
+import { mountSvg, setupZoomPan } from './renderer.js';
 import {
   buildEmptyUi,
-  populatePageSelect,
+  populatePageTabs,
   showError,
   hideError,
   wireFileInput,
-  wirePageSelect,
   wireDismiss,
 } from './ui.js';
+import { buildInspector } from './inspector.js';
 import { Editor } from './editor.js';
-import type { PageToken, PageRender } from './types.js';
+import type { PageToken, PageRender, SlotmapId } from './types.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
 let activePages: PageRender[] = [];
 let activeEditor: Editor | null = null;
+let activeEditorIdx = 0;
 
 function updateUndoRedoButtons(
   undoBtn: HTMLButtonElement | undefined,
@@ -45,43 +52,61 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
-  const ui = buildEmptyUi(root);
-
-  // Error display callback for Editor
-  const onEditorError = (msg: string) => {
-    showError(ui.errorBanner, ui.errorMessage, msg);
-  };
-
+  // ─── 1. WASM loading ──────────────────────────────────────────────────────
   const wasmResult = await loadWasm();
   if (!wasmResult.ok) {
-    showError(
-      ui.errorBanner,
-      ui.errorMessage,
-      'Failed to load diagram engine: ' + wasmResult.error,
-    );
+    root.textContent = 'Failed to load diagram engine: ' + wasmResult.error;
     return;
   }
 
+  // ─── 2. Engine session ────────────────────────────────────────────────────
   const sessionResult = DiagramEngineSession.create(wasmResult.value);
   if (!sessionResult.ok) {
-    showError(
-      ui.errorBanner,
-      ui.errorMessage,
-      'Failed to create engine session: ' + sessionResult.error,
-    );
+    root.textContent = 'Failed to create engine session: ' + sessionResult.error;
     return;
   }
 
   activeSession = sessionResult.value;
 
-  wireFileInput(ui.fileInput, async (xml) => {
+  // ─── 3. Build Inspector (needed before UI for update wiring) ──────────────
+  const inspector = buildInspector(activeSession);
+
+  // ─── 4. Build 5-zone UI with inspector ────────────────────────────────────
+  const ui = buildEmptyUi(root, inspector.container);
+
+  // ─── 5. Zoom/Pan on canvas container ──────────────────────────────────────
+  const zoomPan = setupZoomPan(ui.canvasContainer, ui.viewer);
+
+  // ─── 6. Editor ────────────────────────────────────────────────────────────
+  const onEditorError = (msg: string) => {
+    showError(ui.errorBanner, ui.errorMessage, msg);
+  };
+
+  const onStateChange = () => {
+    updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+  };
+
+  // Selection change → inspector update
+  const onSelectionChange = (id: SlotmapId | null) => {
+    // Update inspector with current selection and scene data
+    if (activeEditor) {
+      const scene = activeEditor.getSceneCache();
+      const sceneData = scene.ok ? scene.value : [];
+      inspector.update(id, sceneData, activeEditor.activePageIdx);
+    }
+    // Update zoom display
+    ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+  };
+
+  // ─── 6. Import handler ────────────────────────────────────────────────────
+  function handleImport(xml: string): void {
     if (!activeSession) return;
     const importResult = activeSession.importDrawio(xml);
     if (!importResult.ok) {
       showError(ui.errorBanner, ui.errorMessage, 'Import failed: ' + importResult.error);
       return;
     }
-    clear(ui.viewer);
+
     const renderResult = activeSession.renderAllPages();
     if (!renderResult.ok) {
       showError(ui.errorBanner, ui.errorMessage, 'Render failed: ' + renderResult.error);
@@ -90,29 +115,37 @@ async function bootstrap(): Promise<void> {
     activePages = renderResult.value;
     if (activePages.length > 0) {
       mountSvg(ui.viewer, activePages[0]!.svg);
-      populatePageSelect(ui.pageSelect, activePages, 0);
+      populatePageTabs(ui.pageTabContainer, activePages, 0, handlePageSwitch);
     }
 
     // Wire editor after successful import
     if (!activeEditor) {
-      activeEditor = new Editor(activeSession, ui.viewer, onEditorError, () =>
-        updateUndoRedoButtons(ui.undoButton, ui.redoButton),
+      activeEditor = new Editor(
+        activeSession,
+        ui.viewer,
+        onEditorError,
+        onStateChange,
+        onSelectionChange,
+        () => zoomPan.getZoom(),
       );
       activeEditor.attach();
     }
 
-    // Seed editor scene cache
-    // We need to call getScene to populate the cache for drag geometry
-    (activeEditor as unknown as Record<string, unknown>)['activePageIdx'] = 0;
+    activeEditorIdx = 0;
+    if (activeEditor) activeEditor.activePageIdx = 0;
 
-    // Enable Save button after successful import
-    if (saveBtn) saveBtn.disabled = false;
+    // Enable Save button
+    ui.saveButton.disabled = false;
 
-    // Update undo/redo button states
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
-  });
 
-  wirePageSelect(ui.pageSelect, (pageIdNum) => {
+    // Reset zoom on import
+    zoomPan.resetView();
+    ui.zoomDisplay.textContent = '100%';
+  }
+
+  // ─── 7. Page switch handler ───────────────────────────────────────────────
+  function handlePageSwitch(pageIdNum: number): void {
     if (!activeSession || activePages.length === 0) return;
     const token = pageIdNum as PageToken;
     const svg = activeSession.getPage(token);
@@ -120,71 +153,134 @@ async function bootstrap(): Promise<void> {
       mountSvg(ui.viewer, svg);
       const idx = activePages.findIndex((p) => p.pageId === token);
       if (idx >= 0) {
-        populatePageSelect(ui.pageSelect, activePages, idx);
-        // Update editor active page index
+        populatePageTabs(ui.pageTabContainer, activePages, idx, handlePageSwitch);
+        activeEditorIdx = idx;
         if (activeEditor) {
-          (activeEditor as unknown as Record<string, unknown>)['activePageIdx'] = idx;
-          // Clear selection on page switch
-          // Use public replay to refresh scene cache
-          // For now, we rely on the editor to re-apply correctly
+          activeEditor.activePageIdx = idx;
+          // Refresh editor scene for new page
+          activeEditor.refreshScene();
         }
+        // Reset zoom on page switch
+        zoomPan.resetView();
+        ui.zoomDisplay.textContent = '100%';
       }
     }
-  });
+  }
 
+  // ─── 8. Wire file input (from navbar File > Open) ─────────────────────────
+  wireFileInput(ui.fileInput, handleImport);
+
+  // ─── 9. Wire error dismiss ────────────────────────────────────────────────
   wireDismiss(ui.dismissButton, () => {
     hideError(ui.errorBanner);
   });
 
-  // Wire Save button
-  const saveBtn = ui.saveButton;
-  if (saveBtn) {
-    saveBtn.addEventListener('click', () => {
-      if (!activeSession) return;
-      const result = activeSession.exportDrawio();
-      if (result.ok) {
-        downloadDrawio(result.value, 'diagram.drawio');
-      } else {
-        showError(ui.errorBanner, ui.errorMessage, 'Export failed: ' + result.error);
-      }
-    });
-  }
+  // ─── 10. Wire Save button ─────────────────────────────────────────────────
+  ui.saveButton.addEventListener('click', () => {
+    if (!activeSession) return;
+    const result = activeSession.exportDrawio();
+    if (result.ok) {
+      downloadDrawio(result.value, 'diagram.drawio');
+    } else {
+      showError(ui.errorBanner, ui.errorMessage, 'Export failed: ' + result.error);
+    }
+  });
 
-  // Wire toolbar buttons
-  if (ui.undoButton) {
-    ui.undoButton.addEventListener('click', () => {
-      activeEditor?.undoCmd();
-      updateUndoRedoButtons(ui.undoButton, ui.redoButton);
-    });
-  }
-  if (ui.redoButton) {
-    ui.redoButton.addEventListener('click', () => {
-      activeEditor?.redoCmd();
-      updateUndoRedoButtons(ui.undoButton, ui.redoButton);
-    });
-  }
+  // ─── 11. Wire Undo/Redo buttons ───────────────────────────────────────────
+  ui.undoButton.addEventListener('click', () => {
+    activeEditor?.undoCmd();
+    updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+  });
+  ui.redoButton.addEventListener('click', () => {
+    activeEditor?.redoCmd();
+    updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+  });
+
+  // ─── 12. Wire palette tools ───────────────────────────────────────────────
   const rectBtn = ui.rectToolButton;
-  if (rectBtn) {
-    const ellipseBtn = ui.ellipseToolButton;
-    rectBtn.addEventListener('click', () => {
-      if (!activeEditor) return;
-      activeEditor.setActiveTool('rectangle');
-      ellipseBtn?.classList.remove('active-tool');
-      rectBtn.classList.toggle('active-tool', activeEditor.activeTool === 'rectangle');
-    });
-  }
   const ellipseBtn = ui.ellipseToolButton;
-  if (ellipseBtn) {
-    const rectBtn2 = ui.rectToolButton;
-    ellipseBtn.addEventListener('click', () => {
-      if (!activeEditor) return;
-      activeEditor.setActiveTool('ellipse');
-      rectBtn2?.classList.remove('active-tool');
-      ellipseBtn.classList.toggle('active-tool', activeEditor.activeTool === 'ellipse');
-    });
-  }
 
-  // Expose debug API for E2E tests
+  rectBtn.addEventListener('click', () => {
+    if (!activeEditor) return;
+    if (activeEditor.activeTool === 'rectangle') {
+      activeEditor.setActiveTool(null);
+      rectBtn.classList.remove('active-tool');
+      ellipseBtn.classList.remove('active-tool');
+    } else {
+      activeEditor.setActiveTool('rectangle');
+      rectBtn.classList.add('active-tool');
+      ellipseBtn.classList.remove('active-tool');
+    }
+  });
+
+  ellipseBtn.addEventListener('click', () => {
+    if (!activeEditor) return;
+    if (activeEditor.activeTool === 'ellipse') {
+      activeEditor.setActiveTool(null);
+      ellipseBtn.classList.remove('active-tool');
+      rectBtn.classList.remove('active-tool');
+    } else {
+      activeEditor.setActiveTool('ellipse');
+      ellipseBtn.classList.add('active-tool');
+      rectBtn.classList.remove('active-tool');
+    }
+  });
+
+  // ─── 13. Wire menu items ──────────────────────────────────────────────────
+
+  // File > Open - re-use fileInput
+  // File > Save
+  const menuSave = document.querySelector('[data-testid="menu-save"]');
+  menuSave?.addEventListener('click', () => {
+    ui.saveButton.click();
+  });
+
+  // Edit > Undo
+  const menuUndo = document.querySelector('[data-testid="menu-undo"]');
+  menuUndo?.addEventListener('click', () => {
+    ui.undoButton.click();
+  });
+
+  // Edit > Redo
+  const menuRedo = document.querySelector('[data-testid="menu-redo"]');
+  menuRedo?.addEventListener('click', () => {
+    ui.redoButton.click();
+  });
+
+  // Edit > Delete
+  const menuDelete = document.querySelector('[data-testid="menu-delete"]');
+  menuDelete?.addEventListener('click', () => {
+    // Simulate Delete key press
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
+  });
+
+  // View > Zoom In
+  const menuZoomIn = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(1)');
+  menuZoomIn?.addEventListener('click', () => {
+    zoomPan.setZoom(zoomPan.getZoom() + 0.2);
+    ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+  });
+
+  // View > Zoom Out
+  const menuZoomOut = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(2)');
+  menuZoomOut?.addEventListener('click', () => {
+    zoomPan.setZoom(zoomPan.getZoom() - 0.2);
+    ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+  });
+
+  // View > Zoom Reset
+  const menuZoomReset = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(3)');
+  menuZoomReset?.addEventListener('click', () => {
+    zoomPan.resetView();
+    ui.zoomDisplay.textContent = '100%';
+  });
+
+  // ─── 14. Listen for zoom changes from wheel events ────────────────────────
+  ui.canvasContainer.addEventListener('zoomchange', ((e: CustomEvent) => {
+    ui.zoomDisplay.textContent = `${Math.round(e.detail.zoom * 100)}%`;
+  }) as EventListener);
+
+  // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
   (window as unknown as Record<string, unknown>).__hodeiDebug = {
     getScene: () => {
       const result = activeEditor?.getSceneCache();
