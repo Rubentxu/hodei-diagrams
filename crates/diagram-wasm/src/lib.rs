@@ -3,7 +3,7 @@
 //! # Architecture
 //!
 //! This crate is a pure translator between JavaScript and the Rust diagram engine.
-//! 11 `#[wasm_bindgen]` free functions operate over an opaque `u32` handle into
+//! 12 `#[wasm_bindgen]` free functions operate over an opaque `u32` handle into
 //! a static `Slab`-backed `Editor` pool.
 //!
 //! # Error Handling
@@ -29,12 +29,14 @@
 
 mod commands;
 mod engine;
+mod export;
 mod import;
 mod render;
 mod scene;
 
 pub use commands::{engine_can_redo, engine_can_undo, execute_command, redo, undo};
 pub use engine::{create_engine, dispose_engine};
+pub use export::export_drawio;
 pub use import::import_drawio;
 pub use render::{render_pages, render_svg};
 pub use scene::get_scene;
