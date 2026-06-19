@@ -1,90 +1,106 @@
+/**
+ * ui.ts — Assembles the 5-zone layout from individual component builders.
+ *
+ * Preserves all existing data-testid attributes for backward compatibility
+ * with E2E tests.
+ */
+
 import type { PageRender } from './types.js';
+import { buildNavbar } from './navbar.js';
+import { buildSidebar } from './sidebar.js';
 
 export interface UiElements {
+  // Zone 1: Navbar
   fileInput: HTMLInputElement;
-  pageSelect: HTMLSelectElement;
+  undoButton: HTMLButtonElement;
+  redoButton: HTMLButtonElement;
+  saveButton: HTMLButtonElement;
+  zoomDisplay: HTMLSpanElement;
+
+  // Zone 2: Sidebar
+  rectToolButton: HTMLButtonElement;
+  ellipseToolButton: HTMLButtonElement;
+  sidebarCollapseBtn: HTMLButtonElement;
+
+  // Zone 3: Canvas
   viewer: HTMLElement;
+  canvasContainer: HTMLElement;
+
+  // Zone 4: Inspector
+  inspectorContainer: HTMLElement;
+
+  // Zone 5: Bottom
+  bottomBar: HTMLElement;
   errorBanner: HTMLElement;
   errorMessage: HTMLElement;
   dismissButton: HTMLButtonElement;
-  undoButton?: HTMLButtonElement;
-  redoButton?: HTMLButtonElement;
-  saveButton?: HTMLButtonElement;
-  rectToolButton?: HTMLButtonElement;
-  ellipseToolButton?: HTMLButtonElement;
+  pageTabContainer: HTMLElement;
+
+  // Core containers
+  app: HTMLElement;
+  navbar: HTMLElement;
+  sidebar: HTMLElement;
 }
 
-export function buildEmptyUi(root: HTMLElement): UiElements {
-  // Toolbar row
-  const toolbar = document.createElement('div');
-  toolbar.className = 'toolbar';
+/**
+ * Build the empty 5-zone UI layout.
+ * Returns references to all zones and critical elements for wiring.
+ */
+export function buildEmptyUi(
+  root: HTMLElement,
+  inspectorContainer?: HTMLElement,
+): UiElements {
+  root.innerHTML = '';
+  root.setAttribute('data-testid', 'app-grid');
 
-  // File input
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = '.drawio,.xml';
-  fileInput.setAttribute('data-testid', 'file-input');
+  // ─── Zone 1: Navbar ──────────────────────────────────────────────────────
+  const navbar = buildNavbar();
 
-  // Page select
-  const pageSelect = document.createElement('select');
-  pageSelect.className = 'page-select';
-  pageSelect.setAttribute('data-testid', 'page-select');
+  // ─── Zone 2: Sidebar ─────────────────────────────────────────────────────
+  const sidebar = buildSidebar();
 
-  toolbar.appendChild(fileInput);
-  toolbar.appendChild(pageSelect);
+  // ─── Zone 3: Canvas ──────────────────────────────────────────────────────
+  const canvasContainer = document.createElement('div');
+  canvasContainer.className = 'canvas-container';
+  canvasContainer.setAttribute('data-testid', 'canvas-container');
 
-  // Spacer
-  const spacer = document.createElement('span');
-  spacer.className = 'toolbar-spacer';
-  toolbar.appendChild(spacer);
+  const viewer = document.createElement('div');
+  viewer.className = 'viewer';
+  viewer.setAttribute('data-testid', 'viewer');
+  canvasContainer.appendChild(viewer);
 
-  // Undo / Redo buttons
-  const undoButton = document.createElement('button');
-  undoButton.textContent = 'Undo';
-  undoButton.disabled = true;
-  undoButton.setAttribute('data-testid', 'undo-btn');
-  toolbar.appendChild(undoButton);
+  // ─── Zone 4: Inspector ───────────────────────────────────────────────────
+  const inspContainer = inspectorContainer ?? document.createElement('div');
+  if (!inspectorContainer) {
+    inspContainer.className = 'inspector';
+    inspContainer.setAttribute('data-testid', 'inspector');
+  }
 
-  const redoButton = document.createElement('button');
-  redoButton.textContent = 'Redo';
-  redoButton.disabled = true;
-  redoButton.setAttribute('data-testid', 'redo-btn');
-  toolbar.appendChild(redoButton);
+  // ─── Zone 5: Bottom bar ──────────────────────────────────────────────────
+  const bottomBar = document.createElement('div');
+  bottomBar.className = 'bottom-bar';
+  bottomBar.setAttribute('data-testid', 'bottom-bar');
 
-  // Separator
-  const sep = document.createElement('span');
-  sep.className = 'toolbar-sep';
-  sep.textContent = '|';
-  toolbar.appendChild(sep);
+  const pageTabContainer = document.createElement('div');
+  pageTabContainer.className = 'page-tabs';
+  pageTabContainer.setAttribute('data-testid', 'page-tabs');
+  bottomBar.appendChild(pageTabContainer);
 
-  // Palette: Rectangle tool
-  const rectToolButton = document.createElement('button');
-  rectToolButton.textContent = 'Rect';
-  rectToolButton.setAttribute('data-testid', 'rect-tool-btn');
-  toolbar.appendChild(rectToolButton);
+  // Page add button (deferred)
+  const addPageBtn = document.createElement('button');
+  addPageBtn.className = 'page-tab-add';
+  addPageBtn.textContent = '+';
+  addPageBtn.title = 'Add page (v1.1)';
+  addPageBtn.disabled = true;
+  bottomBar.appendChild(addPageBtn);
 
-  // Palette: Ellipse tool
-  const ellipseToolButton = document.createElement('button');
-  ellipseToolButton.textContent = 'Ellipse';
-  ellipseToolButton.setAttribute('data-testid', 'ellipse-tool-btn');
-  toolbar.appendChild(ellipseToolButton);
+  const bottomSpacer = document.createElement('div');
+  bottomSpacer.className = 'bottom-spacer';
+  bottomBar.appendChild(bottomSpacer);
 
-  // Separator
-  const saveSep = document.createElement('span');
-  saveSep.className = 'toolbar-sep';
-  saveSep.textContent = '|';
-  toolbar.appendChild(saveSep);
-
-  // Save / Export button
-  const saveButton = document.createElement('button');
-  saveButton.textContent = 'Save .drawio';
-  saveButton.disabled = true;
-  saveButton.setAttribute('data-testid', 'save-btn');
-  toolbar.appendChild(saveButton);
-
-  // Error banner
+  // Diagnostics / error area
   const errorBanner = document.createElement('div');
-  errorBanner.className = 'error-banner';
+  errorBanner.className = 'diagnostics-area';
   errorBanner.setAttribute('data-testid', 'error-banner');
   errorBanner.hidden = true;
 
@@ -92,53 +108,106 @@ export function buildEmptyUi(root: HTMLElement): UiElements {
   errorMessage.className = 'error-message';
 
   const dismissButton = document.createElement('button');
-  dismissButton.textContent = 'Dismiss';
+  dismissButton.className = 'dismiss-btn';
+  dismissButton.textContent = '✕';
   dismissButton.setAttribute('data-testid', 'dismiss-error');
 
   errorBanner.appendChild(errorMessage);
   errorBanner.appendChild(dismissButton);
+  bottomBar.appendChild(errorBanner);
 
-  // Viewer container
-  const viewer = document.createElement('div');
-  viewer.className = 'viewer';
-  viewer.setAttribute('data-testid', 'viewer');
+  // ─── Assemble into grid ──────────────────────────────────────────────────
+  root.appendChild(navbar.container);
+  root.appendChild(sidebar.container);
+  root.appendChild(canvasContainer);
+  root.appendChild(inspContainer);
+  root.appendChild(bottomBar);
 
-  root.appendChild(toolbar);
-  root.appendChild(errorBanner);
-  root.appendChild(viewer);
+  // ─── Sidebar collapse toggle ────────────────────────────────────────────
+  sidebar.collapseBtn.addEventListener('click', () => {
+    const isCollapsed = sidebar.container.classList.toggle('collapsed');
+    root.classList.toggle('sidebar-collapsed', isCollapsed);
+    sidebar.collapseBtn.textContent = isCollapsed ? '▶' : '◀';
+    sidebar.collapseBtn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+    try {
+      localStorage.setItem('hodei:sidebar-collapsed', String(isCollapsed));
+    } catch {
+      // localStorage may be unavailable
+    }
+  });
+
+  // Restore collapsed state
+  try {
+    if (localStorage.getItem('hodei:sidebar-collapsed') === 'true') {
+      sidebar.container.classList.add('collapsed');
+      root.classList.add('sidebar-collapsed');
+      sidebar.collapseBtn.textContent = '▶';
+      sidebar.collapseBtn.title = 'Expand sidebar';
+    }
+  } catch {
+    // localStorage may be unavailable
+  }
 
   return {
-    fileInput,
-    pageSelect,
+    // Zone 1
+    fileInput: navbar.fileInput,
+    undoButton: navbar.undoBtn,
+    redoButton: navbar.redoBtn,
+    saveButton: navbar.saveBtn,
+    zoomDisplay: navbar.zoomDisplay,
+
+    // Zone 2
+    rectToolButton: sidebar.rectToolBtn,
+    ellipseToolButton: sidebar.ellipseToolBtn,
+    sidebarCollapseBtn: sidebar.collapseBtn,
+
+    // Zone 3
     viewer,
+    canvasContainer,
+
+    // Zone 4
+    inspectorContainer: inspContainer,
+
+    // Zone 5
+    bottomBar,
     errorBanner,
     errorMessage,
     dismissButton,
-    undoButton,
-    redoButton,
-    saveButton,
-    rectToolButton,
-    ellipseToolButton,
+    pageTabContainer,
+
+    // Core
+    app: root,
+    navbar: navbar.container,
+    sidebar: sidebar.container,
   };
 }
 
-export function populatePageSelect(
-  select: HTMLSelectElement,
+// ─── Page Tab Management ──────────────────────────────────────────────────────
+
+/** Update page tabs in the bottom bar. */
+export function populatePageTabs(
+  container: HTMLElement,
   pages: ReadonlyArray<PageRender>,
   activeIndex: number,
+  onChange: (_pageId: number) => void,
 ): void {
-  select.innerHTML = '';
+  container.innerHTML = '';
   for (const [i, page] of pages.entries()) {
-    const opt = document.createElement('option');
-    opt.textContent = page.name;
-    opt.value = String(page.pageId);
+    const tab = document.createElement('button');
+    tab.className = 'page-tab';
+    tab.textContent = page.name;
+    tab.setAttribute('data-testid', `page-tab-${i}`);
     if (i === activeIndex) {
-      opt.selected = true;
+      tab.classList.add('active');
     }
-    select.appendChild(opt);
+    tab.addEventListener('click', () => {
+      onChange(page.pageId);
+    });
+    container.appendChild(tab);
   }
-  select.disabled = pages.length === 1;
 }
+
+// ─── Error Display ────────────────────────────────────────────────────────────
 
 export function showError(banner: HTMLElement, messageEl: HTMLElement, message: string): void {
   messageEl.textContent = message;
@@ -148,6 +217,8 @@ export function showError(banner: HTMLElement, messageEl: HTMLElement, message: 
 export function hideError(banner: HTMLElement): void {
   banner.hidden = true;
 }
+
+// ─── File Input Wiring ────────────────────────────────────────────────────────
 
 export function wireFileInput(fileInput: HTMLInputElement, onFile: (_xml: string) => void): void {
   fileInput.addEventListener('change', () => {
@@ -159,23 +230,11 @@ export function wireFileInput(fileInput: HTMLInputElement, onFile: (_xml: string
       onFile(text);
     });
     reader.addEventListener('error', () => {
-      // FileReader error - file couldn't be read
+      // FileReader error — file couldn't be read
     });
     reader.readAsText(file);
     // Reset so same file can be re-selected
     fileInput.value = '';
-  });
-}
-
-export function wirePageSelect(
-  select: HTMLSelectElement,
-  onChange: (_pageId: number) => void,
-): void {
-  select.addEventListener('change', () => {
-    const val = parseInt(select.value, 10);
-    if (!isNaN(val)) {
-      onChange(val);
-    }
   });
 }
 

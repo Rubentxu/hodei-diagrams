@@ -81,3 +81,20 @@ export interface ScenePage {
   height: number;
   display_list: Record<string, unknown>[];
 }
+
+// ─── Style Types ──────────────────────────────────────────────────────────────
+
+/** Style changes payload for the ChangeStyle command. */
+export interface StyleChanges {
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  dashed?: boolean;
+  rounded?: boolean;
+  fontFamily?: string;
+  fontSize?: number;
+  fontColor?: string;
+  bold?: boolean;
+  italic?: boolean;
+  [key: string]: unknown;
+}

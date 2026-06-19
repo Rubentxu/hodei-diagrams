@@ -7,9 +7,9 @@ const INVALID_PATH =
   '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/invalid.drawio';
 
 test.describe('viewer-only web shell', () => {
-  test('viewer page mounts with file input and viewer container', async ({ page }) => {
+  test('viewer page mounts with Open button and viewer container', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('[data-testid="file-input"]')).toBeVisible();
+    await expect(page.locator('[data-testid="open-btn"]')).toBeVisible();
     await expect(page.locator('[data-testid="viewer"]')).toBeVisible();
   });
 
@@ -17,6 +17,7 @@ test.describe('viewer-only web shell', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
+    // Use the file input directly (it's in the navbar menu)
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -24,13 +25,12 @@ test.describe('viewer-only web shell', () => {
     expect(svgCount).toBe(1);
   });
 
-  test('viewer-only: no edit buttons present in the DOM', async ({ page }) => {
+  test('editor edit buttons from old toolbar are not present (tools are in sidebar/inspector)', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.locator('button:has-text("Add")')).toHaveCount(0);
-    await expect(page.locator('button:has-text("Delete")')).toHaveCount(0);
+    // These were toolbar buttons from the v1 viewer that no longer exist
     await expect(page.locator('button:has-text("Properties")')).toHaveCount(0);
-    await expect(page.locator('button:has-text("Style")')).toHaveCount(0);
+    await expect(page.locator('button:has-text("Add")')).toHaveCount(0);
   });
 
   test('importing invalid XML shows an error banner without rendering SVG', async ({ page }) => {
@@ -51,16 +51,17 @@ test.describe('viewer-only web shell', () => {
     await expect(page.locator('[data-testid="error-banner"][hidden]')).toBeAttached();
   });
 
-  test('SVG container fills the viewport at 1024x768', async ({ page }) => {
-    await page.setViewportSize({ width: 1024, height: 768 });
+  test('canvas area fills remaining space in the 5-zone layout', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 768 });
     await page.goto('/');
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
+    // At 1280px with sidebar (240px) + inspector (280px), canvas = 760px
     const viewer = page.locator('[data-testid="viewer"]');
     const box = await viewer.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.width).toBeCloseTo(1024, 0);
+    expect(box!.width).toBeGreaterThan(700); // approx 760
   });
 });

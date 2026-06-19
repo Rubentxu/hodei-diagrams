@@ -3,7 +3,7 @@ import type { SlotmapId, ScenePage } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 
 /** Active tool from the palette. */
-export type ToolKind = 'rectangle' | 'ellipse' | null;
+export type ToolKind = 'rectangle' | 'rounded-rect' | 'ellipse' | null;
 
 /** Drag FSM state. */
 interface DragState {
@@ -18,6 +18,8 @@ interface DragState {
 type ErrorCallback = (_msg: string) => void;
 /** State-change callback type (fired after every successful command). */
 type StateChangeCallback = () => void;
+/** Selection-change callback type (fired when selection changes). */
+type SelectionChangeCallback = (_id: SlotmapId | null) => void;
 
 /**
  * Editor class: owns hit-testing, selection, drag FSM, and command construction.
@@ -38,6 +40,8 @@ export class Editor {
   #activePageIdx = 0;
   #onError: ErrorCallback;
   #onStateChange: StateChangeCallback;
+  #onSelectionChange: SelectionChangeCallback;
+  #getZoom: () => number;
   #abortController: AbortController | null = null;
 
   constructor(
@@ -45,11 +49,15 @@ export class Editor {
     viewer: HTMLElement,
     onError?: ErrorCallback,
     onStateChange?: StateChangeCallback,
+    onSelectionChange?: SelectionChangeCallback,
+    getZoom?: () => number,
   ) {
     this.#session = session;
     this.#viewer = viewer;
     this.#onError = onError ?? (() => {});
     this.#onStateChange = onStateChange ?? (() => {});
+    this.#onSelectionChange = onSelectionChange ?? (() => {});
+    this.#getZoom = getZoom ?? (() => 1);
   }
 
   /** Current selection. */
@@ -143,6 +151,18 @@ export class Editor {
     this.#replay();
   }
 
+  // ─── Coordinate Conversion ───────────────────────────────────────────────
+
+  /** Convert screen client coordinates to document-space coordinates, accounting for zoom. */
+  #clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.#viewer.getBoundingClientRect();
+    const zoom = this.#getZoom();
+    return {
+      x: (clientX - rect.left) / zoom,
+      y: (clientY - rect.top) / zoom,
+    };
+  }
+
   /** Refresh scene cache and re-render. Called after commands. */
   #replay(): void {
     // Refresh scene cache
@@ -191,6 +211,8 @@ export class Editor {
         el.classList.add('selected');
       }
     }
+    // Notify selection change (for inspector, etc.)
+    this.#onSelectionChange(id);
   }
 
   /** After re-render, validate selection and re-apply CSS class. */
@@ -220,6 +242,7 @@ export class Editor {
     if (!stillExists) {
       // Selection is stale — clear it
       this.#selectedId = null;
+      this.#onSelectionChange(null);
       return;
     }
 
@@ -230,6 +253,7 @@ export class Editor {
       el.classList.add('selected');
     } else {
       this.#selectedId = null;
+      this.#onSelectionChange(null);
     }
   }
 
@@ -271,12 +295,13 @@ export class Editor {
     // Set pointer capture and start drag tracking
     this.#viewer.setPointerCapture(e.pointerId);
 
+    const docPos = this.#clientToDoc(e.clientX, e.clientY);
     this.#dragState = {
       vertexId: hit,
-      startX: e.offsetX,
-      startY: e.offsetY,
-      currentX: e.offsetX,
-      currentY: e.offsetY,
+      startX: docPos.x,
+      startY: docPos.y,
+      currentX: docPos.x,
+      currentY: docPos.y,
     };
 
     // Add drag-specific listeners (stored references for cleanup)
@@ -291,8 +316,9 @@ export class Editor {
 
   #onPointerMove(e: PointerEvent): void {
     if (!this.#dragState) return;
-    this.#dragState.currentX = e.offsetX;
-    this.#dragState.currentY = e.offsetY;
+    const docPos = this.#clientToDoc(e.clientX, e.clientY);
+    this.#dragState.currentX = docPos.x;
+    this.#dragState.currentY = docPos.y;
 
     const dx = this.#dragState.currentX - this.#dragState.startX;
     const dy = this.#dragState.currentY - this.#dragState.startY;
@@ -420,8 +446,6 @@ export class Editor {
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        // Scene elements are externally-tagged: {"Rect": {"id": ..., "bounds": ...}}
-        // Iterate through possible variant keys
         for (const key of ['Rect', 'RoundedRect', 'Ellipse'] as const) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
@@ -452,8 +476,12 @@ export class Editor {
   #onPaletteClick(e: PointerEvent): void {
     if (!this.#activeTool) return;
 
-    const kind = this.#activeTool === 'rectangle' ? 'Rectangle' : 'Ellipse';
-    const cmd = this.#buildAddVertexCmd(kind, e.offsetX, e.offsetY);
+    const kind = this.#activeTool === 'rectangle' || this.#activeTool === 'rounded-rect'
+      ? 'Rectangle'
+      : 'Ellipse';
+
+    const docPos = this.#clientToDoc(e.clientX, e.clientY);
+    const cmd = this.#buildAddVertexCmd(kind, docPos.x, docPos.y);
     const r = this.#session.executeCommand(cmd);
     if (!r.ok) {
       this.#onError(r.error);
