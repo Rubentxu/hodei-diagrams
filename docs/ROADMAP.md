@@ -101,6 +101,7 @@ Ubicación prevista de clones: `/var/home/rubentxu/Proyectos/rust/_upstream/` (i
 | 0040 | Diagram-WASM Dependency Clarification |
 | 0041 | Web Shell Vite + Vitest + Playwright Toolchain |
 | 0042 | Web Shell Editor Surface v1.1 |
+| 0043 | diagram-commands depends on diagram-format-drawio for IdMap storage |
 
 ## Reglas de Actualización
 
