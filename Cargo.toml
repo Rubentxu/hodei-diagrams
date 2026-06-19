@@ -9,6 +9,7 @@ members = [
     "crates/diagram-render-svg",
     "crates/diagram-wasm",
     "crates/diagram-routing",
+    "crates/diagram-layout",
 ]
 
 [workspace.package]
@@ -35,6 +36,9 @@ base64 = "0.22"
 similar = "2"
 walkdir = "2"
 ignore = "0.4"
+
+# Layout
+petgraph = "0.8"
 
 # Routing
 rstar = "0.13"
