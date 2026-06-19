@@ -5,9 +5,11 @@ TypeScript viewer shell for the Hodei Diagrams Diagram Engine. Loads `.drawio` f
 ## Architecture
 
 - **Viewer-only v1**: Import `.drawio` + render SVG. No editing capabilities.
+- **Editor v1.1**: Click-to-select, drag-to-move, delete, undo/redo (Ctrl+Z/Y), palette (rectangle/ellipse). All mutations via `executeCommand`.
 - **DiagramEngineSession**: Single TypeScript class wrapping the WASM bridge. All engine communication goes through it.
-- **SVG-string injection**: The engine renders SVG strings; the shell injects them into the DOM. No Scene JSON parsing in the shell.
-- **NO domain logic, NO style logic, NO editing logic** — everything delegates to the Rust engine.
+- **SVG-string injection**: The engine renders SVG strings; the shell injects them into the DOM.
+- **editor.ts**: New module for hit-testing, selection state, drag FSM, command construction. Never imports `./wasm`.
+- **NO domain logic, NO style logic, NO editing logic** — everything delegates to the Rust engine. Shell only builds command JSON payloads.
 
 The shell is **outside** the Rust workspace (`crates/`). See:
 - `docs/adr/0002-typescript-web-shell-rust-engine.md`
@@ -42,8 +44,8 @@ npm run test:e2e
 | `npm run build:wasm` | Build diagram-wasm for wasm32 target |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript strict check |
-| `npm test` | Vitest unit tests (26 tests) |
-| `npm run test:e2e` | Playwright E2E tests (6 tests) |
+| `npm test` | Vitest unit tests (83 tests) |
+| `npm run test:e2e` | Playwright E2E tests (12 tests) |
 | `npm run verify` | Full verification pipeline |
 
 ## Directory Structure
@@ -55,9 +57,10 @@ web-shell/
 │   ├── main.ts         # Entry: load WASM → create session → wire UI
 │   ├── session.ts      # DiagramEngineSession — sole WASM boundary
 │   ├── wasm-loader.ts  # WASM module loading
-│   ├── renderer.ts     # SVG injection into DOM
-│   ├── ui.ts           # File input, page nav, error display
-│   └── types.ts        # Branded types, Result<T>, PageRender
+│   ├── renderer.ts     # SVG injection into DOM, applySelectionClass
+│   ├── ui.ts           # File input, page nav, error display, toolbar
+│   ├── editor.ts       # Hit-test, selection, drag FSM, command builders
+│   └── types.ts        # Branded types, Result<T>, PageRender, SlotmapId, ScenePage
 ├── tests/
 │   ├── session.test.ts # Vitest unit tests (mocked WASM)
 │   └── e2e/
@@ -67,5 +70,5 @@ web-shell/
 
 ## Status
 
-**v0.5.1** — Viewer-only v1 complete. 26 unit tests + 6 E2E tests passing.
-Editor surface deferred to v1.1.
+**v0.5.2** — Viewer v1 + Editor v1.1 complete. 83 unit tests + 12 E2E tests passing.
+Capabilities: import, page navigation, click-to-select, drag-to-move, delete, undo/redo, palette (rectangle + ellipse).

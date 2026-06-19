@@ -1,7 +1,7 @@
 {
   "name": "hodei-diagrams-web-shell",
   "version": "0.1.0",
-  "description": "Minimal TypeScript web shell for the Hodei Diagrams engine — viewer-only v1",
+  "description": "TypeScript web shell for the Hodei Diagrams engine — viewer v1 + editor v1.1",
   "type": "module",
   "private": true,
   "peerWasmVersion": "0.5.0",
