@@ -1,5 +1,6 @@
 //! Visual element to SVG conversion.
 
+use diagram_core::VertexId;
 use diagram_scene::{
     EllipseElement, GroupElement, LineElement, PathElement, RectElement, RoundedRectElement,
     TextElement, VisualElement,
@@ -8,6 +9,19 @@ use diagram_scene::{
 use crate::clip::ClipPathManager;
 use crate::escape::escape_text;
 use crate::style::{AttrContext, style_to_attrs};
+
+/// Serialize a `VertexId` to a `data-vertex-id` attribute string.
+///
+/// Format: `data-vertex-id="idx:version"` — compact, no quote-escaping needed
+/// in SVG attributes. Both fields are required for slotmap lookups.
+fn vid_attr(id: &VertexId) -> String {
+    let v = serde_json::to_value(id).expect("VertexId should serialize");
+    let idx = v["idx"].as_u64().expect("VertexId idx should be u64");
+    let version = v["version"]
+        .as_u64()
+        .expect("VertexId version should be u64");
+    format!(" data-vertex-id=\"{idx}:{version}\"")
+}
 
 /// Converts a `VisualElement` to an SVG string.
 ///
@@ -38,17 +52,25 @@ fn make_indent(indent: usize) -> String {
 fn rect_to_svg(r: &RectElement, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = style_to_attrs(&r.style, AttrContext::Shape);
+    let vid = vid_attr(&r.id);
     format!(
-        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}/>",
-        ind, r.bounds.origin.x, r.bounds.origin.y, r.bounds.size.width, r.bounds.size.height, style
+        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}/>",
+        ind,
+        r.bounds.origin.x,
+        r.bounds.origin.y,
+        r.bounds.size.width,
+        r.bounds.size.height,
+        vid,
+        style
     )
 }
 
 fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = style_to_attrs(&r.style, AttrContext::Shape);
+    let vid = vid_attr(&r.id);
     format!(
-        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\"{}/>",
+        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\"{}{}/>",
         ind,
         r.bounds.origin.x,
         r.bounds.origin.y,
@@ -56,6 +78,7 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
         r.bounds.size.height,
         r.radius,
         r.radius,
+        vid,
         style
     )
 }
@@ -63,13 +86,14 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
 fn ellipse_to_svg(e: &EllipseElement, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = style_to_attrs(&e.style, AttrContext::Shape);
+    let vid = vid_attr(&e.id);
     let cx = e.bounds.origin.x + e.bounds.size.width / 2.0;
     let cy = e.bounds.origin.y + e.bounds.size.height / 2.0;
     let rx = e.bounds.size.width / 2.0;
     let ry = e.bounds.size.height / 2.0;
     format!(
-        "{}<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"{}/>",
-        ind, cx, cy, rx, ry, style
+        "{}<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"{}{}/>",
+        ind, cx, cy, rx, ry, vid, style
     )
 }
 

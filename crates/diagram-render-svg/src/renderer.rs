@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn render_page_contains_no_engine_ids() {
+    fn render_page_contains_data_vertex_id() {
         let rect = VisualElement::Rect(RectElement {
             id: VertexId::default(),
             bounds: Rect {
@@ -208,6 +208,10 @@ mod tests {
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
         let result = renderer.render(&scene, PageId::default()).unwrap();
+        assert!(
+            result.contains("data-vertex-id=\""),
+            "SVG should contain data-vertex-id attribute: {result}"
+        );
         assert!(!result.contains("vertex#"));
         assert!(!result.contains("edge#"));
         assert!(!result.contains("group#"));

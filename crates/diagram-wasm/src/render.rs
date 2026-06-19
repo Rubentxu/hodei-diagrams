@@ -1,7 +1,6 @@
 //! SVG rendering: render scene pages to SVG strings.
 
 use crate::engine::with_editor;
-use diagram_core::PageId;
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::SceneBuilder;
 use wasm_bindgen::prelude::*;
@@ -14,26 +13,36 @@ struct PageRender {
 
 /// Render a single page to an SVG string.
 ///
-/// The `page_id_json` must be a JSON string representing the `PageId` (slotmap key).
+/// The `page_idx` is the flat `u64` index from `render_pages` page_id field.
 ///
 /// # Errors
 ///
-/// - `InvalidPageId: <detail>` if the JSON cannot be parsed as PageId
 /// - `InvalidHandle` if the engine handle is invalid
 /// - `SceneError: <detail>` if scene building fails
-/// - `PageNotFound: <page_id>` if the requested page does not exist
+/// - `PageNotFound: <page_idx>` if the requested page does not exist
 #[wasm_bindgen]
-pub fn render_svg(handle: u32, page_id_json: &str) -> Result<String, JsValue> {
-    // Parse PageId from JSON inside the closure so errors convert to &'static str
+pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
     with_editor(handle, |e| {
-        let page_id: PageId = serde_json::from_str(page_id_json)
-            .map_err(|e| Box::leak(format!("InvalidPageId: {e}").into_boxed_str()) as &str)?;
-
         let scene = SceneBuilder::new()
             .build(e.model())
             .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
+
+        // Find the page whose slotmap idx matches the flat u64 index
+        let page = scene
+            .pages
+            .iter()
+            .find(|p| {
+                serde_json::to_value(p.page_id)
+                    .ok()
+                    .and_then(|v| v["idx"].as_u64())
+                    == Some(page_idx)
+            })
+            .ok_or_else(|| {
+                Box::leak(format!("PageNotFound: {page_idx}").into_boxed_str()) as &str
+            })?;
+
         SvgRenderer::new()
-            .render(&scene, page_id)
+            .render(&scene, page.page_id)
             .map_err(|err| Box::leak(format!("{err:?}").into_boxed_str()) as &str)
     })
     .and_then(|r| r)
