@@ -21,8 +21,8 @@
 use diagram_core::PageId;
 
 use diagram_wasm::{
-    create_engine, dispose_engine, engine_can_redo, engine_can_undo, execute_command, get_scene,
-    import_drawio, redo, render_pages, render_svg, undo,
+    create_engine, dispose_engine, engine_can_redo, engine_can_undo, execute_command,
+    export_drawio, get_scene, import_drawio, redo, render_pages, render_svg, undo,
 };
 
 /// Helper: create a temporary engine, run f, then dispose it.
@@ -366,6 +366,65 @@ fn import_drawio_resets_history() {
         assert!(
             !engine_can_redo(handle).expect("can_redo should succeed"),
             "can_redo should be false after import"
+        );
+    });
+}
+
+// ─── Export Round-trip ────────────────────────────────────────────────────────
+
+#[test]
+fn export_drawio_roundtrip() {
+    with_engine(|handle| {
+        // Import the simple-rect fixture
+        let xml = include_str!("../fixtures/simple-rect.drawio");
+        import_drawio(handle, xml).expect("import_drawio should succeed");
+
+        // Export back to XML
+        let exported = export_drawio(handle).expect("export_drawio should succeed");
+
+        // Assert exported XML has the expected structure
+        assert!(
+            exported.contains("<mxGraphModel"),
+            "exported XML should contain <mxGraphModel>: {}",
+            exported
+        );
+        assert!(
+            exported.contains("<root>"),
+            "exported XML should contain <root>: {}",
+            exported
+        );
+        assert!(
+            exported.contains("<mxCell"),
+            "exported XML should contain <mxCell>: {}",
+            exported
+        );
+
+        // Re-import the exported XML
+        import_drawio(handle, &exported).expect("re-import should succeed");
+
+        // Verify scene is healthy (render works)
+        let scene_json = get_scene(handle).expect("get_scene should succeed");
+        let scene: serde_json::Value =
+            serde_json::from_str(&scene_json).expect("scene should be valid JSON");
+        let pages = scene["pages"].as_array().expect("pages should be array");
+        assert_eq!(pages.len(), 1, "re-imported scene should have 1 page");
+    });
+}
+
+/// JsValue::from_str is only available on wasm32; on native, constructing a
+/// JsValue panics. This error-path test requires the wasm32 target.
+#[cfg(target_arch = "wasm32")]
+#[test]
+fn export_drawio_fresh_engine_errors() {
+    with_engine(|handle| {
+        // Fresh engine with no import — id_map is None
+        let result = export_drawio(handle);
+        assert!(result.is_err(), "export on fresh engine should error");
+        let err = result.unwrap_err();
+        let err_str = format!("{:?}", err);
+        assert!(
+            err_str.contains("ExportFailed: no import context"),
+            "error should mention 'no import context': {err_str}"
         );
     });
 }
