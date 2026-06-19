@@ -3,12 +3,12 @@
 //! Uses DFS-based back-edge detection to find and reverse edges that
 //! create cycles, producing a DAG suitable for layer assignment.
 
-use petgraph::visit::{depth_first_search, DfsEvent};
+use petgraph::visit::{DfsEvent, depth_first_search};
 
+use crate::LayoutStage;
 use crate::config::LayoutConfig;
 use crate::error::LayoutResult;
 use crate::hierarchy::HierarchyModel;
-use crate::LayoutStage;
 
 /// The cycle removal stage.
 ///
@@ -66,8 +66,8 @@ impl LayoutStage for CycleRemover {
 mod tests {
     use super::*;
     use diagram_core::id::{EdgeId, VertexId};
-    use petgraph::visit::depth_first_search;
     use petgraph::visit::DfsEvent;
+    use petgraph::visit::depth_first_search;
 
     use crate::config::Direction;
 
@@ -99,7 +99,9 @@ mod tests {
         model.add_edge(b, c, EdgeId::default(), false);
 
         let remover = CycleRemover;
-        remover.execute(&mut model, &LayoutConfig::default()).unwrap();
+        remover
+            .execute(&mut model, &LayoutConfig::default())
+            .unwrap();
 
         assert_eq!(count_reversed(&model), 0);
         assert!(!has_cycle(&model));
@@ -122,7 +124,9 @@ mod tests {
         model.add_edge(b, a, e2, false);
 
         let remover = CycleRemover;
-        remover.execute(&mut model, &LayoutConfig::default()).unwrap();
+        remover
+            .execute(&mut model, &LayoutConfig::default())
+            .unwrap();
 
         assert!(
             count_reversed(&model) >= 1,
@@ -142,7 +146,9 @@ mod tests {
         model.add_edge(c, a, EdgeId::default(), false);
 
         let remover = CycleRemover;
-        remover.execute(&mut model, &LayoutConfig::default()).unwrap();
+        remover
+            .execute(&mut model, &LayoutConfig::default())
+            .unwrap();
 
         assert!(
             count_reversed(&model) >= 1,
@@ -168,7 +174,9 @@ mod tests {
         model.add_edge(d, e, EdgeId::default(), false);
 
         let remover = CycleRemover;
-        remover.execute(&mut model, &LayoutConfig::default()).unwrap();
+        remover
+            .execute(&mut model, &LayoutConfig::default())
+            .unwrap();
 
         assert!(!has_cycle(&model), "graph should be fully acyclic");
         // D→E should still be D→E (unreversed)

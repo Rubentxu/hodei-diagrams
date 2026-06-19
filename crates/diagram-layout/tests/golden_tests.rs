@@ -5,7 +5,7 @@
 //! tests that exercise the full parse → layout → write cycle.
 
 use diagram_core::store::ModelStore;
-use diagram_format_drawio::{parse_drawio, DrawioMapping};
+use diagram_format_drawio::{DrawioMapping, parse_drawio};
 
 use diagram_layout::{Direction, HierarchicalLayout, LayoutConfig};
 
@@ -147,9 +147,17 @@ fn deterministic_output() {
 
     // Sort positions by y then x for comparison
     let mut first_sorted = first_positions.clone();
-    first_sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.partial_cmp(&b.0).unwrap()));
+    first_sorted.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1)
+            .unwrap()
+            .then(a.0.partial_cmp(&b.0).unwrap())
+    });
     let mut second_sorted = second_positions.clone();
-    second_sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.partial_cmp(&b.0).unwrap()));
+    second_sorted.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1)
+            .unwrap()
+            .then(a.0.partial_cmp(&b.0).unwrap())
+    });
 
     for (i, ((x1, y1), (x2, y2))) in first_sorted.iter().zip(second_sorted.iter()).enumerate() {
         assert!(
@@ -249,8 +257,5 @@ fn disconnected_components_stacked() {
         pos_by_id.len()
     );
     let gap = pos_by_id[2].1 - pos_by_id[1].1;
-    assert!(
-        gap > 0.0,
-        "G2 should start above G1 (gap {gap})"
-    );
+    assert!(gap > 0.0, "G2 should start above G1 (gap {gap})");
 }

@@ -6,10 +6,10 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use crate::LayoutStage;
 use crate::config::LayoutConfig;
 use crate::error::LayoutResult;
 use crate::hierarchy::{HierarchyModel, NodeIx};
-use crate::LayoutStage;
 
 /// The layer assignment stage.
 ///
@@ -102,7 +102,10 @@ fn longest_path_ranking(model: &HierarchyModel) -> HashMap<NodeIx, usize> {
 /// no edges (isolated vertices) are NOT stacked — they all stay at the
 /// base offset since they share rank 0 and are positioned horizontally
 /// by coordinate assignment.
-fn stack_components(model: &HierarchyModel, mut rank: HashMap<NodeIx, usize>) -> HashMap<NodeIx, usize> {
+fn stack_components(
+    model: &HierarchyModel,
+    mut rank: HashMap<NodeIx, usize>,
+) -> HashMap<NodeIx, usize> {
     let components = find_weakly_connected_components(model);
     if components.len() <= 1 {
         return rank;
@@ -231,9 +234,7 @@ fn insert_dummy_nodes(model: &mut HierarchyModel) {
             // Find source/target by searching edge endpoints
             let (source, target) = {
                 let g = model.graph();
-                let (s, t) = g
-                    .edge_endpoints(eix)
-                    .expect("edge endpoints should exist");
+                let (s, t) = g.edge_endpoints(eix).expect("edge endpoints should exist");
                 (s, t)
             };
             let src_rank = node_rank.get(&source).copied().unwrap_or(0);
@@ -277,8 +278,8 @@ fn insert_dummy_nodes(model: &mut HierarchyModel) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagram_core::id::{EdgeId, VertexId};
     use crate::config::Direction;
+    use diagram_core::id::{EdgeId, VertexId};
 
     fn rank_of(model: &HierarchyModel, ix: NodeIx) -> Option<usize> {
         for (r, nodes) in model.ranks.iter().enumerate() {

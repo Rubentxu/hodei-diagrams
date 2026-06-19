@@ -6,10 +6,10 @@
 
 use std::collections::HashMap;
 
+use crate::LayoutStage;
 use crate::config::LayoutConfig;
 use crate::error::LayoutResult;
 use crate::hierarchy::{HierarchyModel, NodeIx};
-use crate::LayoutStage;
 
 /// The crossing reduction stage.
 ///
@@ -130,14 +130,8 @@ fn weighted_median(
         let right = sorted[len / 2];
         // Weighted median: average of two middle elements
         // Using positions from the neighbor rank
-        let left_pos = sorted[..len / 2]
-            .iter()
-            .filter(|&&p| p <= left)
-            .count();
-        let right_pos = sorted[len / 2..]
-            .iter()
-            .filter(|&&p| p >= right)
-            .count();
+        let left_pos = sorted[..len / 2].iter().filter(|&&p| p <= left).count();
+        let right_pos = sorted[len / 2..].iter().filter(|&&p| p >= right).count();
         if left_pos == right_pos {
             (left as f64 + right as f64) / 2.0
         } else if left_pos > right_pos {
@@ -280,8 +274,8 @@ fn share_original_edge(model: &HierarchyModel, a: NodeIx, b: NodeIx) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagram_core::id::{EdgeId, VertexId};
     use crate::config::Direction;
+    use diagram_core::id::{EdgeId, VertexId};
 
     #[test]
     fn already_planar_stays_planar() {

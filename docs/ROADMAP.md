@@ -44,7 +44,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 - [x] `web-shell` (editor surface v1.1) — click, drag, palette, command execution ✅
 - [x] `diagram-wasm` (export_drawio) — enable "Save as .drawio" ✅
 - [x] `diagram-routing` — orthogonal edge routing v1 ✅
-- [ ] `diagram-layout` — layout algorithms _(requiere estudio upstream, ADR-0029)_
+- [x] `diagram-layout` — Sugiyama HierarchicalLayout v1 (4-stage pipeline, TopToBottom + LeftToRight) ✅
 - [ ] `diagram-render-wgpu` — renderer WebGPU
 
 ## External Study Triggers

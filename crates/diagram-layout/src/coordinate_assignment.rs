@@ -4,10 +4,10 @@
 //! within layers, minPath edge straightening for dummy chains, and spacing
 //! constraint resolution.
 
+use crate::LayoutStage;
 use crate::config::LayoutConfig;
 use crate::error::LayoutResult;
 use crate::hierarchy::{HierarchyModel, NodeIx};
-use crate::LayoutStage;
 
 /// The coordinate assignment stage.
 ///
@@ -101,10 +101,7 @@ fn positions_converged(model: &HierarchyModel, prev: &[f64], threshold: f64) -> 
 fn compute_initial_x(model: &mut HierarchyModel, intra_cell_spacing: f64) {
     for r in 0..model.rank_count() {
         let nodes: Vec<NodeIx> = model.ranks[r].clone();
-        let total_width: f64 = nodes
-            .iter()
-            .map(|&ix| node_width(model, ix))
-            .sum();
+        let total_width: f64 = nodes.iter().map(|&ix| node_width(model, ix)).sum();
         let gaps = (nodes.len().saturating_sub(1)) as f64 * intra_cell_spacing;
         let start_x = -total_width / 2.0 - gaps / 2.0;
 
@@ -172,10 +169,7 @@ fn compute_start_x_for_rank(model: &HierarchyModel, medians: &[(NodeIx, f64)], i
     if medians.is_empty() {
         return 0.0;
     }
-    let total_width: f64 = medians
-        .iter()
-        .map(|&(ix, _)| node_width(model, ix))
-        .sum();
+    let total_width: f64 = medians.iter().map(|&(ix, _)| node_width(model, ix)).sum();
     let gaps = (medians.len().saturating_sub(1)) as f64 * intra;
     -(total_width + gaps) / 2.0
 }
@@ -328,8 +322,8 @@ fn compute_y_positions(model: &mut HierarchyModel, inter_rank_spacing: f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagram_core::id::{EdgeId, VertexId};
     use crate::config::Direction;
+    use diagram_core::id::{EdgeId, VertexId};
 
     #[test]
     fn vertices_get_finite_positions() {
@@ -446,14 +440,8 @@ mod tests {
 
         for ix in model.node_indices() {
             let (x, y) = model.node_position(ix).unwrap();
-            assert!(
-                x.abs() <= 1e6,
-                "x ({x}) must be within ±1e6"
-            );
-            assert!(
-                y.abs() <= 1e6,
-                "y ({y}) must be within ±1e6"
-            );
+            assert!(x.abs() <= 1e6, "x ({x}) must be within ±1e6");
+            assert!(y.abs() <= 1e6, "y ({y}) must be within ±1e6");
         }
     }
 

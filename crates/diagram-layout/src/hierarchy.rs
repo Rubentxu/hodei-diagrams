@@ -94,7 +94,9 @@ impl HierarchyModel {
 
     /// Add a real vertex node to the graph.
     pub fn add_real_node(&mut self, id: VertexId, width: f64, height: f64) -> NodeIx {
-        let ix = self.graph.add_node(HierarchyNode::Real { id, width, height });
+        let ix = self
+            .graph
+            .add_node(HierarchyNode::Real { id, width, height });
         // Extend positions vec to match (default to 0,0)
         let idx = ix.index();
         while self.positions.len() <= idx {
@@ -116,9 +118,21 @@ impl HierarchyModel {
     /// Add an edge between two nodes.
     ///
     /// Returns the index of the new edge.
-    pub fn add_edge(&mut self, source: NodeIx, target: NodeIx, edge_id: EdgeId, reversed: bool) -> EdgeIndex {
-        self.graph
-            .add_edge(source, target, HierarchyEdgeData { id: edge_id, reversed })
+    pub fn add_edge(
+        &mut self,
+        source: NodeIx,
+        target: NodeIx,
+        edge_id: EdgeId,
+        reversed: bool,
+    ) -> EdgeIndex {
+        self.graph.add_edge(
+            source,
+            target,
+            HierarchyEdgeData {
+                id: edge_id,
+                reversed,
+            },
+        )
     }
 
     /// Borrow a node by index.
@@ -173,13 +187,13 @@ impl HierarchyModel {
 
     /// Return incoming neighbors (predecessors) of a node.
     pub fn neighbors_incoming(&self, ix: NodeIx) -> impl Iterator<Item = NodeIx> {
-        self.graph.neighbors_directed(ix, petgraph::Direction::Incoming)
+        self.graph
+            .neighbors_directed(ix, petgraph::Direction::Incoming)
     }
 
     /// Return all neighbors (both incoming and outgoing) of a node.
     pub fn neighbors_all(&self, ix: NodeIx) -> impl Iterator<Item = NodeIx> {
-        self.graph
-            .neighbors_undirected(ix)
+        self.graph.neighbors_undirected(ix)
     }
 
     /// Returns `true` if the node is a real vertex.

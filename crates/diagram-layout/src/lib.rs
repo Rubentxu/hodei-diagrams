@@ -222,7 +222,7 @@ mod tests {
 
     fn make_store_with_topology(
         vertices: &[(f64, f64, f64, f64)], // (x, y, w, h)
-        edges: &[(usize, usize)],           // (source_idx, target_idx)
+        edges: &[(usize, usize)],          // (source_idx, target_idx)
     ) -> (ModelStore, PageId) {
         let mut store = ModelStore::new();
 
@@ -284,7 +284,9 @@ mod tests {
         // All vertices have been repositioned
         for vid in store.vertices_with_ids().map(|(id, _)| id) {
             let v = store.vertex(vid).unwrap();
-            let g = v.geometry.expect("vertex should have geometry after layout");
+            let g = v
+                .geometry
+                .expect("vertex should have geometry after layout");
             assert!(g.x.is_finite(), "x must be finite");
             assert!(g.y.is_finite(), "y must be finite");
             // At least some vertices moved from (0,0)
@@ -298,10 +300,7 @@ mod tests {
     #[test]
     fn layout_never_creates_or_deletes_cells() {
         let (mut store, page_id) = make_store_with_topology(
-            &[
-                (0.0, 0.0, 120.0, 60.0),
-                (200.0, 0.0, 120.0, 60.0),
-            ],
+            &[(0.0, 0.0, 120.0, 60.0), (200.0, 0.0, 120.0, 60.0)],
             &[(0, 1)],
         );
 
@@ -317,10 +316,7 @@ mod tests {
     #[test]
     fn layout_preserves_vertex_geometry_size() {
         let (mut store, page_id) = make_store_with_topology(
-            &[
-                (0.0, 0.0, 120.0, 60.0),
-                (200.0, 0.0, 120.0, 60.0),
-            ],
+            &[(0.0, 0.0, 120.0, 60.0), (200.0, 0.0, 120.0, 60.0)],
             &[(0, 1)],
         );
 
@@ -349,10 +345,7 @@ mod tests {
 
     #[test]
     fn single_vertex_no_edges() {
-        let (mut store, page_id) = make_store_with_topology(
-            &[(0.0, 0.0, 120.0, 60.0)],
-            &[],
-        );
+        let (mut store, page_id) = make_store_with_topology(&[(0.0, 0.0, 120.0, 60.0)], &[]);
 
         let layout = HierarchicalLayout::with_default_config();
         layout.layout(&mut store, page_id).unwrap();
@@ -427,10 +420,7 @@ mod tests {
     #[test]
     fn waypoints_reset_after_layout() {
         let (mut store, page_id) = make_store_with_topology(
-            &[
-                (0.0, 0.0, 120.0, 60.0),
-                (200.0, 0.0, 120.0, 60.0),
-            ],
+            &[(0.0, 0.0, 120.0, 60.0), (200.0, 0.0, 120.0, 60.0)],
             &[(0, 1)],
         );
 
