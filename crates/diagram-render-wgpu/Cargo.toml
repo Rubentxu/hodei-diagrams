@@ -1,0 +1,27 @@
+[package]
+name = "diagram-render-wgpu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+description = "WebGPU rendering backend for the Hodei diagram engine."
+
+[dependencies]
+diagram-scene = { path = "../diagram-scene" }
+wgpu = "29"
+bytemuck = { version = "1", features = ["derive"] }
+encase = "0.10"
+thiserror = { workspace = true }
+smallvec = { workspace = true }
+
+[dev-dependencies]
+
+[features]
+visual-tests = []
+
+[lints.rust]
+# unsafe_code is denied at the crate level via `#![deny(unsafe_code)]` in lib.rs,
+# with a documented carve-out in buffers.rs (bytemuck Pod/Zeroable derive).
+# Using `forbid` here would prevent the carve-out, so we use `deny` in lib.rs instead.
