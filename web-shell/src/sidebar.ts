@@ -48,12 +48,39 @@ const GENERAL_SHAPES: ShapeEntry[] = [
   },
 ];
 
+/** Category icons mapping for future categories */
+const CATEGORY_ICONS: Record<string, string> = {
+  'General': '⬜',
+  'Arrows': '➡️',
+  'Flowchart': '🔄',
+  'UML': '📐',
+  'BPMN': '🏭',
+  'AWS': '☁️',
+  'Azure': '🔷',
+  'GCP': '🌐',
+  'Kubernetes': '⚙️',
+  'Terraform': '🏗️',
+  'Jenkins': '🔧',
+  'Databases': '🗄️',
+  'C4': '🏛️',
+  'Network': '🌐',
+  'Database': '🗄️',
+  'Mockups': '📱',
+};
+
 const FUTURE_CATEGORIES = [
   'Arrows',
   'Flowchart',
   'UML',
   'BPMN',
   'AWS',
+  'Azure',
+  'GCP',
+  'Kubernetes',
+  'Terraform',
+  'Jenkins',
+  'Databases',
+  'C4',
   'Network',
   'Database',
   'Mockups',
@@ -125,6 +152,11 @@ export function buildSidebar(): SidebarControls {
   const generalHeader = document.createElement('div');
   generalHeader.className = 'category-header';
 
+  const generalIcon = document.createElement('span');
+  generalIcon.className = 'category-icon';
+  generalIcon.textContent = '⬜';
+  generalHeader.appendChild(generalIcon);
+
   const generalTitle = document.createElement('span');
   generalTitle.className = 'category-title';
   generalTitle.textContent = 'General';
@@ -175,6 +207,11 @@ export function buildSidebar(): SidebarControls {
 
     const catHeader = document.createElement('div');
     catHeader.className = 'category-header';
+
+    const catIcon = document.createElement('span');
+    catIcon.className = 'category-icon';
+    catIcon.textContent = CATEGORY_ICONS[cat] ?? '📄';
+    catHeader.appendChild(catIcon);
 
     const catTitle = document.createElement('span');
     catTitle.className = 'category-title';

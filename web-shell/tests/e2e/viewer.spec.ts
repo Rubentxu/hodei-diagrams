@@ -29,7 +29,8 @@ test.describe('viewer-only web shell', () => {
     await page.goto('/');
 
     // These were toolbar buttons from the v1 viewer that no longer exist
-    await expect(page.locator('button:has-text("Properties")')).toHaveCount(0);
+    // Note: "Properties" menu item exists in File menu, but no toolbar button with that text
+    await expect(page.locator('.quick-controls button:has-text("Properties")')).toHaveCount(0);
     await expect(page.locator('button:has-text("Add")')).toHaveCount(0);
   });
 
