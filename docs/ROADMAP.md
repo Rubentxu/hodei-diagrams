@@ -5,7 +5,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.5.3 — 7 crates + web-shell viewer + editor v1.1 + exportDrawio.** 245+83 unit tests + 25 E2E tests en web-shell. 43 ADRs (0001-0043). 21 PRs mergeados.
+**v0.5.4 — 8 crates + web-shell viewer + editor v1.1 + exportDrawio + diagram-routing v1.** 250+83 unit tests + 4 golden routing tests + 25 E2E tests en web-shell. 44 ADRs (0001-0044). 22 PRs mergeados.
 
 | Crate | Status |
 |-------|--------|
@@ -16,6 +16,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 | `diagram-scene` | ✅ |
 | `diagram-render-svg` | ✅ |
 | `diagram-wasm` | ✅ |
+| `diagram-routing` | ✅ |
 | `web-shell` (viewer v1) | ✅ |
 
 ## Active Track
@@ -31,7 +32,8 @@ Para rationale de decisiones, ver `docs/adr/`.
 | `feat/diagram-scene` | #6, #7, #8, #9, #10 | ✅ |
 | `feat/diagram-render-svg` | #11, #12, #13, #14 | ✅ |
 | `feat/diagram-wasm` | #15, #16, #17, #18, #19 | ✅ |
-| `feat/web-shell-v1` | #20 (current) | 🔄 PR open |
+| `feat/web-shell-v1` | #20 | ✅ |
+| `feat/diagram-routing` | #22 (current) | 🔄 PR open |
 
 ## Chained Milestones
 
@@ -41,7 +43,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 - [x] `web-shell` (viewer v1) ✅
 - [x] `web-shell` (editor surface v1.1) — click, drag, palette, command execution ✅
 - [x] `diagram-wasm` (export_drawio) — enable "Save as .drawio" ✅
-- [ ] `diagram-routing` — connector routing _(requiere estudio upstream, ADR-0029)_
+- [x] `diagram-routing` — orthogonal edge routing v1 ✅
 - [ ] `diagram-layout` — layout algorithms _(requiere estudio upstream, ADR-0029)_
 - [ ] `diagram-render-wgpu` — renderer WebGPU
 
@@ -102,6 +104,7 @@ Ubicación prevista de clones: `/var/home/rubentxu/Proyectos/rust/_upstream/` (i
 | 0041 | Web Shell Vite + Vitest + Playwright Toolchain |
 | 0042 | Web Shell Editor Surface v1.1 |
 | 0043 | diagram-commands depends on diagram-format-drawio for IdMap storage |
+| 0044 | Routing Architecture — Data vs Algorithm |
 
 ## Reglas de Actualización
 

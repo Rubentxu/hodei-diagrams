@@ -1,0 +1,23 @@
+<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="A" value="A" vertex="1">
+          <mxGeometry x="100" y="100" width="50" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="B" value="B" vertex="1">
+          <mxGeometry x="300" y="100" width="50" height="50" as="geometry"/>
+        </mxCell>
+        <!-- Horizontal straight edge: east(150,125) → west(300,125) -->
+        <mxCell id="e1" edge="1" source="A" target="B">
+          <mxGeometry>
+            <Array as="points">
+              <mxPoint x="150" y="125"/>
+              <mxPoint x="300" y="125"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -8,10 +8,11 @@ members = [
     "crates/diagram-scene",
     "crates/diagram-render-svg",
     "crates/diagram-wasm",
+    "crates/diagram-routing",
 ]
 
 [workspace.package]
-version = "0.5.3"
+version = "0.5.4"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -34,6 +35,10 @@ base64 = "0.22"
 similar = "2"
 walkdir = "2"
 ignore = "0.4"
+
+# Routing
+rstar = "0.13"
+pathfinding = "4.15"
 
 # WASM adapter
 wasm-bindgen = "0.2"
