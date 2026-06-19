@@ -27,6 +27,7 @@ export default [
         ...globals.browser,
         ...globals.es2022,
         process: 'readonly',
+        Buffer: 'readonly',
       },
     },
     plugins: {
