@@ -129,25 +129,55 @@ fn node_width(model: &HierarchyModel, ix: NodeIx) -> f64 {
 /// Median refinement: for each node, set x to median of its neighbors' x.
 fn median_refine(model: &mut HierarchyModel, _intra_cell_spacing: f64) {
     for r in 0..model.rank_count() {
-        for &ix in &model.ranks[r].clone() {
-            let neighbor_xs: Vec<f64> = model
-                .neighbors_all(ix)
-                .filter_map(|n| model.node_position(n))
-                .map(|(x, _)| x)
-                .collect();
+        let nodes: Vec<NodeIx> = model.ranks[r].clone();
+        // Collect (node, median) pairs and sort by median, then by node index for stability
+        let mut medians: Vec<(NodeIx, f64)> = nodes
+            .iter()
+            .map(|&ix| {
+                let neighbor_xs: Vec<f64> = model
+                    .neighbors_all(ix)
+                    .filter_map(|n| model.node_position(n))
+                    .map(|(x, _)| x)
+                    .collect();
 
-            if neighbor_xs.is_empty() {
-                continue;
-            }
+                if neighbor_xs.is_empty() {
+                    // No neighbors — keep current x, use existing position if available
+                    let current_x = model.node_position(ix).map(|(x, _)| x).unwrap_or(0.0);
+                    return (ix, current_x);
+                }
 
-            let mut sorted = neighbor_xs.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            let median = sorted[sorted.len() / 2];
+                let mut sorted = neighbor_xs.clone();
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let median = sorted[sorted.len() / 2];
+                (ix, median)
+            })
+            .collect();
 
-            // Update position with median, keeping y at 0 for now
-            model.set_position(ix, median, 0.0);
+        // Stable sort by median only — equal medians preserve original order (stable sort)
+        medians.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Apply sorted positions — first in sorted order gets the leftmost x
+        let intra = _intra_cell_spacing;
+        let mut cx = compute_start_x_for_rank(model, &medians, intra);
+        for &(ix, _) in &medians {
+            let w = node_width(model, ix);
+            model.set_position(ix, cx + w / 2.0, 0.0);
+            cx += w + intra;
         }
     }
+}
+
+/// Compute starting x position for median-sorted nodes so the layer is centered.
+fn compute_start_x_for_rank(model: &HierarchyModel, medians: &[(NodeIx, f64)], intra: f64) -> f64 {
+    if medians.is_empty() {
+        return 0.0;
+    }
+    let total_width: f64 = medians
+        .iter()
+        .map(|&(ix, _)| node_width(model, ix))
+        .sum();
+    let gaps = (medians.len().saturating_sub(1)) as f64 * intra;
+    -(total_width + gaps) / 2.0
 }
 
 /// Resolve overlaps within each layer via left-to-right sweep.

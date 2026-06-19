@@ -161,6 +161,7 @@ name = "diagram-layout"
 version = "0.5.4"
 dependencies = [
  "diagram-core",
+ "diagram-format-drawio",
  "petgraph",
  "thiserror",
 ]

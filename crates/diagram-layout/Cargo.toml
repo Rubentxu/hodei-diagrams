@@ -12,5 +12,8 @@ diagram-core = { path = "../diagram-core" }
 petgraph = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+diagram-format-drawio = { path = "../diagram-format-drawio" }
+
 [lints.rust]
 unsafe_code = "forbid"
