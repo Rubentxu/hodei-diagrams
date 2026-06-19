@@ -199,9 +199,15 @@ describe('Editor', () => {
       const rect = viewer.querySelector('[data-vertex-id="0:0"]')!;
 
       // Use plain MouseEvent - JSDOM compatible
-      rect.dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true, clientX: 10, clientY: 20 }));
-      viewer.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 15, clientY: 20 }));
-      viewer.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 15, clientY: 20 }));
+      rect.dispatchEvent(
+        new MouseEvent('pointerdown', { button: 0, bubbles: true, clientX: 10, clientY: 20 }),
+      );
+      viewer.dispatchEvent(
+        new MouseEvent('pointermove', { bubbles: true, clientX: 15, clientY: 20 }),
+      );
+      viewer.dispatchEvent(
+        new MouseEvent('pointerup', { bubbles: true, clientX: 15, clientY: 20 }),
+      );
 
       expect(wasm.execute_command).toHaveBeenCalled();
       const cmd = wasm.execute_command.mock.calls[0]?.[1] as string;
@@ -268,7 +274,13 @@ describe('Editor', () => {
       wasm.execute_command.mockReturnValue(undefined);
 
       viewer.dispatchEvent(
-        createPointerDownEvent({ button: 0, clientX: 150, clientY: 100, offsetX: 150, offsetY: 100 }),
+        createPointerDownEvent({
+          button: 0,
+          clientX: 150,
+          clientY: 100,
+          offsetX: 150,
+          offsetY: 100,
+        }),
       );
 
       expect(wasm.execute_command).toHaveBeenCalled();
@@ -283,7 +295,13 @@ describe('Editor', () => {
       wasm.execute_command.mockReturnValue(undefined);
 
       viewer.dispatchEvent(
-        createPointerDownEvent({ button: 0, clientX: 200, clientY: 150, offsetX: 200, offsetY: 150 }),
+        createPointerDownEvent({
+          button: 0,
+          clientX: 200,
+          clientY: 150,
+          offsetX: 200,
+          offsetY: 150,
+        }),
       );
 
       expect(wasm.execute_command).toHaveBeenCalled();

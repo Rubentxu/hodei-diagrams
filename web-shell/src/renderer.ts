@@ -31,10 +31,7 @@ export function clear(container: HTMLElement): void {
  * Apply or clear the `.selected` CSS class on elements with `data-vertex-id`.
  * Called after re-render to restore selection highlight.
  */
-export function applySelectionClass(
-  viewer: HTMLElement,
-  id: SlotmapId | null,
-): void {
+export function applySelectionClass(viewer: HTMLElement, id: SlotmapId | null): void {
   // Remove .selected from all elements
   viewer.querySelectorAll('[data-vertex-id]').forEach((el) => {
     el.classList.remove('selected');

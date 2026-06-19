@@ -2,7 +2,6 @@ import type { DiagramEngineSession } from './session.js';
 import type { SlotmapId, ScenePage } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 
-
 /** Active tool from the palette. */
 export type ToolKind = 'rectangle' | 'ellipse' | null;
 
@@ -207,7 +206,10 @@ export class Editor {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (idField?.idx === this.#selectedId!.idx && idField?.version === this.#selectedId!.version) {
+          if (
+            idField?.idx === this.#selectedId!.idx &&
+            idField?.version === this.#selectedId!.version
+          ) {
             return true;
           }
         }
@@ -360,11 +362,7 @@ export class Editor {
   }
 
   /** Build an AddVertex command JSON string. */
-  #buildAddVertexCmd(
-    kind: 'Rectangle' | 'Ellipse',
-    x: number,
-    y: number,
-  ): string {
+  #buildAddVertexCmd(kind: 'Rectangle' | 'Ellipse', x: number, y: number): string {
     const width = kind === 'Rectangle' ? 120 : 80;
     const height = 80;
     const payload: Record<string, unknown> = {
@@ -495,10 +493,7 @@ export class Editor {
     }
 
     // Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z → Redo
-    if (
-      (e.ctrlKey || e.metaKey) &&
-      (e.key === 'y' || (e.key === 'z' && e.shiftKey))
-    ) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
       e.preventDefault();
       this.redoCmd();
       return;

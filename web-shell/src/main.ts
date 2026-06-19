@@ -95,11 +95,8 @@ async function bootstrap(): Promise<void> {
 
     // Wire editor after successful import
     if (!activeEditor) {
-      activeEditor = new Editor(
-        activeSession,
-        ui.viewer,
-        onEditorError,
-        () => updateUndoRedoButtons(ui.undoButton, ui.redoButton),
+      activeEditor = new Editor(activeSession, ui.viewer, onEditorError, () =>
+        updateUndoRedoButtons(ui.undoButton, ui.redoButton),
       );
       activeEditor.attach();
     }

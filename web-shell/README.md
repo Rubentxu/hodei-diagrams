@@ -12,6 +12,7 @@ TypeScript viewer shell for the Hodei Diagrams Diagram Engine. Loads `.drawio` f
 - **NO domain logic, NO style logic, NO editing logic** — everything delegates to the Rust engine. Shell only builds command JSON payloads.
 
 The shell is **outside** the Rust workspace (`crates/`). See:
+
 - `docs/adr/0002-typescript-web-shell-rust-engine.md`
 - `docs/adr/0004-minimal-wasm-boundary-with-shared-buffers.md`
 - `docs/adr/0017-diagram-wasm-as-thin-technical-adapter.md`
@@ -37,16 +38,16 @@ npm run test:e2e
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Vite dev server |
-| `npm run build` | Vite production build |
+| Command              | Description                          |
+| -------------------- | ------------------------------------ |
+| `npm run dev`        | Vite dev server                      |
+| `npm run build`      | Vite production build                |
 | `npm run build:wasm` | Build diagram-wasm for wasm32 target |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | TypeScript strict check |
-| `npm test` | Vitest unit tests (83 tests) |
-| `npm run test:e2e` | Playwright E2E tests (12 tests) |
-| `npm run verify` | Full verification pipeline |
+| `npm run lint`       | ESLint                               |
+| `npm run typecheck`  | TypeScript strict check              |
+| `npm test`           | Vitest unit tests (83 tests)         |
+| `npm run test:e2e`   | Playwright E2E tests (12 tests)      |
+| `npm run verify`     | Full verification pipeline           |
 
 ## Directory Structure
 

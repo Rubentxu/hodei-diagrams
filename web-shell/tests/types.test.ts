@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  parseSlotmapAttr,
-  slotmapIdToField,
-  ok,
-  err,
-} from '../src/types.js';
+import { parseSlotmapAttr, slotmapIdToField, ok, err } from '../src/types.js';
 
 describe('SlotmapId helpers', () => {
   it('parseSlotmapAttr parses "0:0" correctly', () => {

@@ -41,7 +41,10 @@ impl From<String> for StyleValue {
 }
 
 /// Ordered collection of style key/value pairs.
+///
+/// Serialized as a flat JSON object `{"key": "value", ...}` via `#[serde(transparent)]`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct StyleMap {
     /// Underlying map; `BTreeMap` for deterministic iteration order.
     entries: BTreeMap<String, StyleValue>,
