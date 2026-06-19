@@ -5,7 +5,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.5.2 — 7 crates + web-shell viewer + editor v1.1.** 83 unit tests + 12 E2E tests en web-shell. 42 ADRs (0001-0042). 20 PRs mergeados.
+**v0.5.3 — 7 crates + web-shell viewer + editor v1.1 + exportDrawio.** 245+83 unit tests + 25 E2E tests en web-shell. 43 ADRs (0001-0043). 21 PRs mergeados.
 
 | Crate | Status |
 |-------|--------|
@@ -40,7 +40,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 - [x] `diagram-wasm` — thin WASM adapter ✅
 - [x] `web-shell` (viewer v1) ✅
 - [x] `web-shell` (editor surface v1.1) — click, drag, palette, command execution ✅
-- [ ] `diagram-wasm` (export_drawio) — enable "Save as .drawio"
+- [x] `diagram-wasm` (export_drawio) — enable "Save as .drawio" ✅
 - [ ] `diagram-routing` — connector routing _(requiere estudio upstream, ADR-0029)_
 - [ ] `diagram-layout` — layout algorithms _(requiere estudio upstream, ADR-0029)_
 - [ ] `diagram-render-wgpu` — renderer WebGPU
