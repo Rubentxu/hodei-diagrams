@@ -483,6 +483,7 @@ name = "diagram-render-wgpu"
 version = "0.5.4"
 dependencies = [
  "bytemuck",
+ "diagram-core",
  "diagram-scene",
  "encase",
  "raw-window-handle",

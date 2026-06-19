@@ -19,6 +19,7 @@ winit = "0.30"
 raw-window-handle = "0.6"
 
 [dev-dependencies]
+diagram-core = { path = "../diagram-core" }
 
 [features]
 visual-tests = []
