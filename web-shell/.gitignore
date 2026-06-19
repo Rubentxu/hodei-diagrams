@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.vite/
+src/wasm/
+playwright-report/
+test-results/
+coverage/
+*.log
