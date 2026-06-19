@@ -84,7 +84,12 @@ async function bootstrap(): Promise<void> {
 
     // Wire editor after successful import
     if (!activeEditor) {
-      activeEditor = new Editor(activeSession, ui.viewer, onEditorError);
+      activeEditor = new Editor(
+        activeSession,
+        ui.viewer,
+        onEditorError,
+        () => updateUndoRedoButtons(ui.undoButton, ui.redoButton),
+      );
       activeEditor.attach();
     }
 
@@ -153,18 +158,17 @@ async function bootstrap(): Promise<void> {
       ellipseBtn.classList.toggle('active-tool', activeEditor.activeTool === 'ellipse');
     });
   }
-}
 
-// Hook editor replay to update toolbar after each command
-// Monkey-patch the Editor's replay via the error callback (or proxy)
-// We'll use a MutationObserver-or... simpler: just call updateUndoRedoButtons
-// in the onError callback won't help for success. Let's use a setInterval for now
-// or better: intercept the replay by patching.
-//
-// Actually the cleanest approach: set up a periodic check for undo/redo state
-// But for reliability, let's patch the Editor's replay by wrapping it.
-// For v1.1, we'll use a simple polling approach after interactions.
-// Actually, the buttons are updated in the click handlers already.
+  // Expose debug API for E2E tests
+  (window as unknown as Record<string, unknown>).__hodeiDebug = {
+    getScene: () => {
+      const result = activeEditor?.getSceneCache();
+      if (!result || !result.ok) return [];
+      return result.value;
+    },
+    getSession: () => activeSession,
+  };
+}
 
 bootstrap().catch((e) => {
   console.error('Bootstrap failed:', e);

@@ -29,9 +29,16 @@ type RemovedPage = (
 pub struct AddVertexPayload {
     /// The vertex to insert.
     pub vertex: Vertex,
+    /// Optional inline style map. When provided, the style is inserted into the store
+    /// and assigned to the vertex before insertion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<StyleMap>,
     /// The ID assigned by the store during `apply`. Used by `undo`.
     #[serde(skip)]
     pub inserted_id: Option<VertexId>,
+    /// The style ID created for inline style. Used by `undo` for cleanup.
+    #[serde(skip)]
+    pub inserted_style_id: Option<StyleId>,
     /// Whether this command has been applied.
     #[serde(skip)]
     applied: bool,
@@ -42,14 +49,23 @@ impl AddVertexPayload {
     pub fn new(vertex: Vertex) -> Self {
         Self {
             vertex,
+            style: None,
             inserted_id: None,
+            inserted_style_id: None,
             applied: false,
         }
     }
 
     /// Apply the add-vertex operation.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
-        let id = model.store.insert_vertex(self.vertex.clone());
+        let mut v = self.vertex.clone();
+        // If inline style was provided, insert it and assign to vertex
+        if let Some(ref style_map) = self.style {
+            let sid = model.store.insert_style(style_map.clone());
+            v.style_id = Some(sid);
+            self.inserted_style_id = Some(sid);
+        }
+        let id = model.store.insert_vertex(v);
         self.inserted_id = Some(id);
         self.applied = true;
         Ok(())
@@ -62,6 +78,10 @@ impl AddVertexPayload {
         }
         let id = self.inserted_id.take().ok_or(CommandError::NotApplied)?;
         model.store.remove_vertex(id);
+        // Clean up the inline style if we created one
+        if let Some(sid) = self.inserted_style_id.take() {
+            model.store.remove_style(sid);
+        }
         self.applied = false;
         Ok(())
     }

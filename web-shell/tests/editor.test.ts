@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Editor } from '../src/editor.js';
 import { DiagramEngineSession } from '../src/session.js';
 
 // JSDOM does not provide PointerEvent or setPointerCapture; polyfill both
 function createPointerDownEvent(init?: Record<string, unknown>): Event {
-  const ev = new MouseEvent('pointerdown', { ...init, bubbles: true } as MouseEventInit);
+  // eslint-disable-next-line no-undef
+  const ev = new MouseEvent('pointerdown', { ...init, bubbles: true } as unknown as MouseEventInit);
   Object.defineProperty(ev, 'pointerId', { value: (init?.pointerId as number) ?? 0 });
   Object.defineProperty(ev, 'offsetX', { value: (init?.offsetX as number) ?? 0 });
   Object.defineProperty(ev, 'offsetY', { value: (init?.offsetY as number) ?? 0 });
@@ -13,7 +14,8 @@ function createPointerDownEvent(init?: Record<string, unknown>): Event {
 }
 
 function createPointerMoveEvent(init?: Record<string, unknown>): Event {
-  const ev = new MouseEvent('pointermove', { ...init, bubbles: true } as MouseEventInit);
+  // eslint-disable-next-line no-undef
+  const ev = new MouseEvent('pointermove', { ...init, bubbles: true } as unknown as MouseEventInit);
   Object.defineProperty(ev, 'clientX', { value: (init?.clientX as number) ?? 0 });
   Object.defineProperty(ev, 'clientY', { value: (init?.clientY as number) ?? 0 });
   Object.defineProperty(ev, 'offsetX', { value: (init?.offsetX as number) ?? 0 });
@@ -22,7 +24,8 @@ function createPointerMoveEvent(init?: Record<string, unknown>): Event {
 }
 
 function createPointerUpEvent(init?: Record<string, unknown>): Event {
-  const ev = new MouseEvent('pointerup', { ...init, bubbles: true } as MouseEventInit);
+  // eslint-disable-next-line no-undef
+  const ev = new MouseEvent('pointerup', { ...init, bubbles: true } as unknown as MouseEventInit);
   return ev;
 }
 
@@ -193,7 +196,6 @@ describe('Editor', () => {
 
     it('drag with sufficient movement dispatches MoveVertex', () => {
       const rect = viewer.querySelector('[data-vertex-id="0:0"]')!;
-      const rectEl = viewer.querySelector('rect')! as HTMLElement;
 
       // Use plain MouseEvent - JSDOM compatible
       rect.dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true, clientX: 10, clientY: 20 }));

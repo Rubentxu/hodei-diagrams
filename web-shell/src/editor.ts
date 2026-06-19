@@ -1,7 +1,7 @@
 import type { DiagramEngineSession } from './session.js';
 import type { SlotmapId, ScenePage } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
-import { applySelectionClass } from './renderer.js';
+
 
 /** Active tool from the palette. */
 export type ToolKind = 'rectangle' | 'ellipse' | null;
@@ -16,7 +16,9 @@ interface DragState {
 }
 
 /** Error callback type. */
-type ErrorCallback = (msg: string) => void;
+type ErrorCallback = (_msg: string) => void;
+/** State-change callback type (fired after every successful command). */
+type StateChangeCallback = () => void;
 
 /**
  * Editor class: owns hit-testing, selection, drag FSM, and command construction.
@@ -36,16 +38,19 @@ export class Editor {
   #activePageSlotId: SlotmapId | null = null;
   #activePageIdx = 0;
   #onError: ErrorCallback;
+  #onStateChange: StateChangeCallback;
   #abortController: AbortController | null = null;
 
   constructor(
     session: DiagramEngineSession,
     viewer: HTMLElement,
     onError?: ErrorCallback,
+    onStateChange?: StateChangeCallback,
   ) {
     this.#session = session;
     this.#viewer = viewer;
     this.#onError = onError ?? (() => {});
+    this.#onStateChange = onStateChange ?? (() => {});
   }
 
   /** Current selection. */
@@ -101,6 +106,11 @@ export class Editor {
         }
       }
     }
+  }
+
+  /** Get scene cache for E2E debugging. */
+  getSceneCache(): { ok: true; value: ScenePage[] } | { ok: false; error: string } {
+    return { ok: true, value: this.#sceneCache };
   }
 
   /** Detach event listeners from the viewer container. */
@@ -159,6 +169,8 @@ export class Editor {
     // Inject SVG into viewer container
     const svg = renderResult.value;
     this.#viewer.innerHTML = svg;
+    // Notify state change (e.g. for undo/redo button updates)
+    this.#onStateChange();
 
     // Re-apply selection if still valid
     this.#reapplySelection();
@@ -353,24 +365,27 @@ export class Editor {
     x: number,
     y: number,
   ): string {
-    const width = kind === 'Rectangle' ? 120 : 100;
-    const height = kind === 'Rectangle' ? 80 : 80;
-    return JSON.stringify({
-      AddVertex: {
-        vertex: {
-          geometry: {
-            x,
-            y,
-            width,
-            height,
-            relative: false,
-          },
-          page_id: this.#activePageSlotId
-            ? slotmapIdToField(this.#activePageSlotId)
-            : { idx: 0, version: 0 },
+    const width = kind === 'Rectangle' ? 120 : 80;
+    const height = 80;
+    const payload: Record<string, unknown> = {
+      vertex: {
+        geometry: {
+          x,
+          y,
+          width,
+          height,
+          relative: false,
         },
+        page_id: this.#activePageSlotId
+          ? slotmapIdToField(this.#activePageSlotId)
+          : { idx: 0, version: 0 },
       },
-    });
+    };
+    // Include inline style for ellipse (engine classifies by shape=ellipse)
+    if (kind === 'Ellipse') {
+      payload.style = { shape: 'ellipse' };
+    }
+    return JSON.stringify({ AddVertex: payload });
   }
 
   // ─── Command Execution ───────────────────────────────────────────────────

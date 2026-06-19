@@ -12,16 +12,26 @@ test.describe('G5 smoke test: getScene() in browser', () => {
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Call getScene via page.evaluate
+    // Call getScene via window.__debug (exposed by main.ts for E2E)
     const sceneResult = await page.evaluate(() => {
-      // Access the session through the module's activeSession reference
-      // We need to expose this - for now, try to access via window or check
-      // if the module exposes it. We'll use a simpler approach: check the
-      // document for the expected SVG content which confirms get_scene was called.
-      return null; // Placeholder - real test needs session access
+      const debug = (window as unknown as Record<string, unknown>).__hodeiDebug as
+        | { getScene: () => unknown }
+        | undefined;
+      if (!debug?.getScene) return { error: 'debug.getScene not available' };
+      return debug.getScene();
     });
 
-    // Verify the SVG was rendered (confirms get_scene worked via editor's refreshScene)
+    // Validate scene shape
+    expect(sceneResult).not.toHaveProperty('error');
+    const scene = sceneResult as Record<string, unknown>;
+    expect(Array.isArray(scene)).toBe(true);
+    expect(scene.length).toBeGreaterThan(0);
+    const page0 = scene[0] as Record<string, unknown>;
+    expect(page0).toHaveProperty('page_id');
+    expect(page0).toHaveProperty('display_list');
+    expect(Array.isArray(page0.display_list)).toBe(true);
+
+    // Verify the SVG was rendered
     const svgCount = await page.locator('[data-testid="viewer"] svg').count();
     expect(svgCount).toBe(1);
   });
