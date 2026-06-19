@@ -103,6 +103,13 @@ export function buildNavbar(): NavbarControls {
   const viewList = document.createElement('div');
   viewList.className = 'menu-items';
 
+  const gridItem = document.createElement('button');
+  gridItem.className = 'menu-item has-checkmark';
+  gridItem.setAttribute('data-testid', 'menu-grid');
+  gridItem.textContent = 'Grid';
+  gridItem.id = 'menu-item-grid';
+  viewList.appendChild(gridItem);
+
   const zoomInItem = document.createElement('button');
   zoomInItem.className = 'menu-item';
   zoomInItem.textContent = 'Zoom In';
