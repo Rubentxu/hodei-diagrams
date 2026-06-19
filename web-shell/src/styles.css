@@ -463,6 +463,11 @@ button:disabled {
   color: var(--text-dim);
 }
 
+.category-icon {
+  font-size: 12px;
+  margin-right: var(--xs);
+}
+
 .category-chevron {
   font-size: 10px;
   color: var(--text-dim);
@@ -1038,6 +1043,218 @@ button:disabled {
 
 .dismiss-btn:hover {
   color: var(--text);
+}
+
+/* ─── Slice C: Presentation Mode ───────────────────────────────────────────── */
+body.presentation-mode {
+  background: #0A0F1A;
+}
+
+body.presentation-mode #app {
+  grid-template-areas:
+    "canvas canvas canvas"
+    "hud    hud    hud"
+    "bottom bottom bottom";
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr var(--hud-h) var(--bottom-h);
+}
+
+body.presentation-mode .navbar,
+body.presentation-mode .sidebar,
+body.presentation-mode .rail,
+body.presentation-mode .inspector {
+  display: none !important;
+}
+
+body.presentation-mode .canvas-container {
+  background: #0A0F1A;
+}
+
+body.presentation-mode .hud {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.presentation-mode .page-tab {
+  background: transparent;
+}
+
+body.presentation-mode .page-tab.active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ─── Slice C: Properties Dialog ───────────────────────────────────────────── */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fade-in var(--motion-fast);
+}
+
+.dialog-overlay[hidden] {
+  display: none;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  min-width: 360px;
+  max-width: 480px;
+  animation: dialog-in var(--motion-normal);
+}
+
+@keyframes dialog-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--md) var(--lg);
+  border-bottom: 1px solid var(--bg-surface);
+}
+
+.dialog-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 14px;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+
+.dialog-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text);
+}
+
+.dialog-body {
+  padding: var(--lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--md);
+}
+
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xs);
+}
+
+.dialog-field label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.dialog-field input,
+.dialog-field textarea {
+  padding: var(--sm) var(--md);
+  border: 1px solid var(--bg-surface);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--motion-fast);
+}
+
+.dialog-field input:focus,
+.dialog-field textarea:focus {
+  border-color: var(--accent);
+}
+
+.dialog-field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sm);
+  padding: var(--md) var(--lg);
+  border-top: 1px solid var(--bg-surface);
+}
+
+.dialog-cancel {
+  padding: var(--sm) var(--md);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--bg-surface);
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+
+.dialog-cancel:hover {
+  background: var(--bg-tertiary);
+  color: var(--text);
+}
+
+.dialog-save {
+  padding: var(--sm) var(--md);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  background: var(--accent);
+  border: none;
+  transition: background var(--motion-fast);
+}
+
+.dialog-save:hover {
+  background: var(--accent-hover);
+}
+
+.dialog-footnote {
+  padding: var(--sm) var(--lg);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  border-top: 1px solid var(--bg-surface);
+  font-style: italic;
+}
+
+/* ─── Slice C: Menu item disabled/grayed state ─────────────────────────────── */
+.menu-item.disabled-item {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.menu-item.disabled-item:hover {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.menu-item-tooltip {
+  position: relative;
 }
 
 /* ─── Utility ─────────────────────────────────────────────────────────────── */

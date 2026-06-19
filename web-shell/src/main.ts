@@ -14,6 +14,10 @@ import {
   hideError,
   wireFileInput,
   wireDismiss,
+  buildPropertiesDialog,
+  showDialog,
+  saveProperties,
+  type DiagramProperties,
 } from './ui.js';
 import { buildInspector } from './inspector.js';
 import { Editor } from './editor.js';
@@ -44,6 +48,21 @@ function setGridVisible(visible: boolean): void {
   }
 }
 
+// ─── Presentation mode state ──────────────────────────────────────────────────
+let isPresentationMode = false;
+
+function togglePresentationMode(): void {
+  isPresentationMode = !isPresentationMode;
+  document.body.classList.toggle('presentation-mode', isPresentationMode);
+}
+
+function exitPresentationMode(): void {
+  if (isPresentationMode) {
+    isPresentationMode = false;
+    document.body.classList.remove('presentation-mode');
+  }
+}
+
 function updateUndoRedoButtons(
   undoBtn: HTMLButtonElement | undefined,
   redoBtn: HTMLButtonElement | undefined,
@@ -56,6 +75,17 @@ function updateUndoRedoButtons(
 /** Create a Blob download of a .drawio XML string. */
 function downloadDrawio(xml: string, filename: string): void {
   const blob = new Blob([xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Create a Blob download of an SVG string. */
+function downloadSvg(svg: string, filename: string): void {
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -163,6 +193,15 @@ async function bootstrap(): Promise<void> {
     if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
       e.preventDefault();
       toggleGrid();
+    }
+    // Ctrl+Shift+P for presentation mode
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+      e.preventDefault();
+      togglePresentationMode();
+    }
+    // Escape to exit presentation mode
+    if (e.key === 'Escape' && isPresentationMode) {
+      exitPresentationMode();
     }
   });
 
@@ -379,6 +418,37 @@ async function bootstrap(): Promise<void> {
   menuZoomReset?.addEventListener('click', () => {
     zoomPan.resetView();
     ui.zoomDisplay.textContent = '100%';
+  });
+
+  // View > Present
+  const menuPresent = document.querySelector('[data-testid="menu-present"]');
+  menuPresent?.addEventListener('click', () => {
+    togglePresentationMode();
+  });
+
+  // ─── 13.5. Wire File > Export > SVG ─────────────────────────────────────
+  const menuExportSvg = document.querySelector('[data-testid="menu-export-svg"]');
+  menuExportSvg?.addEventListener('click', () => {
+    if (!activeSession || activePages.length === 0) return;
+    const pageIdx = activeEditorIdx ?? 0;
+    // Use cached SVG from activePages for efficiency
+    const page = activePages[pageIdx];
+    if (!page) return;
+    const svg = activeSession.getPage(page.pageId);
+    if (!svg) return;
+    const pageName = page.name ?? 'page';
+    const safeName = pageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    downloadSvg(svg, `diagram-${safeName}-${pageIdx + 1}.svg`);
+  });
+
+  // ─── 13.6. Wire File > Properties ────────────────────────────────────────
+  const propsDialog = buildPropertiesDialog((props: DiagramProperties) => {
+    saveProperties(props);
+  });
+
+  const menuProps = document.querySelector('[data-testid="menu-properties"]');
+  menuProps?.addEventListener('click', () => {
+    showDialog(propsDialog);
   });
 
   // ─── 14. Listen for zoom changes from wheel events ────────────────────────

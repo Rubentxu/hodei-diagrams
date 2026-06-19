@@ -272,3 +272,133 @@ export function wireDismiss(button: HTMLButtonElement, onDismiss: () => void): v
     onDismiss();
   });
 }
+
+// ─── Properties Dialog ───────────────────────────────────────────────────────
+
+export interface DiagramProperties {
+  title: string;
+  author: string;
+  description: string;
+}
+
+const PROPS_LS_KEY = 'hodei:diagram-props';
+
+export function loadProperties(): DiagramProperties {
+  try {
+    const raw = localStorage.getItem(PROPS_LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<DiagramProperties>;
+      return {
+        title: parsed.title ?? '',
+        author: parsed.author ?? '',
+        description: parsed.description ?? '',
+      };
+    }
+  } catch {
+    // localStorage unavailable
+  }
+  return { title: '', author: '', description: '' };
+}
+
+export function saveProperties(props: DiagramProperties): void {
+  try {
+    localStorage.setItem(PROPS_LS_KEY, JSON.stringify(props));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+/** Build a properties dialog overlay and mount it to document.body */
+export function buildPropertiesDialog(onSave: (props: DiagramProperties) => void): HTMLElement {
+  const overlay = document.createElement('div');
+  overlay.className = 'dialog-overlay';
+  overlay.setAttribute('data-testid', 'properties-dialog');
+  overlay.hidden = true;
+
+  const currentProps = loadProperties();
+
+  overlay.innerHTML = `
+    <div class="dialog">
+      <div class="dialog-header">
+        <span class="dialog-title">Diagram Properties</span>
+        <button class="dialog-close" data-testid="dialog-close" aria-label="Close">✕</button>
+      </div>
+      <div class="dialog-body">
+        <div class="dialog-field">
+          <label for="prop-title">Title</label>
+          <input type="text" id="prop-title" value="${escapeHtml(currentProps.title)}" placeholder="Untitled Diagram" />
+        </div>
+        <div class="dialog-field">
+          <label for="prop-author">Author</label>
+          <input type="text" id="prop-author" value="${escapeHtml(currentProps.author)}" placeholder="Your name" />
+        </div>
+        <div class="dialog-field">
+          <label for="prop-description">Description</label>
+          <textarea id="prop-description" placeholder="Optional description...">${escapeHtml(currentProps.description)}</textarea>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="dialog-cancel" data-testid="dialog-cancel">Cancel</button>
+        <button class="dialog-save" data-testid="dialog-save">Save</button>
+      </div>
+      <div class="dialog-footnote">Engine metadata support coming in v2</div>
+    </div>
+  `;
+
+  // Wire close button
+  overlay.querySelector('[data-testid="dialog-close"]')?.addEventListener('click', () => {
+    hideDialog(overlay);
+  });
+
+  // Wire cancel button
+  overlay.querySelector('[data-testid="dialog-cancel"]')?.addEventListener('click', () => {
+    hideDialog(overlay);
+  });
+
+  // Wire save button
+  overlay.querySelector('[data-testid="dialog-save"]')?.addEventListener('click', () => {
+    const title = (overlay.querySelector('#prop-title') as HTMLInputElement)?.value ?? '';
+    const author = (overlay.querySelector('#prop-author') as HTMLInputElement)?.value ?? '';
+    const description = (overlay.querySelector('#prop-description') as HTMLTextAreaElement)?.value ?? '';
+    onSave({ title, author, description });
+    hideDialog(overlay);
+  });
+
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      hideDialog(overlay);
+    }
+  });
+
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+export function showDialog(overlay: HTMLElement): void {
+  overlay.hidden = false;
+  // Add Escape key listener
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      hideDialog(overlay);
+      document.removeEventListener('keydown', onKeydown);
+    }
+  };
+  document.addEventListener('keydown', onKeydown);
+  // Focus first input
+  setTimeout(() => {
+    (overlay.querySelector('input') as HTMLInputElement)?.focus();
+  }, 50);
+}
+
+export function hideDialog(overlay: HTMLElement): void {
+  overlay.hidden = true;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}

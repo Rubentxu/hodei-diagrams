@@ -59,6 +59,47 @@ export function buildNavbar(): NavbarControls {
   saveItem.setAttribute('data-testid', 'menu-save');
   fileList.appendChild(saveItem);
 
+  // Export submenu
+  const exportItem = document.createElement('button');
+  exportItem.className = 'menu-item';
+  exportItem.setAttribute('data-testid', 'menu-export');
+  exportItem.textContent = 'Export';
+  fileList.appendChild(exportItem);
+
+  const exportList = document.createElement('div');
+  exportList.className = 'menu-items';
+  exportList.style.position = 'absolute';
+  exportList.style.left = '100%';
+  exportList.style.top = '0';
+
+  const svgExportItem = document.createElement('button');
+  svgExportItem.className = 'menu-item';
+  svgExportItem.textContent = 'SVG';
+  svgExportItem.setAttribute('data-testid', 'menu-export-svg');
+  exportList.appendChild(svgExportItem);
+  exportItem.appendChild(exportList);
+
+  const pngExportItem = document.createElement('button');
+  pngExportItem.className = 'menu-item disabled-item';
+  pngExportItem.textContent = 'PNG';
+  pngExportItem.setAttribute('data-testid', 'menu-export-png');
+  pngExportItem.title = 'Requires WebGPU renderer';
+  exportList.appendChild(pngExportItem);
+
+  exportItem.addEventListener('mouseenter', () => {
+    exportList.style.display = 'block';
+  });
+  exportItem.addEventListener('mouseleave', () => {
+    exportList.style.display = 'none';
+  });
+
+  // Properties item
+  const propsItem = document.createElement('button');
+  propsItem.className = 'menu-item';
+  propsItem.textContent = 'Properties';
+  propsItem.setAttribute('data-testid', 'menu-properties');
+  fileList.appendChild(propsItem);
+
   fileMenu.appendChild(fileList);
   menuBar.appendChild(fileMenu);
 
@@ -109,6 +150,12 @@ export function buildNavbar(): NavbarControls {
   gridItem.textContent = 'Grid';
   gridItem.id = 'menu-item-grid';
   viewList.appendChild(gridItem);
+
+  const presentItem = document.createElement('button');
+  presentItem.className = 'menu-item';
+  presentItem.textContent = 'Present';
+  presentItem.setAttribute('data-testid', 'menu-present');
+  viewList.appendChild(presentItem);
 
   const zoomInItem = document.createElement('button');
   zoomInItem.className = 'menu-item';
