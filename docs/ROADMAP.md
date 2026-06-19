@@ -5,111 +5,125 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.5.4 — 8 crates + web-shell viewer + editor v1.1 + exportDrawio + diagram-routing v1.** 250+83 unit tests + 4 golden routing tests + 25 E2E tests en web-shell. 44 ADRs (0001-0044). 22 PRs mergeados.
+**v0.8.0 — Motor completo (11 crates) + web-shell viewer/editor.** 347 tests Rust + 83 tests Vitest + 21 tests Playwright E2E. 48 ADRs (0001-0048). 25 PRs mergeados. `DESIGN.md` establece la visión de producto.
 
-| Crate | Status |
-|-------|--------|
-| `diagram-core` | ✅ |
-| `diagram-format-drawio` | ✅ |
-| `diagram-commands` | ✅ |
-| `diagram-compat-testkit` | ✅ |
-| `diagram-scene` | ✅ |
-| `diagram-render-svg` | ✅ |
-| `diagram-wasm` | ✅ |
-| `diagram-routing` | ✅ |
-| `web-shell` (viewer v1) | ✅ |
+| Crate | Capa | Status |
+|-------|------|--------|
+| `diagram-core` | Dominio | ✅ |
+| `diagram-format-drawio` | Compatibilidad | ✅ |
+| `diagram-commands` | Comandos | ✅ |
+| `diagram-compat-testkit` | Testing | ✅ |
+| `diagram-scene` | Proyección | ✅ |
+| `diagram-render-svg` | Render SVG | ✅ |
+| `diagram-render-wgpu` | Render WebGPU | ✅ |
+| `diagram-wasm` | WASM Bridge | ✅ |
+| `diagram-routing` | Routing | ✅ |
+| `diagram-layout` | Layout | ✅ |
+| `web-shell/` | UI (TypeScript) | ✅ viewer + editor básico |
 
-## Active Track
+---
 
-### Milestones Completados
+## 🎯 Active Track: UI v1 — 5-Zone Application Layout
 
-| Milestone | PRs | Status |
-|-----------|-----|--------|
-| `feat/drawio-raw-roundtrip-v1` | #1 | ✅ |
-| `feat/domain-mapping-v1` | #1 | ✅ |
-| `feat/roundtrip-completo` | #2 | ✅ |
-| `feat/diagram-commands-v1` | #3, #4, #5 | ✅ |
-| `feat/diagram-scene` | #6, #7, #8, #9, #10 | ✅ |
-| `feat/diagram-render-svg` | #11, #12, #13, #14 | ✅ |
-| `feat/diagram-wasm` | #15, #16, #17, #18, #19 | ✅ |
-| `feat/web-shell-v1` | #20 | ✅ |
-| `feat/diagram-routing` | #22 (current) | 🔄 PR open |
+> **ADR-0047**: Web Shell UI v1 Architecture
+> **DESIGN.md**: Layout philosophy, design system, visual personality
 
-## Chained Milestones
+### Fase 1: web-shell-ui-layout (ahora)
 
-- [x] `diagram-scene` — proyección visual intermedia ✅
-- [x] `diagram-render-svg` — renderer SVG ✅
-- [x] `diagram-wasm` — thin WASM adapter ✅
-- [x] `web-shell` (viewer v1) ✅
-- [x] `web-shell` (editor surface v1.1) — click, drag, palette, command execution ✅
-- [x] `diagram-wasm` (export_drawio) — enable "Save as .drawio" ✅
-- [x] `diagram-routing` — orthogonal edge routing v1 ✅
-- [x] `diagram-layout` — Sugiyama HierarchicalLayout v1 (4-stage pipeline, TopToBottom + LeftToRight) ✅
-- [x] `diagram-render-wgpu` — renderer WebGPU 🔄 (ADR-0046) — code complete, merge pending
+**5 zonas tipo draw.io con motor real atrás. Nada fake.**
 
-## External Study Triggers
+| Zona | Scope v1 | Motor |
+|------|----------|-------|
+| Top NavBar | File (Open/Save), Edit (Undo/Redo/Delete), View (Zoom) | `import_drawio`, `export_drawio`, `execute_command` |
+| Left Sidebar | 1 categoría "General": Rect, RoundedRect, Ellipse. Resto gris. | Scene shapes |
+| Central Canvas | SVG render + zoom/pan + page tabs + edge display | `render_svg`, `render_pages` |
+| Right Inspector | Style tab (6 controles) + Text tab (5 controles). Arrange gris. | `ChangeStyle` via `execute_command` |
+| Bottom | Page tabs (draw.io-style) + Diagnostics toast | `parse_drawio_with_diagnostics` |
 
-| Crate | Qué estudiar | Cuándo |
-|-------|-------------|--------|
-| `diagram-routing` | `mxEdgeStyle`, orthogonal routing, waypoints en mxGraph | antes de sddk-propose de routing |
-| `diagram-layout` | algoritmos Sugiyama-style, layout heuristics | antes de sddk-propose de layout |
-| Compatibilidad | corpus grande `.drawio` para validar round-trip | después de domain mapping |
+- [ ] `feat/web-shell-ui-layout` — 5-zone skeleton + NavBar + Canvas zoom/pan + page tabs
+- [ ] `feat/web-shell-ui-sidebar` — Left Sidebar con categorías + shape grid + drag-to-canvas
+- [ ] `feat/web-shell-ui-inspector` — Right Inspector Style + Text tabs → `ChangeStyle`
+- [ ] `feat/web-shell-ui-polish` — Design system (DESIGN.md colors/spacing/typography/motion), E2E tests, ADR-0047 final
 
-Ubicación prevista de clones: `/var/home/rubentxu/Proyectos/rust/_upstream/` (ignorado en .gitignore)
+### Fase 2: UI v1.1 — Shapes + Interactividad
 
-## ADR Inventory (índice rápido)
+- [ ] `diagram-scene shapes` — Diamond, Triangle shape support in scene builder
+- [ ] `web-shell shapes` — Sidebar expande "General" con nuevos shapes funcionales
+- [ ] `web-shell edges` — Edge creation interactiva en canvas (usa routing engine)
+- [ ] `web-shell arrange` — Inspector Arrange tab (X/Y/W/H numéricos)
+- [ ] `diagram-scene text` — Text element as first-class scene element
 
-| ADR | Tema |
-|-----|------|
-| 0001 | Semantic Port with .drawio Compatibility |
-| 0002 | TypeScript Web Shell over Rust Engine |
-| 0003 | SVG First Render Backend, WebGPU Later |
-| 0004 | Minimal WASM Boundary with Shared Buffers |
-| 0005 | Command-Driven Engine, Not Literal Redux Store |
-| 0006 | Behavior First, Upstream Code Second |
-| 0007 | v1 Targets Solid Basic-to-Medium Compatibility |
-| 0008 | Import .drawio Before Rich Authoring |
-| 0009 | Rust-Native Model with .drawio Mapping |
-| 0010 | Foundational Crate Matrix by Layer |
-| 0011 | Multi-crate Workspace with Hexagonal Boundaries |
-| 0012 | Separate Core from Commands and Keep Web Outside crates/ |
-| 0013 | Keep Layout and Routing Outside diagram-core |
-| 0014 | diagram-format-drawio Depends Only on diagram-core |
-| 0015 | Renderers Consume Scene, Not Core Model |
-| 0016 | diagram-scene as Separate Projection Crate |
-| 0017 | diagram-wasm as Thin Technical Adapter |
-| 0018 | Shared Compatibility Testkit Early |
-| 0019 | Bootstrap with Core, Format, and Compat Testkit |
-| 0020 | Core Model Starts with Pages, Groups, Styles, and Labels |
-| 0021 | Start Styles as Flexible Map, Then Type Gradually |
-| 0022 | Model Labels as Potentially Rich Content |
-| 0023 | Engine-Owned Stable IDs with External ID Mapping |
-| 0024 | Preserve Unknown When Safe, Degrade Explicitly |
-| 0025 | Compatibility Diagnostics from Bootstrap |
-| 0026 | Parse .drawio into Raw Model Before Domain Mapping |
-| 0027 | Keep Raw Drawio Model Inside Format Crate for Now |
-| 0028 | Bootstrap with Separated Pieces Before Engine Facade |
-| 0029 | Defer Upstream Repo Cloning Until Routing/Layout Phase |
-| 0030 | Style as Flexible Map, Gradual Typing |
-| 0031 | Label as Potentially Rich Content |
-| 0032 | Engine-Owned Stable IDs with External Mapping |
-| 0033 | JS/TS Latest Stable Version Policy |
-| 0034 | Document Roles and Update Authority |
-| 0035 | Gitignore Policy |
-| 0036 | Hybrid Scene Structure |
-| 0037 | Eager Style Resolution in Scene |
-| 0038 | Multi-Page SVG Output |
-| 0039 | Remaining StyleMap to Style Attribute |
-| 0040 | Diagram-WASM Dependency Clarification |
-| 0041 | Web Shell Vite + Vitest + Playwright Toolchain |
-| 0042 | Web Shell Editor Surface v1.1 |
-| 0043 | diagram-commands depends on diagram-format-drawio for IdMap storage |
-| 0044 | Routing Architecture — Data vs Algorithm |
-| 0045 | diagram-layout Architecture |
-| 0046 | WebGPU Renderer Architecture |
+### Fase 3: UI v1.2 — Stencils + Export
+
+- [ ] `web-shell stencils` — Carga de stencils .drawio XML (arrows, flowchart, UML)
+- [ ] `web-shell formats` — Export SVG, PNG desde el engine
+- [ ] `diagram-format-drawio stencils` — Parser de XML de stencils tipo draw.io
+
+---
+
+## 🔮 Innovations (v2)
+
+> **ADR-0048**: Deferred Innovations — Version History, Properties, Presentation Mode
+
+| Innovación | Motor requerido | Complejidad |
+|-----------|----------------|-------------|
+| Version History | IndexedDB + DiagramModel serde | Media |
+| Properties Dialog | Metadata en DiagramModel | Baja |
+| Presentation Mode | Fullscreen API (puro UI) | Baja |
+
+---
+
+## 🏗️ Engine — Completado
+
+### Milestones Completados (25 PRs)
+
+| # | Milestone | PRs | Tag |
+|---|-----------|-----|-----|
+| 1 | `feat/drawio-raw-roundtrip-v1` | #1 | — |
+| 2 | `feat/domain-mapping-v1` | #1 | — |
+| 3 | `feat/roundtrip-completo` | #2 | — |
+| 4 | `feat/diagram-commands-v1` | #3, #4, #5 | v0.3.0 |
+| 5 | `feat/diagram-scene` | #6, #7, #8, #9, #10 | v0.3.0 |
+| 6 | `feat/diagram-render-svg` | #11, #12, #13, #14 | v0.4.0 |
+| 7 | `feat/diagram-wasm` | #15, #16, #17, #18, #19 | v0.5.0 |
+| 8 | `feat/web-shell-v1` (viewer) | #20 | v0.5.1 |
+| 9 | `feat/web-shell-editor-v1` | #21 | v0.5.2 |
+| 10 | `feat/diagram-wasm-export` | #22 | v0.5.3 |
+| 11 | `feat/diagram-routing` | #23 | v0.6.0 |
+| 12 | `feat/diagram-layout` | #24 | v0.7.0 |
+| 13 | `feat/diagram-render-wgpu` | #25 | v0.8.0 |
+
+---
+
+## ⏳ External Study Triggers (completados)
+
+| Crate | Qué se estudió | Estado |
+|-------|---------------|--------|
+| `diagram-routing` | `mxEdgeStyle.js`, OrthConnector, SegmentConnector | ✅ (repomix, 4 archivos) |
+| `diagram-layout` | `mxHierarchicalLayout.js`, 4-stage Sugiyama pipeline | ✅ (repomix, 20 archivos) |
+| Compatibilidad | Archivo real 4MB (AWS-Admision) — import/export OK | ✅ |
+
+Ubicación de upstream: `/var/home/rubentxu/Proyectos/rust/_upstream/mxgraph/` (gitignored)
+
+---
+
+## 📋 ADR Inventory
+
+| ADR | Tema | Fase |
+|-----|------|------|
+| 0001-0040 | Bootstrap, dominio, compatibilidad, crates | Engine |
+| 0041 | Web Shell Toolchain (Vite + Vitest + Playwright) | UI |
+| 0042 | Web Shell Editor Surface v1.1 | UI |
+| 0043 | commands → format-drawio dep for IdMap | Engine |
+| 0044 | Routing Architecture (Data vs Algorithm) | Engine |
+| 0045 | Layout Architecture (Sugiyama pipeline) | Engine |
+| 0046 | WebGPU Renderer Architecture | Engine |
+| 0047 | **Web Shell UI v1 — 5-Zone Application Layout** 🆕 | UI |
+| 0048 | **Deferred Innovations (History, Properties, Presentation)** 🆕 | v2 |
 
 ## Reglas de Actualización
 
 - Este documento se actualiza al completar cada milestone o cambiar de dirección.
-- No duplica rationale de ADRs — solo ссылается a ellos.
-- El estado "actual" de AGENTS.md ссылается aquí.
+- No duplica rationale de ADRs — solo referencia a ellos.
+- El estado "actual" de AGENTS.md referencia aquí.
+- `DESIGN.md` es la visión de producto; este ROADMAP es el plan de ejecución.
