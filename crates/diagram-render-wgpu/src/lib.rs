@@ -13,6 +13,7 @@
 
 pub mod context;
 pub mod error;
+pub mod shapes;
 
 pub use context::WgpuContext;
 pub use error::WgpuError;
