@@ -93,20 +93,45 @@ pub(crate) fn style_to_attrs(style: &ResolvedStyle, ctx: AttrContext) -> String 
         attrs.push('"');
     }
 
-    // remaining: StyleMap -> style="k1=v1;k2=v2" (always last)
-    if !style.remaining.is_empty() {
-        attrs.push_str(" style=\"");
-        let mut first = true;
-        for (key, value) in style.remaining.iter() {
-            if !first {
-                attrs.push(';');
+    // bold=true -> font-weight="bold" (text context)
+    if matches!(ctx, AttrContext::Text) {
+        if let Some(v) = style.remaining.get("bold") {
+            if v.as_str() == "true" {
+                attrs.push_str(" font-weight=\"bold\"");
             }
-            first = false;
-            attrs.push_str(key);
-            attrs.push('=');
-            attrs.push_str(&escape_attr(value.as_str()));
         }
-        attrs.push('"');
+        // italic=true -> font-style="italic" (text context)
+        if let Some(v) = style.remaining.get("italic") {
+            if v.as_str() == "true" {
+                attrs.push_str(" font-style=\"italic\"");
+            }
+        }
+    }
+
+    // remaining: StyleMap -> style="k1=v1;k2=v2" (always last)
+    // Filter out bold/italic since we handled them above
+    if !style.remaining.is_empty() {
+        let has_remaining = style
+            .remaining
+            .iter()
+            .any(|(k, _)| k != "bold" && k != "italic");
+        if has_remaining {
+            attrs.push_str(" style=\"");
+            let mut first = true;
+            for (key, value) in style.remaining.iter() {
+                if key == "bold" || key == "italic" {
+                    continue;
+                }
+                if !first {
+                    attrs.push(';');
+                }
+                first = false;
+                attrs.push_str(key);
+                attrs.push('=');
+                attrs.push_str(&escape_attr(value.as_str()));
+            }
+            attrs.push('"');
+        }
     }
 
     attrs
