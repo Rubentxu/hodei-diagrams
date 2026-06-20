@@ -26,6 +26,14 @@ export interface UiElements {
   rectToolButton: HTMLButtonElement;
   roundedRectToolButton: HTMLButtonElement;
   ellipseToolButton: HTMLButtonElement;
+  diamondToolButton: HTMLButtonElement;
+  triangleToolButton: HTMLButtonElement;
+  hexagonToolButton: HTMLButtonElement;
+  cylinderToolButton: HTMLButtonElement;
+  cloudToolButton: HTMLButtonElement;
+  parallelogramToolButton: HTMLButtonElement;
+  trapezoidToolButton: HTMLButtonElement;
+  polygonToolButton: HTMLButtonElement;
   sidebarCollapseBtn: HTMLButtonElement;
 
   // Zone 3: Canvas
@@ -187,6 +195,14 @@ export function buildEmptyUi(
     rectToolButton: sidebar.rectToolBtn,
     roundedRectToolButton: sidebar.roundedRectToolBtn,
     ellipseToolButton: sidebar.ellipseToolBtn,
+    diamondToolButton: sidebar.diamondToolBtn,
+    triangleToolButton: sidebar.triangleToolBtn,
+    hexagonToolButton: sidebar.hexagonToolBtn,
+    cylinderToolButton: sidebar.cylinderToolBtn,
+    cloudToolButton: sidebar.cloudToolBtn,
+    parallelogramToolButton: sidebar.parallelogramToolBtn,
+    trapezoidToolButton: sidebar.trapezoidToolBtn,
+    polygonToolButton: sidebar.polygonToolBtn,
     sidebarCollapseBtn: sidebar.collapseBtn,
 
     // Zone 3
