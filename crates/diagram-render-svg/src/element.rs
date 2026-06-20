@@ -51,7 +51,7 @@ fn make_indent(indent: usize) -> String {
 
 fn rect_to_svg(r: &RectElement, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = style_to_attrs(&r.style, AttrContext::Shape);
+    let style = shape_style_defaults(&r.style, AttrContext::Shape);
     let vid = vid_attr(&r.id);
     format!(
         "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}/>",
@@ -67,7 +67,7 @@ fn rect_to_svg(r: &RectElement, indent: usize) -> String {
 
 fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = style_to_attrs(&r.style, AttrContext::Shape);
+    let style = shape_style_defaults(&r.style, AttrContext::Shape);
     let vid = vid_attr(&r.id);
     format!(
         "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\"{}{}/>",
@@ -85,7 +85,7 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
 
 fn ellipse_to_svg(e: &EllipseElement, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = style_to_attrs(&e.style, AttrContext::Shape);
+    let style = shape_style_defaults(&e.style, AttrContext::Shape);
     let vid = vid_attr(&e.id);
     let cx = e.bounds.origin.x + e.bounds.size.width / 2.0;
     let cy = e.bounds.origin.y + e.bounds.size.height / 2.0;
@@ -95,6 +95,28 @@ fn ellipse_to_svg(e: &EllipseElement, indent: usize) -> String {
         "{}<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"{}{}/>",
         ind, cx, cy, rx, ry, vid, style
     )
+}
+
+/// Apply sensible default fill/stroke for shapes when the style has none.
+///
+/// The canvas is dark (#0A0F1A per DESIGN.md), so SVG's default fill of
+/// black would make unstyled shapes invisible. We default unstyled shapes
+/// to a light-blue fill and a visible stroke, matching the draw.io default
+/// visual baseline and ensuring shapes are always visible.
+fn shape_style_defaults(
+    style: &diagram_scene::ResolvedStyle,
+    ctx: AttrContext,
+) -> String {
+    let has_fill = !matches!(style.fill_color.as_deref(), None | Some("none"));
+    let has_stroke = !matches!(style.stroke_color.as_deref(), None | Some("none"));
+    let mut attrs = style_to_attrs(style, ctx);
+    if !has_fill {
+        attrs.push_str(" fill=\"#dae8fc\"");
+    }
+    if !has_stroke {
+        attrs.push_str(" stroke=\"#6c8ebf\"");
+    }
+    attrs
 }
 
 fn text_to_svg(t: &TextElement, indent: usize) -> String {
