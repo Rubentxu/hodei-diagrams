@@ -5,7 +5,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.9.0 — Motor completo (11 crates) + 5-zone UI v1.** 347 tests Rust + 83 tests Vitest + 30 tests Playwright E2E. 49 ADRs (0001-0049). 26 PRs mergeados. `DESIGN.md` establece la visión de producto; ADR-0049 captura el gap visual/funcional hacia ese target.
+**v0.12.0 — Motor completo (11 crates) + 5-zone UI + 3 slices presencia/densidad/plataforma.** 347 tests Rust + 83 tests Vitest + 30 tests Playwright E2E. 49 ADRs (0001-0049). 29 PRs mergeados. `DESIGN.md` establece la visión de producto; ADR-0049 captura el gap visual/funcional hacia ese target.
 
 | Crate | Capa | Status |
 |-------|------|--------|
@@ -50,15 +50,33 @@ Para rationale de decisiones, ver `docs/adr/`.
 > **ADR-0049**: UI Gap Alignment Against DESIGN.md and draw.io Reference
 > **docs/ui/ui-gap-slice-plan.md**: execution slices
 
-- [ ] `feat/web-shell-ui-presence` — stronger top bar grouping, left rail, richer sidebar hierarchy, meaningful empty states, intentional bottom area
+- [x] `feat/web-shell-ui-presence` — ✅ (PR #27, v0.10.0) — stronger top bar grouping, left rail, richer sidebar hierarchy, meaningful empty states, intentional bottom area
 
 ### Fase 2: Slice B — Professional Density
 
-- [ ] `feat/web-shell-ui-density` — grid toggle, status strip/HUD, compact inspector forms, stronger typography/spacing rhythm
+- [x] `feat/web-shell-ui-density` — ✅ (PR #28, v0.11.0) — grid toggle, status strip/HUD, compact inspector forms, stronger typography/spacing rhythm
 
 ### Fase 3: Slice C — Platform Surface
 
-- [ ] `feat/web-shell-ui-platform-surface` — version history, properties dialog, presentation mode, richer stencils/export surfaces
+- [x] `feat/web-shell-ui-platform-surface` — ✅ (PR #29, v0.12.0) — version history, properties dialog, presentation mode, richer stencils/export surfaces
+
+
+---
+
+## 🧪 Active Track: E2E Test Coverage
+
+> **docs/testing/e2e-test-plan.md**: 93 nuevos tests en 13 specs
+> Objetivo: 80 → 173 tests, cobertura funcional completa
+
+### 🔴 P1 — Funcionalidad básica (36 tests)
+- [ ] `test/e2e-primitives-render` — Crear primitivas (10) + Cargar/renderizar (10) + Zoom/Pan (9) + Selección/Mover (7)
+- [ ] `test/e2e-zoom-interaction` — Zoom wheel, pan, grid, HUD
+
+### 🟡 P2 — Edición y estilos (24 tests)
+- [ ] `test/e2e-styles-editing` — Inspector estilos (12) + Edición texto (6) + Undo/Redo avanzado (6)
+
+### 🟢 P3 — Plataforma y edge cases (33 tests)
+- [ ] `test/e2e-platform-edge` — Export (5) + Navegación (6) + Errores (8) + Accesibilidad (7) + Perf (4) + Visual (3)
 
 ### Fase 2: UI v1.1 — Shapes + Interactividad
 
