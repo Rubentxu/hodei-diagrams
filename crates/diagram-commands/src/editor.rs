@@ -8,8 +8,9 @@ use crate::error::{CommandError, CommandResult};
 use crate::history::History;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
-    EditLabelPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
-    RemoveVertexPayload, RenamePagePayload,
+    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, MoveVertexPayload,
+    RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload,
+    RenamePagePayload, RoutingKind,
 };
 use diagram_core::{
     CellGeometry, Edge, EdgeId, Group, GroupId, Label, Page, PageId, StyleMap, Vertex, VertexId,
@@ -45,6 +46,33 @@ impl Editor {
     pub fn execute(&mut self, mut cmd: Command) -> CommandResult<()> {
         cmd.apply(&mut self.model)?;
         self.history.push(vec![cmd]);
+        Ok(())
+    }
+
+    /// Connect two vertices with an edge, using the specified routing algorithm.
+    ///
+    /// On success, returns the inserted edge ID.
+    /// Pushes a `ConnectVertices` command to history for undo/redo.
+    pub fn connect_vertices(
+        &mut self,
+        from: VertexId,
+        to: VertexId,
+        routing_kind: RoutingKind,
+    ) -> CommandResult<EdgeId> {
+        let mut cmd = ConnectVerticesCommand::new(from, to, routing_kind);
+        cmd.apply(&mut self.model)?;
+        let inserted_id = cmd.inserted_edge_id.ok_or(CommandError::NotApplied)?;
+        self.history.push(vec![Command::ConnectVertices(cmd)]);
+        Ok(inserted_id)
+    }
+
+    /// Disconnect an edge (remove it from the model).
+    ///
+    /// Pushes a `DisconnectEdge` command to history for undo/redo.
+    pub fn disconnect_edge(&mut self, edge: EdgeId) -> CommandResult<()> {
+        let mut cmd = DisconnectEdgeCommand::new(edge);
+        cmd.apply(&mut self.model)?;
+        self.history.push(vec![Command::DisconnectEdge(cmd)]);
         Ok(())
     }
 

@@ -34,7 +34,10 @@ mod import;
 mod render;
 mod scene;
 
-pub use commands::{engine_can_redo, engine_can_undo, execute_command, redo, undo};
+pub use commands::{
+    ROUTING_KIND_ORTHOGONAL, ROUTING_KIND_STRAIGHT, connect_vertices, disconnect_edge,
+    engine_can_redo, engine_can_undo, execute_command, redo, undo,
+};
 pub use engine::{create_engine, dispose_engine};
 pub use export::export_drawio;
 pub use import::import_drawio;
