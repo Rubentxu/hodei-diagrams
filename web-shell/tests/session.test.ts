@@ -16,6 +16,8 @@ function createMockWasm() {
     redo: vi.fn(),
     engine_can_undo: vi.fn(),
     engine_can_redo: vi.fn(),
+    connect_vertices: vi.fn(),
+    disconnect_edge: vi.fn(),
   };
 }
 

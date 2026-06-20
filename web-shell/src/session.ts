@@ -261,4 +261,49 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Connect two vertices with an edge.
+   * @param from Source vertex SlotmapId
+   * @param to Target vertex SlotmapId
+   * @param routingKind 'orthogonal' (default) or 'straight'
+   * @returns The new edge's SlotmapId, or an error
+   */
+  connectVertices(
+    from: SlotmapId,
+    to: SlotmapId,
+    routingKind: 'orthogonal' | 'straight' = 'orthogonal',
+  ): Result<SlotmapId, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const routingKindVal = routingKind === 'straight' ? 1 : 0;
+      const rawEdgeId = this.wasm.connect_vertices(
+        this.handle as number,
+        from.idx,
+        to.idx,
+        routingKindVal,
+      );
+      this.#onStateChange?.();
+      return ok({ idx: rawEdgeId, version: 0 });
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Disconnect an edge (remove it from the diagram).
+   * @param edgeId The edge to disconnect
+   */
+  disconnectEdge(edgeId: SlotmapId): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.disconnect_edge(this.handle as number, edgeId.idx);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }

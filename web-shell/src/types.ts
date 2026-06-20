@@ -27,6 +27,8 @@ export type WasmModule = {
   redo(_h: number): void;
   engine_can_undo(_h: number): boolean;
   engine_can_redo(_h: number): boolean;
+  connect_vertices(_h: number, _from: number, _to: number, _routingKind: number): number;
+  disconnect_edge(_h: number, _edgeId: number): void;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
