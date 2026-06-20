@@ -61,3 +61,11 @@ docs/
 # sccache (dev-only, not for release)
 # (sccache data lives in ~/.cache/sccache by default — keep that way)
 sddk/
+
+# Playwright visual evidence — screenshots, videos, traces, diff images
+# (directories already ignored above; patterns catch stray file extensions)
+*.trace.zip
+*.webm
+*.snap.png
+__snapshots__/
+playwright/.cache/
