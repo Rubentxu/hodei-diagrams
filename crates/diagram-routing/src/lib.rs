@@ -117,6 +117,7 @@ mod tests {
                 width: w,
                 height: h,
                 relative: false,
+                ..Default::default()
             }),
             ..Vertex::default()
         }

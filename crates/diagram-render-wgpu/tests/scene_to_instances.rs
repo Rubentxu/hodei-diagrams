@@ -31,6 +31,9 @@ fn make_rect(
                 height: h,
             },
         },
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: fill.map(String::from),
             stroke_color: stroke.map(String::from),
@@ -71,6 +74,9 @@ fn four_elements_produce_4_instances() {
             },
         },
         radius: 8.0,
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: Some("#ffffff".to_owned()),
             ..Default::default()
@@ -85,6 +91,9 @@ fn four_elements_produce_4_instances() {
                 height: 50.0,
             },
         },
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: Some("#dae8fc".to_owned()),
             ..Default::default()

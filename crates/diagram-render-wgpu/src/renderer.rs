@@ -305,6 +305,9 @@ mod tests {
         VisualElement::Rect(RectElement {
             id: VertexId::default(),
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle {
                 fill_color: fill.map(String::from),
                 stroke_color: stroke.map(String::from),
@@ -319,6 +322,9 @@ mod tests {
             id: VertexId::default(),
             bounds,
             radius,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle {
                 fill_color: Some("#dae8fc".to_owned()),
                 ..Default::default()
@@ -330,6 +336,9 @@ mod tests {
         VisualElement::Ellipse(EllipseElement {
             id: VertexId::default(),
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle {
                 fill_color: Some("#dae8fc".to_owned()),
                 ..Default::default()
@@ -541,6 +550,9 @@ mod tests {
                     height: 10.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle {
                 fill_color: Some("#ff0000".to_owned()),
                 opacity: Some(0.5),

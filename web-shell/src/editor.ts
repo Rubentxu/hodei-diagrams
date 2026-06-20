@@ -316,6 +316,53 @@ export class Editor {
     this.#applySelection(new Set(allIds));
   }
 
+  /**
+   * Rotate all selected shapes by the given angle delta (radians).
+   * Dispatches one RotateVertex per shape in a single transaction.
+   */
+  rotateSelection(angleDelta: number): void {
+    if (this.#selection.size === 0) return;
+
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      commands.push(
+        JSON.stringify({
+          RotateVertex: {
+            id: slotmapIdToField(id),
+            angle_delta: angleDelta,
+          },
+        }),
+      );
+    }
+
+    this.#session.executeCommands(commands);
+    this.#replay();
+  }
+
+  /**
+   * Flip all selected shapes along the given axis.
+   * Dispatches one FlipVertex per shape in a single transaction.
+   */
+  flipSelection(axis: 'horizontal' | 'vertical'): void {
+    if (this.#selection.size === 0) return;
+
+    const axisValue = axis === 'horizontal' ? 'Horizontal' : 'Vertical';
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      commands.push(
+        JSON.stringify({
+          FlipVertex: {
+            id: slotmapIdToField(id),
+            axis: axisValue,
+          },
+        }),
+      );
+    }
+
+    this.#session.executeCommands(commands);
+    this.#replay();
+  }
+
   // ─── Active Tool ──────────────────────────────────────────────────────────
 
   /** Current active tool. */
@@ -1539,6 +1586,42 @@ export class Editor {
     if (hasMod && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
       e.preventDefault();
       this.redoCmd();
+      return;
+    }
+
+    // R → rotate selection 90° clockwise (only when shapes are selected)
+    if (e.key === 'r' && !hasMod && !e.shiftKey) {
+      if (this.#selection.size > 0) {
+        e.preventDefault();
+        this.rotateSelection(Math.PI / 2);
+      }
+      return;
+    }
+
+    // Shift+R → rotate selection 15° fine adjustment
+    if (e.key === 'R' && !hasMod && e.shiftKey) {
+      if (this.#selection.size > 0) {
+        e.preventDefault();
+        this.rotateSelection(Math.PI / 12);
+      }
+      return;
+    }
+
+    // H → flip selection horizontally (only when shapes are selected)
+    if (e.key === 'h' && !hasMod && !e.shiftKey) {
+      if (this.#selection.size > 0) {
+        e.preventDefault();
+        this.flipSelection('horizontal');
+      }
+      return;
+    }
+
+    // V → flip selection vertically (only when shapes are selected)
+    if (e.key === 'v' && !hasMod && !e.shiftKey) {
+      if (this.#selection.size > 0) {
+        e.preventDefault();
+        this.flipSelection('vertical');
+      }
       return;
     }
   }

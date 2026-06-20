@@ -38,6 +38,7 @@ fn undo_remove_page_restores_all_cells_with_new_ids() {
                 width: 100.0,
                 height: 50.0,
                 relative: false,
+                ..Default::default()
             }),
             label: Some(Label::new("V1")),
             page_id: Some(pid),
@@ -56,6 +57,7 @@ fn undo_remove_page_restores_all_cells_with_new_ids() {
                 width: 100.0,
                 height: 50.0,
                 relative: false,
+                ..Default::default()
             }),
             label: Some(Label::new("V2")),
             page_id: Some(pid),

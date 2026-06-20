@@ -92,6 +92,15 @@ fn write_geometry(writer: &mut Writer<&mut Vec<u8>>, geo: &RawDrawioGeometry) ->
     if !geo.r#as.is_empty() {
         geo_start.push_attribute(("as", geo.r#as.as_str()));
     }
+    if let Some(rot) = geo.rotation {
+        geo_start.push_attribute(("rotation", format!("{}", rot).as_str()));
+    }
+    if geo.flip_h == Some(true) {
+        geo_start.push_attribute(("flipH", "1"));
+    }
+    if geo.flip_v == Some(true) {
+        geo_start.push_attribute(("flipV", "1"));
+    }
     writer.write_event(Event::Empty(geo_start))
 }
 
@@ -186,6 +195,9 @@ mod tests {
                 y: 20.0,
                 width: 80.0,
                 height: 40.0,
+                rotation: None,
+                flip_h: None,
+                flip_v: None,
                 r#as: "geometry".to_owned(),
             }),
             extra: Default::default(),

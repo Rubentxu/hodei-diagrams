@@ -260,4 +260,69 @@ describe('DiagramEngineSession', () => {
     expect(session.categorizeError('TooManyEngines').kind).toBe('TooManyEngines');
     expect(session.categorizeError('SomeOtherError').kind).toBe('Unknown');
   });
+
+  it('rotateVertex sends correct JSON command', () => {
+    const mockWasm = createMockWasm();
+    mockWasm.create_engine.mockReturnValue(42);
+    mockWasm.execute_command.mockReturnValue(undefined);
+
+    const result = DiagramEngineSession.create(
+      mockWasm as Parameters<typeof DiagramEngineSession.create>[0],
+    );
+    if (!result.ok) throw new Error('create failed');
+    const session = result.value;
+
+    const rotateResult = session.rotateVertex({ idx: 1, version: 1 }, Math.PI / 2);
+
+    expect(rotateResult.ok).toBe(true);
+    expect(mockWasm.execute_command).toHaveBeenCalledOnce();
+    const calledJson = mockWasm.execute_command.mock.calls[0]![1] as string;
+    const parsed = JSON.parse(calledJson);
+    expect(parsed.RotateVertex).toBeDefined();
+    expect(parsed.RotateVertex.id).toEqual({ idx: 1, version: 1 });
+    expect(parsed.RotateVertex.angle_delta).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('flipVertex sends correct JSON command for horizontal flip', () => {
+    const mockWasm = createMockWasm();
+    mockWasm.create_engine.mockReturnValue(42);
+    mockWasm.execute_command.mockReturnValue(undefined);
+
+    const result = DiagramEngineSession.create(
+      mockWasm as Parameters<typeof DiagramEngineSession.create>[0],
+    );
+    if (!result.ok) throw new Error('create failed');
+    const session = result.value;
+
+    const flipResult = session.flipVertex({ idx: 2, version: 0 }, 'horizontal');
+
+    expect(flipResult.ok).toBe(true);
+    expect(mockWasm.execute_command).toHaveBeenCalledOnce();
+    const calledJson = mockWasm.execute_command.mock.calls[0]![1] as string;
+    const parsed = JSON.parse(calledJson);
+    expect(parsed.FlipVertex).toBeDefined();
+    expect(parsed.FlipVertex.id).toEqual({ idx: 2, version: 0 });
+    expect(parsed.FlipVertex.axis).toBe('Horizontal');
+  });
+
+  it('flipVertex sends correct JSON command for vertical flip', () => {
+    const mockWasm = createMockWasm();
+    mockWasm.create_engine.mockReturnValue(42);
+    mockWasm.execute_command.mockReturnValue(undefined);
+
+    const result = DiagramEngineSession.create(
+      mockWasm as Parameters<typeof DiagramEngineSession.create>[0],
+    );
+    if (!result.ok) throw new Error('create failed');
+    const session = result.value;
+
+    const flipResult = session.flipVertex({ idx: 3, version: 2 }, 'vertical');
+
+    expect(flipResult.ok).toBe(true);
+    expect(mockWasm.execute_command).toHaveBeenCalledOnce();
+    const calledJson = mockWasm.execute_command.mock.calls[0]![1] as string;
+    const parsed = JSON.parse(calledJson);
+    expect(parsed.FlipVertex).toBeDefined();
+    expect(parsed.FlipVertex.axis).toBe('Vertical');
+  });
 });

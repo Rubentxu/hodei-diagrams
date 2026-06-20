@@ -34,6 +34,7 @@ fn execute_undo_redo_single_command() {
             width: 100.0,
             height: 50.0,
             relative: false,
+            ..Default::default()
         }),
         label: Some(Label::new("Test")),
         page_id: Some(pid),

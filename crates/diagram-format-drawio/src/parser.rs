@@ -265,6 +265,9 @@ impl DrawioParser {
         let mut width = 0.0;
         let mut height = 0.0;
         let mut r#as = String::new();
+        let mut rotation: Option<f64> = None;
+        let mut flip_h: Option<bool> = None;
+        let mut flip_v: Option<bool> = None;
 
         for attr_result in start.attributes().with_checks(false) {
             let attr = match attr_result {
@@ -283,6 +286,9 @@ impl DrawioParser {
                 b"width" => width = val.parse().unwrap_or(0.0),
                 b"height" => height = val.parse().unwrap_or(0.0),
                 b"as" => r#as = val.to_owned(),
+                b"rotation" => rotation = val.parse::<f64>().ok(),
+                b"flipH" => flip_h = Some(val == "1"),
+                b"flipV" => flip_v = Some(val == "1"),
                 _ => {}
             }
         }
@@ -293,6 +299,9 @@ impl DrawioParser {
             width,
             height,
             r#as,
+            rotation,
+            flip_h,
+            flip_v,
         })
     }
 }

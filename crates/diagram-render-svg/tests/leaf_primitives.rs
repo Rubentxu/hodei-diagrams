@@ -17,6 +17,9 @@ fn simple_rect_renders_correctly() {
                 height: 40.0,
             },
         },
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: Some("#dae8fc".to_owned()),
             stroke_color: Some("#6c8ebf".to_owned()),
@@ -82,6 +85,9 @@ fn rect_with_no_style_renders() {
                 height: 100.0,
             },
         },
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle::default(),
     });
 
@@ -116,6 +122,9 @@ fn multiple_rects_render_in_order() {
                 height: 50.0,
             },
         },
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: Some("#ff0000".to_owned()),
             ..Default::default()
@@ -131,6 +140,9 @@ fn multiple_rects_render_in_order() {
                 height: 40.0,
             },
         },
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: Some("#0000ff".to_owned()),
             ..Default::default()

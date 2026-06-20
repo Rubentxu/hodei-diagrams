@@ -66,10 +66,8 @@ pub fn engine_can_redo(handle: u32) -> Result<bool, JsValue> {
 /// Routing kind constants for connect_vertices (exported for TypeScript).
 #[allow(dead_code)]
 /// Orthogonal routing (right-angle edges).
-#[allow(dead_code)]
 pub const ROUTING_KIND_ORTHOGONAL: u32 = 0;
 /// Straight line routing.
-#[allow(dead_code)]
 pub const ROUTING_KIND_STRAIGHT: u32 = 1;
 
 fn routing_kind_from_u32(kind: u32) -> RoutingKind {
