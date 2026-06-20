@@ -100,3 +100,9 @@ export interface StyleChanges {
   italic?: boolean;
   [key: string]: unknown;
 }
+
+/** Vertex shape data used by copy/paste. */
+export interface Vertex {
+  geometry: { x: number; y: number; width: number; height: number };
+  style?: Record<string, unknown>;
+}

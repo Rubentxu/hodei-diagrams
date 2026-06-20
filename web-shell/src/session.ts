@@ -128,6 +128,24 @@ export class DiagramEngineSession {
     }
   }
 
+  /**
+   * Execute multiple commands in sequence.
+   * Returns aggregate result: ok if all succeed, first error otherwise.
+   */
+  executeCommands(cmdJsons: string[]): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      for (const cmd of cmdJsons) {
+        this.wasm.execute_command(this.handle as number, cmd);
+      }
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   #onStateChange: (() => void) | null = null;
 
   /**

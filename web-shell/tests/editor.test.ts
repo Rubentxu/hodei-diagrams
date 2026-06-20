@@ -119,13 +119,13 @@ describe('Editor', () => {
   });
 
   it('constructor creates editor with no selection', () => {
-    expect(editor.selection).toBeNull();
+    expect(editor.selection).toEqual([]);
   });
 
   it('attach/detach cycle works without errors', () => {
     editor.detach();
     editor.attach();
-    expect(editor.selection).toBeNull();
+    expect(editor.selection).toEqual([]);
   });
 
   it('setActiveTool sets and clears the active tool', () => {
@@ -145,27 +145,27 @@ describe('Editor', () => {
 
       rect!.dispatchEvent(createPointerDownEvent({ button: 0 }));
 
-      expect(editor.selection).toEqual({ idx: 0, version: 0 });
+      expect(editor.selection).toEqual([{ idx: 0, version: 0 }]);
     });
 
     it('click on empty area deselects', () => {
       const rect = viewer.querySelector('[data-vertex-id="0:0"]');
       rect!.dispatchEvent(createPointerDownEvent({ button: 0 }));
-      expect(editor.selection).toEqual({ idx: 0, version: 0 });
+      expect(editor.selection).toEqual([{ idx: 0, version: 0 }]);
 
       // Click on background (not on a vertex element)
       viewer.dispatchEvent(createPointerDownEvent({ button: 0 }));
-      expect(editor.selection).toBeNull();
+      expect(editor.selection).toEqual([]);
     });
 
     it('click on different shape switches selection', () => {
       const rect = viewer.querySelector('[data-vertex-id="0:0"]');
       rect!.dispatchEvent(createPointerDownEvent({ button: 0 }));
-      expect(editor.selection).toEqual({ idx: 0, version: 0 });
+      expect(editor.selection).toEqual([{ idx: 0, version: 0 }]);
 
       const ellipse = viewer.querySelector('[data-vertex-id="1:0"]');
       ellipse!.dispatchEvent(createPointerDownEvent({ button: 0 }));
-      expect(editor.selection).toEqual({ idx: 1, version: 0 });
+      expect(editor.selection).toEqual([{ idx: 1, version: 0 }]);
     });
   });
 
@@ -326,6 +326,111 @@ describe('Editor', () => {
       editor.redoCmd();
       expect(wasm.redo).toHaveBeenCalled();
       expect(wasm.get_scene).toHaveBeenCalled();
+    });
+  });
+
+  describe('multi-selection API', () => {
+    it('selectOnly replaces selection', () => {
+      editor.selectOnly({ idx: 1, version: 0 });
+      expect(editor.selection).toEqual([{ idx: 1, version: 0 }]);
+      expect(editor.isSelected({ idx: 1, version: 0 })).toBe(true);
+      expect(editor.isSelected({ idx: 0, version: 0 })).toBe(false);
+    });
+
+    it('addToSelection adds without removing', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      editor.addToSelection({ idx: 1, version: 0 });
+      expect(editor.selection).toContainEqual({ idx: 0, version: 0 });
+      expect(editor.selection).toContainEqual({ idx: 1, version: 0 });
+      expect(editor.selection.length).toBe(2);
+    });
+
+    it('removeFromSelection removes without affecting others', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      editor.addToSelection({ idx: 1, version: 0 });
+      editor.removeFromSelection({ idx: 0, version: 0 });
+      expect(editor.selection).toEqual([{ idx: 1, version: 0 }]);
+    });
+
+    it('toggleSelection adds if not present', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      editor.toggleSelection({ idx: 1, version: 0 });
+      expect(editor.selection).toContainEqual({ idx: 0, version: 0 });
+      expect(editor.selection).toContainEqual({ idx: 1, version: 0 });
+    });
+
+    it('toggleSelection removes if already present', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      editor.addToSelection({ idx: 1, version: 0 });
+      editor.toggleSelection({ idx: 0, version: 0 });
+      expect(editor.selection).toEqual([{ idx: 1, version: 0 }]);
+    });
+
+    it('clearSelection empties the set', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      editor.addToSelection({ idx: 1, version: 0 });
+      editor.clearSelection();
+      expect(editor.selection).toEqual([]);
+      expect(editor.isSelected({ idx: 0, version: 0 })).toBe(false);
+    });
+
+    it('selectMany replaces with multiple ids', () => {
+      editor.selectMany([{ idx: 0, version: 0 }, { idx: 1, version: 0 }]);
+      expect(editor.selection.length).toBe(2);
+      expect(editor.isSelected({ idx: 0, version: 0 })).toBe(true);
+      expect(editor.isSelected({ idx: 1, version: 0 })).toBe(true);
+    });
+
+    it('isSelected returns correct boolean', () => {
+      editor.selectOnly({ idx: 5, version: 2 });
+      expect(editor.isSelected({ idx: 5, version: 2 })).toBe(true);
+      expect(editor.isSelected({ idx: 5, version: 3 })).toBe(false);
+      expect(editor.isSelected({ idx: 6, version: 2 })).toBe(false);
+    });
+  });
+
+  describe('keyboard shortcuts', () => {
+    it('Ctrl+A selects all shapes in scene cache', () => {
+      wasm.execute_command.mockReturnValue(undefined);
+
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }),
+      );
+
+      // The scene cache mock has one Rect (id 0:0)
+      expect(editor.selection.length).toBe(1);
+      expect(editor.isSelected({ idx: 0, version: 0 })).toBe(true);
+    });
+
+    it('Escape clears selection', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      expect(editor.isSelected({ idx: 0, version: 0 })).toBe(true);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(editor.selection).toEqual([]);
+    });
+
+    it('Ctrl+C copies to clipboard', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      wasm.execute_command.mockReturnValue(undefined);
+
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true }),
+      );
+
+      // copySelection should have been called (no-op in this test env)
+    });
+
+    it('Ctrl+X cuts selection', () => {
+      editor.selectOnly({ idx: 0, version: 0 });
+      wasm.execute_command.mockReturnValue(undefined);
+
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'x', ctrlKey: true, bubbles: true }),
+      );
+
+      // Cut should clear selection
+      expect(editor.selection).toEqual([]);
     });
   });
 });

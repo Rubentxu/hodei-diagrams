@@ -58,6 +58,45 @@ describe('executeCommand', () => {
   });
 });
 
+describe('executeCommands', () => {
+  it('calls wasm.execute_command for each command in order', () => {
+    const { session, wasm } = createSession();
+    const cmds = ['{"AddVertex":{}}', '{"MoveVertex":{}}', '{"RemoveVertex":{}}'];
+    const r = session.executeCommands(cmds);
+    expect(r.ok).toBe(true);
+    expect(wasm.execute_command).toHaveBeenCalledTimes(3);
+    expect(wasm.execute_command).toHaveBeenNthCalledWith(1, 42, '{"AddVertex":{}}');
+    expect(wasm.execute_command).toHaveBeenNthCalledWith(2, 42, '{"MoveVertex":{}}');
+    expect(wasm.execute_command).toHaveBeenNthCalledWith(3, 42, '{"RemoveVertex":{}}');
+  });
+
+  it('returns aggregate ok when all commands succeed', () => {
+    const { session, wasm } = createSession();
+    const cmds = ['{"cmd":1}', '{"cmd":2}'];
+    const r = session.executeCommands(cmds);
+    expect(r.ok).toBe(true);
+  });
+
+  it('returns err on disposed session without calling wasm', () => {
+    const { session, wasm } = createSession();
+    session.dispose();
+    const r = session.executeCommands(['{}']);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe('Disposed: Engine session was disposed');
+    expect(wasm.execute_command).not.toHaveBeenCalled();
+  });
+
+  it('wraps wasm throw into error result', () => {
+    const { session, wasm } = createSession();
+    wasm.execute_command.mockImplementation(() => {
+      throw new Error('InvalidCommand: boom');
+    });
+    const r = session.executeCommands(['{"AddVertex":{}}', '{"MoveVertex":{}}']);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('InvalidCommand');
+  });
+});
+
 describe('undo / redo', () => {
   it('undo calls wasm.undo and returns ok', () => {
     const { session, wasm } = createSession();

@@ -95,9 +95,12 @@ function downloadSvg(svg: string, filename: string): void {
 }
 
 /** Get human-readable selection label from scene data */
-function getSelectionLabel(id: SlotmapId | null, sceneData: ScenePage[]): string {
-  if (!id) return 'Nothing selected';
-  // Find the vertex in scene data
+function getSelectionLabel(ids: SlotmapId[], sceneData: ScenePage[]): string {
+  if (ids.length === 0) return 'Nothing selected';
+  if (ids.length > 1) return `${ids.length} shapes selected`;
+
+  // Single selection — find the vertex in scene data
+  const id = ids[0]!;
   for (const page of sceneData) {
     for (const elem of page.display_list) {
       const e = elem as Record<string, unknown>;
@@ -218,14 +221,14 @@ async function bootstrap(): Promise<void> {
   };
 
   // Selection change → inspector update + HUD update
-  const onSelectionChange = (id: SlotmapId | null) => {
-    // Update inspector with current selection and scene data
+  const onSelectionChange = (ids: SlotmapId[]) => {
+    // Update inspector with current selection and scene data (inspector uses first item)
     if (activeEditor) {
       const scene = activeEditor.getSceneCache();
       const sceneData = scene.ok ? scene.value : [];
-      inspector.update(id, sceneData, activeEditor.activePageIdx);
+      inspector.update(ids[0] ?? null, sceneData, activeEditor.activePageIdx);
       // Update HUD selection label
-      ui.hud.setSelection(getSelectionLabel(id, sceneData));
+      ui.hud.setSelection(getSelectionLabel(ids, sceneData));
     }
     // Update zoom display
     ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
