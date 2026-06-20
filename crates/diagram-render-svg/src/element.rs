@@ -58,18 +58,43 @@ fn make_indent(indent: usize) -> String {
     "  ".repeat(indent)
 }
 
+/// Compute the SVG transform attribute string from rotation and flip values.
+///
+/// Returns an empty string if no transform is needed (identity).
+fn compute_transform(
+    bounds: &diagram_core::geometry::Rect,
+    rotation: f64,
+    flip_h: bool,
+    flip_v: bool,
+) -> String {
+    if rotation == 0.0 && !flip_h && !flip_v {
+        return String::new();
+    }
+    let cx = bounds.origin.x + bounds.size.width / 2.0;
+    let cy = bounds.origin.y + bounds.size.height / 2.0;
+    let deg = rotation.to_degrees();
+    let sx: f64 = if flip_h { -1.0 } else { 1.0 };
+    let sy: f64 = if flip_v { -1.0 } else { 1.0 };
+    format!(
+        " transform=\"rotate({} {} {}) scale({} {})\"",
+        deg, cx, cy, sx, sy
+    )
+}
+
 fn rect_to_svg(r: &RectElement, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = shape_style_defaults(&r.style, AttrContext::Shape);
     let vid = vid_attr(&r.id);
+    let xform = compute_transform(&r.bounds, r.rotation, r.flip_h, r.flip_v);
     format!(
-        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}/>",
+        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}{}/>",
         ind,
         r.bounds.origin.x,
         r.bounds.origin.y,
         r.bounds.size.width,
         r.bounds.size.height,
         vid,
+        xform,
         style
     )
 }
@@ -78,8 +103,9 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = shape_style_defaults(&r.style, AttrContext::Shape);
     let vid = vid_attr(&r.id);
+    let xform = compute_transform(&r.bounds, r.rotation, r.flip_h, r.flip_v);
     format!(
-        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\"{}{}/>",
+        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\"{}{}{}/>",
         ind,
         r.bounds.origin.x,
         r.bounds.origin.y,
@@ -88,6 +114,7 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
         r.radius,
         r.radius,
         vid,
+        xform,
         style
     )
 }
@@ -100,9 +127,10 @@ fn ellipse_to_svg(e: &EllipseElement, indent: usize) -> String {
     let cy = e.bounds.origin.y + e.bounds.size.height / 2.0;
     let rx = e.bounds.size.width / 2.0;
     let ry = e.bounds.size.height / 2.0;
+    let xform = compute_transform(&e.bounds, e.rotation, e.flip_h, e.flip_v);
     format!(
-        "{}<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"{}{}/>",
-        ind, cx, cy, rx, ry, vid, style
+        "{}<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"{}{}{}/>",
+        ind, cx, cy, rx, ry, vid, xform, style
     )
 }
 
@@ -126,7 +154,11 @@ fn diamond_to_svg(d: &DiamondElement, indent: usize) -> String {
         x,
         y + h / 2.0 // left
     );
-    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+    let xform = compute_transform(&d.bounds, d.rotation, d.flip_h, d.flip_v);
+    format!(
+        "{}<polygon points=\"{}\"{}{}{}/>",
+        ind, points, vid, xform, style
+    )
 }
 
 fn triangle_to_svg(t: &TriangleElement, indent: usize) -> String {
@@ -147,7 +179,11 @@ fn triangle_to_svg(t: &TriangleElement, indent: usize) -> String {
         x,
         y + h // bottom-left
     );
-    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+    let xform = compute_transform(&t.bounds, t.rotation, t.flip_h, t.flip_v);
+    format!(
+        "{}<polygon points=\"{}\"{}{}{}/>",
+        ind, points, vid, xform, style
+    )
 }
 
 fn hexagon_to_svg(h: &HexagonElement, indent: usize) -> String {
@@ -174,7 +210,11 @@ fn hexagon_to_svg(h: &HexagonElement, indent: usize) -> String {
         x,
         y + h_h / 4.0 // upper-left
     );
-    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+    let xform = compute_transform(&h.bounds, h.rotation, h.flip_h, h.flip_v);
+    format!(
+        "{}<polygon points=\"{}\"{}{}{}/>",
+        ind, points, vid, xform, style
+    )
 }
 
 fn cylinder_to_svg(c: &CylinderElement, indent: usize) -> String {
@@ -207,7 +247,8 @@ fn cylinder_to_svg(c: &CylinderElement, indent: usize) -> String {
         x,
         y + h - ry // bottom-left
     );
-    format!("{}<path d=\"{}\"{}{}/>", ind, path, vid, style)
+    let xform = compute_transform(&c.bounds, c.rotation, c.flip_h, c.flip_v);
+    format!("{}<path d=\"{}\"{}{}{}/>", ind, path, vid, xform, style)
 }
 
 fn cloud_to_svg(c: &CloudElement, indent: usize) -> String {
@@ -254,7 +295,8 @@ fn cloud_to_svg(c: &CloudElement, indent: usize) -> String {
         x + w * 0.25,
         y + h * 0.7 // bump 4
     );
-    format!("{}<path d=\"{}\"{}{}/>", ind, path, vid, style)
+    let xform = compute_transform(&c.bounds, c.rotation, c.flip_h, c.flip_v);
+    format!("{}<path d=\"{}\"{}{}{}/>", ind, path, vid, xform, style)
 }
 
 fn parallelogram_to_svg(p: &ParallelogramElement, indent: usize) -> String {
@@ -278,7 +320,11 @@ fn parallelogram_to_svg(p: &ParallelogramElement, indent: usize) -> String {
         x,
         y + h // bottom-left
     );
-    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+    let xform = compute_transform(&p.bounds, p.rotation, p.flip_h, p.flip_v);
+    format!(
+        "{}<polygon points=\"{}\"{}{}{}/>",
+        ind, points, vid, xform, style
+    )
 }
 
 fn trapezoid_to_svg(t: &TrapezoidElement, indent: usize) -> String {
@@ -302,7 +348,11 @@ fn trapezoid_to_svg(t: &TrapezoidElement, indent: usize) -> String {
         x,
         y + h // bottom-left
     );
-    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+    let xform = compute_transform(&t.bounds, t.rotation, t.flip_h, t.flip_v);
+    format!(
+        "{}<polygon points=\"{}\"{}{}{}/>",
+        ind, points, vid, xform, style
+    )
 }
 
 fn polygon_to_svg(p: &PolygonElement, indent: usize) -> String {
@@ -321,9 +371,10 @@ fn polygon_to_svg(p: &PolygonElement, indent: usize) -> String {
         points.join(" ")
     };
 
+    let xform = compute_transform(&p.bounds, p.rotation, p.flip_h, p.flip_v);
     format!(
-        "{}<polygon points=\"{}\"{}{}/>",
-        ind, points_str, vid, style
+        "{}<polygon points=\"{}\"{}{}{}/>",
+        ind, points_str, vid, xform, style
     )
 }
 
@@ -447,6 +498,9 @@ mod tests {
                     height: 40.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         };
         let result = rect_to_svg(&rect, 1);
@@ -464,6 +518,9 @@ mod tests {
                     height: 100.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle {
                 fill_color: Some("#dae8fc".to_owned()),
                 stroke_color: Some("#6c8ebf".to_owned()),
@@ -489,6 +546,9 @@ mod tests {
                 },
             },
             radius: 8.0,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         };
         let result = rounded_rect_to_svg(&rect, 0);
@@ -507,6 +567,9 @@ mod tests {
                     height: 40.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         };
         let result = ellipse_to_svg(&ellipse, 0);
@@ -629,6 +692,9 @@ mod tests {
                     height: 40.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let group = VisualElement::Group(diagram_scene::GroupElement {
@@ -664,6 +730,9 @@ mod tests {
                     height: 80.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -688,6 +757,9 @@ mod tests {
                     height: 80.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -710,6 +782,9 @@ mod tests {
                     height: 80.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -729,6 +804,9 @@ mod tests {
                     height: 100.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -748,6 +826,9 @@ mod tests {
                     height: 80.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -767,6 +848,9 @@ mod tests {
                     height: 60.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -786,6 +870,9 @@ mod tests {
                     height: 60.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -812,6 +899,9 @@ mod tests {
                     height: 40.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -835,6 +925,9 @@ mod tests {
                     height: 0.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
@@ -857,6 +950,9 @@ mod tests {
                     height: 80.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();

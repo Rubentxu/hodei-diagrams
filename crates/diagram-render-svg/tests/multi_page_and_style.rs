@@ -133,6 +133,9 @@ fn remaining_style_emitted_in_lexicographic_order() {
     let rect = VisualElement::Rect(RectElement {
         id: VertexId::default(),
         bounds: make_rect(0.0, 0.0, 100.0, 100.0),
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: Some("#ffffff".to_owned()),
             remaining,

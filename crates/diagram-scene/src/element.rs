@@ -68,6 +68,12 @@ pub struct RectElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -81,6 +87,12 @@ pub struct RoundedRectElement {
     pub bounds: Rect,
     /// The corner radius.
     pub radius: f64,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -92,6 +104,12 @@ pub struct EllipseElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -103,6 +121,12 @@ pub struct DiamondElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -114,6 +138,12 @@ pub struct TriangleElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -125,6 +155,12 @@ pub struct HexagonElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -136,6 +172,12 @@ pub struct CylinderElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -147,6 +189,12 @@ pub struct CloudElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -158,6 +206,12 @@ pub struct ParallelogramElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -169,6 +223,12 @@ pub struct TrapezoidElement {
     pub id: VertexId,
     /// The bounds in page coordinates.
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -182,6 +242,12 @@ pub struct PolygonElement {
     pub points: Vec<Point>,
     /// The bounds in page coordinates (derived from points min/max).
     pub bounds: Rect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
     /// The resolved style.
     pub style: super::ResolvedStyle,
 }
@@ -271,6 +337,9 @@ mod tests {
         let elem = RectElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: style.clone(),
         };
 
@@ -346,11 +415,17 @@ mod tests {
         let child1 = VisualElement::Rect(RectElement {
             id: VertexId::default(),
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: style.clone(),
         });
         let child2 = VisualElement::Ellipse(EllipseElement {
             id: VertexId::default(),
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: style.clone(),
         });
 
@@ -385,6 +460,9 @@ mod tests {
         let elem = DiamondElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: style.clone(),
         };
 
@@ -409,6 +487,9 @@ mod tests {
         let elem = TriangleElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: style.clone(),
         };
 
@@ -431,6 +512,9 @@ mod tests {
         let elem = HexagonElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style,
         };
 
@@ -452,6 +536,9 @@ mod tests {
         let elem = CylinderElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style,
         };
 
@@ -473,6 +560,9 @@ mod tests {
         let elem = CloudElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style,
         };
 
@@ -494,6 +584,9 @@ mod tests {
         let elem = ParallelogramElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style,
         };
 
@@ -515,6 +608,9 @@ mod tests {
         let elem = TrapezoidElement {
             id: vid,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style,
         };
 
@@ -543,6 +639,9 @@ mod tests {
             id: vid,
             points: points.clone(),
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style,
         };
 
@@ -569,6 +668,9 @@ mod tests {
             id: vid,
             points,
             bounds,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style,
         };
 
@@ -610,6 +712,9 @@ mod tests {
                     height: 100.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle::default(),
         });
         _assert_non_exhaustive(elem);

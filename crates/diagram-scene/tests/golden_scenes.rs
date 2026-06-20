@@ -27,6 +27,7 @@ fn geom(x: f64, y: f64, w: f64, h: f64, relative: bool) -> CellGeometry {
         width: w,
         height: h,
         relative,
+        ..Default::default()
     }
 }
 

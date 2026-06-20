@@ -324,4 +324,34 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Rotate a vertex by a delta angle (radians).
+   * @param id The vertex to rotate
+   * @param angleDelta The angle in radians to add to the current rotation
+   */
+  rotateVertex(id: SlotmapId, angleDelta: number): Result<void, EngineError> {
+    const cmd = JSON.stringify({
+      RotateVertex: {
+        id: slotmapIdToField(id),
+        angle_delta: angleDelta,
+      },
+    });
+    return this.executeCommand(cmd);
+  }
+
+  /**
+   * Flip a vertex along an axis.
+   * @param id The vertex to flip
+   * @param axis 'horizontal' for left-right mirror, 'vertical' for top-bottom mirror
+   */
+  flipVertex(id: SlotmapId, axis: 'horizontal' | 'vertical'): Result<void, EngineError> {
+    const cmd = JSON.stringify({
+      FlipVertex: {
+        id: slotmapIdToField(id),
+        axis: axis === 'horizontal' ? 'Horizontal' : 'Vertical',
+      },
+    });
+    return this.executeCommand(cmd);
+  }
 }

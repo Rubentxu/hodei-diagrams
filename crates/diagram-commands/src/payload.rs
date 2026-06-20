@@ -981,3 +981,150 @@ impl DisconnectEdgeCommand {
         Ok(())
     }
 }
+
+/// Axis for flip operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FlipAxis {
+    /// Horizontal flip (left-right mirror).
+    Horizontal,
+    /// Vertical flip (top-bottom mirror).
+    Vertical,
+}
+
+/// Payload for rotating a vertex by a delta angle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RotateCommand {
+    /// The ID of the vertex to rotate.
+    pub id: VertexId,
+    /// The angle delta in radians to add to the current rotation.
+    pub angle_delta: f64,
+    /// The previous rotation value. Populated by `apply`.
+    #[serde(skip)]
+    pub previous_rotation: Option<f64>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl RotateCommand {
+    /// Create a new payload for rotating a vertex.
+    pub fn new(id: VertexId, angle_delta: f64) -> Self {
+        Self {
+            id,
+            angle_delta,
+            previous_rotation: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the rotate operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let vertex = model
+            .store
+            .vertex_mut(self.id)
+            .ok_or(CommandError::VertexNotFound(self.id))?;
+
+        // Capture previous rotation
+        self.previous_rotation = vertex.geometry.map(|g| g.rotation);
+
+        // Apply new rotation
+        let geo = vertex.geometry.get_or_insert_with(CellGeometry::default);
+        geo.rotation += self.angle_delta;
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the rotate operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev_rotation = self.previous_rotation.take();
+        let vertex = model
+            .store
+            .vertex_mut(self.id)
+            .ok_or(CommandError::VertexNotFound(self.id))?;
+
+        if let Some(geo) = vertex.geometry.as_mut() {
+            geo.rotation = prev_rotation.unwrap_or(0.0);
+        }
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for flipping a vertex along an axis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlipCommand {
+    /// The ID of the vertex to flip.
+    pub id: VertexId,
+    /// The axis along which to flip.
+    pub axis: FlipAxis,
+    /// The previous horizontal flip state. Populated by `apply`.
+    #[serde(skip)]
+    pub previous_flip_h: Option<bool>,
+    /// The previous vertical flip state. Populated by `apply`.
+    #[serde(skip)]
+    pub previous_flip_v: Option<bool>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl FlipCommand {
+    /// Create a new payload for flipping a vertex.
+    pub fn new(id: VertexId, axis: FlipAxis) -> Self {
+        Self {
+            id,
+            axis,
+            previous_flip_h: None,
+            previous_flip_v: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the flip operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let vertex = model
+            .store
+            .vertex_mut(self.id)
+            .ok_or(CommandError::VertexNotFound(self.id))?;
+
+        // Capture previous flip states
+        self.previous_flip_h = vertex.geometry.map(|g| g.flip_h);
+        self.previous_flip_v = vertex.geometry.map(|g| g.flip_v);
+
+        // Toggle the appropriate axis
+        let geo = vertex.geometry.get_or_insert_with(CellGeometry::default);
+        match self.axis {
+            FlipAxis::Horizontal => geo.flip_h = !geo.flip_h,
+            FlipAxis::Vertical => geo.flip_v = !geo.flip_v,
+        }
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the flip operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let vertex = model
+            .store
+            .vertex_mut(self.id)
+            .ok_or(CommandError::VertexNotFound(self.id))?;
+
+        if let Some(geo) = vertex.geometry.as_mut() {
+            if let Some(prev_h) = self.previous_flip_h {
+                geo.flip_h = prev_h;
+            }
+            if let Some(prev_v) = self.previous_flip_v {
+                geo.flip_v = prev_v;
+            }
+        }
+        self.applied = false;
+        Ok(())
+    }
+}

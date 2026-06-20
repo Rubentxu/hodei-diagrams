@@ -27,6 +27,9 @@ fn group_with_clip_emits_defs_and_clip_path() {
     let child_rect = VisualElement::Rect(RectElement {
         id: VertexId::default(),
         bounds: make_rect(60.0, 60.0, 80.0, 40.0),
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: empty_style(),
     });
     let group = VisualElement::Group(GroupElement {
@@ -73,6 +76,9 @@ fn group_without_clip_no_defs() {
     let child_rect = VisualElement::Rect(RectElement {
         id: VertexId::default(),
         bounds: make_rect(10.0, 10.0, 80.0, 40.0),
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: empty_style(),
     });
     let group = VisualElement::Group(GroupElement {
@@ -206,6 +212,9 @@ fn empty_defs_when_no_clipping() {
     let rect = VisualElement::Rect(RectElement {
         id: VertexId::default(),
         bounds: make_rect(10.0, 20.0, 80.0, 40.0),
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: empty_style(),
     });
     let page = PageScene {
@@ -228,6 +237,9 @@ fn nested_group_with_child_vertex() {
     let child_rect = VisualElement::Rect(RectElement {
         id: VertexId::default(),
         bounds: make_rect(10.0, 10.0, 80.0, 40.0),
+        rotation: 0.0,
+        flip_h: false,
+        flip_v: false,
         style: ResolvedStyle {
             fill_color: Some("#dae8fc".to_owned()),
             stroke_color: Some("#6c8ebf".to_owned()),

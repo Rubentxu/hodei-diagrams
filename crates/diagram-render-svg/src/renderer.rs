@@ -266,6 +266,9 @@ mod tests {
                     height: 40.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle {
                 fill_color: Some("#dae8fc".to_owned()),
                 stroke_color: Some("#6c8ebf".to_owned()),
@@ -298,6 +301,9 @@ mod tests {
                     height: 100.0,
                 },
             },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
             style: ResolvedStyle::default(),
         });
         let page = PageScene {

@@ -196,6 +196,7 @@ fn write_back(store: &mut ModelStore, model: &HierarchyModel, direction: Directi
                         width: w,
                         height: h,
                         relative: false,
+                        ..Default::default()
                     });
                 }
             }
@@ -243,6 +244,7 @@ mod tests {
                     width: *w,
                     height: *h,
                     relative: false,
+                    ..Default::default()
                 }),
                 page_id: Some(page_id),
                 ..Vertex::default()

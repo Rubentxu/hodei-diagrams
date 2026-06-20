@@ -27,6 +27,27 @@ pub struct CellGeometry {
     /// `relative = true` when the raw `as` attribute is missing or ≠ `"geometry"`.
     /// `relative = false` when `as == "geometry"`.
     pub relative: bool,
+    /// Rotation angle in radians (clockwise positive). Default 0.0.
+    pub rotation: f64,
+    /// Horizontal flip flag. Default false.
+    pub flip_h: bool,
+    /// Vertical flip flag. Default false.
+    pub flip_v: bool,
+}
+
+impl Default for CellGeometry {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+            relative: false,
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
+        }
+    }
 }
 
 /// A 2D point in the diagram's user-space coordinate system.

@@ -219,12 +219,22 @@ impl DrawioMapping {
                     .geometry
                     .as_ref()
                     .filter(|_| matches!(cell_ref, CellRef::Vertex(_) | CellRef::Group(_)))
-                    .map(|geo| CellGeometry {
-                        x: geo.x,
-                        y: geo.y,
-                        width: geo.width,
-                        height: geo.height,
-                        relative: geo.r#as != "geometry",
+                    .map(|geo| {
+                        // Convert draw.io rotation (degrees) to radians
+                        let rotation_rad = geo
+                            .rotation
+                            .map(|deg| deg * std::f64::consts::PI / 180.0)
+                            .unwrap_or(0.0);
+                        CellGeometry {
+                            x: geo.x,
+                            y: geo.y,
+                            width: geo.width,
+                            height: geo.height,
+                            relative: geo.r#as != "geometry",
+                            rotation: rotation_rad,
+                            flip_h: geo.flip_h.unwrap_or(false),
+                            flip_v: geo.flip_v.unwrap_or(false),
+                        }
                     });
 
                 match cell_ref {
@@ -357,10 +367,14 @@ impl DrawioMapping {
                     format_style_string(smap)
                 });
 
-                let geometry = vertex
-                    .geometry
-                    .as_ref()
-                    .map(|geo| crate::raw::RawDrawioGeometry {
+                let geometry = vertex.geometry.as_ref().map(|geo| {
+                    // Convert radians to degrees for draw.io; only emit if non-zero
+                    let rotation_deg = if geo.rotation != 0.0 {
+                        Some(geo.rotation * 180.0 / std::f64::consts::PI)
+                    } else {
+                        None
+                    };
+                    crate::raw::RawDrawioGeometry {
                         x: geo.x,
                         y: geo.y,
                         width: geo.width,
@@ -370,7 +384,11 @@ impl DrawioMapping {
                         } else {
                             "geometry".to_owned()
                         },
-                    });
+                        rotation: rotation_deg,
+                        flip_h: if geo.flip_h { Some(true) } else { None },
+                        flip_v: if geo.flip_v { Some(true) } else { None },
+                    }
+                });
 
                 let parent = vertex.parent.and_then(|gid| id_map.get_external_group(gid));
 
@@ -468,10 +486,14 @@ impl DrawioMapping {
                     format_style_string(smap)
                 });
 
-                let geometry = group
-                    .geometry
-                    .as_ref()
-                    .map(|geo| crate::raw::RawDrawioGeometry {
+                let geometry = group.geometry.as_ref().map(|geo| {
+                    // Convert radians to degrees for draw.io; only emit if non-zero
+                    let rotation_deg = if geo.rotation != 0.0 {
+                        Some(geo.rotation * 180.0 / std::f64::consts::PI)
+                    } else {
+                        None
+                    };
+                    crate::raw::RawDrawioGeometry {
                         x: geo.x,
                         y: geo.y,
                         width: geo.width,
@@ -481,7 +503,11 @@ impl DrawioMapping {
                         } else {
                             "geometry".to_owned()
                         },
-                    });
+                        rotation: rotation_deg,
+                        flip_h: if geo.flip_h { Some(true) } else { None },
+                        flip_v: if geo.flip_v { Some(true) } else { None },
+                    }
+                });
 
                 let cell = RawDrawioCell {
                     id: raw_id,

@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::error::CommandResult;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
-    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, MoveVertexPayload,
-    RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload,
-    RenamePagePayload,
+    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, FlipCommand,
+    MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
+    RemoveVertexPayload, RenamePagePayload, RotateCommand,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -49,6 +49,10 @@ pub enum Command {
     RemovePage(RemovePagePayload),
     /// Rename a page.
     RenamePage(RenamePagePayload),
+    /// Rotate a vertex by a delta angle.
+    RotateVertex(RotateCommand),
+    /// Flip a vertex along an axis.
+    FlipVertex(FlipCommand),
 }
 
 impl Command {
@@ -71,6 +75,8 @@ impl Command {
             Command::AddPage(p) => p.apply(model),
             Command::RemovePage(p) => p.apply(model),
             Command::RenamePage(p) => p.apply(model),
+            Command::RotateVertex(p) => p.apply(model),
+            Command::FlipVertex(p) => p.apply(model),
         }
     }
 
@@ -93,6 +99,8 @@ impl Command {
             Command::AddPage(p) => p.undo(model),
             Command::RemovePage(p) => p.undo(model),
             Command::RenamePage(p) => p.undo(model),
+            Command::RotateVertex(p) => p.undo(model),
+            Command::FlipVertex(p) => p.undo(model),
         }
     }
 }
@@ -153,6 +161,7 @@ mod tests {
                 width: 100.0,
                 height: 50.0,
                 relative: false,
+                ..Default::default()
             }),
             label: Some(Label::new("Test")),
             page_id: Some(pid),
@@ -177,6 +186,7 @@ mod tests {
                 width: 100.0,
                 height: 50.0,
                 relative: false,
+                ..Default::default()
             }),
             label: Some(Label::new("Test")),
             page_id: Some(pid),
@@ -291,6 +301,7 @@ mod tests {
             width: 50.0,
             height: 50.0,
             relative: false,
+            ..Default::default()
         };
 
         let mut cmd = Command::MoveVertex(MoveVertexPayload::new(vid, new_geom));
@@ -315,6 +326,7 @@ mod tests {
             width: 50.0,
             height: 50.0,
             relative: false,
+            ..Default::default()
         };
 
         let mut cmd = Command::MoveVertex(MoveVertexPayload::new(vid, new_geom));
@@ -942,6 +954,7 @@ mod tests {
                                 width: 100.0,
                                 height: 50.0,
                                 relative: false,
+                                ..Default::default()
                             };
                             commands.push(Command::MoveVertex(MoveVertexPayload::new(vid, geom)));
                         }

@@ -32,6 +32,15 @@ pub struct RawDrawioGeometry {
     /// Possible values: `"geometry"` (absolute), `"graph"` (page-level),
     /// empty string or any other value (relative).
     pub r#as: String,
+    /// Rotation angle in degrees (draw.io convention). Default 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<f64>,
+    /// Horizontal flip flag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flip_h: Option<bool>,
+    /// Vertical flip flag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flip_v: Option<bool>,
 }
 
 /// Root document of a `.drawio` file: `<mxfile>` containing one or more

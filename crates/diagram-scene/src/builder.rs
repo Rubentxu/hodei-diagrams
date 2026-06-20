@@ -162,6 +162,9 @@ impl SceneBuilder {
             crate::resolver::ShapeKind::Rect => Ok(VisualElement::Rect(RectElement {
                 id: vid,
                 bounds,
+                rotation: geometry.rotation,
+                flip_h: geometry.flip_h,
+                flip_v: geometry.flip_v,
                 style: resolved_style,
             })),
             crate::resolver::ShapeKind::RoundedRect => {
@@ -169,43 +172,67 @@ impl SceneBuilder {
                     id: vid,
                     bounds,
                     radius: DEFAULT_ROUNDED_RADIUS,
+                    rotation: geometry.rotation,
+                    flip_h: geometry.flip_h,
+                    flip_v: geometry.flip_v,
                     style: resolved_style,
                 }))
             }
             crate::resolver::ShapeKind::Ellipse => Ok(VisualElement::Ellipse(EllipseElement {
                 id: vid,
                 bounds,
+                rotation: geometry.rotation,
+                flip_h: geometry.flip_h,
+                flip_v: geometry.flip_v,
                 style: resolved_style,
             })),
             crate::resolver::ShapeKind::Diamond => Ok(VisualElement::Diamond(DiamondElement {
                 id: vid,
                 bounds,
+                rotation: geometry.rotation,
+                flip_h: geometry.flip_h,
+                flip_v: geometry.flip_v,
                 style: resolved_style,
             })),
             crate::resolver::ShapeKind::Triangle => Ok(VisualElement::Triangle(TriangleElement {
                 id: vid,
                 bounds,
+                rotation: geometry.rotation,
+                flip_h: geometry.flip_h,
+                flip_v: geometry.flip_v,
                 style: resolved_style,
             })),
             crate::resolver::ShapeKind::Hexagon => Ok(VisualElement::Hexagon(HexagonElement {
                 id: vid,
                 bounds,
+                rotation: geometry.rotation,
+                flip_h: geometry.flip_h,
+                flip_v: geometry.flip_v,
                 style: resolved_style,
             })),
             crate::resolver::ShapeKind::Cylinder => Ok(VisualElement::Cylinder(CylinderElement {
                 id: vid,
                 bounds,
+                rotation: geometry.rotation,
+                flip_h: geometry.flip_h,
+                flip_v: geometry.flip_v,
                 style: resolved_style,
             })),
             crate::resolver::ShapeKind::Cloud => Ok(VisualElement::Cloud(CloudElement {
                 id: vid,
                 bounds,
+                rotation: geometry.rotation,
+                flip_h: geometry.flip_h,
+                flip_v: geometry.flip_v,
                 style: resolved_style,
             })),
             crate::resolver::ShapeKind::Parallelogram => {
                 Ok(VisualElement::Parallelogram(ParallelogramElement {
                     id: vid,
                     bounds,
+                    rotation: geometry.rotation,
+                    flip_h: geometry.flip_h,
+                    flip_v: geometry.flip_v,
                     style: resolved_style,
                 }))
             }
@@ -213,6 +240,9 @@ impl SceneBuilder {
                 Ok(VisualElement::Trapezoid(TrapezoidElement {
                     id: vid,
                     bounds,
+                    rotation: geometry.rotation,
+                    flip_h: geometry.flip_h,
+                    flip_v: geometry.flip_v,
                     style: resolved_style,
                 }))
             }
@@ -241,6 +271,9 @@ impl SceneBuilder {
                     id: vid,
                     points,
                     bounds,
+                    rotation: geometry.rotation,
+                    flip_h: geometry.flip_h,
+                    flip_v: geometry.flip_v,
                     style: resolved_style,
                 }))
             }
@@ -433,6 +466,7 @@ mod tests {
             width: w,
             height: h,
             relative,
+            ..Default::default()
         }
     }
 
