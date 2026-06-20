@@ -20,6 +20,8 @@ type ErrorCallback = (_msg: string) => void;
 type StateChangeCallback = () => void;
 /** Selection-change callback type (fired when selection changes). */
 type SelectionChangeCallback = (_id: SlotmapId | null) => void;
+/** Tool-change callback type (fired when active tool changes). */
+type ToolChangeCallback = (_tool: ToolKind) => void;
 
 /**
  * Editor class: owns hit-testing, selection, drag FSM, and command construction.
@@ -41,6 +43,7 @@ export class Editor {
   #onError: ErrorCallback;
   #onStateChange: StateChangeCallback;
   #onSelectionChange: SelectionChangeCallback;
+  #onToolChange: ToolChangeCallback;
   #getZoom: () => number;
   #abortController: AbortController | null = null;
 
@@ -50,6 +53,7 @@ export class Editor {
     onError?: ErrorCallback,
     onStateChange?: StateChangeCallback,
     onSelectionChange?: SelectionChangeCallback,
+    onToolChange?: ToolChangeCallback,
     getZoom?: () => number,
   ) {
     this.#session = session;
@@ -57,6 +61,7 @@ export class Editor {
     this.#onError = onError ?? (() => {});
     this.#onStateChange = onStateChange ?? (() => {});
     this.#onSelectionChange = onSelectionChange ?? (() => {});
+    this.#onToolChange = onToolChange ?? (() => {});
     this.#getZoom = getZoom ?? (() => 1);
   }
 
@@ -73,6 +78,7 @@ export class Editor {
   /** Set the active palette tool (single-placement mode). */
   setActiveTool(tool: ToolKind): void {
     this.#activeTool = tool;
+    this.#onToolChange(tool);
   }
 
   /** Current active page index. */
@@ -179,15 +185,20 @@ export class Editor {
       }
     }
 
-    // Re-render the active page
-    const renderResult = this.#session.renderPage(this.#activePageIdx);
+    // Re-render the active page using renderPage with the slotmap ID index
+    // page.page_id.idx is the slotmap ID index which corresponds to the engine's page index
+    const page = this.#sceneCache[this.#activePageIdx];
+    if (!page) {
+      this.#onError('Page not found: ' + this.#activePageIdx);
+      return;
+    }
+    const pageIdx = page.page_id.idx;
+    const renderResult = this.#session.renderPage(pageIdx);
     if (!renderResult.ok) {
       this.#onError(renderResult.error);
       return;
     }
-    // Inject SVG into viewer container
-    const svg = renderResult.value;
-    this.#viewer.innerHTML = svg;
+    this.#viewer.innerHTML = renderResult.value;
     // Notify state change (e.g. for undo/redo button updates)
     this.#onStateChange();
 
@@ -388,8 +399,8 @@ export class Editor {
   }
 
   /** Build an AddVertex command JSON string. */
-  #buildAddVertexCmd(kind: 'Rectangle' | 'Ellipse', x: number, y: number): string {
-    const width = kind === 'Rectangle' ? 120 : 80;
+  #buildAddVertexCmd(kind: 'Rectangle' | 'RoundedRect' | 'Ellipse', x: number, y: number): string {
+    const width = kind === 'Rectangle' || kind === 'RoundedRect' ? 120 : 80;
     const height = 80;
     const payload: Record<string, unknown> = {
       vertex: {
@@ -405,9 +416,11 @@ export class Editor {
           : { idx: 0, version: 0 },
       },
     };
-    // Include inline style for ellipse (engine classifies by shape=ellipse)
+    // Include inline style based on shape kind (engine classifies by style properties)
     if (kind === 'Ellipse') {
       payload.style = { shape: 'ellipse' };
+    } else if (kind === 'RoundedRect') {
+      payload.style = { rounded: '1' };
     }
     return JSON.stringify({ AddVertex: payload });
   }
@@ -476,9 +489,12 @@ export class Editor {
   #onPaletteClick(e: PointerEvent): void {
     if (!this.#activeTool) return;
 
-    const kind = this.#activeTool === 'rectangle' || this.#activeTool === 'rounded-rect'
-      ? 'Rectangle'
-      : 'Ellipse';
+    const kind: 'Rectangle' | 'RoundedRect' | 'Ellipse' =
+      this.#activeTool === 'rectangle'
+        ? 'Rectangle'
+        : this.#activeTool === 'rounded-rect'
+          ? 'RoundedRect'
+          : 'Ellipse';
 
     const docPos = this.#clientToDoc(e.clientX, e.clientY);
     const cmd = this.#buildAddVertexCmd(kind, docPos.x, docPos.y);
@@ -490,7 +506,7 @@ export class Editor {
     }
 
     // Single-placement mode: clear tool after use
-    this.#activeTool = null;
+    this.setActiveTool(null);
   }
 
   // ─── Keyboard ────────────────────────────────────────────────────────────

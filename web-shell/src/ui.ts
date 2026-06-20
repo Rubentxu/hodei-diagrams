@@ -24,6 +24,7 @@ export interface UiElements {
 
   // Zone 2: Sidebar
   rectToolButton: HTMLButtonElement;
+  roundedRectToolButton: HTMLButtonElement;
   ellipseToolButton: HTMLButtonElement;
   sidebarCollapseBtn: HTMLButtonElement;
 
@@ -184,6 +185,7 @@ export function buildEmptyUi(
 
     // Zone 2
     rectToolButton: sidebar.rectToolBtn,
+    roundedRectToolButton: sidebar.roundedRectToolBtn,
     ellipseToolButton: sidebar.ellipseToolBtn,
     sidebarCollapseBtn: sidebar.collapseBtn,
 

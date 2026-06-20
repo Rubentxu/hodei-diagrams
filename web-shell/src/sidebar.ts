@@ -9,6 +9,7 @@
 export interface SidebarControls {
   container: HTMLElement;
   rectToolBtn: HTMLButtonElement;
+  roundedRectToolBtn: HTMLButtonElement;
   ellipseToolBtn: HTMLButtonElement;
   collapseBtn: HTMLButtonElement;
 }
@@ -172,8 +173,9 @@ export function buildSidebar(): SidebarControls {
   const shapeGrid = document.createElement('div');
   shapeGrid.className = 'shape-grid';
 
-  const controls: Pick<SidebarControls, 'rectToolBtn' | 'ellipseToolBtn'> = {
+  const controls: Pick<SidebarControls, 'rectToolBtn' | 'roundedRectToolBtn' | 'ellipseToolBtn'> = {
     rectToolBtn: document.createElement('button'),
+    roundedRectToolBtn: document.createElement('button'),
     ellipseToolBtn: document.createElement('button'),
   };
 
@@ -190,6 +192,8 @@ export function buildSidebar(): SidebarControls {
 
     if (shape.id === 'rectangle') {
       controls.rectToolBtn = btn;
+    } else if (shape.id === 'rounded-rect') {
+      controls.roundedRectToolBtn = btn;
     } else if (shape.id === 'ellipse') {
       controls.ellipseToolBtn = btn;
     }
@@ -243,6 +247,7 @@ export function buildSidebar(): SidebarControls {
   return {
     container,
     rectToolBtn: controls.rectToolBtn,
+    roundedRectToolBtn: controls.roundedRectToolBtn,
     ellipseToolBtn: controls.ellipseToolBtn,
     collapseBtn,
   };
