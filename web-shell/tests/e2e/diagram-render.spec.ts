@@ -26,7 +26,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 2: Load aws-admision.drawio (4MB, 21 cells) → no crash, SVG present
    * Note: aws-admision.drawio is not present in fixtures; this test is skipped.
    */
-  test.skip('Load aws-admision.drawio (4MB, 21 cells) → no crash, SVG present', async ({ page }) => {
+  test('Load aws-admision.drawio (4MB, 21 cells) → no crash, SVG present', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
