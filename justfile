@@ -42,7 +42,7 @@ web-install:
 
 # Build WASM for web-shell
 web-wasm:
-    wasm-pack build --target web crates/diagram-wasm --out-dir ../../web-shell/pkg
+    wasm-pack build --target web crates/diagram-wasm --out-dir ../../web-shell/src/wasm
 
 # TypeScript type check
 web-typecheck:
@@ -56,11 +56,30 @@ web-test *args:
 web-e2e *args:
     cd web-shell && npx playwright test {{args}}
 
-# Web-shell dev server
+# ═══════════════════════════════════════════════════════════════════════════════
+# ONE-SHOT COMMANDS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Compile Rust → WASM + start Vite dev server at http://localhost:4100
+dev: web-wasm
+    @echo "⚡ Hodei Diagrams → http://localhost:4100"
+    cd web-shell && npx vite --port 4100 --strictPort
+
+# Full pipeline: WASM → build → E2E tests in headless browser
+e2e: web-wasm
+    cd web-shell && npx playwright test
+
+# Full CI: Rust verify + WASM + TypeScript verify + E2E
+ci: verify web-verify
+    cd web-shell && npx playwright test
+
+# ─── Old aliases (kept for compatibility) ─────────────────────────────────────
+
+# Web-shell dev server (alias)
 web-dev:
     cd web-shell && npm run dev
 
-# Web-shell full verify (lint + typecheck + wasm + build)
+# Web-shell full verify (alias)
 web-verify:
     cd web-shell && npm run verify
 
