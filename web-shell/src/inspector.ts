@@ -356,29 +356,31 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
     const changes: StyleChanges = {};
     changes.fillColor = fillInput.value;
     changes.strokeColor = strokeInput.value;
-    changes.strokeWidth = parseInt(widthInput.value, 10);
-    changes.dashed = dashedInput.checked;
-    changes.rounded = roundedInput.checked;
+    changes.strokeWidth = widthInput.value; // string, engine parses
+    changes.dashed = dashedInput.checked ? "1" : "0"; // engine parses as bool
+    changes.rounded = roundedInput.checked ? "1" : "0"; // engine parses as bool
     changes.fontFamily = fontSelect.value;
-    changes.fontSize = parseInt(sizeInput.value, 10);
+    changes.fontSize = sizeInput.value; // string, engine parses
     changes.fontColor = fontColorInput.value;
-    changes.bold = boldInput.checked;
-    changes.italic = italicInput.checked;
+    changes.bold = boldInput.checked ? "1" : "0"; // engine parses as bool
+    changes.italic = italicInput.checked ? "1" : "0"; // engine parses as bool
     return changes;
   }
 
   function dispatchChange(): void {
-    if (!currentSelection) return;
+    if (!currentSelection) {
+      return;
+    }
     const changes = getChanges();
     const cmd = JSON.stringify({
       ChangeStyle: {
         id: slotmapIdToField(currentSelection),
-        changes,
+        style: changes,
       },
     });
     const r = session.executeCommand(cmd);
     if (!r.ok) {
-      console.warn('ChangeStyle command failed:', r.error);
+      console.warn('[inspector] ChangeStyle failed:', r.error);
     }
   }
 

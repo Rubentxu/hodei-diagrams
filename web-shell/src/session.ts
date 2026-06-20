@@ -121,10 +121,21 @@ export class DiagramEngineSession {
     if (!g.ok) return g;
     try {
       this.wasm.execute_command(this.handle as number, cmdJson);
+      this.#onStateChange?.();
       return ok(undefined);
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  #onStateChange: (() => void) | null = null;
+
+  /**
+   * Register a callback that fires after every successful `executeCommand`.
+   * Used by the editor to trigger re-renders when the inspector modifies state.
+   */
+  setOnStateChange(cb: () => void): void {
+    this.#onStateChange = cb;
   }
 
   /** Undo the last command. */

@@ -273,6 +273,10 @@ async function bootstrap(): Promise<void> {
         () => zoomPan.getZoom(),
       );
       activeEditor.attach();
+      // Re-render when inspector modifies state via session.executeCommand
+      activeSession.setOnStateChange(() => {
+        activeEditor?.triggerReplay();
+      });
     }
 
     // Ensure the editor's scene cache is refreshed after import

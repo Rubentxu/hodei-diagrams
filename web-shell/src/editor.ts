@@ -157,6 +157,14 @@ export class Editor {
     this.#replay();
   }
 
+  /**
+   * Trigger a re-render of the current page.
+   * Called externally when state changes (e.g., from inspector via session callback).
+   */
+  triggerReplay(): void {
+    this.#replay();
+  }
+
   // ─── Coordinate Conversion ───────────────────────────────────────────────
 
   /** Convert screen client coordinates to document-space coordinates, accounting for zoom. */
