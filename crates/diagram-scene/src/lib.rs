@@ -35,8 +35,10 @@ pub mod scene;
 pub use builder::SceneBuilder;
 pub use diagram_core::id::PageId;
 pub use element::{
-    DEFAULT_ROUNDED_RADIUS, EllipseElement, EntityId, GroupElement, LineElement, PathElement,
-    RectElement, RoundedRectElement, TextElement, VisualElement,
+    CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
+    EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PathElement,
+    PolygonElement, RectElement, RoundedRectElement, TextElement, TrapezoidElement,
+    TriangleElement, VisualElement,
 };
 pub use error::{SceneError, SceneResult};
 pub use resolver::{ResolvedStyle, ShapeKind, StyleResolver};

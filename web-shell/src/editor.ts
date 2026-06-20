@@ -3,7 +3,19 @@ import type { SlotmapId, ScenePage } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 
 /** Active tool from the palette. */
-export type ToolKind = 'rectangle' | 'rounded-rect' | 'ellipse' | null;
+export type ToolKind =
+  | 'rectangle'
+  | 'rounded-rect'
+  | 'ellipse'
+  | 'diamond'
+  | 'triangle'
+  | 'hexagon'
+  | 'cylinder'
+  | 'cloud'
+  | 'parallelogram'
+  | 'trapezoid'
+  | 'polygon'
+  | null;
 
 /** Drag FSM state. */
 interface DragState {
@@ -238,12 +250,26 @@ export class Editor {
   #reapplySelection(): void {
     if (this.#selectedId === null) return;
 
+    const shapeKeys = [
+      'Rect',
+      'RoundedRect',
+      'Ellipse',
+      'Diamond',
+      'Triangle',
+      'Hexagon',
+      'Cylinder',
+      'Cloud',
+      'Parallelogram',
+      'Trapezoid',
+      'Polygon',
+    ] as const;
+
     // Validate the selected ID still exists in the current scene
     const stillExists = this.#sceneCache.some((page) =>
       page.display_list.some((elem: unknown) => {
         const e = elem as Record<string, unknown>;
         // Check through externally-tagged variants
-        for (const key of ['Rect', 'RoundedRect', 'Ellipse'] as const) {
+        for (const key of shapeKeys) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
@@ -407,7 +433,11 @@ export class Editor {
   }
 
   /** Build an AddVertex command JSON string. */
-  #buildAddVertexCmd(kind: 'Rectangle' | 'RoundedRect' | 'Ellipse', x: number, y: number): string {
+  #buildAddVertexCmd(
+    kind: 'Rectangle' | 'RoundedRect' | 'Ellipse' | 'Diamond' | 'Triangle' | 'Hexagon' | 'Cylinder' | 'Cloud' | 'Parallelogram' | 'Trapezoid' | 'Polygon',
+    x: number,
+    y: number
+  ): string {
     const width = kind === 'Rectangle' || kind === 'RoundedRect' ? 120 : 80;
     const height = 80;
     const payload: Record<string, unknown> = {
@@ -429,6 +459,22 @@ export class Editor {
       payload.style = { shape: 'ellipse' };
     } else if (kind === 'RoundedRect') {
       payload.style = { rounded: '1' };
+    } else if (kind === 'Diamond') {
+      payload.style = { shape: 'diamond' };
+    } else if (kind === 'Triangle') {
+      payload.style = { shape: 'triangle' };
+    } else if (kind === 'Hexagon') {
+      payload.style = { shape: 'hexagon' };
+    } else if (kind === 'Cylinder') {
+      payload.style = { shape: 'cylinder' };
+    } else if (kind === 'Cloud') {
+      payload.style = { shape: 'cloud' };
+    } else if (kind === 'Parallelogram') {
+      payload.style = { shape: 'parallelogram' };
+    } else if (kind === 'Trapezoid') {
+      payload.style = { shape: 'trapezoid' };
+    } else if (kind === 'Polygon') {
+      payload.style = { shape: 'polygon' };
     }
     return JSON.stringify({ AddVertex: payload });
   }
@@ -464,10 +510,24 @@ export class Editor {
   #findOriginalGeometry(
     vid: SlotmapId,
   ): { x: number; y: number; width: number; height: number } | null {
+    const shapeKeys = [
+      'Rect',
+      'RoundedRect',
+      'Ellipse',
+      'Diamond',
+      'Triangle',
+      'Hexagon',
+      'Cylinder',
+      'Cloud',
+      'Parallelogram',
+      'Trapezoid',
+      'Polygon',
+    ] as const;
+
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        for (const key of ['Rect', 'RoundedRect', 'Ellipse'] as const) {
+        for (const key of shapeKeys) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
@@ -497,12 +557,21 @@ export class Editor {
   #onPaletteClick(e: PointerEvent): void {
     if (!this.#activeTool) return;
 
-    const kind: 'Rectangle' | 'RoundedRect' | 'Ellipse' =
-      this.#activeTool === 'rectangle'
-        ? 'Rectangle'
-        : this.#activeTool === 'rounded-rect'
-          ? 'RoundedRect'
-          : 'Ellipse';
+    const kindMap: Record<string, 'Rectangle' | 'RoundedRect' | 'Ellipse' | 'Diamond' | 'Triangle' | 'Hexagon' | 'Cylinder' | 'Cloud' | 'Parallelogram' | 'Trapezoid' | 'Polygon'> = {
+      'rectangle': 'Rectangle',
+      'rounded-rect': 'RoundedRect',
+      'ellipse': 'Ellipse',
+      'diamond': 'Diamond',
+      'triangle': 'Triangle',
+      'hexagon': 'Hexagon',
+      'cylinder': 'Cylinder',
+      'cloud': 'Cloud',
+      'parallelogram': 'Parallelogram',
+      'trapezoid': 'Trapezoid',
+      'polygon': 'Polygon',
+    };
+
+    const kind = kindMap[this.#activeTool] ?? 'Rectangle';
 
     const docPos = this.#clientToDoc(e.clientX, e.clientY);
     const cmd = this.#buildAddVertexCmd(kind, docPos.x, docPos.y);

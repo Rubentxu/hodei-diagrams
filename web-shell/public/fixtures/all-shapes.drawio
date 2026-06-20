@@ -1,0 +1,41 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="2" vertex="1">
+          <mxGeometry width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" vertex="1" style="rounded=1;">
+          <mxGeometry x="140" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" vertex="1" style="shape=ellipse;">
+          <mxGeometry x="280" width="80" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" vertex="1" style="shape=diamond;">
+          <mxGeometry x="380" width="100" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" vertex="1" style="shape=triangle;">
+          <mxGeometry y="120" width="100" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" vertex="1" style="shape=hexagon;">
+          <mxGeometry x="120" y="120" width="100" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="8" vertex="1" style="shape=cylinder;">
+          <mxGeometry x="240" y="120" width="60" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="9" vertex="1" style="shape=cloud;">
+          <mxGeometry x="320" y="120" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" vertex="1" style="shape=parallelogram;">
+          <mxGeometry y="240" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" vertex="1" style="shape=trapezoid;">
+          <mxGeometry x="140" y="240" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" vertex="1" style="shape=polygon;points=10,10 50,5 90,15 85,60 15,55;">
+          <mxGeometry x="280" y="240" width="100" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

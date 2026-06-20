@@ -58,6 +58,22 @@ pub enum ShapeKind {
     RoundedRect,
     /// An ellipse.
     Ellipse,
+    /// A diamond (rhombus).
+    Diamond,
+    /// A triangle.
+    Triangle,
+    /// A hexagon.
+    Hexagon,
+    /// A cylinder (3D-ish).
+    Cylinder,
+    /// A cloud shape.
+    Cloud,
+    /// A parallelogram.
+    Parallelogram,
+    /// A trapezoid.
+    Trapezoid,
+    /// A free-form polygon.
+    Polygon,
 }
 
 /// The stateless style resolver.
@@ -172,14 +188,49 @@ impl StyleResolver {
     ///
     /// - `shape=ellipse` or `ellipse=1`/`true` → `Ellipse`
     /// - `rounded=1`/`true` → `RoundedRect`
+    /// - `shape=diamond` or `shape=rhombus` → `Diamond`
+    /// - `shape=triangle` → `Triangle`
+    /// - `shape=hexagon` → `Hexagon`
+    /// - `shape=cylinder` → `Cylinder`
+    /// - `shape=cloud` → `Cloud`
+    /// - `shape=parallelogram` → `Parallelogram`
+    /// - `shape=trapezoid` → `Trapezoid`
+    /// - `shape=polygon` → `Polygon`
     /// - otherwise → `Rect`
     pub fn classify(&self, style: &StyleMap) -> ShapeKind {
-        // Check for ellipse shape
+        // Check for explicit shape= key
         if let Some(v) = style.get("shape") {
-            if v.as_str().eq_ignore_ascii_case("ellipse") {
+            let s = v.as_str();
+            if s.eq_ignore_ascii_case("ellipse") {
                 return ShapeKind::Ellipse;
             }
+            if s.eq_ignore_ascii_case("diamond") || s.eq_ignore_ascii_case("rhombus") {
+                return ShapeKind::Diamond;
+            }
+            if s.eq_ignore_ascii_case("triangle") {
+                return ShapeKind::Triangle;
+            }
+            if s.eq_ignore_ascii_case("hexagon") {
+                return ShapeKind::Hexagon;
+            }
+            if s.eq_ignore_ascii_case("cylinder") {
+                return ShapeKind::Cylinder;
+            }
+            if s.eq_ignore_ascii_case("cloud") {
+                return ShapeKind::Cloud;
+            }
+            if s.eq_ignore_ascii_case("parallelogram") {
+                return ShapeKind::Parallelogram;
+            }
+            if s.eq_ignore_ascii_case("trapezoid") {
+                return ShapeKind::Trapezoid;
+            }
+            if s.eq_ignore_ascii_case("polygon") {
+                return ShapeKind::Polygon;
+            }
         }
+
+        // Check for ellipse legacy key
         if let Some(v) = style.get("ellipse") {
             if parse_bool(v.as_str()) == Some(true) {
                 return ShapeKind::Ellipse;
@@ -410,6 +461,94 @@ mod tests {
         map.insert("rounded", "1");
         // ellipse should win over rounded
         assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Ellipse);
+    }
+
+    // ─── new shape classify tests ───────────────────────────────────────────────
+
+    #[test]
+    fn classify_diamond() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "diamond");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Diamond);
+    }
+
+    #[test]
+    fn classify_rhombus_alias() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "rhombus");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Diamond);
+    }
+
+    #[test]
+    fn classify_triangle() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "triangle");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Triangle);
+    }
+
+    #[test]
+    fn classify_hexagon() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "hexagon");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Hexagon);
+    }
+
+    #[test]
+    fn classify_cylinder() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "cylinder");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Cylinder);
+    }
+
+    #[test]
+    fn classify_cloud() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "cloud");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Cloud);
+    }
+
+    #[test]
+    fn classify_parallelogram() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "parallelogram");
+        assert_eq!(
+            StyleResolver::new().classify(&map),
+            ShapeKind::Parallelogram
+        );
+    }
+
+    #[test]
+    fn classify_trapezoid() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "trapezoid");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Trapezoid);
+    }
+
+    #[test]
+    fn classify_polygon() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "polygon");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Polygon);
+    }
+
+    #[test]
+    fn classify_shape_case_insensitive() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "DIAMOND");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Diamond);
+
+        let mut map2 = StyleMap::new();
+        map2.insert("shape", "Hexagon");
+        assert_eq!(StyleResolver::new().classify(&map2), ShapeKind::Hexagon);
+    }
+
+    #[test]
+    fn classify_shape_with_fill_style_still_classifies() {
+        // shape key should be read from remaining map, not interfere with fill
+        let mut map = StyleMap::new();
+        map.insert("shape", "cloud");
+        map.insert("fillColor", "#ff0000");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Cloud);
     }
 
     // ─── helper tests ─────────────────────────────────────────────────────────

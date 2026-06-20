@@ -359,54 +359,47 @@ async function bootstrap(): Promise<void> {
   });
 
   // ─── 12. Wire palette tools ───────────────────────────────────────────────
-  const rectBtn = ui.rectToolButton;
-  const roundedRectBtn = ui.roundedRectToolButton;
-  const ellipseBtn = ui.ellipseToolButton;
+  // All shape tool buttons share the same toggle pattern: click activates,
+  // click again deactivates. The button visual class is synced to the active
+  // tool so users always know which one is armed.
+  type ShapeTool = 'rectangle' | 'rounded-rect' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'cylinder' | 'cloud' | 'parallelogram' | 'trapezoid' | 'polygon';
+  interface ToolBtn {
+    btn: HTMLButtonElement;
+    tool: ShapeTool;
+  }
+  const uiRecord = ui as unknown as Record<string, HTMLButtonElement | undefined>;
+  const pickBtn = (key: string, tool: ShapeTool): ToolBtn | null => {
+    const b = uiRecord[key];
+    return b ? { btn: b, tool } : null;
+  };
+  const allToolButtons: ToolBtn[] = [
+    pickBtn('rectToolButton', 'rectangle'),
+    pickBtn('roundedRectToolButton', 'rounded-rect'),
+    pickBtn('ellipseToolButton', 'ellipse'),
+    pickBtn('diamondToolButton', 'diamond'),
+    pickBtn('triangleToolButton', 'triangle'),
+    pickBtn('hexagonToolButton', 'hexagon'),
+    pickBtn('cylinderToolButton', 'cylinder'),
+    pickBtn('cloudToolButton', 'cloud'),
+    pickBtn('parallelogramToolButton', 'parallelogram'),
+    pickBtn('trapezoidToolButton', 'trapezoid'),
+    pickBtn('polygonToolButton', 'polygon'),
+  ].filter((x): x is ToolBtn => x !== null);
 
-  rectBtn.addEventListener('click', () => {
-    if (!activeEditor) return;
-    if (activeEditor.activeTool === 'rectangle') {
-      activeEditor.setActiveTool(null);
-      rectBtn.classList.remove('active-tool');
-      roundedRectBtn.classList.remove('active-tool');
-      ellipseBtn.classList.remove('active-tool');
-    } else {
-      activeEditor.setActiveTool('rectangle');
-      rectBtn.classList.add('active-tool');
-      roundedRectBtn.classList.remove('active-tool');
-      ellipseBtn.classList.remove('active-tool');
-    }
-  });
-
-  roundedRectBtn.addEventListener('click', () => {
-    if (!activeEditor) return;
-    if (activeEditor.activeTool === 'rounded-rect') {
-      activeEditor.setActiveTool(null);
-      roundedRectBtn.classList.remove('active-tool');
-      rectBtn.classList.remove('active-tool');
-      ellipseBtn.classList.remove('active-tool');
-    } else {
-      activeEditor.setActiveTool('rounded-rect');
-      roundedRectBtn.classList.add('active-tool');
-      rectBtn.classList.remove('active-tool');
-      ellipseBtn.classList.remove('active-tool');
-    }
-  });
-
-  ellipseBtn.addEventListener('click', () => {
-    if (!activeEditor) return;
-    if (activeEditor.activeTool === 'ellipse') {
-      activeEditor.setActiveTool(null);
-      ellipseBtn.classList.remove('active-tool');
-      rectBtn.classList.remove('active-tool');
-      roundedRectBtn.classList.remove('active-tool');
-    } else {
-      activeEditor.setActiveTool('ellipse');
-      ellipseBtn.classList.add('active-tool');
-      rectBtn.classList.remove('active-tool');
-      roundedRectBtn.classList.remove('active-tool');
-    }
-  });
+  for (const { btn, tool } of allToolButtons) {
+    btn.addEventListener('click', () => {
+      if (!activeEditor) return;
+      if (activeEditor.activeTool === tool) {
+        activeEditor.setActiveTool(null);
+      } else {
+        activeEditor.setActiveTool(tool);
+      }
+      // Sync visual class across all tool buttons
+      for (const { btn: b, tool: t } of allToolButtons) {
+        b.classList.toggle('active-tool', activeEditor?.activeTool === t);
+      }
+    });
+  }
 
   // ─── 13. Wire menu items ──────────────────────────────────────────────────
 
