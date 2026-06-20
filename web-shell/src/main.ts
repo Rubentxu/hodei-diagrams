@@ -233,6 +233,14 @@ async function bootstrap(): Promise<void> {
     ui.hud.setZoom(zoomPan.getZoom() * 100);
   };
 
+  // Tool change → UI update (remove active-tool class)
+  const onToolChange = (tool: import('./editor.js').ToolKind) => {
+    if (tool === null) {
+      ui.rectToolButton.classList.remove('active-tool');
+      ui.ellipseToolButton.classList.remove('active-tool');
+    }
+  };
+
   // ─── 6. Import handler ────────────────────────────────────────────────────
   function handleImport(xml: string): void {
     if (!activeSession) return;
@@ -261,10 +269,15 @@ async function bootstrap(): Promise<void> {
         onEditorError,
         onStateChange,
         onSelectionChange,
+        onToolChange,
         () => zoomPan.getZoom(),
       );
       activeEditor.attach();
     }
+
+    // Ensure the editor's scene cache is refreshed after import
+    // This is needed because attach() might have been called when the engine had no diagram
+    activeEditor.refreshScene();
 
     activeEditorIdx = 0;
     if (activeEditor) activeEditor.activePageIdx = 0;
@@ -343,6 +356,7 @@ async function bootstrap(): Promise<void> {
 
   // ─── 12. Wire palette tools ───────────────────────────────────────────────
   const rectBtn = ui.rectToolButton;
+  const roundedRectBtn = ui.roundedRectToolButton;
   const ellipseBtn = ui.ellipseToolButton;
 
   rectBtn.addEventListener('click', () => {
@@ -350,10 +364,27 @@ async function bootstrap(): Promise<void> {
     if (activeEditor.activeTool === 'rectangle') {
       activeEditor.setActiveTool(null);
       rectBtn.classList.remove('active-tool');
+      roundedRectBtn.classList.remove('active-tool');
       ellipseBtn.classList.remove('active-tool');
     } else {
       activeEditor.setActiveTool('rectangle');
       rectBtn.classList.add('active-tool');
+      roundedRectBtn.classList.remove('active-tool');
+      ellipseBtn.classList.remove('active-tool');
+    }
+  });
+
+  roundedRectBtn.addEventListener('click', () => {
+    if (!activeEditor) return;
+    if (activeEditor.activeTool === 'rounded-rect') {
+      activeEditor.setActiveTool(null);
+      roundedRectBtn.classList.remove('active-tool');
+      rectBtn.classList.remove('active-tool');
+      ellipseBtn.classList.remove('active-tool');
+    } else {
+      activeEditor.setActiveTool('rounded-rect');
+      roundedRectBtn.classList.add('active-tool');
+      rectBtn.classList.remove('active-tool');
       ellipseBtn.classList.remove('active-tool');
     }
   });
@@ -364,10 +395,12 @@ async function bootstrap(): Promise<void> {
       activeEditor.setActiveTool(null);
       ellipseBtn.classList.remove('active-tool');
       rectBtn.classList.remove('active-tool');
+      roundedRectBtn.classList.remove('active-tool');
     } else {
       activeEditor.setActiveTool('ellipse');
       ellipseBtn.classList.add('active-tool');
       rectBtn.classList.remove('active-tool');
+      roundedRectBtn.classList.remove('active-tool');
     }
   });
 
