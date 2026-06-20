@@ -337,15 +337,16 @@ export class Editor {
     // Ignore non-primary button
     if (e.button !== 0) return;
 
-    // If tool is active, handle palette placement instead
-    if (this.#activeTool) {
-      this.#onPaletteClick(e);
+    // Connect mode is handled via a separate two-click FSM — check BEFORE palette tools
+    // because 'connector' is truthy and would incorrectly route to #onPaletteClick
+    if (this.#activeTool === 'connector') {
+      this.#onConnectClick(e);
       return;
     }
 
-    // Connect mode is handled via a separate two-click FSM
-    if (this.#activeTool === 'connector') {
-      this.#onConnectClick(e);
+    // If tool is active, handle palette placement instead
+    if (this.#activeTool) {
+      this.#onPaletteClick(e);
       return;
     }
 
@@ -726,14 +727,26 @@ export class Editor {
 
     // Delete / Backspace → RemoveVertex
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (this.#selectedId === null) return; // no-op
-      const cmd = this.#buildRemoveVertexCmd(this.#selectedId);
+      // In connect mode, delete the source vertex if we have one pending
+      let vertexToDelete = this.#selectedId;
+      if (vertexToDelete === null && this.#connectState !== null) {
+        vertexToDelete = this.#connectState.sourceId;
+      }
+      if (vertexToDelete === null) return; // no-op
+      const cmd = this.#buildRemoveVertexCmd(vertexToDelete);
       const r = this.#session.executeCommand(cmd);
       if (!r.ok) {
         this.#onError(r.error);
         return;
       }
       this.#replay();
+      // If we deleted the connect source, cancel connect mode
+      if (this.#connectState !== null && vertexToDelete !== null) {
+        if (this.#connectState.sourceId.idx === vertexToDelete.idx &&
+            this.#connectState.sourceId.version === vertexToDelete.version) {
+          this.#cancelConnect();
+        }
+      }
       return;
     }
 
