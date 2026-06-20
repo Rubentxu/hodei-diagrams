@@ -1,0 +1,20 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="2" vertex="1" style="shape=diamond;">
+          <mxGeometry width="100" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" vertex="1" style="shape=diamond;fillColor=#ff0000;strokeColor=#000000;">
+          <mxGeometry x="120" width="100" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" vertex="1" style="shape=diamond;dashed=1;">
+          <mxGeometry x="240" width="100" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" vertex="1" style="shape=rhombus;">
+          <mxGeometry y="100" width="100" height="80" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
