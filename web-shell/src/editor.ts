@@ -52,6 +52,13 @@ type SelectionChangeCallback = (_ids: SlotmapId[]) => void;
 /** Tool-change callback type (fired when active tool changes). */
 type ToolChangeCallback = (_tool: ToolKind) => void;
 
+/** Inline text edit state — null when not editing. */
+type TextEditState = {
+  vertexId: SlotmapId;
+  input: HTMLInputElement;
+  originalLabel: string;
+} | null;
+
 /**
  * Editor class: owns hit-testing, selection, drag FSM, and command construction.
  *
@@ -78,6 +85,13 @@ export class Editor {
   #onToolChange: ToolChangeCallback;
   #getZoom: () => number;
   #abortController: AbortController | null = null;
+
+  // ─── Inline Text Edit ─────────────────────────────────────────────────────
+  #textEdit: TextEditState = null;
+
+  get isTextEditing(): boolean {
+    return this.#textEdit !== null;
+  }
 
   // Internal clipboard for copy/paste
   #clipboard: { vertices: Vertex[]; offset: number } | null = null;
@@ -338,6 +352,8 @@ export class Editor {
     const opts = { signal };
 
     this.#viewer.addEventListener('pointerdown', (e) => this.#onPointerDown(e), opts);
+    // Double-click on a shape enters inline text edit mode
+    this.#viewer.addEventListener('dblclick', (e) => this.#onDblClick(e), opts);
     // keydown on the document to catch keyboard shortcuts
     document.addEventListener('keydown', (e) => this.#onKeyDown(e), opts);
 
@@ -403,6 +419,139 @@ export class Editor {
    */
   triggerReplay(): void {
     this.#replay();
+  }
+
+  // ─── Inline Text Edit ─────────────────────────────────────────────────────
+
+  /** Start inline text editing for a vertex. Shows an input overlay on the shape. */
+  #startTextEdit(vertexId: SlotmapId, e: MouseEvent): void {
+    // If already editing, do nothing
+    if (this.#textEdit) return;
+
+    // Find the vertex's label from the scene cache
+    const originalLabel = this.#getVertexLabel(vertexId) ?? '';
+
+    // Find the shape's SVG element by data-vertex-id
+    const shapeEl = this.#viewer.querySelector(
+      `[data-vertex-id="${vertexId.idx}:${vertexId.version}"]`,
+    );
+    if (!shapeEl) return;
+
+    const rect = shapeEl.getBoundingClientRect();
+
+    // Create input overlay
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'label-editor';
+    input.value = originalLabel;
+    input.style.position = 'fixed';
+    input.style.left = `${rect.left}px`;
+    input.style.top = `${rect.top}px`;
+    input.style.width = `${rect.width}px`;
+    input.style.height = `${rect.height}px`;
+    input.style.font = '14px Inter, sans-serif';
+    input.style.textAlign = 'center';
+    input.style.background = 'rgba(255,255,255,0.95)';
+    input.style.border = '2px solid #3B82F6';
+    input.style.zIndex = '1000';
+    document.body.appendChild(input);
+
+    input.focus();
+    input.select();
+
+    // Mark shape as being edited (hides its SVG text label)
+    shapeEl.setAttribute('data-editing', 'true');
+
+    this.#textEdit = { vertexId, input, originalLabel };
+
+    // Debounced label dispatch on input
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    input.addEventListener('input', () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        this.#dispatchLabelEdit(vertexId, input.value);
+      }, 200);
+    });
+
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        this.#commitTextEdit();
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        this.#cancelTextEdit();
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      this.#commitTextEdit();
+    });
+  }
+
+  /** Commit the current text edit and close the overlay. */
+  #commitTextEdit(): void {
+    if (!this.#textEdit) return;
+    const { vertexId, input } = this.#textEdit;
+    this.#dispatchLabelEdit(vertexId, input.value);
+    this.#cleanupTextEdit();
+  }
+
+  /** Cancel the current text edit without committing. */
+  #cancelTextEdit(): void {
+    // No dispatch — engine still has original label
+    this.#cleanupTextEdit();
+  }
+
+  /** Dispatch an EditVertexLabel command to the engine. */
+  #dispatchLabelEdit(vertexId: SlotmapId, newLabel: string): void {
+    const cmd = JSON.stringify({
+      EditVertexLabel: {
+        id: slotmapIdToField(vertexId),
+        label: { text: newLabel },
+      },
+    });
+    const result = this.#session.executeCommand(cmd);
+    if (!result.ok) {
+      this.#onError(result.error);
+    } else {
+      this.#replay();
+    }
+  }
+
+  /** Clean up the text edit overlay and reset state. */
+  #cleanupTextEdit(): void {
+    if (!this.#textEdit) return;
+    const { input } = this.#textEdit;
+
+    // Remove editing attribute from shape
+    const shapeEl = this.#viewer.querySelector(
+      `[data-vertex-id="${this.#textEdit.vertexId.idx}:${this.#textEdit.vertexId.version}"]`,
+    );
+    if (shapeEl) {
+      shapeEl.removeAttribute('data-editing');
+    }
+
+    input.remove();
+    this.#textEdit = null;
+  }
+
+  /** Get the label text for a vertex from the scene cache. */
+  #getVertexLabel(vertexId: SlotmapId): string | null {
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        // TextElement in display_list has `text: string` field
+        const text = e['text'] as string | undefined;
+        if (text !== undefined) {
+          const owner = e['owner'] as Record<string, unknown> | undefined;
+          const ownerVid = owner?.['Vertex'] as { idx?: number; version?: number } | undefined;
+          if (ownerVid?.idx === vertexId.idx && ownerVid?.version === vertexId.version) {
+            return text;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   // ─── Coordinate Conversion ────────────────────────────────────────────────
@@ -528,8 +677,9 @@ export class Editor {
     }
 
     // Update selection to only valid IDs
-    const changed = validIds.size !== this.#selection.size ||
-      [...validIds].some(id => !this.#selection.has(id));
+    const changed =
+      validIds.size !== this.#selection.size ||
+      [...validIds].some((id) => !this.#selection.has(id));
 
     this.#selection = validIds;
 
@@ -637,9 +787,7 @@ export class Editor {
   }
 
   /** Get all shape SlotmapIds whose bounds intersect the given rect. */
-  #getIntersectingIds(
-    rect: { x: number; y: number; width: number; height: number },
-  ): SlotmapId[] {
+  #getIntersectingIds(rect: { x: number; y: number; width: number; height: number }): SlotmapId[] {
     const result: SlotmapId[] = [];
     const shapeKeys = [
       'Rect',
@@ -668,10 +816,10 @@ export class Editor {
             | undefined;
           if (!bounds?.origin || !bounds?.size) continue;
 
-          const sx = bounds.origin['x'] as number ?? 0;
-          const sy = bounds.origin['y'] as number ?? 0;
-          const sw = bounds.size['width'] as number ?? 0;
-          const sh = bounds.size['height'] as number ?? 0;
+          const sx = (bounds.origin['x'] as number) ?? 0;
+          const sy = (bounds.origin['y'] as number) ?? 0;
+          const sw = (bounds.size['width'] as number) ?? 0;
+          const sh = (bounds.size['height'] as number) ?? 0;
 
           // Intersection test
           if (
@@ -849,9 +997,20 @@ export class Editor {
 
   /** Build an AddVertex command JSON string. */
   #buildAddVertexCmd(
-    kind: 'Rectangle' | 'RoundedRect' | 'Ellipse' | 'Diamond' | 'Triangle' | 'Hexagon' | 'Cylinder' | 'Cloud' | 'Parallelogram' | 'Trapezoid' | 'Polygon',
+    kind:
+      | 'Rectangle'
+      | 'RoundedRect'
+      | 'Ellipse'
+      | 'Diamond'
+      | 'Triangle'
+      | 'Hexagon'
+      | 'Cylinder'
+      | 'Cloud'
+      | 'Parallelogram'
+      | 'Trapezoid'
+      | 'Polygon',
     x: number,
-    y: number
+    y: number,
   ): string {
     const width = kind === 'Rectangle' || kind === 'RoundedRect' ? 120 : 80;
     const height = 80;
@@ -1069,10 +1228,10 @@ export class Editor {
             | undefined;
           if (!bounds?.origin || !bounds?.size) continue;
 
-          const sx = bounds.origin['x'] as number ?? 0;
-          const sy = bounds.origin['y'] as number ?? 0;
-          const sw = bounds.size['width'] as number ?? 0;
-          const sh = bounds.size['height'] as number ?? 0;
+          const sx = (bounds.origin['x'] as number) ?? 0;
+          const sy = (bounds.origin['y'] as number) ?? 0;
+          const sw = (bounds.size['width'] as number) ?? 0;
+          const sh = (bounds.size['height'] as number) ?? 0;
 
           if (
             x >= sx - tolerance &&
@@ -1218,7 +1377,9 @@ export class Editor {
   /** Remove the preview line overlay. */
   #hidePreviewLine(): void {
     if (this.#previewLine) {
-      const interval = (this.#previewLine as SVGSVGElement & { _interval?: ReturnType<typeof setInterval> })._interval;
+      const interval = (
+        this.#previewLine as SVGSVGElement & { _interval?: ReturnType<typeof setInterval> }
+      )._interval;
       if (interval) clearInterval(interval);
       this.#previewLine.remove();
       this.#previewLine = null;
@@ -1231,18 +1392,31 @@ export class Editor {
   #onPaletteClick(e: PointerEvent): void {
     if (!this.#activeTool) return;
 
-    const kindMap: Record<string, 'Rectangle' | 'RoundedRect' | 'Ellipse' | 'Diamond' | 'Triangle' | 'Hexagon' | 'Cylinder' | 'Cloud' | 'Parallelogram' | 'Trapezoid' | 'Polygon'> = {
-      'rectangle': 'Rectangle',
+    const kindMap: Record<
+      string,
+      | 'Rectangle'
+      | 'RoundedRect'
+      | 'Ellipse'
+      | 'Diamond'
+      | 'Triangle'
+      | 'Hexagon'
+      | 'Cylinder'
+      | 'Cloud'
+      | 'Parallelogram'
+      | 'Trapezoid'
+      | 'Polygon'
+    > = {
+      rectangle: 'Rectangle',
       'rounded-rect': 'RoundedRect',
-      'ellipse': 'Ellipse',
-      'diamond': 'Diamond',
-      'triangle': 'Triangle',
-      'hexagon': 'Hexagon',
-      'cylinder': 'Cylinder',
-      'cloud': 'Cloud',
-      'parallelogram': 'Parallelogram',
-      'trapezoid': 'Trapezoid',
-      'polygon': 'Polygon',
+      ellipse: 'Ellipse',
+      diamond: 'Diamond',
+      triangle: 'Triangle',
+      hexagon: 'Hexagon',
+      cylinder: 'Cylinder',
+      cloud: 'Cloud',
+      parallelogram: 'Parallelogram',
+      trapezoid: 'Trapezoid',
+      polygon: 'Polygon',
     };
 
     const kind = kindMap[this.#activeTool] ?? 'Rectangle';
@@ -1258,6 +1432,25 @@ export class Editor {
 
     // Single-placement mode: clear tool after use
     this.setActiveTool(null);
+  }
+
+  // ─── Double-Click Text Edit ───────────────────────────────────────────────
+
+  /** Handle dblclick on the viewer: start text edit on the hit shape. */
+  #onDblClick(e: MouseEvent): void {
+    const target = e.target as Element | null;
+    if (!target) return;
+    const shapeEl = target.closest('[data-vertex-id]');
+    if (!shapeEl) return;
+
+    const idAttr = shapeEl.getAttribute('data-vertex-id');
+    if (!idAttr) return;
+    const id = parseSlotmapAttr(idAttr);
+    if (!id) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    this.#startTextEdit(id, e);
   }
 
   // ─── Keyboard ─────────────────────────────────────────────────────────────
@@ -1293,6 +1486,16 @@ export class Editor {
         }
         this.#replay();
         this.#cancelConnect();
+      }
+      return;
+    }
+
+    // F2 or Enter (no Shift) on a single selection → start text edit
+    if (e.key === 'F2' || (e.key === 'Enter' && !e.shiftKey)) {
+      if (this.#selection.size === 1) {
+        e.preventDefault();
+        const id = this.#selection.values().next().value as SlotmapId;
+        this.#startTextEdit(id, e as unknown as MouseEvent);
       }
       return;
     }

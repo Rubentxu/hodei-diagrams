@@ -5,10 +5,10 @@
 /* ─── Design Tokens (from DESIGN.md) ──────────────────────────────────────── */
 :root {
   /* Colors */
-  --bg-primary: #0A0F1A;
+  --bg-primary: #0a0f1a;
   --bg-secondary: #101826;
   --bg-tertiary: #162033;
-  --bg-surface: #1E293B;
+  --bg-surface: #1e293b;
   --border: #334155;
 
   /* Semantic aliases for backward compatibility */
@@ -16,12 +16,12 @@
   --surface: var(--bg-secondary);
   --surface-hover: var(--bg-tertiary);
   --border-old: var(--bg-surface);
-  --text: #F8FAFC;
-  --text-dim: #94A3B8;
-  --accent: #3B82F6;
-  --accent-hover: #2563EB;
+  --text: #f8fafc;
+  --text-dim: #94a3b8;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
   --accent-dim: rgba(59, 130, 246, 0.15);
-  --danger: #EF4444;
+  --danger: #ef4444;
 
   /* Typography */
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
@@ -58,7 +58,7 @@
   /* Slice B: Density tokens */
   --hud-h: 28px;
   --grid-cell: 20px;
-  --grid-color: #1E293B;
+  --grid-color: #1e293b;
   --compact-label-size: 12px;
   --compact-label-transform: uppercase;
   --compact-label-letter-spacing: 0.05em;
@@ -116,10 +116,10 @@ button:disabled {
   height: 100vh;
   width: 100vw;
   grid-template-areas:
-    "rail navbar  navbar   navbar"
-    "rail sidebar canvas   inspector"
-    "rail sidebar hud      inspector"
-    "rail sidebar bottom   bottom";
+    'rail navbar  navbar   navbar'
+    'rail sidebar canvas   inspector'
+    'rail sidebar hud      inspector'
+    'rail sidebar bottom   bottom';
   grid-template-columns: var(--rail-w) var(--sidebar-w) 1fr var(--inspector-w);
   grid-template-rows: var(--navbar-h) 1fr var(--hud-h) var(--bottom-h);
   overflow: hidden;
@@ -193,7 +193,9 @@ button:disabled {
   height: 28px;
   border-radius: var(--radius-sm);
   color: var(--text-dim);
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
   position: relative;
 }
 
@@ -240,7 +242,9 @@ button:disabled {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-dim);
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
   user-select: none;
 }
 
@@ -273,8 +277,14 @@ button:disabled {
 }
 
 @keyframes dropdown-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .menu-item {
@@ -284,7 +294,9 @@ button:disabled {
   padding: var(--sm) var(--lg);
   font-size: 12px;
   color: var(--text-dim);
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -395,7 +407,9 @@ button:disabled {
   border-radius: var(--radius-sm);
   font-size: 10px;
   color: var(--text-dim);
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .collapse-btn:hover {
@@ -501,7 +515,9 @@ button:disabled {
   padding: var(--xs);
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
   aspect-ratio: 1;
   width: var(--sidebar-thumb-size);
   height: var(--sidebar-thumb-size);
@@ -544,7 +560,9 @@ button:disabled {
   color: var(--text-dim);
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .more-shapes-btn:hover:not(:disabled) {
@@ -657,7 +675,9 @@ button:disabled {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-dim);
-  transition: background var(--motion-fast), color var(--motion-fast);
+  transition:
+    background var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .hud-zoom-btn:hover {
@@ -689,7 +709,9 @@ button:disabled {
   text-align: center;
   color: var(--text-dim);
   border-bottom: 2px solid transparent;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .inspector-tab:hover {
@@ -811,7 +833,7 @@ button:disabled {
   gap: var(--xs);
 }
 
-.field-control input[type="color"] {
+.field-control input[type='color'] {
   width: 24px;
   height: 24px;
   border: 1px solid var(--bg-surface);
@@ -822,7 +844,7 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.field-control input[type="color"] + input[type="text"] {
+.field-control input[type='color'] + input[type='text'] {
   width: 64px;
   padding: 2px var(--xs);
   border: 1px solid var(--bg-surface);
@@ -834,7 +856,7 @@ button:disabled {
   outline: none;
 }
 
-.field-control input[type="color"] + input[type="text"]:focus {
+.field-control input[type='color'] + input[type='text']:focus {
   border-color: var(--accent);
 }
 
@@ -854,7 +876,7 @@ button:disabled {
   border-color: var(--accent);
 }
 
-.field-control input[type="range"] {
+.field-control input[type='range'] {
   flex: 1;
   height: 4px;
   accent-color: var(--accent);
@@ -868,7 +890,7 @@ button:disabled {
   color: var(--text-dim);
 }
 
-.field-control input[type="number"] {
+.field-control input[type='number'] {
   width: 60px;
   padding: var(--xs) var(--sm);
   border: 1px solid var(--bg-surface);
@@ -881,7 +903,7 @@ button:disabled {
   outline: none;
 }
 
-.field-control input[type="number"]:focus {
+.field-control input[type='number']:focus {
   border-color: var(--accent);
 }
 
@@ -900,7 +922,7 @@ button:disabled {
   border-color: var(--accent);
 }
 
-.field-control input[type="checkbox"] {
+.field-control input[type='checkbox'] {
   accent-color: var(--accent);
   width: 16px;
   height: 16px;
@@ -920,7 +942,10 @@ button:disabled {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+  transition:
+    background var(--motion-fast),
+    color var(--motion-fast),
+    border-color var(--motion-fast);
 }
 
 .field-control .style-toggle:hover {
@@ -961,7 +986,10 @@ button:disabled {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
   cursor: pointer;
   height: 100%;
   display: flex;
@@ -1047,14 +1075,14 @@ button:disabled {
 
 /* ─── Slice C: Presentation Mode ───────────────────────────────────────────── */
 body.presentation-mode {
-  background: #0A0F1A;
+  background: #0a0f1a;
 }
 
 body.presentation-mode #app {
   grid-template-areas:
-    "canvas canvas canvas"
-    "hud    hud    hud"
-    "bottom bottom bottom";
+    'canvas canvas canvas'
+    'hud    hud    hud'
+    'bottom bottom bottom';
   grid-template-columns: 1fr;
   grid-template-rows: 1fr var(--hud-h) var(--bottom-h);
 }
@@ -1067,7 +1095,7 @@ body.presentation-mode .inspector {
 }
 
 body.presentation-mode .canvas-container {
-  background: #0A0F1A;
+  background: #0a0f1a;
 }
 
 body.presentation-mode .hud {
@@ -1099,8 +1127,12 @@ body.presentation-mode .page-tab.active {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .dialog {
@@ -1114,8 +1146,14 @@ body.presentation-mode .page-tab.active {
 }
 
 @keyframes dialog-in {
-  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .dialog-header {
@@ -1141,7 +1179,9 @@ body.presentation-mode .page-tab.active {
   border-radius: var(--radius-sm);
   color: var(--text-dim);
   font-size: 14px;
-  transition: background var(--motion-fast), color var(--motion-fast);
+  transition:
+    background var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .dialog-close:hover {
@@ -1210,7 +1250,9 @@ body.presentation-mode .page-tab.active {
   color: var(--text-dim);
   background: transparent;
   border: 1px solid var(--bg-surface);
-  transition: background var(--motion-fast), color var(--motion-fast);
+  transition:
+    background var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .dialog-cancel:hover {
@@ -1255,6 +1297,34 @@ body.presentation-mode .page-tab.active {
 
 .menu-item-tooltip {
   position: relative;
+}
+
+/* ─── Inline Text Edit Label Editor ───────────────────────────────────────── */
+.label-editor {
+  position: fixed;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0a0f1a;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  margin: 0;
+  text-align: center;
+}
+
+.label-editor:focus {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Hide SVG text labels for shapes being edited */
+svg [data-editing='true'] text.vertex-label,
+[data-editing='true'] text.vertex-label {
+  display: none;
 }
 
 /* ─── Utility ─────────────────────────────────────────────────────────────── */
