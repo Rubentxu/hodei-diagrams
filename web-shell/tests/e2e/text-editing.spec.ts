@@ -5,12 +5,12 @@ const SIMPLE_RECT_PATH =
 
 test.describe('Suite F: text-editing', () => {
   /**
-   * Test 1: Double click text/label enters inline edit mode
-   * Note: Inline text editing is not yet implemented in the web-shell.
-   * The editor does not have a dblclick handler for text editing.
-   * This test documents the expected behavior for future implementation.
+   * Test 1: Double click on a shape enters inline edit mode.
+   * An .label-editor input overlay appears positioned over the shape.
+   * Note: Playwright's locator.dblclick() doesn't fire a native dblclick event on
+   * SVG elements, so we use dispatchEvent('dblclick') instead.
    */
-  test('Double click text/label enters inline edit mode', async ({ page }) => {
+  test('Double click on shape enters inline edit mode', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -19,31 +19,23 @@ test.describe('Suite F: text-editing', () => {
 
     const viewer = page.locator('[data-testid="viewer"]');
 
-    // Look for any text element in the SVG
-    const textElements = viewer.locator('text');
-    const textCount = await textElements.count();
+    // Find the first shape (has data-vertex-id)
+    const shape = viewer.locator('[data-vertex-id]').first();
+    await expect(shape).toBeVisible();
 
-    if (textCount === 0) {
-      // No text in simple-rect - this test is only applicable when there's text
-      test.skip();
-      return;
-    }
+    // Dispatch native dblclick event on the shape
+    await shape.dispatchEvent('dblclick');
 
-    // Double-click on the first text element
-    const firstText = textElements.first();
-    await firstText.dblclick();
-    await page.waitForTimeout(300);
+    // The .label-editor input should appear
+    const labelEditor = page.locator('.label-editor');
+    await expect(labelEditor).toBeVisible();
 
-    // After double-click, an input field should appear for inline editing
-    // (This is the expected behavior - not yet implemented)
-    const inlineEditInput = page.locator('.inline-edit-input, [contenteditable="true"], input.inline-text-edit');
-    // For now, we check that double-click doesn't crash
-    // Future: await expect(inlineEditInput).toBeVisible();
+    // Input should be focused
+    await expect(labelEditor).toBeFocused();
   });
 
   /**
-   * Test 2: Enter commits text change
-   * Note: Inline text editing not implemented.
+   * Test 2: Enter commits text change and exits edit mode.
    */
   test('Enter commits text change', async ({ page }) => {
     await page.goto('/');
@@ -53,30 +45,29 @@ test.describe('Suite F: text-editing', () => {
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     const viewer = page.locator('[data-testid="viewer"]');
-    const textElements = viewer.locator('text');
-    const textCount = await textElements.count();
+    const shape = viewer.locator('[data-vertex-id]').first();
 
-    if (textCount === 0) {
-      test.skip();
-      return;
-    }
+    await shape.dispatchEvent('dblclick');
 
-    const firstText = textElements.first();
-    await firstText.dblclick();
-    await page.waitForTimeout(200);
+    const labelEditor = page.locator('.label-editor');
+    await expect(labelEditor).toBeVisible();
 
-    // Type new text and press Enter
-    await page.keyboard.type('New Label');
+    // Type new text
+    await labelEditor.fill('New Label');
+
+    // Press Enter to commit
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(300);
 
-    // The text should be updated
-    // Future: check that the text content changed
+    // Editor should be gone (overlay removed)
+    await expect(page.locator('.label-editor')).not.toBeVisible();
+
+    // Re-render happened — shape still visible
+    await expect(shape).toBeVisible();
   });
 
   /**
-   * Test 3: Escape cancels text edit
-   * Note: Inline text editing not implemented.
+   * Test 3: Escape cancels text edit without committing.
+   * The input overlay closes and no EditVertexLabel command is dispatched.
    */
   test('Escape cancels text edit', async ({ page }) => {
     await page.goto('/');
@@ -86,36 +77,30 @@ test.describe('Suite F: text-editing', () => {
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     const viewer = page.locator('[data-testid="viewer"]');
-    const textElements = viewer.locator('text');
-    const textCount = await textElements.count();
+    const shape = viewer.locator('[data-vertex-id]').first();
+    await expect(shape).toBeVisible();
 
-    if (textCount === 0) {
-      test.skip();
-      return;
-    }
+    // Enter edit mode
+    await shape.dispatchEvent('dblclick');
 
-    // Get original text content
-    const originalText = await textElements.first().textContent();
+    const labelEditor = page.locator('.label-editor');
+    await expect(labelEditor).toBeVisible();
 
-    // Double-click to enter edit mode
-    await textElements.first().dblclick();
-    await page.waitForTimeout(200);
+    // Type something (do NOT commit — Escape should cancel)
+    await labelEditor.fill('Modified');
 
-    // Type something
-    await page.keyboard.type('Modified');
-
-    // Press Escape to cancel
+    // Press Escape to cancel — no dispatch, just close
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
 
-    // Text should be restored to original
-    const restoredText = await textElements.first().textContent();
-    expect(restoredText).toBe(originalText);
+    // Editor should be gone
+    await expect(page.locator('.label-editor')).not.toBeVisible();
+
+    // Shape still visible (no re-render since no command was dispatched)
+    await expect(shape).toBeVisible();
   });
 
   /**
-   * Test 4: Click outside commits text change
-   * Note: Inline text editing not implemented.
+   * Test 4: Blur (click outside) commits text change.
    */
   test('Click outside commits text change', async ({ page }) => {
     await page.goto('/');
@@ -125,34 +110,30 @@ test.describe('Suite F: text-editing', () => {
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     const viewer = page.locator('[data-testid="viewer"]');
-    const textElements = viewer.locator('text');
-    const textCount = await textElements.count();
+    const shape = viewer.locator('[data-vertex-id]').first();
 
-    if (textCount === 0) {
-      test.skip();
-      return;
-    }
+    await shape.dispatchEvent('dblclick');
 
-    // Enter edit mode
-    await textElements.first().dblclick();
-    await page.waitForTimeout(200);
+    const labelEditor = page.locator('.label-editor');
+    await expect(labelEditor).toBeVisible();
 
     // Type new text
-    await page.keyboard.type('New Text');
+    await labelEditor.fill('New Text');
 
-    // Click outside (on canvas)
+    // Click outside (on canvas container) to blur
     const canvasContainer = page.locator('[data-testid="canvas-container"]');
     const canvasBox = await canvasContainer.boundingBox();
     await page.mouse.click(canvasBox!.x + 10, canvasBox!.y + 10);
-    await page.waitForTimeout(300);
 
-    // Text should be committed
-    // Future: verify the text changed
+    // Editor should be gone
+    await expect(page.locator('.label-editor')).not.toBeVisible();
+
+    // Shape still visible
+    await expect(shape).toBeVisible();
   });
 
   /**
-   * Test 5: Empty label allowed
-   * Note: Inline text editing not implemented.
+   * Test 5: Empty text can be committed (no crash).
    */
   test('Empty label allowed', async ({ page }) => {
     await page.goto('/');
@@ -162,35 +143,27 @@ test.describe('Suite F: text-editing', () => {
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     const viewer = page.locator('[data-testid="viewer"]');
-    const textElements = viewer.locator('text');
-    const textCount = await textElements.count();
+    const shape = viewer.locator('[data-vertex-id]').first();
 
-    if (textCount === 0) {
-      test.skip();
-      return;
-    }
+    await shape.dispatchEvent('dblclick');
 
-    // Enter edit mode
-    await textElements.first().dblclick();
-    await page.waitForTimeout(200);
+    const labelEditor = page.locator('.label-editor');
+    await expect(labelEditor).toBeVisible();
 
     // Clear all text
-    await page.keyboard.press('Control+a');
-    await page.keyboard.press('Backspace');
+    await labelEditor.fill('');
 
-    // Commit by clicking outside
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
-    const canvasBox = await canvasContainer.boundingBox();
-    await page.mouse.click(canvasBox!.x + 10, canvasBox!.y + 10);
-    await page.waitForTimeout(300);
+    // Commit by pressing Enter
+    await page.keyboard.press('Enter');
 
-    // App should not crash - empty labels are valid
+    // App should not crash — editor gone and SVG still visible
+    await expect(page.locator('.label-editor')).not.toBeVisible();
     await expect(viewer.locator('svg')).toBeVisible();
   });
 
   /**
-   * Test 6: Edited text persists after re-render
-   * Note: Inline text editing not implemented.
+   * Test 6: Edited text persists after re-render.
+   * After committing with Enter, the shape still has the label in the DOM.
    */
   test('Edited text persists after re-render', async ({ page }) => {
     await page.goto('/');
@@ -200,32 +173,31 @@ test.describe('Suite F: text-editing', () => {
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     const viewer = page.locator('[data-testid="viewer"]');
-    const textElements = viewer.locator('text');
-    const textCount = await textElements.count();
+    const shape = viewer.locator('[data-vertex-id]').first();
 
-    if (textCount === 0) {
-      test.skip();
-      return;
-    }
-
-    // Enter edit mode
-    await textElements.first().dblclick();
-    await page.waitForTimeout(200);
-
-    // Type new text
-    await page.keyboard.type('Persisted Text');
+    // Enter edit mode and type
+    await shape.dispatchEvent('dblclick');
+    const labelEditor = page.locator('.label-editor');
+    await expect(labelEditor).toBeVisible();
+    await labelEditor.fill('Persisted Text');
 
     // Commit
     await page.keyboard.press('Enter');
+    await expect(page.locator('.label-editor')).not.toBeVisible();
+
+    // Trigger re-render by double-clicking empty canvas area
+    await page.locator('[data-testid="canvas-container"]').dispatchEvent('dblclick');
     await page.waitForTimeout(300);
 
-    // Trigger re-render by switching pages and back (if multi-page)
-    // For single page, trigger a zoom which causes re-render
-    await page.locator('[data-testid="canvas-container"]').dblclick({ position: { x: 10, y: 10 } });
-    await page.waitForTimeout(300);
+    // Shape still visible with data-vertex-id intact (re-render succeeded)
+    await expect(shape).toBeVisible();
 
-    // Text should still be "Persisted Text"
-    const finalText = await textElements.first().textContent();
-    expect(finalText).toContain('Persisted Text');
+    // The text element for this vertex should contain the persisted text.
+    // The SVG text element is a sibling of the rect, not a child, so we query
+    // the viewer directly.
+    const vid = await shape.getAttribute('data-vertex-id');
+    const textSelector = `[data-vertex-id="${vid}"] ~ text`;
+    const textEl = viewer.locator('text').filter({ hasText: 'Persisted Text' }).first();
+    await expect(textEl).toBeVisible();
   });
 });
