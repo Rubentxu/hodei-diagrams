@@ -1,0 +1,32 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="1" vertex="1">
+          <mxGeometry x="20" y="20" width="100" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="2" vertex="1">
+          <mxGeometry x="180" y="20" width="100" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" vertex="1">
+          <mxGeometry x="340" y="20" width="100" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" vertex="1">
+          <mxGeometry x="20" y="120" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" vertex="1">
+          <mxGeometry x="180" y="120" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" vertex="1">
+          <mxGeometry x="20" y="220" width="60" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" vertex="1">
+          <mxGeometry x="100" y="220" width="60" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="8" vertex="1">
+          <mxGeometry x="180" y="220" width="60" height="60" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

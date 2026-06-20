@@ -6,6 +6,11 @@ use crate::clip::ClipPathManager;
 use crate::element::element_to_svg;
 use crate::error::RenderError;
 use crate::escape::escape_text;
+use diagram_core::geometry::{Point, Rect, Size};
+use diagram_scene::{
+    EllipseElement, GroupElement, LineElement, PathElement, RectElement, RoundedRectElement,
+    TextElement, VisualElement,
+};
 
 /// Stateless SVG renderer.
 pub struct SvgRenderer;
@@ -46,10 +51,12 @@ impl SvgRenderer {
         let mut clip = ClipPathManager::new();
         let mut output = String::new();
 
+        let (view_x, view_y, view_w, view_h) = effective_view_box(page);
+
         // Open svg tag with viewBox
         output.push_str(&format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {} {}\">\n",
-            page.width, page.height
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\">\n",
+            view_x, view_y, view_w, view_h
         ));
 
         // Title
@@ -57,8 +64,8 @@ impl SvgRenderer {
 
         // White background rect as first drawn child
         output.push_str(&format!(
-            "<rect x=\"0\" y=\"0\" width=\"{}\" height=\"{}\" fill=\"white\"/>\n",
-            page.width, page.height
+            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\"/>\n",
+            view_x, view_y, view_w, view_h
         ));
 
         // Walk display list
@@ -78,6 +85,95 @@ impl SvgRenderer {
         output.push_str("</svg>");
 
         output
+    }
+}
+
+/// Derive a sensible viewBox for the page.
+///
+/// draw.io-style .drawio files often leave the page size at the default 1×1.
+/// In that case we derive the viewBox from the content bounds so that the
+/// rendered shapes appear at a readable scale instead of being blown up to
+/// the pixel size of the container.
+fn effective_view_box(page: &PageScene) -> (f64, f64, f64, f64) {
+    if page.width > 1.0 || page.height > 1.0 {
+        return (0.0, 0.0, page.width.max(1.0), page.height.max(1.0));
+    }
+
+    content_bounds(&page.display_list)
+        .map(|bounds| {
+            let width = bounds.size.width.max(1.0);
+            let height = bounds.size.height.max(1.0);
+            (bounds.origin.x, bounds.origin.y, width, height)
+        })
+        .unwrap_or((0.0, 0.0, 1.0, 1.0))
+}
+
+fn content_bounds(display_list: &[VisualElement]) -> Option<Rect> {
+    let mut acc: Option<Rect> = None;
+    for elem in display_list {
+        if let Some(rect) = element_bounds(elem) {
+            acc = Some(match acc {
+                None => rect,
+                Some(existing) => union_rect(existing, rect),
+            });
+        }
+    }
+    acc
+}
+
+fn element_bounds(elem: &VisualElement) -> Option<Rect> {
+    match elem {
+        VisualElement::Rect(RectElement { bounds, .. }) => Some(*bounds),
+        VisualElement::RoundedRect(RoundedRectElement { bounds, .. }) => Some(*bounds),
+        VisualElement::Ellipse(EllipseElement { bounds, .. }) => Some(*bounds),
+        VisualElement::Text(TextElement { anchor, .. }) => Some(Rect {
+            origin: *anchor,
+            size: Size {
+                width: 1.0,
+                height: 1.0,
+            },
+        }),
+        VisualElement::Line(LineElement { from, to, .. }) => Some(rect_from_points(&[*from, *to])),
+        VisualElement::Path(PathElement { points, .. }) => {
+            if points.is_empty() {
+                None
+            } else {
+                Some(rect_from_points(points))
+            }
+        }
+        VisualElement::Group(GroupElement { bounds, children, .. }) => {
+            let child_bounds = content_bounds(children);
+            Some(child_bounds.map(|c| union_rect(*bounds, c)).unwrap_or(*bounds))
+        }
+        _ => None,
+    }
+}
+
+fn rect_from_points(points: &[Point]) -> Rect {
+    let min_x = points.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
+    let min_y = points.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
+    let max_x = points.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max);
+    let max_y = points.iter().map(|p| p.y).fold(f64::NEG_INFINITY, f64::max);
+    Rect {
+        origin: Point { x: min_x, y: min_y },
+        size: Size {
+            width: (max_x - min_x).max(0.0),
+            height: (max_y - min_y).max(0.0),
+        },
+    }
+}
+
+fn union_rect(a: Rect, b: Rect) -> Rect {
+    let min_x = a.origin.x.min(b.origin.x);
+    let min_y = a.origin.y.min(b.origin.y);
+    let max_x = (a.origin.x + a.size.width).max(b.origin.x + b.size.width);
+    let max_y = (a.origin.y + a.size.height).max(b.origin.y + b.size.height);
+    Rect {
+        origin: Point { x: min_x, y: min_y },
+        size: Size {
+            width: max_x - min_x,
+            height: max_y - min_y,
+        },
     }
 }
 
