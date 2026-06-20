@@ -543,6 +543,7 @@ version = "0.0.0"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
+ "diagram-routing",
  "serde",
  "thiserror 2.0.18",
 ]

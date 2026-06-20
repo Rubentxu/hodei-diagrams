@@ -167,7 +167,7 @@ async function bootstrap(): Promise<void> {
       }
     },
     onConnectorTool: () => {
-      // Connector tool not yet implemented
+      activeEditor?.setActiveTool('connector');
     },
   });
 

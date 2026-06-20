@@ -15,6 +15,7 @@ export type ToolKind =
   | 'parallelogram'
   | 'trapezoid'
   | 'polygon'
+  | 'connector'
   | null;
 
 /** Drag FSM state. */
@@ -24,6 +25,14 @@ interface DragState {
   startY: number;
   currentX: number;
   currentY: number;
+}
+
+/** Connect-mode FSM state (two-click edge creation). */
+interface ConnectState {
+  sourceId: SlotmapId;
+  /** Document-space position of source center for preview line. */
+  sourceX: number;
+  sourceY: number;
 }
 
 /** Error callback type. */
@@ -49,6 +58,8 @@ export class Editor {
   #selectedId: SlotmapId | null = null;
   #dragState: DragState | null = null;
   #activeTool: ToolKind = null;
+  #connectState: ConnectState | null = null;
+  #previewLine: SVGSVGElement | null = null;
   #sceneCache: ScenePage[] = [];
   #activePageSlotId: SlotmapId | null = null;
   #activePageIdx = 0;
@@ -89,6 +100,10 @@ export class Editor {
 
   /** Set the active palette tool (single-placement mode). */
   setActiveTool(tool: ToolKind): void {
+    // Cancel any active connect mode when switching tools
+    if (this.#activeTool === 'connector' && tool !== 'connector') {
+      this.#cancelConnect();
+    }
     this.#activeTool = tool;
     this.#onToolChange(tool);
   }
@@ -147,6 +162,7 @@ export class Editor {
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
     this.#dragState = null;
+    this.#cancelConnect();
   }
 
   /** Execute undo and replay. For toolbar button binding. */
@@ -320,6 +336,13 @@ export class Editor {
   #onPointerDown(e: PointerEvent): void {
     // Ignore non-primary button
     if (e.button !== 0) return;
+
+    // Connect mode is handled via a separate two-click FSM — check BEFORE palette tools
+    // because 'connector' is truthy and would incorrectly route to #onPaletteClick
+    if (this.#activeTool === 'connector') {
+      this.#onConnectClick(e);
+      return;
+    }
 
     // If tool is active, handle palette placement instead
     if (this.#activeTool) {
@@ -551,6 +574,109 @@ export class Editor {
     return null;
   }
 
+  // ─── Connect Mode ────────────────────────────────────────────────────────
+
+  /**
+   * Handle a pointer click in connect tool mode.
+   * First click: records source vertex and shows preview line.
+   * Second click: creates the edge and resets.
+   */
+  #onConnectClick(e: PointerEvent): void {
+    const hit = this.#hitTest(e);
+    if (!hit) {
+      // Clicked empty space — cancel connect mode
+      this.#cancelConnect();
+      return;
+    }
+
+    if (!this.#connectState) {
+      // First click: record source
+      const geom = this.#findOriginalGeometry(hit);
+      if (!geom) return;
+      this.#connectState = {
+        sourceId: hit,
+        sourceX: geom.x + geom.width / 2,
+        sourceY: geom.y + geom.height / 2,
+      };
+      this.#showPreviewLine(this.#connectState.sourceX, this.#connectState.sourceY);
+      return;
+    }
+
+    // Second click: create edge
+    const sourceId = this.#connectState.sourceId;
+    this.#hidePreviewLine();
+
+    // Don't connect a vertex to itself
+    if (hit.idx === sourceId.idx && hit.version === sourceId.version) {
+      this.#cancelConnect();
+      return;
+    }
+
+    const r = this.#session.connectVertices(sourceId, hit, 'orthogonal');
+    if (!r.ok) {
+      this.#onError(r.error);
+    } else {
+      this.#replay();
+    }
+
+    this.#connectState = null;
+  }
+
+  /** Cancel connect mode and clean up preview. */
+  #cancelConnect(): void {
+    this.#hidePreviewLine();
+    this.#connectState = null;
+  }
+
+  /** Create an SVG overlay for the dashed preview line. */
+  #showPreviewLine(x1: number, y1: number): void {
+    this.#hidePreviewLine();
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.style.cssText =
+      'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;';
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(x1));
+    line.setAttribute('y1', String(y1));
+    line.setAttribute('x2', String(x1));
+    line.setAttribute('y2', String(y1));
+    line.setAttribute('stroke', '#2563eb');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-dasharray', '6 4');
+    line.setAttribute('opacity', '0.8');
+    svg.appendChild(line);
+    this.#viewer.style.position = 'relative';
+    this.#viewer.appendChild(svg);
+    this.#previewLine = svg;
+
+    // Track mouse to update line end
+    const moveHandler = (ev: PointerEvent) => {
+      const pos = this.#clientToDoc(ev.clientX, ev.clientY);
+      line.setAttribute('x2', String(pos.x));
+      line.setAttribute('y2', String(pos.y));
+    };
+    svg.addEventListener('pointermove', moveHandler, { once: true });
+    // Keep move handler active while in connect mode
+    const interval = setInterval(() => {
+      if (!this.#connectState) {
+        clearInterval(interval);
+        return;
+      }
+      this.#viewer.addEventListener('pointermove', moveHandler, { once: true });
+    }, 50);
+    // Store interval id on svg for cleanup
+    (svg as SVGSVGElement & { _interval?: ReturnType<typeof setInterval> })._interval = interval;
+  }
+
+  /** Remove the preview line overlay. */
+  #hidePreviewLine(): void {
+    if (this.#previewLine) {
+      const interval = (this.#previewLine as SVGSVGElement & { _interval?: ReturnType<typeof setInterval> })._interval;
+      if (interval) clearInterval(interval);
+      this.#previewLine.remove();
+      this.#previewLine = null;
+    }
+  }
+
   // ─── Palette ─────────────────────────────────────────────────────────────
 
   /** Handle click when a palette tool is active. */
@@ -593,16 +719,34 @@ export class Editor {
     const tag = (e.target as HTMLElement | null)?.tagName ?? '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+    // Escape → cancel connect mode
+    if (e.key === 'Escape' && this.#connectState) {
+      this.#cancelConnect();
+      return;
+    }
+
     // Delete / Backspace → RemoveVertex
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (this.#selectedId === null) return; // no-op
-      const cmd = this.#buildRemoveVertexCmd(this.#selectedId);
+      // In connect mode, delete the source vertex if we have one pending
+      let vertexToDelete = this.#selectedId;
+      if (vertexToDelete === null && this.#connectState !== null) {
+        vertexToDelete = this.#connectState.sourceId;
+      }
+      if (vertexToDelete === null) return; // no-op
+      const cmd = this.#buildRemoveVertexCmd(vertexToDelete);
       const r = this.#session.executeCommand(cmd);
       if (!r.ok) {
         this.#onError(r.error);
         return;
       }
       this.#replay();
+      // If we deleted the connect source, cancel connect mode
+      if (this.#connectState !== null && vertexToDelete !== null) {
+        if (this.#connectState.sourceId.idx === vertexToDelete.idx &&
+            this.#connectState.sourceId.version === vertexToDelete.version) {
+          this.#cancelConnect();
+        }
+      }
       return;
     }
 

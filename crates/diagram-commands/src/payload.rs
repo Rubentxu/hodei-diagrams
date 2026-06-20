@@ -7,6 +7,27 @@ use diagram_core::{
     CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, StyleId,
     StyleMap, Vertex, VertexId,
 };
+use diagram_routing::{EdgeStyle, RoutingRequest, route};
+
+/// Routing algorithm kind — exposed at the command layer for serialization.
+/// Maps to `diagram_routing::EdgeStyle`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum RoutingKind {
+    /// Right-angle (orthogonal) routing.
+    #[default]
+    Orthogonal,
+    /// Straight line routing (passthrough).
+    Straight,
+}
+
+impl From<RoutingKind> for EdgeStyle {
+    fn from(kind: RoutingKind) -> Self {
+        match kind {
+            RoutingKind::Orthogonal => EdgeStyle::Orthogonal,
+            RoutingKind::Straight => EdgeStyle::Segment,
+        }
+    }
+}
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -790,6 +811,172 @@ impl RenamePagePayload {
             .page_mut(self.id)
             .ok_or(CommandError::PageNotFound(self.id))?;
         page.name = prev;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for connecting two vertices with an edge (Phase 0 interactive edge creation).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectVerticesCommand {
+    /// The source vertex.
+    pub from: VertexId,
+    /// The target vertex.
+    pub to: VertexId,
+    /// The routing algorithm to use.
+    pub routing_kind: RoutingKind,
+    /// The edge ID assigned during `apply`. Used by `undo`.
+    #[serde(skip)]
+    pub inserted_edge_id: Option<EdgeId>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl ConnectVerticesCommand {
+    /// Create a new payload for connecting two vertices.
+    pub fn new(from: VertexId, to: VertexId, routing_kind: RoutingKind) -> Self {
+        Self {
+            from,
+            to,
+            routing_kind,
+            inserted_edge_id: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the connect operation: insert edge, compute waypoints via routing.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        // Validate source and target exist
+        if model.store.vertex(self.from).is_none() {
+            return Err(CommandError::VertexNotFound(self.from));
+        }
+        if model.store.vertex(self.to).is_none() {
+            return Err(CommandError::VertexNotFound(self.to));
+        }
+
+        // Build the edge
+        let page_id = model
+            .store
+            .vertex(self.from)
+            .and_then(|v| v.page_id)
+            .or_else(|| model.store.vertex(self.to).and_then(|v| v.page_id));
+
+        let edge = Edge {
+            source: self.from,
+            target: self.to,
+            page_id,
+            waypoints: Vec::new(),
+            ..Default::default()
+        };
+
+        let inserted_id = model.store.insert_edge(edge);
+        self.inserted_edge_id = Some(inserted_id);
+        self.applied = true;
+
+        // Route the new edge: compute waypoints
+        let routed_id = self.inserted_edge_id.ok_or(CommandError::NotApplied)?;
+        self.route_edge(routed_id, model)?;
+
+        Ok(())
+    }
+
+    /// Route a specific edge and store its computed waypoints.
+    fn route_edge(&self, edge_id: EdgeId, model: &mut DiagramModel) -> CommandResult<()> {
+        // Get source/target IDs first (can't borrow store mutably and immutably at same time)
+        let (src_id, tgt_id) = {
+            let edge = model
+                .store
+                .edge(edge_id)
+                .ok_or(CommandError::EdgeNotFound(edge_id))?;
+            (edge.source, edge.target)
+        };
+
+        let source = model
+            .store
+            .vertex(src_id)
+            .ok_or(CommandError::VertexNotFound(src_id))?;
+        let target = model
+            .store
+            .vertex(tgt_id)
+            .ok_or(CommandError::VertexNotFound(tgt_id))?;
+
+        let req = RoutingRequest {
+            source,
+            target,
+            style: self.routing_kind.into(),
+            ports: (None, None),
+            waypoints: &[],
+        };
+
+        // Route the edge; if routing fails, the edge is still inserted (fallback: no waypoints)
+        if let Ok(path) = route(&req) {
+            let edge = model
+                .store
+                .edge_mut(edge_id)
+                .ok_or(CommandError::EdgeNotFound(edge_id))?;
+            edge.waypoints = path.0;
+        }
+
+        Ok(())
+    }
+
+    /// Undo the connect operation: remove the edge.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let id = self
+            .inserted_edge_id
+            .take()
+            .ok_or(CommandError::NotApplied)?;
+        model.store.remove_edge(id);
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for disconnecting (removing) an edge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisconnectEdgeCommand {
+    /// The ID of the edge to disconnect.
+    pub edge: EdgeId,
+    /// The captured edge state for undo. Populated by `apply`.
+    #[serde(skip)]
+    pub captured_edge: Option<Edge>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl DisconnectEdgeCommand {
+    /// Create a new payload for disconnecting an edge.
+    pub fn new(edge: EdgeId) -> Self {
+        Self {
+            edge,
+            captured_edge: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the disconnect operation: capture and remove the edge.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let captured = model
+            .store
+            .remove_edge(self.edge)
+            .ok_or(CommandError::EdgeNotFound(self.edge))?;
+        self.captured_edge = Some(captured);
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the disconnect operation: re-insert the captured edge.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let edge = self.captured_edge.take().ok_or(CommandError::NotApplied)?;
+        model.store.insert_edge(edge);
         self.applied = false;
         Ok(())
     }
