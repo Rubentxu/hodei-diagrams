@@ -1,5 +1,5 @@
 import type { DiagramEngineSession } from './session.js';
-import type { SlotmapId, ScenePage } from './types.js';
+import type { SlotmapId, ScenePage, Vertex } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 
 /** Active tool from the palette. */
@@ -18,11 +18,19 @@ export type ToolKind =
   | 'connector'
   | null;
 
-/** Drag FSM state. */
+/** Drag FSM state (single-shape drag). */
 interface DragState {
   vertexId: SlotmapId;
   startX: number;
   startY: number;
+  currentX: number;
+  currentY: number;
+}
+
+/** Marquee selection state. */
+interface MarqueeState {
+  originX: number;
+  originY: number;
   currentX: number;
   currentY: number;
 }
@@ -40,7 +48,7 @@ type ErrorCallback = (_msg: string) => void;
 /** State-change callback type (fired after every successful command). */
 type StateChangeCallback = () => void;
 /** Selection-change callback type (fired when selection changes). */
-type SelectionChangeCallback = (_id: SlotmapId | null) => void;
+type SelectionChangeCallback = (_ids: SlotmapId[]) => void;
 /** Tool-change callback type (fired when active tool changes). */
 type ToolChangeCallback = (_tool: ToolKind) => void;
 
@@ -55,7 +63,8 @@ type ToolChangeCallback = (_tool: ToolKind) => void;
 export class Editor {
   readonly #session: DiagramEngineSession;
   readonly #viewer: HTMLElement;
-  #selectedId: SlotmapId | null = null;
+  #selection: Set<SlotmapId> = new Set();
+  #marquee: MarqueeState | null = null;
   #dragState: DragState | null = null;
   #activeTool: ToolKind = null;
   #connectState: ConnectState | null = null;
@@ -69,6 +78,9 @@ export class Editor {
   #onToolChange: ToolChangeCallback;
   #getZoom: () => number;
   #abortController: AbortController | null = null;
+
+  // Internal clipboard for copy/paste
+  #clipboard: { vertices: Vertex[]; offset: number } | null = null;
 
   constructor(
     session: DiagramEngineSession,
@@ -88,10 +100,209 @@ export class Editor {
     this.#getZoom = getZoom ?? (() => 1);
   }
 
-  /** Current selection. */
-  get selection(): SlotmapId | null {
-    return this.#selectedId;
+  // ─── Public Selection API ──────────────────────────────────────────────────
+
+  /**
+   * Current selection as an array.
+   * Backward-compat: returns null when selection is empty for code expecting SlotmapId|null.
+   */
+  get selection(): readonly SlotmapId[] {
+    // Return empty array for null-compatible backward compat
+    return Array.from(this.#selection);
   }
+
+  /** Check if an id is currently selected (deep equality). */
+  isSelected(id: SlotmapId): boolean {
+    return this.#selectionIds().some((s) => s.idx === id.idx && s.version === id.version);
+  }
+
+  /** Replace selection with a single id. */
+  selectOnly(id: SlotmapId): void {
+    this.#applySelection(new Set([id]));
+  }
+
+  /** Add an id to the current selection. */
+  addToSelection(id: SlotmapId): void {
+    if (this.isSelected(id)) return;
+    const next = new Set(this.#selection);
+    next.add(id);
+    this.#applySelection(next);
+  }
+
+  /** Remove an id from the current selection. */
+  removeFromSelection(id: SlotmapId): void {
+    const next = new Set(this.#selection);
+    for (const s of next) {
+      if (s.idx === id.idx && s.version === id.version) {
+        next.delete(s);
+        break;
+      }
+    }
+    this.#applySelection(next);
+  }
+
+  /** Toggle an id in the selection. */
+  toggleSelection(id: SlotmapId): void {
+    const next = new Set(this.#selection);
+    let found = false;
+    let foundKey: SlotmapId | null = null;
+    for (const s of next) {
+      if (s.idx === id.idx && s.version === id.version) {
+        foundKey = s;
+        found = true;
+        break;
+      }
+    }
+    if (found && foundKey) {
+      next.delete(foundKey);
+    } else {
+      next.add(id);
+    }
+    this.#applySelection(next);
+  }
+
+  /** Clear all selection. */
+  clearSelection(): void {
+    this.#applySelection(new Set());
+  }
+
+  /** Replace selection with multiple ids. */
+  selectMany(ids: SlotmapId[]): void {
+    this.#applySelection(new Set(ids));
+  }
+
+  /**
+   * Select all shapes whose bounds intersect the given rect.
+   * Used by marquee selection.
+   */
+  selectInRect(rect: { x: number; y: number; width: number; height: number }): void {
+    const intersecting = this.#getIntersectingIds(rect);
+    this.#applySelection(new Set(intersecting));
+  }
+
+  // ─── Batch Operations ──────────────────────────────────────────────────────
+
+  /**
+   * Move all selected shapes by (dx, dy).
+   * Dispatches one MoveVertex per shape in a single transaction.
+   */
+  moveSelection(dx: number, dy: number): void {
+    if (this.#selection.size === 0) return;
+
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      const orig = this.#findOriginalGeometry(id);
+      if (!orig) continue;
+      const newGeom = {
+        x: orig.x + dx,
+        y: orig.y + dy,
+        width: orig.width,
+        height: orig.height,
+      };
+      commands.push(this.#buildMoveVertexCmd(id, newGeom));
+    }
+
+    if (commands.length === 0) return;
+    this.#session.executeCommands(commands);
+    this.#replay();
+  }
+
+  /**
+   * Delete all selected shapes.
+   * Dispatches one RemoveVertex per shape.
+   */
+  deleteSelection(): void {
+    if (this.#selection.size === 0) return;
+
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      commands.push(this.#buildRemoveVertexCmd(id));
+    }
+    this.#session.executeCommands(commands);
+    this.#selection.clear();
+    this.#notifySelectionChange();
+    this.#replay();
+  }
+
+  /**
+   * Copy all selected shapes to internal clipboard.
+   */
+  copySelection(): void {
+    const vertices: Vertex[] = [];
+    for (const id of this.#selection) {
+      const v = this.#getVertex(id);
+      if (v) vertices.push(this.#deepCloneVertex(v));
+    }
+    this.#clipboard = { vertices, offset: 0 };
+  }
+
+  /**
+   * Cut selection: copy then delete.
+   */
+  cutSelection(): void {
+    this.copySelection();
+    this.deleteSelection();
+  }
+
+  /**
+   * Paste clipboard contents with 20px offset per paste.
+   * Re-selects pasted shapes.
+   */
+  paste(): SlotmapId[] {
+    if (!this.#clipboard || this.#clipboard.vertices.length === 0) return [];
+
+    this.#clipboard.offset += 20;
+    const pastedIds: SlotmapId[] = [];
+
+    for (const vertex of this.#clipboard.vertices) {
+      const newGeom = {
+        x: vertex.geometry.x + this.#clipboard.offset,
+        y: vertex.geometry.y + this.#clipboard.offset,
+        width: vertex.geometry.width,
+        height: vertex.geometry.height,
+      };
+      const cmd = this.#buildAddVertexFromVertexCmd(vertex, newGeom);
+      const r = this.#session.executeCommand(cmd);
+      if (!r.ok) {
+        this.#onError(r.error);
+        continue;
+      }
+      // The command succeeds but we don't get back the new ID directly from executeCommand.
+      // We need to find the newly created vertex by looking at scene after replay.
+      // For now, we'll select based on position matching.
+    }
+
+    this.#replay();
+
+    // Find pasted shapes by matching offset position
+    // After replay, find vertices that match clipboard positions + offset
+    for (const vertex of this.#clipboard.vertices) {
+      const targetX = vertex.geometry.x + this.#clipboard.offset;
+      const targetY = vertex.geometry.y + this.#clipboard.offset;
+      const found = this.#findVertexAt(targetX, targetY);
+      if (found) pastedIds.push(found);
+    }
+
+    if (pastedIds.length > 0) {
+      this.#applySelection(new Set(pastedIds));
+    }
+
+    return pastedIds;
+  }
+
+  /** Select all shapes in the current page. */
+  selectAll(): void {
+    const allIds: SlotmapId[] = [];
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const id = this.#extractIdFromDisplayElem(elem);
+        if (id) allIds.push(id);
+      }
+    }
+    this.#applySelection(new Set(allIds));
+  }
+
+  // ─── Active Tool ──────────────────────────────────────────────────────────
 
   /** Current active tool. */
   get activeTool(): ToolKind {
@@ -117,7 +328,7 @@ export class Editor {
     this.#activePageIdx = idx;
   }
 
-  // ─── Public API ──────────────────────────────────────────────────────────
+  // ─── Public API ───────────────────────────────────────────────────────────
 
   /** Attach event listeners to the viewer container. */
   attach(): void {
@@ -162,6 +373,7 @@ export class Editor {
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
     this.#dragState = null;
+    this.#cancelMarquee();
     this.#cancelConnect();
   }
 
@@ -193,7 +405,7 @@ export class Editor {
     this.#replay();
   }
 
-  // ─── Coordinate Conversion ───────────────────────────────────────────────
+  // ─── Coordinate Conversion ────────────────────────────────────────────────
 
   /** Convert screen client coordinates to document-space coordinates, accounting for zoom. */
   #clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
@@ -222,7 +434,6 @@ export class Editor {
     }
 
     // Re-render the active page using renderPage with the slotmap ID index
-    // page.page_id.idx is the slotmap ID index which corresponds to the engine's page index
     const page = this.#sceneCache[this.#activePageIdx];
     if (!page) {
       this.#onError('Page not found: ' + this.#activePageIdx);
@@ -242,29 +453,43 @@ export class Editor {
     this.#reapplySelection();
   }
 
-  // ─── Selection ───────────────────────────────────────────────────────────
+  // ─── Selection ────────────────────────────────────────────────────────────
 
-  /** Select a vertex by SlotmapId, applying CSS class. */
-  #select(id: SlotmapId | null): void {
+  /** Get array of currently selected ids. */
+  #selectionIds(): SlotmapId[] {
+    return Array.from(this.#selection);
+  }
+
+  /**
+   * Apply a new selection set, update CSS classes, and notify listeners.
+   * @param next New selection set
+   */
+  #applySelection(next: Set<SlotmapId>): void {
     // Remove .selected from all elements
     this.#viewer.querySelectorAll('[data-vertex-id]').forEach((el) => {
       el.classList.remove('selected');
     });
-    this.#selectedId = id;
-    if (id !== null) {
+    this.#selection = next;
+    // Add .selected to all selected elements
+    for (const id of this.#selection) {
       const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
       const el = this.#viewer.querySelector(selector);
       if (el) {
         el.classList.add('selected');
       }
     }
-    // Notify selection change (for inspector, etc.)
-    this.#onSelectionChange(id);
+    // Notify selection change
+    this.#notifySelectionChange();
+  }
+
+  /** Notify selection change listeners. */
+  #notifySelectionChange(): void {
+    this.#onSelectionChange(Array.from(this.#selection));
   }
 
   /** After re-render, validate selection and re-apply CSS class. */
   #reapplySelection(): void {
-    if (this.#selectedId === null) return;
+    if (this.#selection.size === 0) return;
 
     const shapeKeys = [
       'Rect',
@@ -280,41 +505,49 @@ export class Editor {
       'Polygon',
     ] as const;
 
-    // Validate the selected ID still exists in the current scene
-    const stillExists = this.#sceneCache.some((page) =>
-      page.display_list.some((elem: unknown) => {
-        const e = elem as Record<string, unknown>;
-        // Check through externally-tagged variants
-        for (const key of shapeKeys) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (
-            idField?.idx === this.#selectedId!.idx &&
-            idField?.version === this.#selectedId!.version
-          ) {
-            return true;
+    // Validate each selected ID still exists
+    const validIds = new Set<SlotmapId>();
+    for (const id of this.#selection) {
+      const stillExists = this.#sceneCache.some((page) =>
+        page.display_list.some((elem: unknown) => {
+          const e = elem as Record<string, unknown>;
+          for (const key of shapeKeys) {
+            const variant = e[key] as Record<string, unknown> | undefined;
+            if (!variant) continue;
+            const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+            if (idField?.idx === id.idx && idField?.version === id.version) {
+              return true;
+            }
           }
-        }
-        return false;
-      }),
-    );
-
-    if (!stillExists) {
-      // Selection is stale — clear it
-      this.#selectedId = null;
-      this.#onSelectionChange(null);
-      return;
+          return false;
+        }),
+      );
+      if (stillExists) {
+        validIds.add(id);
+      }
     }
 
-    // Re-apply CSS class to the new DOM element
-    const selector = `[data-vertex-id="${this.#selectedId.idx}:${this.#selectedId.version}"]`;
-    const el = this.#viewer.querySelector(selector);
-    if (el) {
-      el.classList.add('selected');
-    } else {
-      this.#selectedId = null;
-      this.#onSelectionChange(null);
+    // Update selection to only valid IDs
+    const changed = validIds.size !== this.#selection.size ||
+      [...validIds].some(id => !this.#selection.has(id));
+
+    this.#selection = validIds;
+
+    if (changed && validIds.size === 0) {
+      // All selected items disappeared — notify
+      this.#notifySelectionChange();
+      return;
+    } else if (changed) {
+      this.#notifySelectionChange();
+    }
+
+    // Re-apply CSS class to DOM elements
+    for (const id of this.#selection) {
+      const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
+      const el = this.#viewer.querySelector(selector);
+      if (el) {
+        el.classList.add('selected');
+      }
     }
   }
 
@@ -331,6 +564,130 @@ export class Editor {
     return parseSlotmapAttr(value);
   }
 
+  // ─── Marquee Selection ────────────────────────────────────────────────────
+
+  /** Start marquee selection at document coordinates (x, y). */
+  #startMarquee(x: number, y: number): void {
+    this.#cancelMarquee();
+    this.#marquee = { originX: x, originY: y, currentX: x, currentY: y };
+  }
+
+  /** Update marquee endpoint. */
+  #updateMarquee(x: number, y: number): void {
+    if (!this.#marquee) return;
+    this.#marquee.currentX = x;
+    this.#marquee.currentY = y;
+    this.#renderMarquee();
+  }
+
+  /** End marquee selection, compute intersecting shapes. */
+  #endMarquee(): void {
+    if (!this.#marquee) return;
+    const rect = this.#normalizeMarqueeRect();
+    this.#cancelMarquee();
+    if (rect.width > 5 || rect.height > 5) {
+      this.selectInRect(rect);
+    }
+  }
+
+  /** Cancel any active marquee without selecting. */
+  #cancelMarquee(): void {
+    this.#marquee = null;
+    // Remove marquee rect from DOM if present
+    const existing = this.#viewer.querySelector('.marquee');
+    if (existing) existing.remove();
+  }
+
+  /** Render or update the SVG marquee rectangle. */
+  #renderMarquee(): void {
+    if (!this.#marquee) return;
+    const rect = this.#normalizeMarqueeRect();
+
+    let el = this.#viewer.querySelector('.marquee') as SVGRectElement | null;
+    if (!el) {
+      // Create the marquee rect
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.style.cssText =
+        'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;';
+      el = document.createElementNS('http://www.w3.org/2000/svg', 'rect') as SVGRectElement;
+      el.setAttribute('class', 'marquee');
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke', '#3B82F6');
+      el.setAttribute('stroke-dasharray', '4 2');
+      svg.appendChild(el);
+      this.#viewer.style.position = 'relative';
+      this.#viewer.appendChild(svg);
+    }
+
+    el.setAttribute('x', String(Math.min(rect.x, rect.x + rect.width)));
+    el.setAttribute('y', String(Math.min(rect.y, rect.y + rect.height)));
+    el.setAttribute('width', String(Math.abs(rect.width)));
+    el.setAttribute('height', String(Math.abs(rect.height)));
+  }
+
+  /** Get the normalized marquee rectangle (always positive width/height). */
+  #normalizeMarqueeRect(): { x: number; y: number; width: number; height: number } {
+    if (!this.#marquee) return { x: 0, y: 0, width: 0, height: 0 };
+    return {
+      x: Math.min(this.#marquee.originX, this.#marquee.currentX),
+      y: Math.min(this.#marquee.originY, this.#marquee.currentY),
+      width: Math.abs(this.#marquee.currentX - this.#marquee.originX),
+      height: Math.abs(this.#marquee.currentY - this.#marquee.originY),
+    };
+  }
+
+  /** Get all shape SlotmapIds whose bounds intersect the given rect. */
+  #getIntersectingIds(
+    rect: { x: number; y: number; width: number; height: number },
+  ): SlotmapId[] {
+    const result: SlotmapId[] = [];
+    const shapeKeys = [
+      'Rect',
+      'RoundedRect',
+      'Ellipse',
+      'Diamond',
+      'Triangle',
+      'Hexagon',
+      'Cylinder',
+      'Cloud',
+      'Parallelogram',
+      'Trapezoid',
+      'Polygon',
+    ] as const;
+
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of shapeKeys) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField) continue;
+          const bounds = variant['bounds'] as
+            | { origin?: Record<string, number>; size?: Record<string, number> }
+            | undefined;
+          if (!bounds?.origin || !bounds?.size) continue;
+
+          const sx = bounds.origin['x'] as number ?? 0;
+          const sy = bounds.origin['y'] as number ?? 0;
+          const sw = bounds.size['width'] as number ?? 0;
+          const sh = bounds.size['height'] as number ?? 0;
+
+          // Intersection test
+          if (
+            sx < rect.x + rect.width &&
+            sx + sw > rect.x &&
+            sy < rect.y + rect.height &&
+            sy + sh > rect.y
+          ) {
+            result.push({ idx: idField.idx!, version: idField.version! });
+          }
+        }
+      }
+    }
+    return result;
+  }
+
   // ─── Drag FSM ────────────────────────────────────────────────────────────
 
   #onPointerDown(e: PointerEvent): void {
@@ -338,7 +695,6 @@ export class Editor {
     if (e.button !== 0) return;
 
     // Connect mode is handled via a separate two-click FSM — check BEFORE palette tools
-    // because 'connector' is truthy and would incorrectly route to #onPaletteClick
     if (this.#activeTool === 'connector') {
       this.#onConnectClick(e);
       return;
@@ -351,14 +707,35 @@ export class Editor {
     }
 
     const hit = this.#hitTest(e);
+
     if (!hit) {
-      // Click on empty area: deselect
-      this.#select(null);
+      // Click on empty area
+      if (e.shiftKey) {
+        // Shift+click on empty: start marquee
+        const docPos = this.#clientToDoc(e.clientX, e.clientY);
+        this.#startMarquee(docPos.x, docPos.y);
+        // Add move/up listeners for marquee
+        this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+        this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+        this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+      } else {
+        // Plain click on empty: clear selection
+        this.clearSelection();
+      }
       return;
     }
 
-    // Select on mousedown
-    this.#select(hit);
+    // Hit a shape
+    if (e.shiftKey) {
+      // Shift+click: toggle in selection
+      this.toggleSelection(hit);
+    } else if (e.ctrlKey || e.metaKey) {
+      // Cmd/Ctrl+click: add to selection
+      this.addToSelection(hit);
+    } else {
+      // Plain click: select only
+      this.selectOnly(hit);
+    }
 
     // Set pointer capture and start drag tracking
     this.#viewer.setPointerCapture(e.pointerId);
@@ -383,15 +760,23 @@ export class Editor {
   #onPointerUpBound = (ev: PointerEvent): void => this.#onPointerUp(ev);
 
   #onPointerMove(e: PointerEvent): void {
-    if (!this.#dragState) return;
     const docPos = this.#clientToDoc(e.clientX, e.clientY);
+
+    // Handle marquee dragging
+    if (this.#marquee) {
+      this.#updateMarquee(docPos.x, docPos.y);
+      return;
+    }
+
+    // Handle shape dragging
+    if (!this.#dragState) return;
     this.#dragState.currentX = docPos.x;
     this.#dragState.currentY = docPos.y;
 
     const dx = this.#dragState.currentX - this.#dragState.startX;
     const dy = this.#dragState.currentY - this.#dragState.startY;
 
-    // Apply CSS transform for visual feedback
+    // Apply CSS transform for visual feedback — only to the dragged shape
     const selector = `[data-vertex-id="${this.#dragState.vertexId.idx}:${this.#dragState.vertexId.version}"]`;
     const el = this.#viewer.querySelector(selector) as HTMLElement | null;
     if (el) {
@@ -399,33 +784,40 @@ export class Editor {
     }
   }
 
-  #onPointerUp(_e: PointerEvent): void {
+  #onPointerUp(e: PointerEvent): void {
+    // Clean up listeners first
+    this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
+    this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
+    this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
+
+    // Handle marquee end
+    if (this.#marquee) {
+      this.#endMarquee();
+      return;
+    }
+
     if (!this.#dragState) return;
 
     const dx = this.#dragState.currentX - this.#dragState.startX;
     const dy = this.#dragState.currentY - this.#dragState.startY;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Remove CSS transform
+    // Remove CSS transform from the dragged element
     const selector = `[data-vertex-id="${this.#dragState.vertexId.idx}:${this.#dragState.vertexId.version}"]`;
     const el = this.#viewer.querySelector(selector) as HTMLElement | null;
     if (el) {
       el.style.transform = '';
     }
 
-    // Only commit if drag exceeded threshold
+    // Commit move if threshold exceeded
     if (distance >= 3) {
       this.#commitMove(this.#dragState.vertexId, dx, dy);
     }
 
-    // Clean up listeners
-    this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
-    this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
-    this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
     this.#dragState = null;
   }
 
-  // ─── Command Builders ────────────────────────────────────────────────────
+  // ─── Command Builders ─────────────────────────────────────────────────────
 
   /** Build a MoveVertex command JSON string. Uses absolute geometry. */
   #buildMoveVertexCmd(
@@ -502,6 +894,32 @@ export class Editor {
     return JSON.stringify({ AddVertex: payload });
   }
 
+  /** Build an AddVertex command from an existing vertex with new geometry. */
+  #buildAddVertexFromVertexCmd(
+    vertex: Vertex,
+    newGeom: { x: number; y: number; width: number; height: number },
+  ): string {
+    const payload: Record<string, unknown> = {
+      vertex: {
+        geometry: {
+          x: newGeom.x,
+          y: newGeom.y,
+          width: newGeom.width,
+          height: newGeom.height,
+          relative: false,
+        },
+        page_id: this.#activePageSlotId
+          ? slotmapIdToField(this.#activePageSlotId)
+          : { idx: 0, version: 0 },
+      },
+    };
+    // Copy style if present
+    if (vertex.style) {
+      payload.style = { ...vertex.style };
+    }
+    return JSON.stringify({ AddVertex: payload });
+  }
+
   // ─── Command Execution ───────────────────────────────────────────────────
 
   /** Commit a move by computing new absolute geometry and dispatching MoveVertex. */
@@ -572,6 +990,136 @@ export class Editor {
       }
     }
     return null;
+  }
+
+  // ─── Vertex Access ────────────────────────────────────────────────────────
+
+  /** Get a vertex object by SlotmapId from the scene cache. */
+  #getVertex(id: SlotmapId): Vertex | null {
+    const shapeKeys = [
+      'Rect',
+      'RoundedRect',
+      'Ellipse',
+      'Diamond',
+      'Triangle',
+      'Hexagon',
+      'Cylinder',
+      'Cloud',
+      'Parallelogram',
+      'Trapezoid',
+      'Polygon',
+    ] as const;
+
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of shapeKeys) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField) continue;
+          if (idField.idx === id.idx && idField.version === id.version) {
+            const bounds = variant['bounds'] as
+              | { origin?: Record<string, number>; size?: Record<string, number> }
+              | undefined;
+            if (bounds?.origin && bounds?.size) {
+              return {
+                geometry: {
+                  x: (bounds.origin['x'] as number) ?? 0,
+                  y: (bounds.origin['y'] as number) ?? 0,
+                  width: (bounds.size['width'] as number) ?? 0,
+                  height: (bounds.size['height'] as number) ?? 0,
+                },
+                style: (variant['style'] as Record<string, unknown>) ?? {},
+              };
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Find a vertex SlotmapId at the given document position (within tolerance). */
+  #findVertexAt(x: number, y: number, tolerance = 5): SlotmapId | null {
+    const shapeKeys = [
+      'Rect',
+      'RoundedRect',
+      'Ellipse',
+      'Diamond',
+      'Triangle',
+      'Hexagon',
+      'Cylinder',
+      'Cloud',
+      'Parallelogram',
+      'Trapezoid',
+      'Polygon',
+    ] as const;
+
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of shapeKeys) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField) continue;
+          const bounds = variant['bounds'] as
+            | { origin?: Record<string, number>; size?: Record<string, number> }
+            | undefined;
+          if (!bounds?.origin || !bounds?.size) continue;
+
+          const sx = bounds.origin['x'] as number ?? 0;
+          const sy = bounds.origin['y'] as number ?? 0;
+          const sw = bounds.size['width'] as number ?? 0;
+          const sh = bounds.size['height'] as number ?? 0;
+
+          if (
+            x >= sx - tolerance &&
+            x <= sx + sw + tolerance &&
+            y >= sy - tolerance &&
+            y <= sy + sh + tolerance
+          ) {
+            return { idx: idField.idx!, version: idField.version! };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Extract SlotmapId from a display list element. */
+  #extractIdFromDisplayElem(elem: unknown): SlotmapId | null {
+    const e = elem as Record<string, unknown>;
+    const shapeKeys = [
+      'Rect',
+      'RoundedRect',
+      'Ellipse',
+      'Diamond',
+      'Triangle',
+      'Hexagon',
+      'Cylinder',
+      'Cloud',
+      'Parallelogram',
+      'Trapezoid',
+      'Polygon',
+    ] as const;
+    for (const key of shapeKeys) {
+      const variant = e[key] as Record<string, unknown> | undefined;
+      if (!variant) continue;
+      const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+      if (!idField) continue;
+      return { idx: idField.idx!, version: idField.version! };
+    }
+    return null;
+  }
+
+  /** Deep clone a vertex object. */
+  #deepCloneVertex(v: Vertex): Vertex {
+    return {
+      geometry: { ...v.geometry },
+      style: v.style ? { ...v.style } : {},
+    };
   }
 
   // ─── Connect Mode ────────────────────────────────────────────────────────
@@ -712,53 +1260,80 @@ export class Editor {
     this.setActiveTool(null);
   }
 
-  // ─── Keyboard ────────────────────────────────────────────────────────────
+  // ─── Keyboard ─────────────────────────────────────────────────────────────
 
   #onKeyDown(e: KeyboardEvent): void {
     // Ignore when focused on input elements
     const tag = (e.target as HTMLElement | null)?.tagName ?? '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-    // Escape → cancel connect mode
-    if (e.key === 'Escape' && this.#connectState) {
-      this.#cancelConnect();
+    const hasMod = e.ctrlKey || e.metaKey;
+
+    // Escape → clear selection / cancel connect mode
+    if (e.key === 'Escape') {
+      if (this.#connectState) {
+        this.#cancelConnect();
+      } else {
+        this.clearSelection();
+      }
       return;
     }
 
-    // Delete / Backspace → RemoveVertex
+    // Delete / Backspace → delete selection
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      // In connect mode, delete the source vertex if we have one pending
-      let vertexToDelete = this.#selectedId;
-      if (vertexToDelete === null && this.#connectState !== null) {
-        vertexToDelete = this.#connectState.sourceId;
-      }
-      if (vertexToDelete === null) return; // no-op
-      const cmd = this.#buildRemoveVertexCmd(vertexToDelete);
-      const r = this.#session.executeCommand(cmd);
-      if (!r.ok) {
-        this.#onError(r.error);
-        return;
-      }
-      this.#replay();
-      // If we deleted the connect source, cancel connect mode
-      if (this.#connectState !== null && vertexToDelete !== null) {
-        if (this.#connectState.sourceId.idx === vertexToDelete.idx &&
-            this.#connectState.sourceId.version === vertexToDelete.version) {
-          this.#cancelConnect();
+      if (this.#selection.size > 0) {
+        this.deleteSelection();
+      } else if (this.#connectState) {
+        // In connect mode with no selection, delete the source vertex if pending
+        const cmd = this.#buildRemoveVertexCmd(this.#connectState.sourceId);
+        const r = this.#session.executeCommand(cmd);
+        if (!r.ok) {
+          this.#onError(r.error);
+          return;
         }
+        this.#replay();
+        this.#cancelConnect();
       }
+      return;
+    }
+
+    // Ctrl+A → select all
+    if (hasMod && e.key === 'a') {
+      e.preventDefault();
+      this.selectAll();
+      return;
+    }
+
+    // Ctrl+C → copy
+    if (hasMod && e.key === 'c') {
+      e.preventDefault();
+      this.copySelection();
+      return;
+    }
+
+    // Ctrl+V → paste
+    if (hasMod && e.key === 'v') {
+      e.preventDefault();
+      this.paste();
+      return;
+    }
+
+    // Ctrl+X → cut
+    if (hasMod && e.key === 'x') {
+      e.preventDefault();
+      this.cutSelection();
       return;
     }
 
     // Ctrl+Z / Cmd+Z → Undo
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    if (hasMod && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       this.undoCmd();
       return;
     }
 
     // Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z → Redo
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+    if (hasMod && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
       e.preventDefault();
       this.redoCmd();
       return;
