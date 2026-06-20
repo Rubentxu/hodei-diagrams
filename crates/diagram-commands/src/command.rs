@@ -9,8 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::error::CommandResult;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
-    EditLabelPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
-    RemoveVertexPayload, RenamePagePayload,
+    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, MoveVertexPayload,
+    RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload,
+    RenamePagePayload,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -32,6 +33,10 @@ pub enum Command {
     AddEdge(AddEdgePayload),
     /// Remove an edge from the diagram.
     RemoveEdge(RemoveEdgePayload),
+    /// Connect two vertices with an edge (Phase 0 interactive edge creation).
+    ConnectVertices(ConnectVerticesCommand),
+    /// Disconnect an edge (remove it).
+    DisconnectEdge(DisconnectEdgeCommand),
     /// Change a vertex's style.
     ChangeStyle(ChangeStylePayload),
     /// Add a group to the diagram.
@@ -58,6 +63,8 @@ impl Command {
             Command::EditVertexLabel(p) => p.apply(model),
             Command::AddEdge(p) => p.apply(model),
             Command::RemoveEdge(p) => p.apply(model),
+            Command::ConnectVertices(p) => p.apply(model),
+            Command::DisconnectEdge(p) => p.apply(model),
             Command::ChangeStyle(p) => p.apply(model),
             Command::AddGroup(p) => p.apply(model),
             Command::RemoveGroup(p) => p.apply(model),
@@ -78,6 +85,8 @@ impl Command {
             Command::EditVertexLabel(p) => p.undo(model),
             Command::AddEdge(p) => p.undo(model),
             Command::RemoveEdge(p) => p.undo(model),
+            Command::ConnectVertices(p) => p.undo(model),
+            Command::DisconnectEdge(p) => p.undo(model),
             Command::ChangeStyle(p) => p.undo(model),
             Command::AddGroup(p) => p.undo(model),
             Command::RemoveGroup(p) => p.undo(model),
@@ -119,6 +128,7 @@ mod tests {
     use diagram_core::{Edge, EdgeId, Group, PageId, Vertex, VertexId};
 
     use super::*;
+    use crate::RoutingKind;
 
     fn make_model_with_page() -> (DiagramModel, PageId) {
         let mut model = DiagramModel::new();
@@ -459,6 +469,152 @@ mod tests {
         assert_eq!(model.store.len_edge(), 1);
         let restored = model.store.edge(eid_from_model(&model, 0)).unwrap();
         assert_eq!(restored.label, orig_label);
+    }
+
+    // ─── ConnectVertices ────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_connect_vertices_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let mut cmd =
+            Command::ConnectVertices(ConnectVerticesCommand::new(v1, v2, RoutingKind::Orthogonal));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_edge(), 1);
+        // Edge was inserted with correct endpoints
+        let edge_id = eid_from_model(&model, 0);
+        let edge = model.store.edge(edge_id).unwrap();
+        assert_eq!(edge.source, v1);
+        assert_eq!(edge.target, v2);
+        // Waypoints may or may not be computed depending on vertex geometry
+        // (vertices without geometry fall back to empty waypoints gracefully)
+    }
+
+    #[test]
+    fn apply_connect_vertices_self_loop() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+
+        // Connecting a vertex to itself is allowed (creates a self-loop)
+        // Routing may fail for self-loops (overlapping vertices error is caught gracefully)
+        let mut cmd =
+            Command::ConnectVertices(ConnectVerticesCommand::new(v1, v1, RoutingKind::Orthogonal));
+        let result = cmd.apply(&mut model);
+        // Edge is inserted even if routing fails (graceful degradation)
+        assert!(result.is_ok());
+        assert_eq!(model.store.len_edge(), 1);
+    }
+
+    #[test]
+    fn undo_connect_vertices_removes_edge() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let mut cmd =
+            Command::ConnectVertices(ConnectVerticesCommand::new(v1, v2, RoutingKind::Orthogonal));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 1);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 0);
+    }
+
+    #[test]
+    fn connect_vertices_invalid_source() {
+        let (mut model, pid) = make_model_with_page();
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let bogus = VertexId::default();
+
+        let mut cmd = Command::ConnectVertices(ConnectVerticesCommand::new(
+            bogus,
+            v2,
+            RoutingKind::Orthogonal,
+        ));
+        let err = cmd.apply(&mut model).unwrap_err();
+        assert!(matches!(err, crate::error::CommandError::VertexNotFound(_)));
+        assert_eq!(model.store.len_edge(), 0); // model unchanged
+    }
+
+    #[test]
+    fn connect_vertices_invalid_target() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let bogus = VertexId::default();
+
+        let mut cmd = Command::ConnectVertices(ConnectVerticesCommand::new(
+            v1,
+            bogus,
+            RoutingKind::Orthogonal,
+        ));
+        let err = cmd.apply(&mut model).unwrap_err();
+        assert!(matches!(err, crate::error::CommandError::VertexNotFound(_)));
+        assert_eq!(model.store.len_edge(), 0); // model unchanged
+    }
+
+    // ─── DisconnectEdge ────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_disconnect_edge_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            waypoints: vec![diagram_core::geometry::Point { x: 0.0, y: 0.0 }],
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+
+        let mut cmd = Command::DisconnectEdge(DisconnectEdgeCommand::new(eid));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_edge(), 0);
+    }
+
+    #[test]
+    fn undo_disconnect_edge_restores_edge_with_waypoints() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            label: Some(Label::new("MyEdge")),
+            waypoints: vec![diagram_core::geometry::Point { x: 10.0, y: 20.0 }],
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+        let orig_label = model.store.edge(eid).unwrap().label.clone();
+        let orig_waypoints = model.store.edge(eid).unwrap().waypoints.clone();
+
+        let mut cmd = Command::DisconnectEdge(DisconnectEdgeCommand::new(eid));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 0);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.len_edge(), 1);
+        let restored = model.store.edge(eid_from_model(&model, 0)).unwrap();
+        assert_eq!(restored.label, orig_label);
+        assert_eq!(restored.waypoints, orig_waypoints);
+    }
+
+    #[test]
+    fn disconnect_edge_invalid_id() {
+        let (mut model, _pid) = make_model_with_page();
+        let bogus = EdgeId::default();
+
+        let mut cmd = Command::DisconnectEdge(DisconnectEdgeCommand::new(bogus));
+        let err = cmd.apply(&mut model).unwrap_err();
+        assert!(matches!(err, crate::error::CommandError::EdgeNotFound(_)));
     }
 
     // ─── ChangeStyle ───────────────────────────────────────────────────────────
