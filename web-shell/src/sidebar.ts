@@ -11,6 +11,14 @@ export interface SidebarControls {
   rectToolBtn: HTMLButtonElement;
   roundedRectToolBtn: HTMLButtonElement;
   ellipseToolBtn: HTMLButtonElement;
+  diamondToolBtn: HTMLButtonElement;
+  triangleToolBtn: HTMLButtonElement;
+  hexagonToolBtn: HTMLButtonElement;
+  cylinderToolBtn: HTMLButtonElement;
+  cloudToolBtn: HTMLButtonElement;
+  parallelogramToolBtn: HTMLButtonElement;
+  trapezoidToolBtn: HTMLButtonElement;
+  polygonToolBtn: HTMLButtonElement;
   collapseBtn: HTMLButtonElement;
 }
 
@@ -46,6 +54,62 @@ const GENERAL_SHAPES: ShapeEntry[] = [
     tooltip: 'Ellipse shape',
     icon: '<svg width="32" height="24" viewBox="0 0 32 24"><ellipse cx="16" cy="12" rx="14" ry="10" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
     dataTestId: 'ellipse-tool-btn',
+  },
+  {
+    id: 'diamond',
+    label: 'Diamond',
+    tooltip: 'Diamond (rhombus) shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="16,2 30,12 16,22 2,12" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'diamond-tool-btn',
+  },
+  {
+    id: 'triangle',
+    label: 'Triangle',
+    tooltip: 'Triangle shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="16,2 30,22 2,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'triangle-tool-btn',
+  },
+  {
+    id: 'hexagon',
+    label: 'Hexagon',
+    tooltip: 'Hexagon shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="16,2 28,7 28,17 16,22 4,17 4,7" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'hexagon-tool-btn',
+  },
+  {
+    id: 'cylinder',
+    label: 'Cylinder',
+    tooltip: 'Cylinder shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><path d="M6,6 C6,3 10,2 16,2 C22,2 26,3 26,6 L26,18 C26,21 22,22 16,22 C10,22 6,21 6,18 Z" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'cylinder-tool-btn',
+  },
+  {
+    id: 'cloud',
+    label: 'Cloud',
+    tooltip: 'Cloud shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><path d="M8,18 C4,18 2,14 4,10 C4,6 8,4 12,6 C14,4 18,4 20,6 C24,6 28,10 26,14 C30,14 30,18 26,18 Z" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'cloud-tool-btn',
+  },
+  {
+    id: 'parallelogram',
+    label: 'Parallelogram',
+    tooltip: 'Parallelogram shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="8,2 30,2 24,22 2,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'parallelogram-tool-btn',
+  },
+  {
+    id: 'trapezoid',
+    label: 'Trapezoid',
+    tooltip: 'Trapezoid shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="6,2 26,2 30,22 2,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'trapezoid-tool-btn',
+  },
+  {
+    id: 'polygon',
+    label: 'Polygon',
+    tooltip: 'Free-form polygon shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="6,18 10,6 22,4 28,14 20,22 8,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
+    dataTestId: 'polygon-tool-btn',
   },
 ];
 
@@ -173,10 +237,18 @@ export function buildSidebar(): SidebarControls {
   const shapeGrid = document.createElement('div');
   shapeGrid.className = 'shape-grid';
 
-  const controls: Pick<SidebarControls, 'rectToolBtn' | 'roundedRectToolBtn' | 'ellipseToolBtn'> = {
+  const controls: Pick<SidebarControls, 'rectToolBtn' | 'roundedRectToolBtn' | 'ellipseToolBtn' | 'diamondToolBtn' | 'triangleToolBtn' | 'hexagonToolBtn' | 'cylinderToolBtn' | 'cloudToolBtn' | 'parallelogramToolBtn' | 'trapezoidToolBtn' | 'polygonToolBtn'> = {
     rectToolBtn: document.createElement('button'),
     roundedRectToolBtn: document.createElement('button'),
     ellipseToolBtn: document.createElement('button'),
+    diamondToolBtn: document.createElement('button'),
+    triangleToolBtn: document.createElement('button'),
+    hexagonToolBtn: document.createElement('button'),
+    cylinderToolBtn: document.createElement('button'),
+    cloudToolBtn: document.createElement('button'),
+    parallelogramToolBtn: document.createElement('button'),
+    trapezoidToolBtn: document.createElement('button'),
+    polygonToolBtn: document.createElement('button'),
   };
 
   for (const shape of GENERAL_SHAPES) {
@@ -196,6 +268,22 @@ export function buildSidebar(): SidebarControls {
       controls.roundedRectToolBtn = btn;
     } else if (shape.id === 'ellipse') {
       controls.ellipseToolBtn = btn;
+    } else if (shape.id === 'diamond') {
+      controls.diamondToolBtn = btn;
+    } else if (shape.id === 'triangle') {
+      controls.triangleToolBtn = btn;
+    } else if (shape.id === 'hexagon') {
+      controls.hexagonToolBtn = btn;
+    } else if (shape.id === 'cylinder') {
+      controls.cylinderToolBtn = btn;
+    } else if (shape.id === 'cloud') {
+      controls.cloudToolBtn = btn;
+    } else if (shape.id === 'parallelogram') {
+      controls.parallelogramToolBtn = btn;
+    } else if (shape.id === 'trapezoid') {
+      controls.trapezoidToolBtn = btn;
+    } else if (shape.id === 'polygon') {
+      controls.polygonToolBtn = btn;
     }
 
     shapeGrid.appendChild(btn);
@@ -249,6 +337,14 @@ export function buildSidebar(): SidebarControls {
     rectToolBtn: controls.rectToolBtn,
     roundedRectToolBtn: controls.roundedRectToolBtn,
     ellipseToolBtn: controls.ellipseToolBtn,
+    diamondToolBtn: controls.diamondToolBtn,
+    triangleToolBtn: controls.triangleToolBtn,
+    hexagonToolBtn: controls.hexagonToolBtn,
+    cylinderToolBtn: controls.cylinderToolBtn,
+    cloudToolBtn: controls.cloudToolBtn,
+    parallelogramToolBtn: controls.parallelogramToolBtn,
+    trapezoidToolBtn: controls.trapezoidToolBtn,
+    polygonToolBtn: controls.polygonToolBtn,
     collapseBtn,
   };
 }

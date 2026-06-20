@@ -35,6 +35,22 @@ pub enum VisualElement {
     RoundedRect(RoundedRectElement),
     /// An ellipse element.
     Ellipse(EllipseElement),
+    /// A diamond (rhombus) element.
+    Diamond(DiamondElement),
+    /// A triangle element.
+    Triangle(TriangleElement),
+    /// A hexagon element.
+    Hexagon(HexagonElement),
+    /// A cylinder element.
+    Cylinder(CylinderElement),
+    /// A cloud element.
+    Cloud(CloudElement),
+    /// A parallelogram element.
+    Parallelogram(ParallelogramElement),
+    /// A trapezoid element.
+    Trapezoid(TrapezoidElement),
+    /// A free-form polygon element.
+    Polygon(PolygonElement),
     /// A text label element.
     Text(TextElement),
     /// A straight line element.
@@ -75,6 +91,96 @@ pub struct EllipseElement {
     /// The vertex ID.
     pub id: VertexId,
     /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A diamond (rhombus) element.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiamondElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A triangle element.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriangleElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A hexagon element.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexagonElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A cylinder element (3D-ish).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CylinderElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A cloud element.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A parallelogram element.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParallelogramElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A trapezoid element.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrapezoidElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// A free-form polygon element.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolygonElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The polygon points in page coordinates.
+    pub points: Vec<Point>,
+    /// The bounds in page coordinates (derived from points min/max).
     pub bounds: Rect,
     /// The resolved style.
     pub style: super::ResolvedStyle,
@@ -262,6 +368,214 @@ mod tests {
         assert!(group.clip);
     }
 
+    // ─── new element tests ─────────────────────────────────────────────────────
+
+    #[test]
+    fn diamond_element_construction() {
+        let vid = VertexId::default();
+        let bounds = Rect {
+            origin: Point { x: 10.0, y: 20.0 },
+            size: Size {
+                width: 80.0,
+                height: 40.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = DiamondElement {
+            id: vid,
+            bounds,
+            style: style.clone(),
+        };
+
+        assert_eq!(elem.id, vid);
+        assert_eq!(elem.bounds.origin.x, 10.0);
+        assert_eq!(elem.bounds.size.width, 80.0);
+        assert_eq!(elem.style.is_empty(), style.is_empty());
+    }
+
+    #[test]
+    fn triangle_element_construction() {
+        let vid = VertexId::default();
+        let bounds = Rect {
+            origin: Point { x: 0.0, y: 0.0 },
+            size: Size {
+                width: 100.0,
+                height: 80.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = TriangleElement {
+            id: vid,
+            bounds,
+            style: style.clone(),
+        };
+
+        assert_eq!(elem.id, vid);
+        assert_eq!(elem.bounds.size.height, 80.0);
+    }
+
+    #[test]
+    fn hexagon_element_construction() {
+        let vid = VertexId::default();
+        let bounds = Rect {
+            origin: Point { x: 0.0, y: 0.0 },
+            size: Size {
+                width: 100.0,
+                height: 100.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = HexagonElement {
+            id: vid,
+            bounds,
+            style,
+        };
+
+        assert_eq!(elem.id, vid);
+    }
+
+    #[test]
+    fn cylinder_element_construction() {
+        let vid = VertexId::default();
+        let bounds = Rect {
+            origin: Point { x: 0.0, y: 0.0 },
+            size: Size {
+                width: 60.0,
+                height: 100.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = CylinderElement {
+            id: vid,
+            bounds,
+            style,
+        };
+
+        assert_eq!(elem.id, vid);
+    }
+
+    #[test]
+    fn cloud_element_construction() {
+        let vid = VertexId::default();
+        let bounds = Rect {
+            origin: Point { x: 0.0, y: 0.0 },
+            size: Size {
+                width: 120.0,
+                height: 80.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = CloudElement {
+            id: vid,
+            bounds,
+            style,
+        };
+
+        assert_eq!(elem.id, vid);
+    }
+
+    #[test]
+    fn parallelogram_element_construction() {
+        let vid = VertexId::default();
+        let bounds = Rect {
+            origin: Point { x: 0.0, y: 0.0 },
+            size: Size {
+                width: 100.0,
+                height: 60.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = ParallelogramElement {
+            id: vid,
+            bounds,
+            style,
+        };
+
+        assert_eq!(elem.id, vid);
+    }
+
+    #[test]
+    fn trapezoid_element_construction() {
+        let vid = VertexId::default();
+        let bounds = Rect {
+            origin: Point { x: 0.0, y: 0.0 },
+            size: Size {
+                width: 100.0,
+                height: 60.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = TrapezoidElement {
+            id: vid,
+            bounds,
+            style,
+        };
+
+        assert_eq!(elem.id, vid);
+    }
+
+    #[test]
+    fn polygon_element_construction() {
+        let vid = VertexId::default();
+        let points = vec![
+            Point { x: 10.0, y: 10.0 },
+            Point { x: 50.0, y: 10.0 },
+            Point { x: 50.0, y: 50.0 },
+            Point { x: 10.0, y: 50.0 },
+        ];
+        let bounds = Rect {
+            origin: Point { x: 10.0, y: 10.0 },
+            size: Size {
+                width: 40.0,
+                height: 40.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = PolygonElement {
+            id: vid,
+            points: points.clone(),
+            bounds,
+            style,
+        };
+
+        assert_eq!(elem.id, vid);
+        assert_eq!(elem.points.len(), 4);
+    }
+
+    #[test]
+    fn polygon_element_min_points_validation() {
+        // PolygonElement can be constructed with any points,
+        // but the engine should validate min 3 points at add time
+        let vid = VertexId::default();
+        let points = vec![Point { x: 10.0, y: 10.0 }, Point { x: 50.0, y: 10.0 }];
+        let bounds = Rect {
+            origin: Point { x: 10.0, y: 10.0 },
+            size: Size {
+                width: 40.0,
+                height: 0.0,
+            },
+        };
+        let style = ResolvedStyle::default();
+
+        let elem = PolygonElement {
+            id: vid,
+            points,
+            bounds,
+            style,
+        };
+
+        // Construction succeeds; validation happens at engine level
+        assert_eq!(elem.points.len(), 2);
+    }
+
     #[test]
     fn visual_element_is_non_exhaustive() {
         // Compile-fail guard: requires #[non_exhaustive] to compile
@@ -270,6 +584,14 @@ mod tests {
                 VisualElement::Rect(_) => {}
                 VisualElement::RoundedRect(_) => {}
                 VisualElement::Ellipse(_) => {}
+                VisualElement::Diamond(_) => {}
+                VisualElement::Triangle(_) => {}
+                VisualElement::Hexagon(_) => {}
+                VisualElement::Cylinder(_) => {}
+                VisualElement::Cloud(_) => {}
+                VisualElement::Parallelogram(_) => {}
+                VisualElement::Trapezoid(_) => {}
+                VisualElement::Polygon(_) => {}
                 VisualElement::Text(_) => {}
                 VisualElement::Line(_) => {}
                 VisualElement::Path(_) => {}

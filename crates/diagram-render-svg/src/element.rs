@@ -2,8 +2,9 @@
 
 use diagram_core::VertexId;
 use diagram_scene::{
-    EllipseElement, GroupElement, LineElement, PathElement, RectElement, RoundedRectElement,
-    TextElement, VisualElement,
+    CloudElement, CylinderElement, DiamondElement, EllipseElement, GroupElement, HexagonElement,
+    LineElement, ParallelogramElement, PathElement, PolygonElement, RectElement,
+    RoundedRectElement, TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
 
 use crate::clip::ClipPathManager;
@@ -36,6 +37,14 @@ pub(crate) fn element_to_svg(
         VisualElement::Rect(r) => rect_to_svg(r, indent),
         VisualElement::RoundedRect(r) => rounded_rect_to_svg(r, indent),
         VisualElement::Ellipse(e) => ellipse_to_svg(e, indent),
+        VisualElement::Diamond(d) => diamond_to_svg(d, indent),
+        VisualElement::Triangle(t) => triangle_to_svg(t, indent),
+        VisualElement::Hexagon(h) => hexagon_to_svg(h, indent),
+        VisualElement::Cylinder(c) => cylinder_to_svg(c, indent),
+        VisualElement::Cloud(c) => cloud_to_svg(c, indent),
+        VisualElement::Parallelogram(p) => parallelogram_to_svg(p, indent),
+        VisualElement::Trapezoid(t) => trapezoid_to_svg(t, indent),
+        VisualElement::Polygon(p) => polygon_to_svg(p, indent),
         VisualElement::Text(t) => text_to_svg(t, indent),
         VisualElement::Line(l) => line_to_svg(l, indent),
         VisualElement::Path(p) => path_to_svg(p, indent),
@@ -97,16 +106,234 @@ fn ellipse_to_svg(e: &EllipseElement, indent: usize) -> String {
     )
 }
 
+fn diamond_to_svg(d: &DiamondElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&d.style, AttrContext::Shape);
+    let vid = vid_attr(&d.id);
+    let x = d.bounds.origin.x;
+    let y = d.bounds.origin.y;
+    let w = d.bounds.size.width;
+    let h = d.bounds.size.height;
+    // Points: top, right, bottom, left
+    let points = format!(
+        "{},{} {},{} {},{} {},{}",
+        x + w / 2.0,
+        y, // top
+        x + w,
+        y + h / 2.0, // right
+        x + w / 2.0,
+        y + h, // bottom
+        x,
+        y + h / 2.0 // left
+    );
+    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+}
+
+fn triangle_to_svg(t: &TriangleElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&t.style, AttrContext::Shape);
+    let vid = vid_attr(&t.id);
+    let x = t.bounds.origin.x;
+    let y = t.bounds.origin.y;
+    let w = t.bounds.size.width;
+    let h = t.bounds.size.height;
+    // Points: top-center, bottom-right, bottom-left
+    let points = format!(
+        "{},{} {},{} {},{}",
+        x + w / 2.0,
+        y, // top-center
+        x + w,
+        y + h, // bottom-right
+        x,
+        y + h // bottom-left
+    );
+    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+}
+
+fn hexagon_to_svg(h: &HexagonElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&h.style, AttrContext::Shape);
+    let vid = vid_attr(&h.id);
+    let x = h.bounds.origin.x;
+    let y = h.bounds.origin.y;
+    let w = h.bounds.size.width;
+    let h_h = h.bounds.size.height;
+    // Pointy-top hexagon
+    let points = format!(
+        "{},{} {},{} {},{} {},{} {},{} {},{}",
+        x + w / 2.0,
+        y, // top
+        x + w,
+        y + h_h / 4.0, // upper-right
+        x + w,
+        y + 3.0 * h_h / 4.0, // lower-right
+        x + w / 2.0,
+        y + h_h, // bottom
+        x,
+        y + 3.0 * h_h / 4.0, // lower-left
+        x,
+        y + h_h / 4.0 // upper-left
+    );
+    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+}
+
+fn cylinder_to_svg(c: &CylinderElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&c.style, AttrContext::Shape);
+    let vid = vid_attr(&c.id);
+    let x = c.bounds.origin.x;
+    let y = c.bounds.origin.y;
+    let w = c.bounds.size.width;
+    let h = c.bounds.size.height;
+    let ry = h / 6.0; // ellipse height for top/bottom caps
+    // Cylinder: elliptical top, body rect, elliptical bottom
+    // Using a path for the body with curved bottom
+    let path = format!(
+        "M {} {} \
+         A {} {} 0 0 1 {} {} \
+         L {} {} \
+         A {} {} 0 0 0 {} {} \
+         Z",
+        x,
+        y + ry, // move to top-left of ellipse
+        w / 2.0,
+        ry, // rx, ry
+        x + w,
+        y + ry, // top-right
+        x + w,
+        y + h - ry, // right side down
+        w / 2.0,
+        ry, // rx, ry for bottom ellipse
+        x,
+        y + h - ry // bottom-left
+    );
+    format!("{}<path d=\"{}\"{}{}/>", ind, path, vid, style)
+}
+
+fn cloud_to_svg(c: &CloudElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&c.style, AttrContext::Shape);
+    let vid = vid_attr(&c.id);
+    let x = c.bounds.origin.x;
+    let y = c.bounds.origin.y;
+    let w = c.bounds.size.width;
+    let h = c.bounds.size.height;
+    // Cloud approximation using cubic bezier curves
+    // A simple cloud shape with bumps
+    let path = format!(
+        "M {} {} \
+         C {} {} {} {} {} {} \
+         C {} {} {} {} {} {} \
+         C {} {} {} {} {} {} \
+         C {} {} {} {} {} {} \
+         Z",
+        x + w * 0.25,
+        y + h * 0.7, // start
+        x + w * 0.1,
+        y + h * 0.4,
+        x + w * 0.2,
+        y + h * 0.1,
+        x + w * 0.45,
+        y + h * 0.15, // bump 1
+        x + w * 0.6,
+        y + h * 0.05,
+        x + w * 0.85,
+        y + h * 0.2,
+        x + w * 0.9,
+        y + h * 0.5, // bump 2
+        x + w * 0.95,
+        y + h * 0.7,
+        x + w * 0.8,
+        y + h * 0.9,
+        x + w * 0.5,
+        y + h * 0.85, // bump 3
+        x + w * 0.2,
+        y + h * 0.9,
+        x + w * 0.05,
+        y + h * 0.75,
+        x + w * 0.25,
+        y + h * 0.7 // bump 4
+    );
+    format!("{}<path d=\"{}\"{}{}/>", ind, path, vid, style)
+}
+
+fn parallelogram_to_svg(p: &ParallelogramElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&p.style, AttrContext::Shape);
+    let vid = vid_attr(&p.id);
+    let x = p.bounds.origin.x;
+    let y = p.bounds.origin.y;
+    let w = p.bounds.size.width;
+    let h = p.bounds.size.height;
+    let skew = w * 0.2; // horizontal skew amount
+    // Points: top-left shifted right, top-right, bottom-right shifted left, bottom-left
+    let points = format!(
+        "{},{} {},{} {},{} {},{}",
+        x + skew,
+        y, // top-left (shifted right)
+        x + w,
+        y, // top-right
+        x + w - skew,
+        y + h, // bottom-right (shifted left)
+        x,
+        y + h // bottom-left
+    );
+    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+}
+
+fn trapezoid_to_svg(t: &TrapezoidElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&t.style, AttrContext::Shape);
+    let vid = vid_attr(&t.id);
+    let x = t.bounds.origin.x;
+    let y = t.bounds.origin.y;
+    let w = t.bounds.size.width;
+    let h = t.bounds.size.height;
+    let inset = w * 0.15; // top is narrower by this amount on each side
+    // Points: top-left (inset), top-right (inset), bottom-right, bottom-left
+    let points = format!(
+        "{},{} {},{} {},{} {},{}",
+        x + inset,
+        y, // top-left (inset)
+        x + w - inset,
+        y, // top-right (inset)
+        x + w,
+        y + h, // bottom-right
+        x,
+        y + h // bottom-left
+    );
+    format!("{}<polygon points=\"{}\"{}{}/>", ind, points, vid, style)
+}
+
+fn polygon_to_svg(p: &PolygonElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let style = shape_style_defaults(&p.style, AttrContext::Shape);
+    let vid = vid_attr(&p.id);
+
+    let points_str = if p.points.is_empty() {
+        String::new()
+    } else {
+        let points: Vec<String> = p
+            .points
+            .iter()
+            .map(|pt| format!("{},{}", pt.x, pt.y))
+            .collect();
+        points.join(" ")
+    };
+
+    format!(
+        "{}<polygon points=\"{}\"{}{}/>",
+        ind, points_str, vid, style
+    )
+}
+
 /// Apply sensible default fill/stroke for shapes when the style has none.
 ///
 /// The canvas is dark (#0A0F1A per DESIGN.md), so SVG's default fill of
 /// black would make unstyled shapes invisible. We default unstyled shapes
 /// to a light-blue fill and a visible stroke, matching the draw.io default
 /// visual baseline and ensuring shapes are always visible.
-fn shape_style_defaults(
-    style: &diagram_scene::ResolvedStyle,
-    ctx: AttrContext,
-) -> String {
+fn shape_style_defaults(style: &diagram_scene::ResolvedStyle, ctx: AttrContext) -> String {
     let has_fill = !matches!(style.fill_color.as_deref(), None | Some("none"));
     let has_stroke = !matches!(style.stroke_color.as_deref(), None | Some("none"));
     let mut attrs = style_to_attrs(style, ctx);
@@ -422,5 +649,220 @@ mod tests {
         assert!(result.contains("<g>"));
         assert!(result.contains("</g>"));
         assert!(result.contains("<rect"));
+    }
+
+    // ─── new shape SVG rendering tests ────────────────────────────────────────
+
+    #[test]
+    fn diamond_emits_polygon() {
+        let diamond = VisualElement::Diamond(diagram_scene::DiamondElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 80.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&diamond, &mut clip, 0);
+        assert!(result.contains("<polygon"));
+        assert!(result.contains("points="));
+        // Diamond points should include center-top, right, center-bottom, left
+        assert!(result.contains("50,0")); // top
+        assert!(result.contains("100,40")); // right
+        assert!(result.contains("50,80")); // bottom
+        assert!(result.contains("0,40")); // left
+    }
+
+    #[test]
+    fn triangle_emits_polygon() {
+        let triangle = VisualElement::Triangle(diagram_scene::TriangleElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 80.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&triangle, &mut clip, 0);
+        assert!(result.contains("<polygon"));
+        // Triangle: top-center, bottom-right, bottom-left
+        assert!(result.contains("50,0")); // top-center
+        assert!(result.contains("100,80")); // bottom-right
+        assert!(result.contains("0,80")); // bottom-left
+    }
+
+    #[test]
+    fn hexagon_emits_polygon() {
+        let hexagon = VisualElement::Hexagon(diagram_scene::HexagonElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 80.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&hexagon, &mut clip, 0);
+        assert!(result.contains("<polygon"));
+        assert!(result.contains("points="));
+    }
+
+    #[test]
+    fn cylinder_emits_path() {
+        let cylinder = VisualElement::Cylinder(diagram_scene::CylinderElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 60.0,
+                    height: 100.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&cylinder, &mut clip, 0);
+        assert!(result.contains("<path"));
+        assert!(result.contains("d="));
+    }
+
+    #[test]
+    fn cloud_emits_path() {
+        let cloud = VisualElement::Cloud(diagram_scene::CloudElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 120.0,
+                    height: 80.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&cloud, &mut clip, 0);
+        assert!(result.contains("<path"));
+        assert!(result.contains("d="));
+    }
+
+    #[test]
+    fn parallelogram_emits_polygon() {
+        let para = VisualElement::Parallelogram(diagram_scene::ParallelogramElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 60.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&para, &mut clip, 0);
+        assert!(result.contains("<polygon"));
+        assert!(result.contains("points="));
+    }
+
+    #[test]
+    fn trapezoid_emits_polygon() {
+        let trap = VisualElement::Trapezoid(diagram_scene::TrapezoidElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 60.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&trap, &mut clip, 0);
+        assert!(result.contains("<polygon"));
+        assert!(result.contains("points="));
+    }
+
+    #[test]
+    fn polygon_emits_polygon_with_points() {
+        use diagram_core::geometry::Point;
+        let polygon = VisualElement::Polygon(diagram_scene::PolygonElement {
+            id: VertexId::default(),
+            points: vec![
+                Point { x: 10.0, y: 10.0 },
+                Point { x: 50.0, y: 10.0 },
+                Point { x: 50.0, y: 50.0 },
+                Point { x: 10.0, y: 50.0 },
+            ],
+            bounds: Rect {
+                origin: Point { x: 10.0, y: 10.0 },
+                size: Size {
+                    width: 40.0,
+                    height: 40.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&polygon, &mut clip, 0);
+        assert!(result.contains("<polygon"));
+        assert!(result.contains("10,10"));
+        assert!(result.contains("50,10"));
+        assert!(result.contains("50,50"));
+        assert!(result.contains("10,50"));
+    }
+
+    #[test]
+    fn polygon_empty_points_emits_empty_polygon() {
+        let polygon = VisualElement::Polygon(diagram_scene::PolygonElement {
+            id: VertexId::default(),
+            points: vec![],
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 0.0,
+                    height: 0.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&polygon, &mut clip, 0);
+        assert!(result.contains("<polygon"));
+        assert!(result.contains("points="));
+    }
+
+    #[test]
+    fn new_shapes_have_default_fill_and_stroke() {
+        // All new shapes should get default fill and stroke via shape_style_defaults
+        use diagram_core::geometry::Point;
+
+        let diamond = VisualElement::Diamond(diagram_scene::DiamondElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 80.0,
+                },
+            },
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&diamond, &mut clip, 0);
+        // Should have default fill #dae8fc and stroke #6c8ebf
+        assert!(result.contains("fill=\"#dae8fc\""));
+        assert!(result.contains("stroke=\"#6c8ebf\""));
     }
 }

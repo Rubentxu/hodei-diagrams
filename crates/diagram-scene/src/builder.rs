@@ -10,8 +10,9 @@ use diagram_core::{
 };
 
 use crate::element::{
-    DEFAULT_ROUNDED_RADIUS, EllipseElement, EntityId, GroupElement, LineElement, RectElement,
-    RoundedRectElement, TextElement, VisualElement,
+    CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
+    EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PolygonElement,
+    RectElement, RoundedRectElement, TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
 use crate::error::{SceneError, SceneResult};
 use crate::resolver::StyleResolver;
@@ -176,6 +177,73 @@ impl SceneBuilder {
                 bounds,
                 style: resolved_style,
             })),
+            crate::resolver::ShapeKind::Diamond => Ok(VisualElement::Diamond(DiamondElement {
+                id: vid,
+                bounds,
+                style: resolved_style,
+            })),
+            crate::resolver::ShapeKind::Triangle => Ok(VisualElement::Triangle(TriangleElement {
+                id: vid,
+                bounds,
+                style: resolved_style,
+            })),
+            crate::resolver::ShapeKind::Hexagon => Ok(VisualElement::Hexagon(HexagonElement {
+                id: vid,
+                bounds,
+                style: resolved_style,
+            })),
+            crate::resolver::ShapeKind::Cylinder => Ok(VisualElement::Cylinder(CylinderElement {
+                id: vid,
+                bounds,
+                style: resolved_style,
+            })),
+            crate::resolver::ShapeKind::Cloud => Ok(VisualElement::Cloud(CloudElement {
+                id: vid,
+                bounds,
+                style: resolved_style,
+            })),
+            crate::resolver::ShapeKind::Parallelogram => {
+                Ok(VisualElement::Parallelogram(ParallelogramElement {
+                    id: vid,
+                    bounds,
+                    style: resolved_style,
+                }))
+            }
+            crate::resolver::ShapeKind::Trapezoid => {
+                Ok(VisualElement::Trapezoid(TrapezoidElement {
+                    id: vid,
+                    bounds,
+                    style: resolved_style,
+                }))
+            }
+            crate::resolver::ShapeKind::Polygon => {
+                // For polygon, derive points from bounds as default
+                // A simple quadrilateral approximating the bounds
+                let points = vec![
+                    CorePoint {
+                        x: bounds.origin.x,
+                        y: bounds.origin.y + bounds.size.height / 2.0,
+                    },
+                    CorePoint {
+                        x: bounds.origin.x + bounds.size.width / 2.0,
+                        y: bounds.origin.y,
+                    },
+                    CorePoint {
+                        x: bounds.origin.x + bounds.size.width,
+                        y: bounds.origin.y + bounds.size.height / 2.0,
+                    },
+                    CorePoint {
+                        x: bounds.origin.x + bounds.size.width / 2.0,
+                        y: bounds.origin.y + bounds.size.height,
+                    },
+                ];
+                Ok(VisualElement::Polygon(PolygonElement {
+                    id: vid,
+                    points,
+                    bounds,
+                    style: resolved_style,
+                }))
+            }
         }
     }
 
@@ -913,6 +981,272 @@ mod tests {
         match &page_scene.display_list[0] {
             VisualElement::Ellipse(_) => {}
             other => panic!("Expected Ellipse, got {:?}", other),
+        }
+    }
+
+    // ─── new shape kind tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn build_vertex_diamond_style_produces_diamond() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "diamond");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Diamond(_) => {}
+            other => panic!("Expected Diamond, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_triangle_style_produces_triangle() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "triangle");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Triangle(_) => {}
+            other => panic!("Expected Triangle, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_hexagon_style_produces_hexagon() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "hexagon");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Hexagon(_) => {}
+            other => panic!("Expected Hexagon, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_cylinder_style_produces_cylinder() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "cylinder");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Cylinder(_) => {}
+            other => panic!("Expected Cylinder, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_cloud_style_produces_cloud() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "cloud");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Cloud(_) => {}
+            other => panic!("Expected Cloud, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_parallelogram_style_produces_parallelogram() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "parallelogram");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Parallelogram(_) => {}
+            other => panic!("Expected Parallelogram, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_trapezoid_style_produces_trapezoid() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "trapezoid");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Trapezoid(_) => {}
+            other => panic!("Expected Trapezoid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_polygon_style_produces_polygon() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "polygon");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Polygon(p) => {
+                // Polygon should have 4 default points derived from bounds
+                assert_eq!(p.points.len(), 4);
+            }
+            other => panic!("Expected Polygon, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_rhombus_alias_produces_diamond() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "rhombus");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Diamond(_) => {}
+            other => panic!("Expected Diamond (from rhombus), got {:?}", other),
         }
     }
 

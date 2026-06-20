@@ -141,9 +141,15 @@ fn element_bounds(elem: &VisualElement) -> Option<Rect> {
                 Some(rect_from_points(points))
             }
         }
-        VisualElement::Group(GroupElement { bounds, children, .. }) => {
+        VisualElement::Group(GroupElement {
+            bounds, children, ..
+        }) => {
             let child_bounds = content_bounds(children);
-            Some(child_bounds.map(|c| union_rect(*bounds, c)).unwrap_or(*bounds))
+            Some(
+                child_bounds
+                    .map(|c| union_rect(*bounds, c))
+                    .unwrap_or(*bounds),
+            )
         }
         _ => None,
     }
