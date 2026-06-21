@@ -365,7 +365,7 @@ async function bootstrap(): Promise<void> {
   // All shape tool buttons share the same toggle pattern: click activates,
   // click again deactivates. The button visual class is synced to the active
   // tool so users always know which one is armed.
-  type ShapeTool = 'rectangle' | 'rounded-rect' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'cylinder' | 'cloud' | 'parallelogram' | 'trapezoid' | 'polygon' | 'stencil';
+  type ShapeTool = 'rectangle' | 'rounded-rect' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'cylinder' | 'cloud' | 'parallelogram' | 'trapezoid' | 'polygon' | 'rectangle-stencil' | 'ellipse-stencil' | 'diamond-stencil' | 'triangle-stencil' | 'hexagon-stencil' | 'cylinder-stencil' | 'cloud-stencil' | 'parallelogram-stencil' | 'trapezoid-stencil' | 'blockArrow-stencil';
   interface ToolBtn {
     btn: HTMLButtonElement;
     tool: ShapeTool;
@@ -387,7 +387,16 @@ async function bootstrap(): Promise<void> {
     pickBtn('parallelogramToolButton', 'parallelogram'),
     pickBtn('trapezoidToolButton', 'trapezoid'),
     pickBtn('polygonToolButton', 'polygon'),
-    pickBtn('stencilToolButton', 'stencil'),
+    pickBtn('rectangleStencilButton', 'rectangle-stencil'),
+    pickBtn('ellipseStencilButton', 'ellipse-stencil'),
+    pickBtn('diamondStencilButton', 'diamond-stencil'),
+    pickBtn('triangleStencilButton', 'triangle-stencil'),
+    pickBtn('hexagonStencilButton', 'hexagon-stencil'),
+    pickBtn('cylinderStencilButton', 'cylinder-stencil'),
+    pickBtn('cloudStencilButton', 'cloud-stencil'),
+    pickBtn('parallelogramStencilButton', 'parallelogram-stencil'),
+    pickBtn('trapezoidStencilButton', 'trapezoid-stencil'),
+    pickBtn('blockArrowStencilButton', 'blockArrow-stencil'),
   ].filter((x): x is ToolBtn => x !== null);
 
   for (const { btn, tool } of allToolButtons) {

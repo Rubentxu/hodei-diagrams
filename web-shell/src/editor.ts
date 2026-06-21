@@ -15,7 +15,16 @@ export type ToolKind =
   | 'parallelogram'
   | 'trapezoid'
   | 'polygon'
-  | 'stencil'
+  | 'rectangle-stencil'
+  | 'ellipse-stencil'
+  | 'diamond-stencil'
+  | 'triangle-stencil'
+  | 'hexagon-stencil'
+  | 'cylinder-stencil'
+  | 'cloud-stencil'
+  | 'parallelogram-stencil'
+  | 'trapezoid-stencil'
+  | 'blockArrow-stencil'
   | 'connector'
   | null;
 
@@ -1057,7 +1066,16 @@ export class Editor {
       | 'Parallelogram'
       | 'Trapezoid'
       | 'Polygon'
-      | 'Stencil',
+      | 'RectangleStencil'
+      | 'EllipseStencil'
+      | 'DiamondStencil'
+      | 'TriangleStencil'
+      | 'HexagonStencil'
+      | 'CylinderStencil'
+      | 'CloudStencil'
+      | 'ParallelogramStencil'
+      | 'TrapezoidStencil'
+      | 'BlockArrowStencil',
     x: number,
     y: number,
   ): string {
@@ -1098,9 +1116,26 @@ export class Editor {
       payload.style = { shape: 'trapezoid' };
     } else if (kind === 'Polygon') {
       payload.style = { shape: 'polygon' };
-    } else if (kind === 'Stencil') {
-      // Default stencil: rectangle. Expand with sub-menu later.
+    } else if (kind === 'RectangleStencil') {
       payload.style = { shape: 'stencil:rectangle' };
+    } else if (kind === 'EllipseStencil') {
+      payload.style = { shape: 'stencil:ellipse' };
+    } else if (kind === 'DiamondStencil') {
+      payload.style = { shape: 'stencil:diamond' };
+    } else if (kind === 'TriangleStencil') {
+      payload.style = { shape: 'stencil:triangle' };
+    } else if (kind === 'HexagonStencil') {
+      payload.style = { shape: 'stencil:hexagon' };
+    } else if (kind === 'CylinderStencil') {
+      payload.style = { shape: 'stencil:cylinder' };
+    } else if (kind === 'CloudStencil') {
+      payload.style = { shape: 'stencil:cloud' };
+    } else if (kind === 'ParallelogramStencil') {
+      payload.style = { shape: 'stencil:parallelogram' };
+    } else if (kind === 'TrapezoidStencil') {
+      payload.style = { shape: 'stencil:trapezoid' };
+    } else if (kind === 'BlockArrowStencil') {
+      payload.style = { shape: 'stencil:blockArrow' };
     }
     return JSON.stringify({ AddVertex: payload });
   }
@@ -1457,7 +1492,16 @@ export class Editor {
       | 'Parallelogram'
       | 'Trapezoid'
       | 'Polygon'
-      | 'Stencil'
+      | 'RectangleStencil'
+      | 'EllipseStencil'
+      | 'DiamondStencil'
+      | 'TriangleStencil'
+      | 'HexagonStencil'
+      | 'CylinderStencil'
+      | 'CloudStencil'
+      | 'ParallelogramStencil'
+      | 'TrapezoidStencil'
+      | 'BlockArrowStencil'
     > = {
       rectangle: 'Rectangle',
       'rounded-rect': 'RoundedRect',
@@ -1470,7 +1514,16 @@ export class Editor {
       parallelogram: 'Parallelogram',
       trapezoid: 'Trapezoid',
       polygon: 'Polygon',
-      stencil: 'Stencil',
+      'rectangle-stencil': 'RectangleStencil',
+      'ellipse-stencil': 'EllipseStencil',
+      'diamond-stencil': 'DiamondStencil',
+      'triangle-stencil': 'TriangleStencil',
+      'hexagon-stencil': 'HexagonStencil',
+      'cylinder-stencil': 'CylinderStencil',
+      'cloud-stencil': 'CloudStencil',
+      'parallelogram-stencil': 'ParallelogramStencil',
+      'trapezoid-stencil': 'TrapezoidStencil',
+      'blockArrow-stencil': 'BlockArrowStencil',
     };
 
     const kind = kindMap[this.#activeTool] ?? 'Rectangle';

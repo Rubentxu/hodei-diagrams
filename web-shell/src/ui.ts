@@ -34,7 +34,16 @@ export interface UiElements {
   parallelogramToolButton: HTMLButtonElement;
   trapezoidToolButton: HTMLButtonElement;
   polygonToolButton: HTMLButtonElement;
-  stencilToolButton: HTMLButtonElement;
+  rectangleStencilButton: HTMLButtonElement;
+  ellipseStencilButton: HTMLButtonElement;
+  diamondStencilButton: HTMLButtonElement;
+  triangleStencilButton: HTMLButtonElement;
+  hexagonStencilButton: HTMLButtonElement;
+  cylinderStencilButton: HTMLButtonElement;
+  cloudStencilButton: HTMLButtonElement;
+  parallelogramStencilButton: HTMLButtonElement;
+  trapezoidStencilButton: HTMLButtonElement;
+  blockArrowStencilButton: HTMLButtonElement;
   sidebarCollapseBtn: HTMLButtonElement;
 
   // Zone 3: Canvas
@@ -204,7 +213,16 @@ export function buildEmptyUi(
     parallelogramToolButton: sidebar.parallelogramToolBtn,
     trapezoidToolButton: sidebar.trapezoidToolBtn,
     polygonToolButton: sidebar.polygonToolBtn,
-    stencilToolButton: sidebar.stencilToolBtn,
+    rectangleStencilButton: sidebar.rectangleStencilBtn,
+    ellipseStencilButton: sidebar.ellipseStencilBtn,
+    diamondStencilButton: sidebar.diamondStencilBtn,
+    triangleStencilButton: sidebar.triangleStencilBtn,
+    hexagonStencilButton: sidebar.hexagonStencilBtn,
+    cylinderStencilButton: sidebar.cylinderStencilBtn,
+    cloudStencilButton: sidebar.cloudStencilBtn,
+    parallelogramStencilButton: sidebar.parallelogramStencilBtn,
+    trapezoidStencilButton: sidebar.trapezoidStencilBtn,
+    blockArrowStencilButton: sidebar.blockArrowStencilBtn,
     sidebarCollapseBtn: sidebar.collapseBtn,
 
     // Zone 3
