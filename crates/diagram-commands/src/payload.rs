@@ -117,24 +117,21 @@ impl BringToFrontPayload {
     /// Apply: set the target's z_order to max(page) + 1.
     /// If the target is already the topmost (z_order == max), this is a no-op.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
-        let page_id = self
+        let page_id = self.target.page_id(&model.store).ok_or(match self.target {
+            CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+            CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+            CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+        })?;
+
+        // Capture previous z_order
+        let current_z = self
             .target
-            .page_id(&model.store)
+            .current_z_order(&model.store)
             .ok_or(match self.target {
                 CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
                 CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
                 CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
             })?;
-
-        // Capture previous z_order
-        let current_z =
-            self.target
-                .current_z_order(&model.store)
-                .ok_or(match self.target {
-                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
-                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
-                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
-                })?;
         self.prev_z_order = Some(current_z);
 
         // No-op if target is already the topmost (max z_order)
@@ -190,23 +187,20 @@ impl SendToBackPayload {
     /// Apply: set the target's z_order to min(page) - 1.
     /// If the target is already the bottommost (z_order == min), this is a no-op.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
-        let page_id = self
+        let page_id = self.target.page_id(&model.store).ok_or(match self.target {
+            CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+            CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+            CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+        })?;
+
+        let current_z = self
             .target
-            .page_id(&model.store)
+            .current_z_order(&model.store)
             .ok_or(match self.target {
                 CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
                 CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
                 CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
             })?;
-
-        let current_z =
-            self.target
-                .current_z_order(&model.store)
-                .ok_or(match self.target {
-                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
-                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
-                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
-                })?;
         self.prev_z_order = Some(current_z);
 
         // No-op if target is already the bottommost (min z_order)
@@ -259,23 +253,20 @@ impl BringForwardPayload {
 
     /// Apply: swap z_order with the next higher cell in (z_order ASC, id ASC) order.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
-        let page_id = self
+        let page_id = self.target.page_id(&model.store).ok_or(match self.target {
+            CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+            CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+            CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+        })?;
+
+        let my_prev_z = self
             .target
-            .page_id(&model.store)
+            .current_z_order(&model.store)
             .ok_or(match self.target {
                 CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
                 CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
                 CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
             })?;
-
-        let my_prev_z =
-            self.target
-                .current_z_order(&model.store)
-                .ok_or(match self.target {
-                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
-                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
-                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
-                })?;
 
         // Collect all cells on this page with their z_order
         let mut cells: Vec<(CellTarget, i32)> = Vec::new();
@@ -384,23 +375,20 @@ impl SendBackwardPayload {
 
     /// Apply: swap z_order with the next lower cell in (z_order ASC, id ASC) order.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
-        let page_id = self
+        let page_id = self.target.page_id(&model.store).ok_or(match self.target {
+            CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+            CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+            CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+        })?;
+
+        let my_prev_z = self
             .target
-            .page_id(&model.store)
+            .current_z_order(&model.store)
             .ok_or(match self.target {
                 CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
                 CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
                 CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
             })?;
-
-        let my_prev_z =
-            self.target
-                .current_z_order(&model.store)
-                .ok_or(match self.target {
-                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
-                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
-                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
-                })?;
 
         // Collect all cells on this page with their z_order
         let mut cells: Vec<(CellTarget, i32)> = Vec::new();
