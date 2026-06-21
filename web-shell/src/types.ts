@@ -29,6 +29,7 @@ export type WasmModule = {
   engine_can_redo(_h: number): boolean;
   connect_vertices(_h: number, _from: number, _to: number, _routingKind: number): number;
   disconnect_edge(_h: number, _edgeId: number): void;
+  parse_stencil_xml(_xml: string): string;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
@@ -105,4 +106,25 @@ export interface StyleChanges {
 export interface Vertex {
   geometry: { x: number; y: number; width: number; height: number };
   style?: Record<string, unknown>;
+}
+
+// ─── Stencil Types ─────────────────────────────────────────────────────────────
+
+/** Parsed stencil metadata returned by parse_stencil_xml. */
+export interface StencilInfo {
+  library: string;
+  name: string;
+  width: number;
+  height: number;
+  aspect: 'fixed' | 'variable';
+  bg_len: number;
+  fg_len: number;
+  license: string | null;
+  diagnostics: StencilDiagnostic[];
+}
+
+/** A diagnostic warning emitted during stencil parsing. */
+export interface StencilDiagnostic {
+  code: string;
+  message: string;
 }

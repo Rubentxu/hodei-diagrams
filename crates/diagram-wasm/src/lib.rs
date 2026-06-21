@@ -33,6 +33,7 @@ mod export;
 mod import;
 mod render;
 mod scene;
+mod stencil;
 
 pub use commands::{
     ROUTING_KIND_ORTHOGONAL, ROUTING_KIND_STRAIGHT, connect_vertices, disconnect_edge,
@@ -43,3 +44,4 @@ pub use export::export_drawio;
 pub use import::import_drawio;
 pub use render::{render_pages, render_svg};
 pub use scene::get_scene;
+pub use stencil::parse_stencil_xml;

@@ -637,6 +637,16 @@ name = "diagram-scene"
 version = "0.5.4"
 dependencies = [
  "diagram-core",
+ "diagram-stencils",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "diagram-stencils"
+version = "0.5.4"
+dependencies = [
+ "quick-xml 0.40.1",
  "serde",
  "thiserror 2.0.18",
 ]
@@ -650,6 +660,7 @@ dependencies = [
  "diagram-format-drawio",
  "diagram-render-svg",
  "diagram-scene",
+ "diagram-stencils",
  "parking_lot",
  "serde",
  "serde_json",

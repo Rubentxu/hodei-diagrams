@@ -19,6 +19,7 @@ export interface SidebarControls {
   parallelogramToolBtn: HTMLButtonElement;
   trapezoidToolBtn: HTMLButtonElement;
   polygonToolBtn: HTMLButtonElement;
+  stencilToolBtn: HTMLButtonElement;
   collapseBtn: HTMLButtonElement;
 }
 
@@ -110,6 +111,13 @@ const GENERAL_SHAPES: ShapeEntry[] = [
     tooltip: 'Free-form polygon shape',
     icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="6,18 10,6 22,4 28,14 20,22 8,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
     dataTestId: 'polygon-tool-btn',
+  },
+  {
+    id: 'stencil',
+    label: 'Stencil',
+    tooltip: 'Draw.io stencil shape',
+    icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="6,18 10,6 22,4 28,14 20,22 8,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/><circle cx="24" cy="6" r="3" fill="#F8FAFC"/></svg>',
+    dataTestId: 'stencil-tool-btn',
   },
 ];
 
@@ -237,7 +245,7 @@ export function buildSidebar(): SidebarControls {
   const shapeGrid = document.createElement('div');
   shapeGrid.className = 'shape-grid';
 
-  const controls: Pick<SidebarControls, 'rectToolBtn' | 'roundedRectToolBtn' | 'ellipseToolBtn' | 'diamondToolBtn' | 'triangleToolBtn' | 'hexagonToolBtn' | 'cylinderToolBtn' | 'cloudToolBtn' | 'parallelogramToolBtn' | 'trapezoidToolBtn' | 'polygonToolBtn'> = {
+  const controls: Pick<SidebarControls, 'rectToolBtn' | 'roundedRectToolBtn' | 'ellipseToolBtn' | 'diamondToolBtn' | 'triangleToolBtn' | 'hexagonToolBtn' | 'cylinderToolBtn' | 'cloudToolBtn' | 'parallelogramToolBtn' | 'trapezoidToolBtn' | 'polygonToolBtn' | 'stencilToolBtn'> = {
     rectToolBtn: document.createElement('button'),
     roundedRectToolBtn: document.createElement('button'),
     ellipseToolBtn: document.createElement('button'),
@@ -249,6 +257,7 @@ export function buildSidebar(): SidebarControls {
     parallelogramToolBtn: document.createElement('button'),
     trapezoidToolBtn: document.createElement('button'),
     polygonToolBtn: document.createElement('button'),
+    stencilToolBtn: document.createElement('button'),
   };
 
   for (const shape of GENERAL_SHAPES) {
@@ -284,6 +293,8 @@ export function buildSidebar(): SidebarControls {
       controls.trapezoidToolBtn = btn;
     } else if (shape.id === 'polygon') {
       controls.polygonToolBtn = btn;
+    } else if (shape.id === 'stencil') {
+      controls.stencilToolBtn = btn;
     }
 
     shapeGrid.appendChild(btn);
@@ -345,6 +356,7 @@ export function buildSidebar(): SidebarControls {
     parallelogramToolBtn: controls.parallelogramToolBtn,
     trapezoidToolBtn: controls.trapezoidToolBtn,
     polygonToolBtn: controls.polygonToolBtn,
+    stencilToolBtn: controls.stencilToolBtn,
     collapseBtn,
   };
 }

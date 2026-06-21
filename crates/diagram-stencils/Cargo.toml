@@ -1,0 +1,18 @@
+[package]
+name = "diagram-stencils"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde = { workspace = true, features = ["derive"] }
+quick-xml = { workspace = true }
+
+[dev-dependencies]
+
+[features]
+default = []
+std = []

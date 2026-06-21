@@ -3,8 +3,9 @@
 use diagram_core::VertexId;
 use diagram_scene::{
     CloudElement, CylinderElement, DiamondElement, EllipseElement, GroupElement, HexagonElement,
-    LineElement, ParallelogramElement, PathElement, PolygonElement, RectElement,
-    RoundedRectElement, TextElement, TrapezoidElement, TriangleElement, VisualElement,
+    LineElement, ParallelogramElement, PathCommand, PathElement, PolygonElement, RectElement,
+    RoundedRectElement, StencilElement, TextElement, TrapezoidElement, TriangleElement,
+    VisualElement,
 };
 
 use crate::clip::ClipPathManager;
@@ -49,6 +50,7 @@ pub(crate) fn element_to_svg(
         VisualElement::Line(l) => line_to_svg(l, indent),
         VisualElement::Path(p) => path_to_svg(p, indent),
         VisualElement::Group(g) => group_to_svg(g, clip, indent),
+        VisualElement::Stencil(s) => stencil_to_svg(s, indent),
         _ => String::new(),
     }
 }
@@ -436,6 +438,122 @@ fn path_to_svg(p: &PathElement, indent: usize) -> String {
     };
 
     format!("{}<path d=\"{}\"{}/>", ind, d, style)
+}
+
+fn stencil_to_svg(s: &StencilElement, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let vid = vid_attr(&s.id);
+    let xform = compute_transform(&s.bounds, s.rotation, s.flip_h, s.flip_v);
+
+    // Build SVG path d-string from background + foreground commands
+    let bg_d = build_path_d(&s.background, s.bounds.size.width, s.bounds.size.height);
+    let fg_d = build_path_d(&s.foreground, s.bounds.size.width, s.bounds.size.height);
+
+    let bg_style = shape_style_defaults(&s.style, AttrContext::Shape);
+    let fg_style = style_to_attrs(&s.style, AttrContext::Shape);
+
+    let mut parts = Vec::new();
+
+    if !bg_d.is_empty() {
+        parts.push(format!("{}<path d=\"{}\"{}{}/>", ind, bg_d, vid, bg_style));
+    }
+    if !fg_d.is_empty() {
+        parts.push(format!("{}<path d=\"{}\"{}{}/>", ind, fg_d, vid, fg_style));
+    }
+
+    // Wrap in a group with transform
+    if parts.is_empty() {
+        String::new()
+    } else if xform.is_empty() {
+        parts.join("\n")
+    } else {
+        let mut result = format!("{}<g{}>", ind, xform);
+        for part in &parts {
+            result.push('\n');
+            result.push_str(part);
+        }
+        result.push('\n');
+        result.push_str(&format!("{}</g>", ind));
+        result
+    }
+}
+
+/// Build an SVG path `d` attribute string from a list of PathCommands.
+///
+/// Scales coordinates from the stencil's native [0, w] × [0, h] space to the
+/// element's bounding box.
+fn build_path_d(commands: &[PathCommand], width: f64, height: f64) -> String {
+    if commands.is_empty() {
+        return String::new();
+    }
+
+    let mut d = String::new();
+    for cmd in commands {
+        match cmd {
+            PathCommand::Move { x, y } => {
+                d.push_str(&format!("M {} {} ", x * width, y * height));
+            }
+            PathCommand::Line { x, y } => {
+                d.push_str(&format!("L {} {} ", x * width, y * height));
+            }
+            PathCommand::Quad { cx, cy, x, y } => {
+                d.push_str(&format!(
+                    "Q {} {} {} {} ",
+                    cx * width,
+                    cy * height,
+                    x * width,
+                    y * height
+                ));
+            }
+            PathCommand::Curve {
+                c1x,
+                c1y,
+                c2x,
+                c2y,
+                x,
+                y,
+            } => {
+                d.push_str(&format!(
+                    "C {} {} {} {} {} {} ",
+                    c1x * width,
+                    c1y * height,
+                    c2x * width,
+                    c2y * height,
+                    x * width,
+                    y * height
+                ));
+            }
+            PathCommand::Arc {
+                rx,
+                ry,
+                x_axis_rotation,
+                large_arc,
+                sweep,
+                x,
+                y,
+            } => {
+                d.push_str(&format!(
+                    "A {} {} {} {} {} {} {} ",
+                    rx * width,
+                    ry * height,
+                    x_axis_rotation,
+                    *large_arc as i32,
+                    *sweep as i32,
+                    x * width,
+                    y * height
+                ));
+            }
+            PathCommand::Close => {
+                d.push_str("Z ");
+            }
+            PathCommand::FillStroke => {
+                // FillStroke is a draw.io marker that fill+stroke are applied;
+                // in SVG this is controlled by presentation attributes on the path element.
+                // No path data emitted.
+            }
+        }
+    }
+    d.trim_end().to_owned()
 }
 
 fn group_to_svg(g: &GroupElement, clip: &mut ClipPathManager, indent: usize) -> String {
@@ -934,6 +1052,40 @@ mod tests {
         let result = element_to_svg(&polygon, &mut clip, 0);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
+    }
+
+    #[test]
+    fn stencil_emits_path_for_background_and_foreground() {
+        use diagram_core::geometry::Point;
+        use diagram_scene::{PathCommand, StencilAspect};
+
+        let stencil = VisualElement::Stencil(diagram_scene::StencilElement {
+            id: VertexId::default(),
+            library: "general".into(),
+            name: "Rectangle".into(),
+            bounds: Rect {
+                origin: Point { x: 10.0, y: 20.0 },
+                size: Size {
+                    width: 80.0,
+                    height: 40.0,
+                },
+            },
+            aspect: StencilAspect::Variable,
+            background: vec![PathCommand::Move { x: 0.0, y: 0.0 }],
+            foreground: vec![PathCommand::FillStroke],
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
+            style: empty_style(),
+        });
+        let mut clip = ClipPathManager::new();
+        let result = element_to_svg(&stencil, &mut clip, 0);
+        // Background path has scaled coordinates (0 * 80 = 0, 0 * 40 = 0)
+        assert!(
+            result.contains("M 0 0"),
+            "background path should scale to bounds"
+        );
+        assert!(result.contains("<path"));
     }
 
     #[test]

@@ -7,6 +7,9 @@ use diagram_core::geometry::{Point, Rect};
 use diagram_core::{EdgeId, GroupId, VertexId};
 use serde::{Deserialize, Serialize};
 
+/// Re-export path command types from diagram-stencils for use in StencilElement.
+pub use diagram_stencils::PathCommand;
+
 /// A stable engine-owned identifier for a vertex, edge, or group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -59,6 +62,69 @@ pub enum VisualElement {
     Path(PathElement),
     /// A group element containing nested children.
     Group(GroupElement),
+    /// A draw.io stencil reference, resolved at scene-build time.
+    Stencil(StencilElement),
+}
+
+/// A draw.io stencil element — resolved path commands embedded at scene build.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StencilElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// Library name from `<shapes name="...">`.
+    pub library: String,
+    /// Shape name from `<shape name="...">`.
+    pub name: String,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// Aspect ratio constraint.
+    pub aspect: StencilAspect,
+    /// Background path commands (already scaled to bounds).
+    pub background: Vec<PathCommand>,
+    /// Foreground path commands (already scaled to bounds).
+    pub foreground: Vec<PathCommand>,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
+}
+
+/// Aspect ratio constraint for a stencil.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StencilAspect {
+    /// Fixed aspect ratio (width / height is locked).
+    Fixed,
+    /// Variable — can stretch independently.
+    Variable,
+}
+
+/// Static definition of a built-in stencil shape.
+/// Used by the registry to look up normalised [0,1] path data.
+#[derive(Debug, Clone, Copy)]
+pub struct StencilDef {
+    /// Width hint (normalised units).
+    pub width: f64,
+    /// Height hint (normalised units).
+    pub height: f64,
+    /// Aspect ratio constraint.
+    pub aspect: StencilAspect,
+    /// Background path commands (normalised [0,1] coordinates).
+    pub background: &'static [PathCommand],
+    /// Foreground path commands (normalised [0,1] coordinates).
+    pub foreground: &'static [PathCommand],
+}
+
+impl From<diagram_stencils::Aspect> for StencilAspect {
+    fn from(a: diagram_stencils::Aspect) -> Self {
+        match a {
+            diagram_stencils::Aspect::Fixed => StencilAspect::Fixed,
+            diagram_stencils::Aspect::Variable => StencilAspect::Variable,
+        }
+    }
 }
 
 /// A rectangle element.
@@ -698,6 +764,7 @@ mod tests {
                 VisualElement::Line(_) => {}
                 VisualElement::Path(_) => {}
                 VisualElement::Group(_) => {}
+                VisualElement::Stencil(_) => {}
             }
         }
 

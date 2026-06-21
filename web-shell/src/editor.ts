@@ -15,6 +15,7 @@ export type ToolKind =
   | 'parallelogram'
   | 'trapezoid'
   | 'polygon'
+  | 'stencil'
   | 'connector'
   | null;
 
@@ -1055,7 +1056,8 @@ export class Editor {
       | 'Cloud'
       | 'Parallelogram'
       | 'Trapezoid'
-      | 'Polygon',
+      | 'Polygon'
+      | 'Stencil',
     x: number,
     y: number,
   ): string {
@@ -1096,6 +1098,9 @@ export class Editor {
       payload.style = { shape: 'trapezoid' };
     } else if (kind === 'Polygon') {
       payload.style = { shape: 'polygon' };
+    } else if (kind === 'Stencil') {
+      // Default stencil: rectangle. Expand with sub-menu later.
+      payload.style = { shape: 'stencil:rectangle' };
     }
     return JSON.stringify({ AddVertex: payload });
   }
@@ -1452,6 +1457,7 @@ export class Editor {
       | 'Parallelogram'
       | 'Trapezoid'
       | 'Polygon'
+      | 'Stencil'
     > = {
       rectangle: 'Rectangle',
       'rounded-rect': 'RoundedRect',
@@ -1464,6 +1470,7 @@ export class Editor {
       parallelogram: 'Parallelogram',
       trapezoid: 'Trapezoid',
       polygon: 'Polygon',
+      stencil: 'Stencil',
     };
 
     const kind = kindMap[this.#activeTool] ?? 'Rectangle';
