@@ -1,0 +1,21 @@
+<!-- MIT licensed -->
+<shapes name="general">
+  <shape name="Rectangle" w="80" h="40" aspect="variable">
+    <background>
+      <path>M 0,0 L 80,0 L 80,40 L 0,40 Z</path>
+    </background>
+    <foreground>
+      <fillstroke/>
+    </foreground>
+  </shape>
+  <shape name="Ellipse" w="40" h="40" aspect="fixed">
+    <background>
+      <path>
+        <!-- ellipse approximation via bezier -->
+      </path>
+    </background>
+    <foreground>
+      <fillstroke/>
+    </foreground>
+  </shape>
+</shapes>

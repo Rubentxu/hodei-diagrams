@@ -642,6 +642,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "diagram-stencils"
+version = "0.5.4"
+dependencies = [
+ "quick-xml 0.40.1",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "diagram-wasm"
 version = "0.4.0"
 dependencies = [
