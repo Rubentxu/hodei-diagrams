@@ -937,38 +937,11 @@ export class Editor {
   #reapplySelection(): void {
     if (this.#selection.size === 0) return;
 
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-
-    // Validate each selected ID still exists
+    // Validate each selected ID still exists in the scene
     const validIds = new Set<SlotmapId>();
     for (const id of this.#selection) {
-      const stillExists = this.#sceneCache.some((page) =>
-        page.display_list.some((elem: unknown) => {
-          const e = elem as Record<string, unknown>;
-          for (const key of shapeKeys) {
-            const variant = e[key] as Record<string, unknown> | undefined;
-            if (!variant) continue;
-            const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-            if (idField?.idx === id.idx && idField?.version === id.version) {
-              return true;
-            }
-          }
-          return false;
-        }),
-      );
-      if (stillExists) {
+      const variant = this.#findShapeById(id);
+      if (variant) {
         validIds.add(id);
       }
     }
@@ -1086,24 +1059,11 @@ export class Editor {
   /** Get all shape SlotmapIds whose bounds intersect the given rect. */
   #getIntersectingIds(rect: { x: number; y: number; width: number; height: number }): SlotmapId[] {
     const result: SlotmapId[] = [];
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
 
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
+        for (const key of Editor.#SHAPE_KEYS) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
@@ -1437,88 +1397,53 @@ export class Editor {
   #findOriginalGeometry(
     vid: SlotmapId,
   ): { x: number; y: number; width: number; height: number } | null {
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          if (idField.idx === vid.idx && idField.version === vid.version) {
-            const bounds = variant['bounds'] as
-              | { origin?: Record<string, number>; size?: Record<string, number> }
-              | undefined;
-            if (bounds?.origin && bounds?.size) {
-              return {
-                x: (bounds.origin['x'] as number) ?? 0,
-                y: (bounds.origin['y'] as number) ?? 0,
-                width: (bounds.size['width'] as number) ?? 0,
-                height: (bounds.size['height'] as number) ?? 0,
-              };
-            }
-          }
-        }
-      }
-    }
-    return null;
+    const variant = this.#findShapeById(vid);
+    if (!variant) return null;
+    const bounds = variant['bounds'] as
+      | { origin?: Record<string, number>; size?: Record<string, number> }
+      | undefined;
+    if (!bounds?.origin || !bounds?.size) return null;
+    return {
+      x: (bounds.origin['x'] as number) ?? 0,
+      y: (bounds.origin['y'] as number) ?? 0,
+      width: (bounds.size['width'] as number) ?? 0,
+      height: (bounds.size['height'] as number) ?? 0,
+    };
   }
 
-  // ─── Vertex Access ────────────────────────────────────────────────────────
+  // ─── Shape Lookup Helpers ─────────────────────────────────────────────────
 
-  /** Get a vertex object by SlotmapId from the scene cache. */
-  #getVertex(id: SlotmapId): Vertex | null {
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
+  /** Shape type keys used across scene-walk helpers. */
+  static readonly #SHAPE_KEYS = [
+    'Rect',
+    'RoundedRect',
+    'Ellipse',
+    'Diamond',
+    'Triangle',
+    'Hexagon',
+    'Cylinder',
+    'Cloud',
+    'Parallelogram',
+    'Trapezoid',
+    'Polygon',
+  ] as const;
 
+  /**
+   * Find the display-list variant data for a shape by its SlotmapId.
+   * Returns the variant record (e.g. `{id, bounds, style}`) or null if not found.
+   * This is the single source of truth for scene-walking by ID.
+   */
+  #findShapeById(id: SlotmapId): Record<string, unknown> | null {
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
+        for (const key of Editor.#SHAPE_KEYS) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
           if (!idField) continue;
           if (idField.idx === id.idx && idField.version === id.version) {
-            const bounds = variant['bounds'] as
-              | { origin?: Record<string, number>; size?: Record<string, number> }
-              | undefined;
-            if (bounds?.origin && bounds?.size) {
-              return {
-                geometry: {
-                  x: (bounds.origin['x'] as number) ?? 0,
-                  y: (bounds.origin['y'] as number) ?? 0,
-                  width: (bounds.size['width'] as number) ?? 0,
-                  height: (bounds.size['height'] as number) ?? 0,
-                },
-                style: (variant['style'] as Record<string, unknown>) ?? {},
-              };
-            }
+            return variant;
           }
         }
       }
@@ -1526,26 +1451,31 @@ export class Editor {
     return null;
   }
 
+  /** Get a vertex object by SlotmapId from the scene cache. */
+  #getVertex(id: SlotmapId): Vertex | null {
+    const variant = this.#findShapeById(id);
+    if (!variant) return null;
+    const bounds = variant['bounds'] as
+      | { origin?: Record<string, number>; size?: Record<string, number> }
+      | undefined;
+    if (!bounds?.origin || !bounds?.size) return null;
+    return {
+      geometry: {
+        x: (bounds.origin['x'] as number) ?? 0,
+        y: (bounds.origin['y'] as number) ?? 0,
+        width: (bounds.size['width'] as number) ?? 0,
+        height: (bounds.size['height'] as number) ?? 0,
+      },
+      style: (variant['style'] as Record<string, unknown>) ?? {},
+    };
+  }
+
   /** Find a vertex SlotmapId at the given document position (within tolerance). */
   #findVertexAt(x: number, y: number, tolerance = 5): SlotmapId | null {
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
+        for (const key of Editor.#SHAPE_KEYS) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
@@ -1577,20 +1507,7 @@ export class Editor {
   /** Extract SlotmapId from a display list element. */
   #extractIdFromDisplayElem(elem: unknown): SlotmapId | null {
     const e = elem as Record<string, unknown>;
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-    for (const key of shapeKeys) {
+    for (const key of Editor.#SHAPE_KEYS) {
       const variant = e[key] as Record<string, unknown> | undefined;
       if (!variant) continue;
       const idField = variant['id'] as { idx?: number; version?: number } | undefined;
