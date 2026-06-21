@@ -35,7 +35,7 @@ AWS-Admisión). 11 crates, 431 tests Rust, ~100+ tests E2E.
 
 **Plan documentado en ADRs 0050-0061.** Fases 0-5 completadas. La UI tiene
 **~45% de paridad** con draw.io. El plan cubre 8 fases secuenciales.
-Fase 6 (Stencils) está en deferred.
+Fase 6 (Stencils) activa — en desarrollo.
 
 | Fase | Tag | Foco | ADRs | Estado |
 |------|-----|------|------|--------|
@@ -45,7 +45,7 @@ Fase 6 (Stencils) está en deferred.
 | 3. Text editing | v0.12.0 | Inline label edit (desbloquea 6 tests skipped) | 0056 | ✅ Completada |
 | 4. Rotate/flip | v0.13.0 | Transform en geometry, resize handles | 0057 | ✅ Completada |
 | 5. Layers | v0.14.0 | Z-order, lock, visibility, ordering | 0058 | ✅ Completada (PR-L1) |
-| 6. Stencils | v0.15.0 | UML, BPMN, Flowchart, AWS (open source subset) | 0059 | ⏸️ Deferred |
+| 6. Stencils | v0.15.0 | UML, BPMN, Flowchart, AWS (open source subset) | 0059 | 🔲 Pendiente |
 | 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 | ⏸️ Deferred |
 | 8. Effects | v0.17.0 | Shadow, glass, gradient (SVG-native) | 0061 | ⏸️ Deferred |
 | **v1.0.0** | **NO automático** | Decisión del usuario | — | — |
