@@ -74,6 +74,8 @@ pub enum ShapeKind {
     Trapezoid,
     /// A free-form polygon.
     Polygon,
+    /// A draw.io stencil — resolved from `shape=stencil:<name>`.
+    Stencil,
 }
 
 /// The stateless style resolver.
@@ -227,6 +229,10 @@ impl StyleResolver {
             }
             if s.eq_ignore_ascii_case("polygon") {
                 return ShapeKind::Polygon;
+            }
+            // stencil:<name> — a draw.io stencil reference
+            if s.starts_with("stencil:") {
+                return ShapeKind::Stencil;
             }
         }
 

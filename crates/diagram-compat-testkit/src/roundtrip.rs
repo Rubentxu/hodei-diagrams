@@ -753,7 +753,7 @@ mod tests {
         let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
 
         // Build a map from raw_id -> z_order
-        let mut id_to_z: BTreeMap<_, _> = model
+        let id_to_z: BTreeMap<_, _> = model
             .store
             .vertices_with_ids()
             .map(|(vid, v)| {
@@ -763,9 +763,21 @@ mod tests {
             .collect();
 
         // v3 is first in XML (index 0), v1 second (index 1), v2 third (index 2)
-        assert_eq!(id_to_z.get("v3"), Some(&0), "v3 z_order should be 0 (XML index 0)");
-        assert_eq!(id_to_z.get("v1"), Some(&1), "v1 z_order should be 1 (XML index 1)");
-        assert_eq!(id_to_z.get("v2"), Some(&2), "v2 z_order should be 2 (XML index 2)");
+        assert_eq!(
+            id_to_z.get("v3"),
+            Some(&0),
+            "v3 z_order should be 0 (XML index 0)"
+        );
+        assert_eq!(
+            id_to_z.get("v1"),
+            Some(&1),
+            "v1 z_order should be 1 (XML index 1)"
+        );
+        assert_eq!(
+            id_to_z.get("v2"),
+            Some(&2),
+            "v2 z_order should be 2 (XML index 2)"
+        );
     }
 
     #[test]

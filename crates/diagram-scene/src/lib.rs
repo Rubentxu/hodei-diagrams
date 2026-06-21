@@ -31,6 +31,7 @@ pub mod element;
 pub mod error;
 pub mod resolver;
 pub mod scene;
+pub mod stencil_registry;
 
 pub use builder::SceneBuilder;
 pub use diagram_core::id::PageId;

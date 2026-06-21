@@ -102,6 +102,22 @@ pub enum StencilAspect {
     Variable,
 }
 
+/// Static definition of a built-in stencil shape.
+/// Used by the registry to look up normalised [0,1] path data.
+#[derive(Debug, Clone, Copy)]
+pub struct StencilDef {
+    /// Width hint (normalised units).
+    pub width: f64,
+    /// Height hint (normalised units).
+    pub height: f64,
+    /// Aspect ratio constraint.
+    pub aspect: StencilAspect,
+    /// Background path commands (normalised [0,1] coordinates).
+    pub background: &'static [PathCommand],
+    /// Foreground path commands (normalised [0,1] coordinates).
+    pub foreground: &'static [PathCommand],
+}
+
 impl From<diagram_stencils::Aspect> for StencilAspect {
     fn from(a: diagram_stencils::Aspect) -> Self {
         match a {

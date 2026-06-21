@@ -1081,7 +1081,10 @@ mod tests {
         let mut clip = ClipPathManager::new();
         let result = element_to_svg(&stencil, &mut clip, 0);
         // Background path has scaled coordinates (0 * 80 = 0, 0 * 40 = 0)
-        assert!(result.contains("M 0 0"), "background path should scale to bounds");
+        assert!(
+            result.contains("M 0 0"),
+            "background path should scale to bounds"
+        );
         assert!(result.contains("<path"));
     }
 

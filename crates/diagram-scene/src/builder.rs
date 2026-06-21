@@ -12,7 +12,8 @@ use diagram_core::{
 use crate::element::{
     CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
     EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PolygonElement,
-    RectElement, RoundedRectElement, TextElement, TrapezoidElement, TriangleElement, VisualElement,
+    RectElement, RoundedRectElement, StencilAspect, StencilElement, TextElement, TrapezoidElement,
+    TriangleElement, VisualElement,
 };
 use crate::error::{SceneError, SceneResult};
 use crate::resolver::StyleResolver;
@@ -299,6 +300,46 @@ impl SceneBuilder {
                     id: vid,
                     points,
                     bounds,
+                    rotation: geometry.rotation,
+                    flip_h: geometry.flip_h,
+                    flip_v: geometry.flip_v,
+                    style: resolved_style,
+                }))
+            }
+            crate::resolver::ShapeKind::Stencil => {
+                // Extract stencil name from shape=stencil:<name> or stencil=<name>
+                let stencil_name = resolved_style
+                    .remaining
+                    .get("shape")
+                    .and_then(|v| {
+                        let s = v.as_str();
+                        if s.starts_with("stencil:") {
+                            Some(s.trim_start_matches("stencil:").to_owned())
+                        } else {
+                            None
+                        }
+                    })
+                    .or_else(|| {
+                        resolved_style
+                            .remaining
+                            .get("stencil")
+                            .map(|v| v.as_str().to_owned())
+                    })
+                    .unwrap_or_default();
+
+                let def = crate::stencil_registry::lookup(&stencil_name);
+                let (aspect, bg, fg) = match def {
+                    Some(s) => (s.aspect, s.background.to_vec(), s.foreground.to_vec()),
+                    None => (StencilAspect::Variable, vec![], vec![]),
+                };
+                Ok(VisualElement::Stencil(StencilElement {
+                    id: vid,
+                    library: "builtin".into(),
+                    name: stencil_name,
+                    bounds,
+                    aspect,
+                    background: bg,
+                    foreground: fg,
                     rotation: geometry.rotation,
                     flip_h: geometry.flip_h,
                     flip_v: geometry.flip_v,
