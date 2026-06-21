@@ -26,6 +26,9 @@ slab = { workspace = true }
 thiserror = { workspace = true }
 parking_lot = "0.12"
 
+# Stencil parsing
+diagram-stencils = { path = "../diagram-stencils" }
+
 [lints.rust]
 unsafe_code = "forbid"
 
