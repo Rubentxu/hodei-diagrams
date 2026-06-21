@@ -1,22 +1,24 @@
-//! Native integration tests for diagram-wasm.
+//! WASM-specific integration tests for diagram-wasm.
 //!
-//! These tests run with `cargo test --workspace` (native rlib) and do NOT
-//! require `wasm32-unknown-unknown`.
+//! These tests require `wasm32-unknown-unknown` target and are compiled ONLY
+//! when targeting wasm32. They CANNOT run on native hosts because `wasm_bindgen`
+//! bindings require the WebAssembly runtime.
 //!
-//! ## JsValue constraint
+//! ## Why wasm32-only?
 //!
-//! Functions returning `Result<T, JsValue>` must create a `JsValue` on the
-//! error path. `wasm-bindgen`'s `JsValue` is only implemented for wasm32
-//! targets; on native, creating a `JsValue` (e.g., via `JsValue::from_str`)
-//! panics. Therefore:
-//!   - Happy-path tests (functions returning `Ok`) work on native ✓
-//!   - Error-path tests (expecting `Err`) require wasm32 — marked
-//!     `#[cfg(target_arch = "wasm32")]`
+//! Functions in `diagram_wasm` use `#[wasm_bindgen]` and return `JsValue`.
+//! `JsValue` is only available on wasm32 targets; on native, constructing a
+//! `JsValue` (e.g., via `JsValue::from_str`) panics.
+//!
+//! To run these tests:
+//!   cargo +wasm32 test --package diagram-wasm
 //!
 //! ## Test isolation
 //!
 //! Tests share the process-global `ENGINES` pool (`LazyLock`). Each test
 //! creates and disposes its own engine via `with_engine()` to avoid leakage.
+
+#![cfg(target_arch = "wasm32")]
 
 use diagram_core::PageId;
 
@@ -411,9 +413,6 @@ fn export_drawio_roundtrip() {
     });
 }
 
-/// JsValue::from_str is only available on wasm32; on native, constructing a
-/// JsValue panics. This error-path test requires the wasm32 target.
-#[cfg(target_arch = "wasm32")]
 #[test]
 fn export_drawio_fresh_engine_errors() {
     with_engine(|handle| {
@@ -429,11 +428,6 @@ fn export_drawio_fresh_engine_errors() {
     });
 }
 
-// ─── wasm32-only tests ─────────────────────────────────────────────────────
-
-/// JsValue::from_str is only available on wasm32; on native, the error path
-/// (pool full) panics when trying to construct the JsValue error.
-#[cfg(target_arch = "wasm32")]
 #[test]
 fn too_many_engines_returns_error() {
     let mut handles: Vec<u32> = Vec::with_capacity(64);

@@ -5,11 +5,10 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.8.2 — Motor completo (11 crates) + web-shell viewer/editor.** Motor
-Rust sólido con round-trip `.drawio` probado en archivo real de 4MB
-(21 celdas, AWS-Admisión). 11 crates, 375+ tests Rust, 167 tests E2E (7
-skipped = gaps documentados). 61 ADRs (0001-0061). UI básica con
-5 zonas, inspector funcional, presentación.
+**v0.5.4 — Fases 0-5 completadas (Edges, Shapes, Multi-select, Text, Rotate/Flip, Layers).**
+Motor Rust sólido con round-trip `.drawio` en archivo real de 4MB (21 celdas,
+AWS-Admisión). 11 crates, 431 tests Rust, ~100+ tests E2E.
+61 ADRs (0001-0061). UI con paridad ~45% vs draw.io. Próximo: Fase 6 — Stencils (⏸️ deferred).
 
 | Crate | Capa | Status |
 |-------|------|--------|
@@ -34,22 +33,22 @@ skipped = gaps documentados). 61 ADRs (0001-0061). UI básica con
 
 ## 🎯 Active Track: Paridad Funcional con draw.io
 
-**Plan documentado en ADRs 0050-0061.** El motor está completo. La UI tiene
-**~15% de paridad** con draw.io. El plan cubre 8 fases secuenciales que
-cubren los gaps principales.
+**Plan documentado en ADRs 0050-0061.** Fases 0-5 completadas. La UI tiene
+**~45% de paridad** con draw.io. El plan cubre 8 fases secuenciales.
+Fase 6 (Stencils) está en deferred.
 
-| Fase | Tag | Foco | ADRs |
-|------|-----|------|------|
-| 0. Edges interactivos | v0.9.0 | Conectores en UI | 0050, 0051 |
-| 1. Shape catalog | v0.10.0 | Diamond, Triangle, Hexagon, Cylinder, Cloud, Parallelogram, Trapezoid, Polygon | 0052, 0053 |
-| 2. Multi-selection | v0.11.0 | Set selection, batch commands, marquee, copy/paste | 0054, 0055 |
-| 3. Text editing | v0.12.0 | Inline label edit (desbloquea 6 tests skipped) | 0056 |
-| 4. Rotate/flip | v0.13.0 | Transform en geometry, resize handles | 0057 |
-| 5. Layers | v0.14.0 | Z-order, lock, visibility, ordering | 0058 |
-| 6. Stencils | v0.15.0 | UML, BPMN, Flowchart, AWS (open source subset) | 0059 |
-| 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 |
-| 8. Effects | v0.17.0 | Shadow, glass, gradient (SVG-native) | 0061 |
-| **v1.0.0** | **NO automático** | Decisión del usuario | — |
+| Fase | Tag | Foco | ADRs | Estado |
+|------|-----|------|------|--------|
+| 0. Edges interactivos | v0.9.0 | Conectores en UI | 0050, 0051 | ✅ Completada |
+| 1. Shape catalog | v0.10.0 | Diamond, Triangle, Hexagon, Cylinder, Cloud, Parallelogram, Trapezoid, Polygon | 0052, 0053 | ✅ Completada |
+| 2. Multi-selection | v0.11.0 | Set selection, batch commands, marquee, copy/paste | 0054, 0055 | ✅ Completada |
+| 3. Text editing | v0.12.0 | Inline label edit (desbloquea 6 tests skipped) | 0056 | ✅ Completada |
+| 4. Rotate/flip | v0.13.0 | Transform en geometry, resize handles | 0057 | ✅ Completada |
+| 5. Layers | v0.14.0 | Z-order, lock, visibility, ordering | 0058 | ✅ Completada (PR-L1) |
+| 6. Stencils | v0.15.0 | UML, BPMN, Flowchart, AWS (open source subset) | 0059 | ⏸️ Deferred |
+| 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 | ⏸️ Deferred |
+| 8. Effects | v0.17.0 | Shadow, glass, gradient (SVG-native) | 0061 | ⏸️ Deferred |
+| **v1.0.0** | **NO automático** | Decisión del usuario | — | — |
 
 ### Fase 0 — Edges interactivos (PR-E1)
 - **Rust**: `ConnectVerticesCommand`, `DisconnectEdgeCommand`, edge.style routing

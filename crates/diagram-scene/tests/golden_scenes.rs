@@ -839,49 +839,68 @@ fn golden_vertex_with_label() {
     }
 }
 
-/// Test: two vertices on same page appear in insertion order (z-order preserved).
+/// Test: display list is sorted by z_order ascending, ties broken by id (higher id on top).
 #[test]
 fn golden_z_order_preserved() {
     let (mut model, pid) = single_page_model();
 
+    // Insert v1 (will get id 1) with z_order=3 (topmost)
     let v1_geom = geom(0.0, 0.0, 50.0, 50.0, false);
     let v1 = Vertex {
         geometry: Some(v1_geom),
         page_id: Some(pid),
+        z_order: 3,
         ..Default::default()
     };
-    let _vid1 = model.store.insert_vertex(v1);
+    let vid1 = model.store.insert_vertex(v1);
 
+    // Insert v2 (will get id 2) with z_order=1 (bottom)
     let v2_geom = geom(100.0, 0.0, 50.0, 50.0, false);
     let v2 = Vertex {
         geometry: Some(v2_geom),
         page_id: Some(pid),
+        z_order: 1,
         ..Default::default()
     };
-    let _vid2 = model.store.insert_vertex(v2);
+    let vid2 = model.store.insert_vertex(v2);
+
+    // Insert v3 (will get id 3) with z_order=2 (middle)
+    let v3_geom = geom(50.0, 0.0, 50.0, 50.0, false);
+    let v3 = Vertex {
+        geometry: Some(v3_geom),
+        page_id: Some(pid),
+        z_order: 2,
+        ..Default::default()
+    };
+    let _vid3 = model.store.insert_vertex(v3);
 
     let builder = SceneBuilder::new();
     let scene = builder.build(&model).unwrap();
 
     let page = &scene.pages[0];
-    assert_eq!(page.display_list.len(), 2);
+    assert_eq!(page.display_list.len(), 3);
 
-    // Check x positions reflect insertion order
+    // Expected order: z_order=1 (vid2), z_order=2 (vid3), z_order=3 (vid1)
     match &page.display_list[0] {
         VisualElement::Rect(r) => {
-            assert_eq!(
-                r.bounds.origin.x, 0.0,
-                "First element should be at x=0 (first inserted)"
-            );
+            assert_eq!(r.id, vid2, "First element should have lowest z_order (1)");
         }
         other => panic!("Expected Rect, got {:?}", other),
     }
     match &page.display_list[1] {
         VisualElement::Rect(r) => {
-            assert_eq!(
-                r.bounds.origin.x, 100.0,
-                "Second element should be at x=100 (second inserted)"
+            // vid3 is the third vertex inserted, so it has the third ID
+            // We can't directly reference vid3 since we used _vid3, so check it's not vid1 or vid2
+            assert!(
+                r.id != vid1 && r.id != vid2,
+                "Second element should be vid3 with middle z_order (2)"
             );
+        }
+        other => panic!("Expected Rect, got {:?}", other),
+    }
+    match &page.display_list[2] {
+        VisualElement::Rect(r) => {
+            assert_eq!(r.id, vid1, "Third element should have highest z_order (3)");
         }
         other => panic!("Expected Rect, got {:?}", other),
     }
@@ -993,5 +1012,297 @@ fn golden_edge_with_label() {
             assert_eq!(t.anchor.y, 20.0, "Edge label anchor y should be midpoint");
         }
         _ => unreachable!(),
+    }
+}
+
+// ─── Visibility filter tests ────────────────────────────────────────────────────
+
+/// Test: vertex with visible=false is excluded from the display list.
+#[test]
+fn build_excludes_hidden_vertex() {
+    let (mut model, pid) = single_page_model();
+
+    let v1_geom = geom(0.0, 0.0, 50.0, 50.0, false);
+    let v1 = Vertex {
+        geometry: Some(v1_geom),
+        page_id: Some(pid),
+        visible: true,
+        ..Default::default()
+    };
+    model.store.insert_vertex(v1);
+
+    let v2_geom = geom(100.0, 0.0, 50.0, 50.0, false);
+    let v2 = Vertex {
+        geometry: Some(v2_geom),
+        page_id: Some(pid),
+        visible: false,
+        ..Default::default()
+    };
+    model.store.insert_vertex(v2);
+
+    let builder = SceneBuilder::new();
+    let scene = builder.build(&model).unwrap();
+
+    let page = &scene.pages[0];
+    assert_eq!(
+        page.display_list.len(),
+        1,
+        "Hidden vertex should be excluded from display list"
+    );
+}
+
+/// Test: edge with visible=false is excluded from the display list.
+#[test]
+fn build_excludes_hidden_edge() {
+    let (mut model, pid) = single_page_model();
+
+    let v1_geom = geom(0.0, 0.0, 50.0, 50.0, false);
+    let v1 = Vertex {
+        geometry: Some(v1_geom),
+        page_id: Some(pid),
+        ..Default::default()
+    };
+    let vid1 = model.store.insert_vertex(v1);
+
+    let v2_geom = geom(100.0, 0.0, 50.0, 50.0, false);
+    let v2 = Vertex {
+        geometry: Some(v2_geom),
+        page_id: Some(pid),
+        ..Default::default()
+    };
+    let vid2 = model.store.insert_vertex(v2);
+
+    // Visible edge
+    let edge_visible = Edge {
+        source: vid1,
+        target: vid2,
+        page_id: Some(pid),
+        visible: true,
+        ..Default::default()
+    };
+    model.store.insert_edge(edge_visible);
+
+    // Hidden edge
+    let edge_hidden = Edge {
+        source: vid1,
+        target: vid2,
+        page_id: Some(pid),
+        visible: false,
+        ..Default::default()
+    };
+    model.store.insert_edge(edge_hidden);
+
+    let builder = SceneBuilder::new();
+    let scene = builder.build(&model).unwrap();
+
+    let page = &scene.pages[0];
+    // 2 vertices + 1 visible edge = 3 elements
+    assert_eq!(
+        page.display_list.len(),
+        3,
+        "Hidden edge should be excluded from display list"
+    );
+}
+
+/// Test: hidden group and all its children are excluded from the display list.
+#[test]
+fn build_excludes_hidden_group_subtree() {
+    let (mut model, pid) = single_page_model();
+
+    // Visible group
+    let group_geom = geom(10.0, 10.0, 200.0, 200.0, false);
+    let group = Group {
+        geometry: Some(group_geom),
+        page_id: Some(pid),
+        visible: true,
+        ..Default::default()
+    };
+    let gid = model.store.insert_group(group);
+
+    // Child vertex with parent=Some(gid) and relative=true, at local (20, 20)
+    let child_geom = geom(20.0, 20.0, 80.0, 40.0, true);
+    let child = Vertex {
+        geometry: Some(child_geom),
+        parent: Some(gid),
+        page_id: Some(pid),
+        visible: true,
+        ..Default::default()
+    };
+    model.store.insert_vertex(child);
+
+    // Hidden group
+    let hidden_group_geom = geom(300.0, 10.0, 200.0, 200.0, false);
+    let hidden_group = Group {
+        geometry: Some(hidden_group_geom),
+        page_id: Some(pid),
+        visible: false,
+        ..Default::default()
+    };
+    let hidden_gid = model.store.insert_group(hidden_group);
+
+    // Child of hidden group
+    let hidden_child_geom = geom(20.0, 20.0, 80.0, 40.0, true);
+    let hidden_child = Vertex {
+        geometry: Some(hidden_child_geom),
+        parent: Some(hidden_gid),
+        page_id: Some(pid),
+        visible: true,
+        ..Default::default()
+    };
+    model.store.insert_vertex(hidden_child);
+
+    let builder = SceneBuilder::new();
+    let scene = builder.build(&model).unwrap();
+
+    let page = &scene.pages[0];
+    // Only the visible group (1 element) should appear
+    assert_eq!(
+        page.display_list.len(),
+        1,
+        "Hidden group and its entire subtree should be excluded"
+    );
+}
+
+// ─── z_order tie-breaking tests ────────────────────────────────────────────────
+
+/// Test: when z_order is equal, ties are broken by id (higher id renders on top).
+#[test]
+fn build_ties_broken_by_id_stably() {
+    let (mut model, pid) = single_page_model();
+
+    // Insert v1 (lower id) with z_order=5
+    let v1_geom = geom(0.0, 0.0, 50.0, 50.0, false);
+    let v1 = Vertex {
+        geometry: Some(v1_geom),
+        page_id: Some(pid),
+        z_order: 5,
+        ..Default::default()
+    };
+    let vid1 = model.store.insert_vertex(v1);
+
+    // Insert v2 (higher id) with z_order=5 (same z_order)
+    let v2_geom = geom(100.0, 0.0, 50.0, 50.0, false);
+    let v2 = Vertex {
+        geometry: Some(v2_geom),
+        page_id: Some(pid),
+        z_order: 5,
+        ..Default::default()
+    };
+    let vid2 = model.store.insert_vertex(v2);
+
+    // Both have same z_order=5, so vid1 (lower id) should come first
+    let builder = SceneBuilder::new();
+    let scene = builder.build(&model).unwrap();
+
+    let page = &scene.pages[0];
+    assert_eq!(page.display_list.len(), 2);
+
+    // vid1 should come first (lower id breaks tie)
+    match &page.display_list[0] {
+        VisualElement::Rect(r) => {
+            assert_eq!(r.id, vid1, "Lower id should come first when z_order ties");
+        }
+        other => panic!("Expected Rect, got {:?}", other),
+    }
+    match &page.display_list[1] {
+        VisualElement::Rect(r) => {
+            assert_eq!(r.id, vid2, "Higher id should come second when z_order ties");
+        }
+        other => panic!("Expected Rect, got {:?}", other),
+    }
+}
+
+// ─── Locked element tests ──────────────────────────────────────────────────────
+
+/// Test: locked vertex IS in the display list (locked does not affect rendering).
+#[test]
+fn build_locked_vertex_still_renders() {
+    let (mut model, pid) = single_page_model();
+
+    let v_geom = geom(0.0, 0.0, 50.0, 50.0, false);
+    let vertex = Vertex {
+        geometry: Some(v_geom),
+        page_id: Some(pid),
+        locked: true,
+        visible: true,
+        ..Default::default()
+    };
+    model.store.insert_vertex(vertex);
+
+    let builder = SceneBuilder::new();
+    let scene = builder.build(&model).unwrap();
+
+    let page = &scene.pages[0];
+    assert_eq!(
+        page.display_list.len(),
+        1,
+        "Locked vertex should still appear in display list"
+    );
+}
+
+// ─── Mixed kinds sorting tests ─────────────────────────────────────────────────
+
+/// Test: vertices and edges are sorted together by (z_order, id).
+#[test]
+fn build_mixed_kinds_sorted_together() {
+    let (mut model, pid) = single_page_model();
+
+    // Vertex with z_order=1
+    let v1_geom = geom(0.0, 0.0, 50.0, 50.0, false);
+    let v1 = Vertex {
+        geometry: Some(v1_geom),
+        page_id: Some(pid),
+        z_order: 1,
+        ..Default::default()
+    };
+    let vid1 = model.store.insert_vertex(v1);
+
+    // Edge with z_order=2
+    let edge = Edge {
+        source: vid1,
+        target: vid1,
+        page_id: Some(pid),
+        z_order: 2,
+        ..Default::default()
+    };
+    model.store.insert_edge(edge);
+
+    // Vertex with z_order=3
+    let v2_geom = geom(100.0, 0.0, 50.0, 50.0, false);
+    let v2 = Vertex {
+        geometry: Some(v2_geom),
+        page_id: Some(pid),
+        z_order: 3,
+        ..Default::default()
+    };
+    model.store.insert_vertex(v2);
+
+    let builder = SceneBuilder::new();
+    let scene = builder.build(&model).unwrap();
+
+    let page = &scene.pages[0];
+    assert_eq!(page.display_list.len(), 3);
+
+    // Expected order: vertex(z=1), edge(z=2), vertex(z=3)
+    // First element should be vertex with z_order=1
+    match &page.display_list[0] {
+        VisualElement::Rect(r) => {
+            assert_eq!(r.id, vid1, "First should be vertex with z_order=1");
+        }
+        other => panic!("Expected Rect, got {:?}", other),
+    }
+
+    // Second should be edge
+    assert!(
+        matches!(&page.display_list[1], VisualElement::Line(_)),
+        "Second should be edge with z_order=2"
+    );
+
+    // Third should be vertex with z_order=3 (vid2, not vid1)
+    match &page.display_list[2] {
+        VisualElement::Rect(r) => {
+            assert_ne!(r.id, vid1, "Third should be the second vertex (vid2)");
+        }
+        other => panic!("Expected Rect, got {:?}", other),
     }
 }

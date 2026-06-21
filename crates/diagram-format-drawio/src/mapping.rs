@@ -249,6 +249,9 @@ impl DrawioMapping {
                             style_id,
                             parent,
                             page_id,
+                            z_order: 0,
+                            locked: false,
+                            visible: true,
                         };
                         model.store.replace_vertex(vid, vertex);
                     }
@@ -261,6 +264,9 @@ impl DrawioMapping {
                             label,
                             style_id,
                             page_id,
+                            z_order: 0,
+                            locked: false,
+                            visible: true,
                         };
                         model.store.replace_group(gid, group);
                     }
@@ -287,6 +293,9 @@ impl DrawioMapping {
                                     target,
                                     waypoints: Vec::new(),
                                     page_id,
+                                    z_order: 0,
+                                    locked: false,
+                                    visible: true,
                                 };
                                 model.store.replace_edge(eid, edge);
                             }
