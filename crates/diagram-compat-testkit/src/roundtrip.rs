@@ -95,6 +95,7 @@ pub fn assert_roundtrip(_model: &DiagramModel) {
 mod tests {
     use super::*;
     use diagram_format_drawio::DrawioMapping;
+    use std::collections::BTreeMap;
 
     // =============================================================================
     // Task 22 — Strengthen simple-rect round-trip test
@@ -735,5 +736,334 @@ mod tests {
     fn parse_drawio_rejects_missing_mxgraphmodel() {
         let result = parse_drawio(r#"<mxfile><diagram></diagram></mxfile>"#);
         assert!(result.is_err(), "missing mxGraphModel must return Err");
+    }
+
+    // =============================================================================
+    // PR-L2: z_order, locked, visible round-trip tests
+    // =============================================================================
+
+    #[test]
+    fn parse_assigns_z_order_from_xml_child_index() {
+        // XML order: v3 (index 0), v1 (index 1), v2 (index 2)
+        // z_order should match XML child index
+        let xml = include_str!("../fixtures/three-vertices-z-ordered.drawio");
+        let raw = parse_drawio(xml).expect("three-vertices-z-ordered.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        // Build a map from raw_id -> z_order
+        let mut id_to_z: BTreeMap<_, _> = model
+            .store
+            .vertices_with_ids()
+            .map(|(vid, v)| {
+                let raw_id = id_map.get_external_vertex(vid).unwrap();
+                (raw_id, v.z_order)
+            })
+            .collect();
+
+        // v3 is first in XML (index 0), v1 second (index 1), v2 third (index 2)
+        assert_eq!(id_to_z.get("v3"), Some(&0), "v3 z_order should be 0 (XML index 0)");
+        assert_eq!(id_to_z.get("v1"), Some(&1), "v1 z_order should be 1 (XML index 1)");
+        assert_eq!(id_to_z.get("v2"), Some(&2), "v2 z_order should be 2 (XML index 2)");
+    }
+
+    #[test]
+    fn parse_reads_locked_and_visible_from_extra() {
+        // v1: normal (locked=false, visible=true)
+        // v2: locked="1", visible="0"
+        let xml = include_str!("../fixtures/locked-and-hidden.drawio");
+        let raw = parse_drawio(xml).expect("locked-and-hidden.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, _id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        let mut vertices: Vec<_> = model
+            .store
+            .vertices_with_ids()
+            .map(|(vid, v)| {
+                let raw_id = _id_map.get_external_vertex(vid).unwrap();
+                (raw_id, v.locked, v.visible)
+            })
+            .collect();
+        vertices.sort_by_key(|(id, _, _)| id.clone());
+
+        assert_eq!(vertices.len(), 2);
+        // v1: normal vertex
+        assert!(!vertices[0].1, "v1 should be unlocked");
+        assert!(vertices[0].2, "v1 should be visible");
+        // v2: locked and hidden
+        assert!(vertices[1].1, "v2 should be locked");
+        assert!(!vertices[1].2, "v2 should be hidden");
+    }
+
+    #[test]
+    fn write_emits_cells_in_z_order_ascending() {
+        // Build a model with 3 vertices: z_order = {2, 0, 1}
+        let mut model = diagram_core::DiagramModel::new();
+        let page_id = model
+            .store
+            .insert_page(diagram_core::Page::new(Default::default()));
+
+        let v0 = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            geometry: Some(diagram_core::geometry::CellGeometry {
+                x: 0.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+                relative: false,
+                rotation: 0.0,
+                flip_h: false,
+                flip_v: false,
+            }),
+            ..Default::default()
+        });
+        model.store.vertex_mut(v0).unwrap().z_order = 2;
+
+        let v1 = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            geometry: Some(diagram_core::geometry::CellGeometry {
+                x: 30.0,
+                y: 50.0,
+                width: 80.0,
+                height: 40.0,
+                relative: false,
+                rotation: 0.0,
+                flip_h: false,
+                flip_v: false,
+            }),
+            ..Default::default()
+        });
+        model.store.vertex_mut(v1).unwrap().z_order = 0;
+
+        let v2 = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            geometry: Some(diagram_core::geometry::CellGeometry {
+                x: 60.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+                relative: false,
+                rotation: 0.0,
+                flip_h: false,
+                flip_v: false,
+            }),
+            ..Default::default()
+        });
+        model.store.vertex_mut(v2).unwrap().z_order = 1;
+
+        // Create id_map with raw IDs for each vertex
+        let mut id_map = diagram_format_drawio::mapping::IdMap::new();
+        id_map.vertices.insert("v0".to_owned(), v0);
+        id_map.vertices.insert("v1".to_owned(), v1);
+        id_map.vertices.insert("v2".to_owned(), v2);
+
+        let mapper = DrawioMapping::new();
+        let mut diags = Vec::new();
+        let raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        // Cells should be emitted in z_order ascending: v1(z=0), v2(z=1), v0(z=2)
+        let cell_ids: Vec<_> = raw.diagrams[0]
+            .cells
+            .iter()
+            .map(|c| c.id.as_str())
+            .collect();
+        assert_eq!(
+            cell_ids,
+            &["v1", "v2", "v0"],
+            "cells should be emitted in z_order ascending"
+        );
+    }
+
+    #[test]
+    fn write_emits_locked_and_hidden_via_extra() {
+        // Build a model with locked and hidden vertices
+        let mut model = diagram_core::DiagramModel::new();
+        let page_id = model
+            .store
+            .insert_page(diagram_core::Page::new(Default::default()));
+
+        let v_normal = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            ..Default::default()
+        });
+
+        let v_locked = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            locked: true,
+            ..Default::default()
+        });
+
+        let v_hidden = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            visible: false,
+            ..Default::default()
+        });
+
+        let mut id_map = diagram_format_drawio::mapping::IdMap::new();
+        id_map.vertices.insert("v_normal".to_owned(), v_normal);
+        id_map.vertices.insert("v_locked".to_owned(), v_locked);
+        id_map.vertices.insert("v_hidden".to_owned(), v_hidden);
+
+        let mapper = DrawioMapping::new();
+        let mut diags = Vec::new();
+        let raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        let locked_cell = raw.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "v_locked")
+            .unwrap();
+        assert_eq!(
+            locked_cell.extra.get("locked"),
+            Some(&"1".to_owned()),
+            "locked=true should emit locked=1 in extra"
+        );
+
+        let hidden_cell = raw.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "v_hidden")
+            .unwrap();
+        assert_eq!(
+            hidden_cell.extra.get("visible"),
+            Some(&"0".to_owned()),
+            "visible=false should emit visible=0 in extra"
+        );
+
+        let normal_cell = raw.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "v_normal")
+            .unwrap();
+        assert!(
+            !normal_cell.extra.contains_key("locked"),
+            "normal vertex should not emit locked"
+        );
+        assert!(
+            !normal_cell.extra.contains_key("visible"),
+            "normal vertex should not emit visible"
+        );
+    }
+
+    #[test]
+    fn roundtrip_locked_and_hidden_preserves_fields() {
+        let xml = include_str!("../fixtures/locked-and-hidden.drawio");
+        let raw = parse_drawio(xml).expect("locked-and-hidden.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        // Collect locked/visible state before round-trip
+        let before: Vec<_> = model
+            .store
+            .vertices_with_ids()
+            .map(|(vid, v)| {
+                let raw_id = id_map.get_external_vertex(vid).unwrap();
+                (raw_id, v.locked, v.visible)
+            })
+            .collect();
+
+        // Round-trip through to_raw
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        // Re-parse
+        let second_raw = parse_drawio_with_diagnostics(
+            &diagram_format_drawio::write_drawio(&roundtrip_raw)
+                .expect("write_drawio should succeed"),
+            &mut Vec::new(),
+        )
+        .expect("re-parsing should succeed");
+
+        let mapper2 = DrawioMapping::new();
+        let (model2, id_map2) = mapper2
+            .to_domain(&second_raw)
+            .expect("second to_domain should succeed");
+
+        let after: Vec<_> = model2
+            .store
+            .vertices_with_ids()
+            .map(|(vid, v)| {
+                let raw_id = id_map2.get_external_vertex(vid).unwrap();
+                (raw_id, v.locked, v.visible)
+            })
+            .collect();
+
+        assert_eq!(before.len(), after.len(), "vertex count must be preserved");
+        let mut before_sorted = before;
+        let mut after_sorted = after;
+        before_sorted.sort_by_key(|(id, _, _)| id.clone());
+        after_sorted.sort_by_key(|(id, _, _)| id.clone());
+
+        for (b, a) in before_sorted.iter().zip(after_sorted.iter()) {
+            assert_eq!(b.0, a.0, "raw ID must be preserved");
+            assert_eq!(b.1, a.1, "locked must be preserved for {}", b.0);
+            assert_eq!(b.2, a.2, "visible must be preserved for {}", b.0);
+        }
+    }
+
+    #[test]
+    fn roundtrip_z_order_preserves_values() {
+        let xml = include_str!("../fixtures/three-vertices-z-ordered.drawio");
+        let raw = parse_drawio(xml).expect("three-vertices-z-ordered.drawio should parse");
+
+        let mapper = DrawioMapping::new();
+        let (model, id_map) = mapper.to_domain(&raw).expect("to_domain should succeed");
+
+        // Collect z_order before
+        let before: Vec<_> = model
+            .store
+            .vertices_with_ids()
+            .map(|(vid, v)| {
+                let raw_id = id_map.get_external_vertex(vid).unwrap();
+                (raw_id, v.z_order)
+            })
+            .collect();
+
+        // Round-trip through to_raw
+        let mut diags = Vec::new();
+        let roundtrip_raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        // Re-parse
+        let second_raw = parse_drawio_with_diagnostics(
+            &diagram_format_drawio::write_drawio(&roundtrip_raw)
+                .expect("write_drawio should succeed"),
+            &mut Vec::new(),
+        )
+        .expect("re-parsing should succeed");
+
+        let mapper2 = DrawioMapping::new();
+        let (model2, id_map2) = mapper2
+            .to_domain(&second_raw)
+            .expect("second to_domain should succeed");
+
+        let after: Vec<_> = model2
+            .store
+            .vertices_with_ids()
+            .map(|(vid, v)| {
+                let raw_id = id_map2.get_external_vertex(vid).unwrap();
+                (raw_id, v.z_order)
+            })
+            .collect();
+
+        let mut before_sorted = before;
+        let mut after_sorted = after;
+        before_sorted.sort_by_key(|(id, _)| id.clone());
+        after_sorted.sort_by_key(|(id, _)| id.clone());
+
+        for (b, a) in before_sorted.iter().zip(after_sorted.iter()) {
+            assert_eq!(b.0, a.0, "raw ID must be preserved");
+            assert_eq!(b.1, a.1, "z_order must be preserved for {}", b.0);
+        }
     }
 }

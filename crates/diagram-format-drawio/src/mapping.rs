@@ -159,6 +159,9 @@ impl DrawioMapping {
         }
 
         // PASS 1 — Forward sweep: allocate placeholder entries, record raw→engine ID
+        // Track cell index as z_order (XML child order = draw.io z-order)
+        let mut z_orders: BTreeMap<String, i32> = BTreeMap::new();
+
         for (diagram_idx, diagram) in raw.diagrams.iter().enumerate() {
             // Pages are stored in insertion order matching diagram indices
             let page_id = model
@@ -167,7 +170,8 @@ impl DrawioMapping {
                 .nth(diagram_idx)
                 .map(|(id, _)| id);
 
-            for cell in &diagram.cells {
+            for (idx, cell) in diagram.cells.iter().enumerate() {
+                z_orders.insert(cell.id.clone(), idx as i32);
                 if cell.vertex && !cell.edge {
                     let vid = model.store.insert_vertex(Vertex {
                         page_id,
@@ -243,15 +247,19 @@ impl DrawioMapping {
                         let parent = resolve_parent(&cell.parent, &id_map, diags);
                         // Preserve page_id set during pass 1
                         let page_id = model.store.vertex(vid).and_then(|v| v.page_id);
+                        // z_order from XML child index; locked/visible from extra attributes
+                        let z_order = z_orders.get(&cell.id).copied().unwrap_or(0);
+                        let locked = cell.extra.get("locked").map(|v| v == "1").unwrap_or(false);
+                        let visible = cell.extra.get("visible").map(|v| v != "0").unwrap_or(true);
                         let vertex = Vertex {
                             geometry: cell_geo,
                             label,
                             style_id,
                             parent,
                             page_id,
-                            z_order: 0,
-                            locked: false,
-                            visible: true,
+                            z_order,
+                            locked,
+                            visible,
                         };
                         model.store.replace_vertex(vid, vertex);
                     }
@@ -259,14 +267,18 @@ impl DrawioMapping {
                         let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                         // Preserve page_id set during pass 1
                         let page_id = model.store.group(gid).and_then(|g| g.page_id);
+                        // z_order from XML child index; locked/visible from extra attributes
+                        let z_order = z_orders.get(&cell.id).copied().unwrap_or(0);
+                        let locked = cell.extra.get("locked").map(|v| v == "1").unwrap_or(false);
+                        let visible = cell.extra.get("visible").map(|v| v != "0").unwrap_or(true);
                         let group = Group {
                             geometry: cell_geo,
                             label,
                             style_id,
                             page_id,
-                            z_order: 0,
-                            locked: false,
-                            visible: true,
+                            z_order,
+                            locked,
+                            visible,
                         };
                         model.store.replace_group(gid, group);
                     }
@@ -286,6 +298,12 @@ impl DrawioMapping {
                                 let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                                 // Preserve page_id set during pass 1
                                 let page_id = model.store.edge(eid).and_then(|e| e.page_id);
+                                // z_order from XML child index; locked/visible from extra attributes
+                                let z_order = z_orders.get(&cell.id).copied().unwrap_or(0);
+                                let locked =
+                                    cell.extra.get("locked").map(|v| v == "1").unwrap_or(false);
+                                let visible =
+                                    cell.extra.get("visible").map(|v| v != "0").unwrap_or(true);
                                 let edge = Edge {
                                     label,
                                     style_id,
@@ -293,9 +311,9 @@ impl DrawioMapping {
                                     target,
                                     waypoints: Vec::new(),
                                     page_id,
-                                    z_order: 0,
-                                    locked: false,
-                                    visible: true,
+                                    z_order,
+                                    locked,
+                                    visible,
                                 };
                                 model.store.replace_edge(eid, edge);
                             }
@@ -401,6 +419,15 @@ impl DrawioMapping {
 
                 let parent = vertex.parent.and_then(|gid| id_map.get_external_group(gid));
 
+                // Build extra: emit locked/visible when non-default
+                let mut extra = BTreeMap::new();
+                if vertex.locked {
+                    extra.insert("locked".to_owned(), "1".to_owned());
+                }
+                if !vertex.visible {
+                    extra.insert("visible".to_owned(), "0".to_owned());
+                }
+
                 let cell = RawDrawioCell {
                     id: raw_id,
                     value: vertex.label.as_ref().map(|l| l.text.as_str().to_owned()),
@@ -411,9 +438,9 @@ impl DrawioMapping {
                     source: None,
                     target: None,
                     geometry,
-                    extra: Default::default(),
+                    extra,
                 };
-                cells.push(cell);
+                cells.push((vertex.z_order, cell));
             }
 
             // Collect edges for this page
@@ -459,6 +486,15 @@ impl DrawioMapping {
                     format_style_string(smap)
                 });
 
+                // Build extra: emit locked/visible when non-default
+                let mut extra = BTreeMap::new();
+                if edge.locked {
+                    extra.insert("locked".to_owned(), "1".to_owned());
+                }
+                if !edge.visible {
+                    extra.insert("visible".to_owned(), "0".to_owned());
+                }
+
                 let cell = RawDrawioCell {
                     id: raw_id,
                     value: edge.label.as_ref().map(|l| l.text.as_str().to_owned()),
@@ -469,9 +505,9 @@ impl DrawioMapping {
                     source: Some(source_raw),
                     target: Some(target_raw),
                     geometry: None,
-                    extra: Default::default(),
+                    extra,
                 };
-                cells.push(cell);
+                cells.push((edge.z_order, cell));
             }
 
             // Collect groups for this page
@@ -518,6 +554,15 @@ impl DrawioMapping {
                     }
                 });
 
+                // Build extra: emit locked/visible when non-default
+                let mut extra = BTreeMap::new();
+                if group.locked {
+                    extra.insert("locked".to_owned(), "1".to_owned());
+                }
+                if !group.visible {
+                    extra.insert("visible".to_owned(), "0".to_owned());
+                }
+
                 let cell = RawDrawioCell {
                     id: raw_id,
                     value: group.label.as_ref().map(|l| l.text.as_str().to_owned()),
@@ -528,10 +573,14 @@ impl DrawioMapping {
                     source: None,
                     target: None,
                     geometry,
-                    extra: Default::default(),
+                    extra,
                 };
-                cells.push(cell);
+                cells.push((group.z_order, cell));
             }
+
+            // Sort cells by z_order ascending before emitting
+            cells.sort_by_key(|(z, _)| *z);
+            let cells: Vec<_> = cells.into_iter().map(|(_, c)| c).collect();
 
             diagrams.push(RawDrawioDiagram {
                 name: diagram_name,
