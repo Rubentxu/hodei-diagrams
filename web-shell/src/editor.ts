@@ -96,6 +96,10 @@ export class Editor {
   #getZoom: () => number;
   #abortController: AbortController | null = null;
 
+  // ─── Stencil Drag Preview ────────────────────────────────────────────────
+  #stencilPreviewEl: SVGGElement | null = null;
+  #stencilDragTool: string | null = null;
+
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
   #textEdit: TextEditState = null;
 
@@ -397,6 +401,242 @@ export class Editor {
 
   set activePageIdx(idx: number) {
     this.#activePageIdx = idx;
+  }
+
+  // ─── Stencil Drag API ─────────────────────────────────────────────────────
+
+  /**
+   * Start a stencil drag operation: create a semi-transparent preview element
+   * following the cursor.
+   */
+  startStencilDrag(tool: string, clientX: number, clientY: number): void {
+    // Cancel any existing preview
+    this.#cancelStencilPreview();
+    this.#stencilDragTool = tool;
+
+    // Build the SVG shape for the preview
+    const shapeEl = this.#buildStencilShapeEl(tool);
+    if (!shapeEl) return;
+
+    // Create a <g> wrapper for the preview
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'stencil-preview');
+    g.style.opacity = '0.7';
+    g.style.pointerEvents = 'none';
+    g.appendChild(shapeEl);
+
+    this.#viewer.style.position = 'relative';
+    this.#viewer.appendChild(g);
+    this.#stencilPreviewEl = g;
+
+    // Position at cursor
+    this.updateStencilDragPreview(clientX, clientY);
+  }
+
+  /**
+   * Update the stencil preview position to follow the cursor.
+   */
+  updateStencilDragPreview(clientX: number, clientY: number): void {
+    if (!this.#stencilPreviewEl) return;
+    const pos = this.#clientToDoc(clientX, clientY);
+    this.#stencilPreviewEl.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+  }
+
+  /**
+   * End the stencil drag: if the drop is inside the canvas bounds,
+   * create the vertex; otherwise cancel and remove the preview.
+   */
+  endStencilDrag(clientX: number, clientY: number): void {
+    if (!this.#stencilPreviewEl || !this.#stencilDragTool) {
+      this.#cancelStencilPreview();
+      return;
+    }
+
+    const rect = this.#viewer.getBoundingClientRect();
+    // Check if drop is within canvas bounds
+    if (
+      clientX < rect.left ||
+      clientX > rect.right ||
+      clientY < rect.top ||
+      clientY > rect.bottom
+    ) {
+      // Outside canvas — cancel
+      this.#cancelStencilPreview();
+      return;
+    }
+
+    // Within bounds — create the vertex
+    const pos = this.#clientToDoc(clientX, clientY);
+    const tool = this.#stencilDragTool;
+
+    const kindMap: Record<string,
+      | 'Rectangle'
+      | 'RoundedRect'
+      | 'Ellipse'
+      | 'Diamond'
+      | 'Triangle'
+      | 'Hexagon'
+      | 'Cylinder'
+      | 'Cloud'
+      | 'Parallelogram'
+      | 'Trapezoid'
+      | 'Polygon'
+      | 'RectangleStencil'
+      | 'EllipseStencil'
+      | 'DiamondStencil'
+      | 'TriangleStencil'
+      | 'HexagonStencil'
+      | 'CylinderStencil'
+      | 'CloudStencil'
+      | 'ParallelogramStencil'
+      | 'TrapezoidStencil'
+      | 'BlockArrowStencil'
+    > = {
+      'rectangle-stencil': 'RectangleStencil',
+      'ellipse-stencil': 'EllipseStencil',
+      'diamond-stencil': 'DiamondStencil',
+      'triangle-stencil': 'TriangleStencil',
+      'hexagon-stencil': 'HexagonStencil',
+      'cylinder-stencil': 'CylinderStencil',
+      'cloud-stencil': 'CloudStencil',
+      'parallelogram-stencil': 'ParallelogramStencil',
+      'trapezoid-stencil': 'TrapezoidStencil',
+      'blockArrow-stencil': 'BlockArrowStencil',
+    };
+
+    const kind = kindMap[tool] ?? 'RectangleStencil';
+    const cmd = this.#buildAddVertexCmd(kind, pos.x, pos.y);
+    const r = this.#session.executeCommand(cmd);
+    if (!r.ok) {
+      this.#onError(r.error);
+    } else {
+      this.#replay();
+    }
+
+    this.#cancelStencilPreview();
+  }
+
+  /** Cancel any active stencil preview without creating a shape. */
+  #cancelStencilPreview(): void {
+    if (this.#stencilPreviewEl) {
+      this.#stencilPreviewEl.remove();
+      this.#stencilPreviewEl = null;
+    }
+    this.#stencilDragTool = null;
+  }
+
+  /**
+   * Build an SVG shape element for a given stencil tool.
+   * Returns the shape element (rect, ellipse, polygon, or path).
+   */
+  #buildStencilShapeEl(tool: string): SVGElement | null {
+    // Mirror the SVG icon paths from sidebar.ts STENCIL_SHAPES
+    switch (tool) {
+      case 'rectangle-stencil':
+      case 'rectangle': {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', '2');
+        rect.setAttribute('y', '2');
+        rect.setAttribute('width', '28');
+        rect.setAttribute('height', '20');
+        rect.setAttribute('fill', 'none');
+        rect.setAttribute('stroke', '#F8FAFC');
+        rect.setAttribute('stroke-width', '1.5');
+        return rect;
+      }
+      case 'ellipse-stencil':
+      case 'ellipse': {
+        const ell = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        ell.setAttribute('cx', '16');
+        ell.setAttribute('cy', '12');
+        ell.setAttribute('rx', '14');
+        ell.setAttribute('ry', '10');
+        ell.setAttribute('fill', 'none');
+        ell.setAttribute('stroke', '#F8FAFC');
+        ell.setAttribute('stroke-width', '1.5');
+        return ell;
+      }
+      case 'diamond-stencil':
+      case 'diamond': {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', '16,2 30,12 16,22 2,12');
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', '#F8FAFC');
+        poly.setAttribute('stroke-width', '1.5');
+        return poly;
+      }
+      case 'triangle-stencil':
+      case 'triangle': {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', '16,2 30,22 2,22');
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', '#F8FAFC');
+        poly.setAttribute('stroke-width', '1.5');
+        return poly;
+      }
+      case 'hexagon-stencil':
+      case 'hexagon': {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', '16,2 28,7 28,17 16,22 4,17 4,7');
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', '#F8FAFC');
+        poly.setAttribute('stroke-width', '1.5');
+        return poly;
+      }
+      case 'cylinder-stencil':
+      case 'cylinder': {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute(
+          'd',
+          'M6,6 C6,3 10,2 16,2 C22,2 26,3 26,6 L26,18 C26,21 22,22 16,22 C10,22 6,21 6,18 Z',
+        );
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#F8FAFC');
+        path.setAttribute('stroke-width', '1.5');
+        return path;
+      }
+      case 'cloud-stencil':
+      case 'cloud': {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute(
+          'd',
+          'M8,18 C4,18 2,14 4,10 C4,6 8,4 12,6 C14,4 18,4 20,6 C24,6 28,10 26,14 C30,14 30,18 26,18 Z',
+        );
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#F8FAFC');
+        path.setAttribute('stroke-width', '1.5');
+        return path;
+      }
+      case 'parallelogram-stencil':
+      case 'parallelogram': {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', '8,2 30,2 24,22 2,22');
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', '#F8FAFC');
+        poly.setAttribute('stroke-width', '1.5');
+        return poly;
+      }
+      case 'trapezoid-stencil':
+      case 'trapezoid': {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', '6,2 26,2 30,22 2,22');
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', '#F8FAFC');
+        poly.setAttribute('stroke-width', '1.5');
+        return poly;
+      }
+      case 'blockArrow-stencil':
+      case 'blockArrow': {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', '4,8 18,8 18,2 28,12 18,22 18,16 4,16');
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', '#F8FAFC');
+        poly.setAttribute('stroke-width', '1.5');
+        return poly;
+      }
+      default:
+        return null;
+    }
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────

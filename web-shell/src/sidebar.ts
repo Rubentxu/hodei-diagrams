@@ -412,6 +412,8 @@ export function buildSidebar(): SidebarControls {
     btn.className = 'shape-btn';
     btn.title = shape.tooltip;
     btn.setAttribute('data-testid', shape.dataTestId);
+    btn.setAttribute('draggable', 'true');
+    btn.setAttribute('data-stencil-name', shape.id);
     btn.innerHTML = shape.icon;
     const label = document.createElement('span');
     label.className = 'shape-label';

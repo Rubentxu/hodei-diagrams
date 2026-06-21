@@ -276,6 +276,59 @@ async function bootstrap(): Promise<void> {
         () => zoomPan.getZoom(),
       );
       activeEditor.attach();
+
+      // ── Stencil drag-and-drop ─────────────────────────────────────────────
+      // Wire dragstart on all stencil sidebar buttons
+      const stencilBtns = [
+        ui.rectangleStencilButton,
+        ui.ellipseStencilButton,
+        ui.diamondStencilButton,
+        ui.triangleStencilButton,
+        ui.hexagonStencilButton,
+        ui.cylinderStencilButton,
+        ui.cloudStencilButton,
+        ui.parallelogramStencilButton,
+        ui.trapezoidStencilButton,
+        ui.blockArrowStencilButton,
+      ];
+
+      for (const btn of stencilBtns) {
+        if (!btn) continue;
+        btn.addEventListener('dragstart', (e) => {
+          if (!activeEditor) return;
+          const stencilName = btn.getAttribute('data-stencil-name') ?? '';
+          // Map to ToolKind stencil variant
+          const toolMap: Record<string, string> = {
+            rectangle: 'rectangle-stencil',
+            ellipse: 'ellipse-stencil',
+            diamond: 'diamond-stencil',
+            triangle: 'triangle-stencil',
+            hexagon: 'hexagon-stencil',
+            cylinder: 'cylinder-stencil',
+            cloud: 'cloud-stencil',
+            parallelogram: 'parallelogram-stencil',
+            trapezoid: 'trapezoid-stencil',
+            blockArrow: 'blockArrow-stencil',
+          };
+          const tool = toolMap[stencilName] ?? 'rectangle-stencil';
+          activeEditor.startStencilDrag(tool, e.clientX, e.clientY);
+        });
+      }
+
+      // Wire canvas container for dragover (update preview) and drop (create shape)
+      ui.canvasContainer.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!activeEditor) return;
+        activeEditor.updateStencilDragPreview(e.clientX, e.clientY);
+      });
+
+      ui.canvasContainer.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!activeEditor) return;
+        activeEditor.endStencilDrag(e.clientX, e.clientY);
+      });
+      // ─────────────────────────────────────────────────────────────────────
+
       // Re-render when inspector modifies state via session.executeCommand
       activeSession.setOnStateChange(() => {
         activeEditor?.triggerReplay();
