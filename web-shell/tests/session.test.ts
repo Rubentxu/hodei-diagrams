@@ -18,6 +18,7 @@ function createMockWasm() {
     engine_can_redo: vi.fn(),
     connect_vertices: vi.fn(),
     disconnect_edge: vi.fn(),
+    parse_stencil_xml: vi.fn(),
   };
 }
 
