@@ -34,6 +34,7 @@ export interface UiElements {
   parallelogramToolButton: HTMLButtonElement;
   trapezoidToolButton: HTMLButtonElement;
   polygonToolButton: HTMLButtonElement;
+  stencilToolButton: HTMLButtonElement;
   sidebarCollapseBtn: HTMLButtonElement;
 
   // Zone 3: Canvas
@@ -203,6 +204,7 @@ export function buildEmptyUi(
     parallelogramToolButton: sidebar.parallelogramToolBtn,
     trapezoidToolButton: sidebar.trapezoidToolBtn,
     polygonToolButton: sidebar.polygonToolBtn,
+    stencilToolButton: sidebar.stencilToolBtn,
     sidebarCollapseBtn: sidebar.collapseBtn,
 
     // Zone 3
