@@ -377,6 +377,20 @@ export class Editor {
     this.#replay();
   }
 
+  /**
+   * Execute an array of commands atomically as a single transaction.
+   * On success, one undo entry is pushed; on error all commands are rolled back.
+   * Empty array is a no-op (no undo entry, no error).
+   */
+  executeTransaction(commands: string[]): void {
+    const result = this.#session.executeTransaction(commands);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    this.#replay();
+  }
+
   // ─── Active Tool ──────────────────────────────────────────────────────────
 
   /** Current active tool. */

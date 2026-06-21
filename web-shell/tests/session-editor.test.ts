@@ -6,6 +6,7 @@ function createMockWasm() {
     create_engine: vi.fn(),
     dispose_engine: vi.fn(),
     execute_command: vi.fn(),
+    execute_transaction: vi.fn(),
     get_scene: vi.fn(),
     render_svg: vi.fn(),
     render_pages: vi.fn(),

@@ -18,6 +18,7 @@ export type WasmModule = {
   create_engine(): number;
   dispose_engine(_h: number): void;
   execute_command(_h: number, _json: string): void;
+  execute_transaction(_h: number, _json: string): void;
   get_scene(_h: number): string;
   render_svg(_h: number, _pageIdx: bigint): string;
   render_pages(_h: number): string;

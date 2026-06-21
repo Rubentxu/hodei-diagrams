@@ -16,6 +16,7 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       create_engine: mod.create_engine,
       dispose_engine: mod.dispose_engine,
       execute_command: mod.execute_command,
+      execute_transaction: mod.execute_transaction,
       get_scene: mod.get_scene,
       render_svg: mod.render_svg,
       render_pages: mod.render_pages,
