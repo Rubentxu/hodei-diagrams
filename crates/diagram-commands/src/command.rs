@@ -8,10 +8,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::CommandResult;
 use crate::payload::{
-    AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
-    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, FlipCommand,
-    MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
-    RemoveVertexPayload, RenamePagePayload, RotateCommand,
+    AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, BringForwardPayload,
+    BringToFrontPayload, ChangeStylePayload, ConnectVerticesCommand, DisconnectEdgeCommand,
+    EditLabelPayload, FlipCommand, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload,
+    RemovePagePayload, RemoveVertexPayload, RenamePagePayload, RotateCommand, SendBackwardPayload,
+    SendToBackPayload,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -53,6 +54,14 @@ pub enum Command {
     RotateVertex(RotateCommand),
     /// Flip a vertex along an axis.
     FlipVertex(FlipCommand),
+    /// Bring a cell to the front (topmost z-order).
+    BringToFront(BringToFrontPayload),
+    /// Send a cell to the back (bottommost z-order).
+    SendToBack(SendToBackPayload),
+    /// Bring a cell forward (swap with next higher).
+    BringForward(BringForwardPayload),
+    /// Send a cell backward (swap with next lower).
+    SendBackward(SendBackwardPayload),
 }
 
 impl Command {
@@ -77,6 +86,10 @@ impl Command {
             Command::RenamePage(p) => p.apply(model),
             Command::RotateVertex(p) => p.apply(model),
             Command::FlipVertex(p) => p.apply(model),
+            Command::BringToFront(p) => p.apply(model),
+            Command::SendToBack(p) => p.apply(model),
+            Command::BringForward(p) => p.apply(model),
+            Command::SendBackward(p) => p.apply(model),
         }
     }
 
@@ -101,6 +114,10 @@ impl Command {
             Command::RenamePage(p) => p.undo(model),
             Command::RotateVertex(p) => p.undo(model),
             Command::FlipVertex(p) => p.undo(model),
+            Command::BringToFront(p) => p.undo(model),
+            Command::SendToBack(p) => p.undo(model),
+            Command::BringForward(p) => p.undo(model),
+            Command::SendBackward(p) => p.undo(model),
         }
     }
 }
@@ -137,6 +154,7 @@ mod tests {
 
     use super::*;
     use crate::RoutingKind;
+    use crate::payload::CellTarget;
 
     fn make_model_with_page() -> (DiagramModel, PageId) {
         let mut model = DiagramModel::new();
@@ -1036,12 +1054,302 @@ mod tests {
         }
     }
 
+    // ─── Z-order: max+1 on Add* ───────────────────────────────────────────────
+
+    #[test]
+    fn apply_add_vertex_first_on_page_assigns_z_order_zero() {
+        let (mut model, pid) = make_model_with_page();
+        let v = Vertex {
+            label: Some(Label::new("First")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+
+        let mut cmd = Command::AddVertex(AddVertexPayload::new(v));
+        cmd.apply(&mut model).unwrap();
+
+        // First vertex on empty page: max=-1, so z_order = -1 + 1 = 0
+        let vid = vid_from_model(&model, 0);
+        let stored = model.store.vertex(vid).unwrap();
+        assert_eq!(stored.z_order, 0);
+    }
+
+    #[test]
+    fn apply_add_vertex_second_assigns_max_plus_one() {
+        let (mut model, pid) = make_model_with_page();
+        // First vertex with explicit z=5
+        let v1 = Vertex {
+            label: Some(Label::new("First")),
+            page_id: Some(pid),
+            z_order: 5,
+            ..Default::default()
+        };
+        let _vid1 = model.store.insert_vertex(v1);
+
+        // Second vertex via command
+        let v2 = Vertex {
+            label: Some(Label::new("Second")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let mut cmd = Command::AddVertex(AddVertexPayload::new(v2));
+        cmd.apply(&mut model).unwrap();
+
+        let vid2 = vid_from_model(&model, 1);
+        let stored = model.store.vertex(vid2).unwrap();
+        assert_eq!(stored.z_order, 6); // max(5) + 1 = 6
+    }
+
+    #[test]
+    fn apply_add_edge_scans_all_kinds() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertex z=3
+        let v1 = Vertex {
+            label: Some(Label::new("V1")),
+            page_id: Some(pid),
+            z_order: 3,
+            ..Default::default()
+        };
+        let vid1 = model.store.insert_vertex(v1);
+
+        // Edge z=7
+        let e = Edge {
+            source: vid1,
+            target: vid1,
+            page_id: Some(pid),
+            z_order: 7,
+            ..Default::default()
+        };
+        let _eid = model.store.insert_edge(e);
+
+        // Add new edge via command
+        let new_edge = Edge {
+            source: vid1,
+            target: vid1,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let mut cmd = Command::AddEdge(AddEdgePayload::new(new_edge));
+        cmd.apply(&mut model).unwrap();
+
+        let eid2 = eid_from_model(&model, 1);
+        let stored = model.store.edge(eid2).unwrap();
+        assert_eq!(stored.z_order, 8); // max(3, 7) + 1 = 8
+    }
+
+    #[test]
+    fn apply_add_group_scans_all_kinds() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertex z=10
+        let v = Vertex {
+            label: Some(Label::new("V1")),
+            page_id: Some(pid),
+            z_order: 10,
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(v);
+
+        // Add group via command
+        let g = Group {
+            label: Some(Label::new("Group")),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let mut cmd = Command::AddGroup(AddGroupPayload::new(g));
+        cmd.apply(&mut model).unwrap();
+
+        let gid = gid_from_model(&model, 0);
+        let stored = model.store.group(gid).unwrap();
+        assert_eq!(stored.z_order, 11); // max(10) + 1 = 11
+    }
+
+    // ─── Z-order: ordering commands ──────────────────────────────────────────
+
+    #[test]
+    fn bring_to_front_moves_to_top() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={1,3,5,7}
+        let _v1 = insert_vertex_with_z(&mut model, pid, "v1", 1);
+        let v2 = insert_vertex_with_z(&mut model, pid, "v2", 3);
+        let _v3 = insert_vertex_with_z(&mut model, pid, "v3", 5);
+        let _v4 = insert_vertex_with_z(&mut model, pid, "v4", 7);
+
+        // Bring v2 (z=3) to front
+        let mut cmd = Command::BringToFront(BringToFrontPayload::new(CellTarget::Vertex(v2)));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(v2).unwrap();
+        assert_eq!(v.z_order, 8); // max({1,3,5,7}) + 1 = 8
+    }
+
+    #[test]
+    fn bring_to_front_topmost_is_noop() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={1,3,5,7}, v4 is topmost with z=7
+        let v4 = insert_vertex_with_z(&mut model, pid, "v4", 7);
+
+        let mut cmd = Command::BringToFront(BringToFrontPayload::new(CellTarget::Vertex(v4)));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(v4).unwrap();
+        // Still 7 because it was already topmost
+        assert_eq!(v.z_order, 7);
+    }
+
+    #[test]
+    fn send_to_back_moves_to_bottom() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={2,4,6,8}
+        let _v1 = insert_vertex_with_z(&mut model, pid, "v1", 2);
+        let _v2 = insert_vertex_with_z(&mut model, pid, "v2", 4);
+        let v3 = insert_vertex_with_z(&mut model, pid, "v3", 6);
+        let _v4 = insert_vertex_with_z(&mut model, pid, "v4", 8);
+
+        // Send v3 (z=6) to back
+        let mut cmd = Command::SendToBack(SendToBackPayload::new(CellTarget::Vertex(v3)));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(v3).unwrap();
+        assert_eq!(v.z_order, 1); // min({2,4,6,8}) - 1 = 1
+    }
+
+    #[test]
+    fn send_to_back_bottom_is_noop() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={2,4,6,8}, v1 is bottom with z=2
+        let v1 = insert_vertex_with_z(&mut model, pid, "v1", 2);
+
+        let mut cmd = Command::SendToBack(SendToBackPayload::new(CellTarget::Vertex(v1)));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(v1).unwrap();
+        assert_eq!(v.z_order, 2);
+    }
+
+    #[test]
+    fn send_to_back_permits_negative() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={0, 5, 10}
+        let _v1 = insert_vertex_with_z(&mut model, pid, "v1", 0);
+        let v2 = insert_vertex_with_z(&mut model, pid, "v2", 5);
+        let _v3 = insert_vertex_with_z(&mut model, pid, "v3", 10);
+
+        // Send v2 (z=5) to back
+        let mut cmd = Command::SendToBack(SendToBackPayload::new(CellTarget::Vertex(v2)));
+        cmd.apply(&mut model).unwrap();
+
+        let v = model.store.vertex(v2).unwrap();
+        assert_eq!(v.z_order, -1); // min({0,5,10}) - 1 = -1
+    }
+
+    #[test]
+    fn bring_forward_swaps_with_next() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={1, 2, 3}
+        let v1 = insert_vertex_with_z(&mut model, pid, "v1", 1);
+        let v2 = insert_vertex_with_z(&mut model, pid, "v2", 2);
+        let _v3 = insert_vertex_with_z(&mut model, pid, "v3", 3);
+
+        // Bring v1 forward (swap with v2)
+        let mut cmd = Command::BringForward(BringForwardPayload::new(CellTarget::Vertex(v1)));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.vertex(v1).unwrap().z_order, 2);
+        assert_eq!(model.store.vertex(v2).unwrap().z_order, 1);
+    }
+
+    #[test]
+    fn bring_forward_topmost_is_noop() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={1, 2, 3}, v3 is topmost
+        let v3 = insert_vertex_with_z(&mut model, pid, "v3", 3);
+
+        let mut cmd = Command::BringForward(BringForwardPayload::new(CellTarget::Vertex(v3)));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.vertex(v3).unwrap().z_order, 3);
+    }
+
+    #[test]
+    fn send_backward_swaps_with_prev() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={1, 2, 3}
+        let _v1 = insert_vertex_with_z(&mut model, pid, "v1", 1);
+        let v2 = insert_vertex_with_z(&mut model, pid, "v2", 2);
+        let v3 = insert_vertex_with_z(&mut model, pid, "v3", 3);
+
+        // Send v3 backward (swap with v2)
+        let mut cmd = Command::SendBackward(SendBackwardPayload::new(CellTarget::Vertex(v3)));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.vertex(v3).unwrap().z_order, 2);
+        assert_eq!(model.store.vertex(v2).unwrap().z_order, 3);
+    }
+
+    #[test]
+    fn send_backward_bottom_is_noop() {
+        let (mut model, pid) = make_model_with_page();
+        // Vertices with z={1, 2, 3}, v1 is bottom
+        let v1 = insert_vertex_with_z(&mut model, pid, "v1", 1);
+
+        let mut cmd = Command::SendBackward(SendBackwardPayload::new(CellTarget::Vertex(v1)));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.vertex(v1).unwrap().z_order, 1);
+    }
+
+    #[test]
+    fn undo_bring_to_front_restores_prev_z() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex_with_z(&mut model, pid, "v1", 3);
+        let v2 = insert_vertex_with_z(&mut model, pid, "v2", 5);
+
+        let mut cmd = Command::BringToFront(BringToFrontPayload::new(CellTarget::Vertex(v1)));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.vertex(v1).unwrap().z_order, 6);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.vertex(v1).unwrap().z_order, 3);
+        assert_eq!(model.store.vertex(v2).unwrap().z_order, 5); // v2 unchanged
+    }
+
+    #[test]
+    fn undo_bring_forward_restores_both() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex_with_z(&mut model, pid, "v1", 1);
+        let v2 = insert_vertex_with_z(&mut model, pid, "v2", 2);
+
+        let mut cmd = Command::BringForward(BringForwardPayload::new(CellTarget::Vertex(v1)));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.vertex(v1).unwrap().z_order, 2);
+        assert_eq!(model.store.vertex(v2).unwrap().z_order, 1);
+
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.vertex(v1).unwrap().z_order, 1);
+        assert_eq!(model.store.vertex(v2).unwrap().z_order, 2);
+    }
+
     // ─── Helpers ───────────────────────────────────────────────────────────────
 
     fn insert_vertex(model: &mut DiagramModel, pid: PageId, label: &str) -> VertexId {
         let v = Vertex {
             label: Some(Label::new(label)),
             page_id: Some(pid),
+            ..Default::default()
+        };
+        model.store.insert_vertex(v)
+    }
+
+    fn insert_vertex_with_z(
+        model: &mut DiagramModel,
+        pid: PageId,
+        label: &str,
+        z: i32,
+    ) -> VertexId {
+        let v = Vertex {
+            label: Some(Label::new(label)),
+            page_id: Some(pid),
+            z_order: z,
             ..Default::default()
         };
         model.store.insert_vertex(v)

@@ -291,6 +291,66 @@ impl ModelStore {
             .get_mut(id)
             .map(|old| std::mem::replace(old, style))
     }
+
+    // ─── Z-order helpers ───────────────────────────────────────────────────────
+
+    /// Returns the maximum `z_order` value among all cells (vertices, edges,
+    /// groups) on the given page.
+    ///
+    /// Returns `-1` if the page is empty, so that `max_z_order(page) + 1 == 0`
+    /// for the first shape on an empty page.
+    ///
+    /// See ADR-0058 §Z-order semantics.
+    pub fn max_z_order(&self, page_id: PageId) -> i32 {
+        let mut max = -1;
+        for (_, v) in self.vertices.iter() {
+            if v.page_id == Some(page_id) && v.z_order > max {
+                max = v.z_order;
+            }
+        }
+        for (_, e) in self.edges.iter() {
+            if e.page_id == Some(page_id) && e.z_order > max {
+                max = e.z_order;
+            }
+        }
+        for (_, g) in self.groups.iter() {
+            if g.page_id == Some(page_id) && g.z_order > max {
+                max = g.z_order;
+            }
+        }
+        max
+    }
+
+    /// Returns the minimum `z_order` value among all cells (vertices, edges,
+    /// groups) on the given page.
+    ///
+    /// Returns `0` if the page is empty (no sentinel needed; `min_z_order - 1`
+    /// can be negative without issue).
+    ///
+    /// See ADR-0058 §Z-order semantics.
+    pub fn min_z_order(&self, page_id: PageId) -> i32 {
+        let mut min = i32::MAX;
+        for (_, v) in self.vertices.iter() {
+            if v.page_id == Some(page_id) && v.z_order < min {
+                min = v.z_order;
+            }
+        }
+        for (_, e) in self.edges.iter() {
+            if e.page_id == Some(page_id) && e.z_order < min {
+                min = e.z_order;
+            }
+        }
+        for (_, g) in self.groups.iter() {
+            if g.page_id == Some(page_id) && g.z_order < min {
+                min = g.z_order;
+            }
+        }
+        if min == i32::MAX {
+            0 // page empty
+        } else {
+            min
+        }
+    }
 }
 
 #[cfg(test)]
@@ -602,5 +662,142 @@ mod tests {
         let result = store.remove_page(pid);
         assert!(result.is_some());
         assert!(store.page(pid).is_none());
+    }
+
+    // ─── Z-order helpers ─────────────────────────────────────────────────────
+
+    #[test]
+    fn max_z_order_empty_page_returns_neg1() {
+        let mut store = ModelStore::new();
+        let page = Page::new(PageId::default());
+        let pid = store.insert_page(page);
+        // max of empty page should be -1 (so max+1 = 0 for first shape)
+        assert_eq!(store.max_z_order(pid), -1);
+    }
+
+    #[test]
+    fn max_z_order_scans_all_kinds() {
+        let mut store = ModelStore::new();
+        let page = Page::new(PageId::default());
+        let pid = store.insert_page(page);
+
+        // Insert vertex z=3
+        let v = Vertex {
+            z_order: 3,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = store.insert_vertex(v);
+
+        // Insert edge z=7
+        let e = Edge {
+            z_order: 7,
+            page_id: Some(pid),
+            source: VertexId::default(),
+            target: VertexId::default(),
+            ..Default::default()
+        };
+        let _eid = store.insert_edge(e);
+
+        // Insert group z=10
+        let g = Group {
+            z_order: 10,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _gid = store.insert_group(g);
+
+        assert_eq!(store.max_z_order(pid), 10);
+    }
+
+    #[test]
+    fn max_z_order_filters_by_page() {
+        let mut store = ModelStore::new();
+        let page_a = Page::new(PageId::default());
+        let pid_a = store.insert_page(page_a);
+        let page_b = Page::new(PageId::default());
+        let pid_b = store.insert_page(page_b);
+
+        // Vertex on page A with z=5
+        let v_a = Vertex {
+            z_order: 5,
+            page_id: Some(pid_a),
+            ..Default::default()
+        };
+        store.insert_vertex(v_a);
+
+        // Vertex on page B with z=99
+        let v_b = Vertex {
+            z_order: 99,
+            page_id: Some(pid_b),
+            ..Default::default()
+        };
+        store.insert_vertex(v_b);
+
+        assert_eq!(store.max_z_order(pid_a), 5);
+        assert_eq!(store.max_z_order(pid_b), 99);
+    }
+
+    #[test]
+    fn max_z_order_includes_negative_values() {
+        let mut store = ModelStore::new();
+        let page = Page::new(PageId::default());
+        let pid = store.insert_page(page);
+
+        // Vertex with z=-3
+        let v = Vertex {
+            z_order: -3,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        store.insert_vertex(v);
+
+        // Edge with z=0
+        let e = Edge {
+            z_order: 0,
+            page_id: Some(pid),
+            source: VertexId::default(),
+            target: VertexId::default(),
+            ..Default::default()
+        };
+        store.insert_edge(e);
+
+        // max should be 0
+        assert_eq!(store.max_z_order(pid), 0);
+    }
+
+    #[test]
+    fn min_z_order_empty_page_returns_zero() {
+        let mut store = ModelStore::new();
+        let page = Page::new(PageId::default());
+        let pid = store.insert_page(page);
+        assert_eq!(store.min_z_order(pid), 0);
+    }
+
+    #[test]
+    fn min_z_order_returns_smallest_including_negatives() {
+        let mut store = ModelStore::new();
+        let page = Page::new(PageId::default());
+        let pid = store.insert_page(page);
+
+        // Vertex with z=-5
+        let v = Vertex {
+            z_order: -5,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        store.insert_vertex(v);
+
+        // Edge with z=3
+        let e = Edge {
+            z_order: 3,
+            page_id: Some(pid),
+            source: VertexId::default(),
+            target: VertexId::default(),
+            ..Default::default()
+        };
+        store.insert_edge(e);
+
+        assert_eq!(store.min_z_order(pid), -5);
     }
 }

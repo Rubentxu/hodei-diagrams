@@ -33,6 +33,452 @@ use std::collections::HashMap;
 
 use crate::error::{CommandError, CommandResult};
 
+/// Target for z-order operations: a cell reference that can be a vertex, edge, or group.
+/// See ADR-0058 §Decision (CellTarget enum).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum CellTarget {
+    /// Target a vertex by its ID.
+    Vertex(VertexId),
+    /// Target an edge by its ID.
+    Edge(EdgeId),
+    /// Target a group by its ID.
+    Group(GroupId),
+}
+
+impl CellTarget {
+    /// Returns the page ID of the targeted cell, or None if not found.
+    fn page_id(&self, store: &diagram_core::ModelStore) -> Option<PageId> {
+        match self {
+            CellTarget::Vertex(vid) => store.vertex(*vid).and_then(|v| v.page_id),
+            CellTarget::Edge(eid) => store.edge(*eid).and_then(|e| e.page_id),
+            CellTarget::Group(gid) => store.group(*gid).and_then(|g| g.page_id),
+        }
+    }
+
+    /// Returns the current z_order of the targeted cell, or None if not found.
+    fn current_z_order(&self, store: &diagram_core::ModelStore) -> Option<i32> {
+        match self {
+            CellTarget::Vertex(vid) => store.vertex(*vid).map(|v| v.z_order),
+            CellTarget::Edge(eid) => store.edge(*eid).map(|e| e.z_order),
+            CellTarget::Group(gid) => store.group(*gid).map(|g| g.z_order),
+        }
+    }
+
+    /// Sets the z_order of the targeted cell. Returns error if cell not found.
+    fn set_z_order(&self, store: &mut diagram_core::ModelStore, z: i32) -> CommandResult<()> {
+        match self {
+            CellTarget::Vertex(vid) => {
+                let v = store
+                    .vertex_mut(*vid)
+                    .ok_or(CommandError::VertexNotFound(*vid))?;
+                v.z_order = z;
+            }
+            CellTarget::Edge(eid) => {
+                let e = store
+                    .edge_mut(*eid)
+                    .ok_or(CommandError::EdgeNotFound(*eid))?;
+                e.z_order = z;
+            }
+            CellTarget::Group(gid) => {
+                let g = store
+                    .group_mut(*gid)
+                    .ok_or(CommandError::GroupNotFound(*gid))?;
+                g.z_order = z;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Payload for bringing a cell to the front (topmost z-order).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BringToFrontPayload {
+    /// The target cell to bring to front.
+    pub target: CellTarget,
+    /// The previous z_order value before the operation. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_z_order: Option<i32>,
+    /// Whether this command was applied (and how).
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl BringToFrontPayload {
+    /// Create a new payload for bringing a cell to front.
+    pub fn new(target: CellTarget) -> Self {
+        Self {
+            target,
+            prev_z_order: None,
+            applied: false,
+        }
+    }
+
+    /// Apply: set the target's z_order to max(page) + 1.
+    /// If the target is already the topmost (z_order == max), this is a no-op.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let page_id = self
+            .target
+            .page_id(&model.store)
+            .ok_or(match self.target {
+                CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+            })?;
+
+        // Capture previous z_order
+        let current_z =
+            self.target
+                .current_z_order(&model.store)
+                .ok_or(match self.target {
+                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+                })?;
+        self.prev_z_order = Some(current_z);
+
+        // No-op if target is already the topmost (max z_order)
+        let max_z = model.store.max_z_order(page_id);
+        if current_z == max_z {
+            self.applied = true; // Mark as applied but no change
+            return Ok(());
+        }
+
+        // Calculate new z_order = max + 1
+        let new_z = max_z + 1;
+
+        self.target.set_z_order(&mut model.store, new_z)?;
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo: restore the previous z_order.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_z_order.ok_or(CommandError::NotApplied)?;
+        self.target.set_z_order(&mut model.store, prev)?;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for sending a cell to the back (bottommost z-order).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendToBackPayload {
+    /// The target cell to send to back.
+    pub target: CellTarget,
+    /// The previous z_order value before the operation. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_z_order: Option<i32>,
+    /// Whether this command was applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SendToBackPayload {
+    /// Create a new payload for sending a cell to back.
+    pub fn new(target: CellTarget) -> Self {
+        Self {
+            target,
+            prev_z_order: None,
+            applied: false,
+        }
+    }
+
+    /// Apply: set the target's z_order to min(page) - 1.
+    /// If the target is already the bottommost (z_order == min), this is a no-op.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let page_id = self
+            .target
+            .page_id(&model.store)
+            .ok_or(match self.target {
+                CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+            })?;
+
+        let current_z =
+            self.target
+                .current_z_order(&model.store)
+                .ok_or(match self.target {
+                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+                })?;
+        self.prev_z_order = Some(current_z);
+
+        // No-op if target is already the bottommost (min z_order)
+        let min_z = model.store.min_z_order(page_id);
+        if current_z == min_z {
+            self.applied = true; // Mark as applied but no change
+            return Ok(());
+        }
+
+        let new_z = min_z - 1;
+        self.target.set_z_order(&mut model.store, new_z)?;
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo: restore the previous z_order.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_z_order.ok_or(CommandError::NotApplied)?;
+        self.target.set_z_order(&mut model.store, prev)?;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for bringing a cell forward (swap with next higher).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BringForwardPayload {
+    /// The target cell to bring forward.
+    pub target: CellTarget,
+    /// The swap pair captured for undo: (other_cell, my_prev_z, other_prev_z).
+    #[serde(skip)]
+    pub swap: Option<(CellTarget, i32, i32)>,
+    /// Whether this command was applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl BringForwardPayload {
+    /// Create a new payload for bringing a cell forward.
+    pub fn new(target: CellTarget) -> Self {
+        Self {
+            target,
+            swap: None,
+            applied: false,
+        }
+    }
+
+    /// Apply: swap z_order with the next higher cell in (z_order ASC, id ASC) order.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let page_id = self
+            .target
+            .page_id(&model.store)
+            .ok_or(match self.target {
+                CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+            })?;
+
+        let my_prev_z =
+            self.target
+                .current_z_order(&model.store)
+                .ok_or(match self.target {
+                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+                })?;
+
+        // Collect all cells on this page with their z_order
+        let mut cells: Vec<(CellTarget, i32)> = Vec::new();
+
+        for (vid, v) in model.store.vertices_with_ids() {
+            if v.page_id == Some(page_id) {
+                cells.push((CellTarget::Vertex(vid), v.z_order));
+            }
+        }
+        for (eid, e) in model.store.edges_with_ids() {
+            if e.page_id == Some(page_id) {
+                cells.push((CellTarget::Edge(eid), e.z_order));
+            }
+        }
+        for (gid, g) in model.store.groups_with_ids() {
+            if g.page_id == Some(page_id) {
+                cells.push((CellTarget::Group(gid), g.z_order));
+            }
+        }
+
+        // Sort by (z_order ASC, id ASC)
+        // For id tie-break, we use the variant index (Vertex=0, Edge=1, Group=2)
+        // plus the ID's built-in Ord for stable per-kind ordering.
+        fn cell_idx(t: &CellTarget) -> u8 {
+            match t {
+                CellTarget::Vertex(_) => 0,
+                CellTarget::Edge(_) => 1,
+                CellTarget::Group(_) => 2,
+            }
+        }
+
+        cells.sort_by(|(t1, z1), (t2, z2)| {
+            z1.cmp(z2).then_with(|| {
+                let idx1 = cell_idx(t1);
+                let idx2 = cell_idx(t2);
+                idx1.cmp(&idx2).then_with(|| {
+                    // Compare IDs within same variant
+                    match (t1, t2) {
+                        (CellTarget::Vertex(v1), CellTarget::Vertex(v2)) => v1.cmp(v2),
+                        (CellTarget::Edge(e1), CellTarget::Edge(e2)) => e1.cmp(e2),
+                        (CellTarget::Group(g1), CellTarget::Group(g2)) => g1.cmp(g2),
+                        _ => unreachable!("same variant by idx check above"),
+                    }
+                })
+            })
+        });
+
+        // Find the target's position
+        let target_idx = cells
+            .iter()
+            .position(|(t, _)| *t == self.target)
+            .expect("target must be in cells list");
+
+        // If target is already at the end (topmost), nothing to do
+        if target_idx == cells.len() - 1 {
+            self.applied = true; // Mark as applied but no-op
+            return Ok(());
+        }
+
+        // Get the next cell (successor)
+        let (other, other_z) = cells[target_idx + 1];
+
+        // Swap z_orders
+        self.swap = Some((other, my_prev_z, other_z));
+        self.target.set_z_order(&mut model.store, other_z)?;
+        other.set_z_order(&mut model.store, my_prev_z)?;
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo: swap back.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let (other, my_z, other_z) = self.swap.ok_or(CommandError::NotApplied)?;
+        self.target.set_z_order(&mut model.store, my_z)?;
+        other.set_z_order(&mut model.store, other_z)?;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for sending a cell backward (swap with next lower).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendBackwardPayload {
+    /// The target cell to send backward.
+    pub target: CellTarget,
+    /// The swap pair captured for undo: (other_cell, my_prev_z, other_prev_z).
+    #[serde(skip)]
+    pub swap: Option<(CellTarget, i32, i32)>,
+    /// Whether this command was applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SendBackwardPayload {
+    /// Create a new payload for sending a cell backward.
+    pub fn new(target: CellTarget) -> Self {
+        Self {
+            target,
+            swap: None,
+            applied: false,
+        }
+    }
+
+    /// Apply: swap z_order with the next lower cell in (z_order ASC, id ASC) order.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let page_id = self
+            .target
+            .page_id(&model.store)
+            .ok_or(match self.target {
+                CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+            })?;
+
+        let my_prev_z =
+            self.target
+                .current_z_order(&model.store)
+                .ok_or(match self.target {
+                    CellTarget::Vertex(vid) => CommandError::VertexNotFound(vid),
+                    CellTarget::Edge(eid) => CommandError::EdgeNotFound(eid),
+                    CellTarget::Group(gid) => CommandError::GroupNotFound(gid),
+                })?;
+
+        // Collect all cells on this page with their z_order
+        let mut cells: Vec<(CellTarget, i32)> = Vec::new();
+
+        for (vid, v) in model.store.vertices_with_ids() {
+            if v.page_id == Some(page_id) {
+                cells.push((CellTarget::Vertex(vid), v.z_order));
+            }
+        }
+        for (eid, e) in model.store.edges_with_ids() {
+            if e.page_id == Some(page_id) {
+                cells.push((CellTarget::Edge(eid), e.z_order));
+            }
+        }
+        for (gid, g) in model.store.groups_with_ids() {
+            if g.page_id == Some(page_id) {
+                cells.push((CellTarget::Group(gid), g.z_order));
+            }
+        }
+
+        // Sort by (z_order ASC, id ASC)
+        fn cell_idx(t: &CellTarget) -> u8 {
+            match t {
+                CellTarget::Vertex(_) => 0,
+                CellTarget::Edge(_) => 1,
+                CellTarget::Group(_) => 2,
+            }
+        }
+
+        cells.sort_by(|(t1, z1), (t2, z2)| {
+            z1.cmp(z2).then_with(|| {
+                let idx1 = cell_idx(t1);
+                let idx2 = cell_idx(t2);
+                idx1.cmp(&idx2).then_with(|| match (t1, t2) {
+                    (CellTarget::Vertex(v1), CellTarget::Vertex(v2)) => v1.cmp(v2),
+                    (CellTarget::Edge(e1), CellTarget::Edge(e2)) => e1.cmp(e2),
+                    (CellTarget::Group(g1), CellTarget::Group(g2)) => g1.cmp(g2),
+                    _ => unreachable!("same variant by idx check above"),
+                })
+            })
+        });
+
+        // Find the target's position
+        let target_idx = cells
+            .iter()
+            .position(|(t, _)| *t == self.target)
+            .expect("target must be in cells list");
+
+        // If target is already at the beginning (bottommost), nothing to do
+        if target_idx == 0 {
+            self.applied = true; // Mark as applied but no-op
+            return Ok(());
+        }
+
+        // Get the previous cell (predecessor)
+        let (other, other_z) = cells[target_idx - 1];
+
+        // Swap z_orders
+        self.swap = Some((other, my_prev_z, other_z));
+        self.target.set_z_order(&mut model.store, other_z)?;
+        other.set_z_order(&mut model.store, my_prev_z)?;
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo: swap back.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let (other, my_z, other_z) = self.swap.ok_or(CommandError::NotApplied)?;
+        self.target.set_z_order(&mut model.store, my_z)?;
+        other.set_z_order(&mut model.store, other_z)?;
+        self.applied = false;
+        Ok(())
+    }
+}
+
 /// Captured state for undo of a group removal.
 type OrphanedChildren = Vec<(VertexId, Option<GroupId>)>;
 
@@ -86,6 +532,9 @@ impl AddVertexPayload {
             v.style_id = Some(sid);
             self.inserted_style_id = Some(sid);
         }
+        // Assign z_order = max(page) + 1 (ADR-0058 §Z-order semantics)
+        let page_id = v.page_id.unwrap_or_default();
+        v.z_order = model.store.max_z_order(page_id) + 1;
         let id = model.store.insert_vertex(v);
         self.inserted_id = Some(id);
         self.applied = true;
@@ -345,7 +794,12 @@ impl AddEdgePayload {
             ));
         }
 
-        let id = model.store.insert_edge(self.edge.clone());
+        // Assign z_order = max(page) + 1 (ADR-0058 §Z-order semantics)
+        let page_id = self.edge.page_id.unwrap_or_default();
+        let mut e = self.edge.clone();
+        e.z_order = model.store.max_z_order(page_id) + 1;
+
+        let id = model.store.insert_edge(e);
         self.inserted_id = Some(id);
         self.applied = true;
         Ok(())
@@ -509,7 +963,11 @@ impl AddGroupPayload {
 
     /// Apply the add-group operation.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
-        let id = model.store.insert_group(self.group.clone());
+        // Assign z_order = max(page) + 1 (ADR-0058 §Z-order semantics)
+        let page_id = self.group.page_id.unwrap_or_default();
+        let mut g = self.group.clone();
+        g.z_order = model.store.max_z_order(page_id) + 1;
+        let id = model.store.insert_group(g);
         self.inserted_id = Some(id);
         self.applied = true;
         Ok(())

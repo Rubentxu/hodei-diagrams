@@ -54,9 +54,12 @@ impl SceneBuilder {
         page_id: diagram_core::PageId,
         page: &Page,
     ) -> SceneResult<PageScene> {
-        let mut display_list: Vec<VisualElement> = Vec::new();
+        // Collect entries as (z_order, entity_kind, index, element) for stable sorting
+        // entity_kind: 0=vertex, 1=vertex-text, 2=edge, 3=edge-text, 4=group
+        let mut entries: Vec<(i32, u8, usize, VisualElement)> = Vec::new();
+        let mut index = 0usize;
 
-        // Top-level vertices: parent.is_none() AND page_id matches
+        // Top-level vertices: parent.is_none() AND page_id matches AND visible
         for (vid, vertex) in store.vertices_with_ids() {
             if vertex.page_id != Some(page_id) {
                 continue;
@@ -64,9 +67,13 @@ impl SceneBuilder {
             if vertex.parent.is_some() {
                 continue; // Will be nested under a group
             }
+            if !vertex.visible {
+                continue; // Hidden
+            }
 
             let elem = self.project_vertex(store, vid, vertex, None)?;
-            display_list.push(elem);
+            entries.push((vertex.z_order, 0, index, elem));
+            index += 1;
 
             // Label projection
             if let Some(ref label) = vertex.label {
@@ -79,19 +86,24 @@ impl SceneBuilder {
                     text: label.text.clone(),
                     style,
                 });
-                display_list.push(text_elem);
+                entries.push((vertex.z_order, 1, index, text_elem));
+                index += 1;
             }
         }
 
-        // Top-level edges: page_id matches (edges don't have parent)
+        // Top-level edges: page_id matches (edges don't have parent) AND visible
         for (eid, edge) in store.edges_with_ids() {
             if edge.page_id != Some(page_id) {
                 continue;
             }
+            if !edge.visible {
+                continue; // Hidden
+            }
 
             match self.project_edge(store, eid, edge) {
                 Ok(elem) => {
-                    display_list.push(elem);
+                    entries.push((edge.z_order, 2, index, elem.clone()));
+                    index += 1;
 
                     // Label projection for edge
                     if let Some(ref label) = edge.label {
@@ -109,7 +121,8 @@ impl SceneBuilder {
                                 text: label.text.clone(),
                                 style,
                             });
-                            display_list.push(text_elem);
+                            entries.push((edge.z_order, 3, index, text_elem));
+                            index += 1;
                         }
                     }
                 }
@@ -117,15 +130,30 @@ impl SceneBuilder {
             }
         }
 
-        // Top-level groups: page_id matches (groups don't have parent in v1)
+        // Top-level groups: page_id matches (groups don't have parent in v1) AND visible
         for (gid, group) in store.groups_with_ids() {
             if group.page_id != Some(page_id) {
                 continue;
             }
+            if !group.visible {
+                continue; // Hidden group skips its entire subtree
+            }
 
             let elem = self.project_group(store, gid, group, page_id)?;
-            display_list.push(elem);
+            entries.push((group.z_order, 4, index, elem));
+            index += 1;
         }
+
+        // Sort by (z_order ASC, entity_kind ASC, index ASC)
+        // Stable sort preserves insertion order for equal keys
+        entries.sort_by(|a, b| {
+            a.0.cmp(&b.0)
+                .then_with(|| a.1.cmp(&b.1))
+                .then_with(|| a.2.cmp(&b.2))
+        });
+
+        let display_list: Vec<VisualElement> =
+            entries.into_iter().map(|(_, _, _, elem)| elem).collect();
 
         let name = page
             .name

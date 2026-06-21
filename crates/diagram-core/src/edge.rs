@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 /// Source and target are non-optional: the engine always produces well-formed
 /// edges. If a draw.io cell references a non-existent source or target, the
 /// mapping layer drops the edge and emits a `Diagnostic`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+///
+/// See ADR-0058 §Decision (data shape).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Edge {
     /// The label text displayed on the edge.
     pub label: Option<Label>,
@@ -32,4 +34,33 @@ pub struct Edge {
     pub waypoints: Vec<Point>,
     /// The page this edge belongs to, if any.
     pub page_id: Option<PageId>,
+    /// Z-order for layering: higher values render on top. Ties are broken
+    /// by engine ID (higher ID on top). Default is 0.
+    /// See ADR-0058 §Z-order semantics.
+    pub z_order: i32,
+    /// Whether the edge is locked. The engine stores this flag but does NOT
+    /// enforce it — the editor layer is responsible for preventing mutations
+    /// on locked shapes. Default is false.
+    /// See ADR-0058 §Lock and visibility.
+    pub locked: bool,
+    /// Whether the edge is visible. Invisible shapes are excluded from the
+    /// scene display list but remain addressable in the model. Default is true.
+    /// See ADR-0058 §Lock and visibility.
+    pub visible: bool,
+}
+
+impl Default for Edge {
+    fn default() -> Self {
+        Self {
+            label: None,
+            style_id: None,
+            source: VertexId::default(),
+            target: VertexId::default(),
+            waypoints: Vec::new(),
+            page_id: None,
+            z_order: 0,
+            locked: false,
+            visible: true, // Visible by default per ADR-0058
+        }
+    }
 }
