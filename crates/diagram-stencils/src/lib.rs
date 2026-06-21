@@ -13,6 +13,12 @@
 //! let stencil = diagram_stencils::parse_stencil(xml).unwrap();
 //! assert_eq!(stencil.name, "Box");
 //! ```
+//!
+//! ## Serde
+//!
+//! This crate supports `serde` serialization/deserialization via the `serde`
+//! feature flag. The `PathCommand` enum and `Stencil` struct serialize to a
+//! machine-readable format suitable for caching or IPC.
 
 mod error;
 mod parse;
@@ -63,7 +69,7 @@ impl Aspect {
 }
 
 /// A command within a `<path>` element.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PathCommand {
     /// `move to x,y`
     Move { x: f64, y: f64 },

@@ -9,6 +9,7 @@ description = "Render-agnostic projection layer for the Diagram Engine. Depends 
 
 [dependencies]
 diagram-core = { path = "../diagram-core" }
+diagram-stencils = { path = "../diagram-stencils" }
 thiserror = { workspace = true }
 serde = "1"
 
