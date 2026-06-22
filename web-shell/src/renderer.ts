@@ -58,6 +58,11 @@ export interface ZoomPanControls {
   setPan(x: number, y: number): void;
   /** Convert screen client coordinates to document-space coordinates. */
   clientToDoc(clientX: number, clientY: number): { x: number; y: number };
+  /**
+   * Zoom and pan so all shapes fit within the viewport.
+   * Uses 5% viewport margin by default. Safe no-op when viewer is empty.
+   */
+  fitToView(padding?: number): void;
 }
 
 /**
@@ -106,6 +111,65 @@ export function setupZoomPan(
       x: (clientX - rect.left) / zoom,
       y: (clientY - rect.top) / zoom,
     };
+  }
+
+  function fitToView(padding = 0.05): void {
+    // Collect all shape bounding boxes from data-vertex-id elements
+    const shapeEls = viewer.querySelectorAll('[data-vertex-id]');
+    if (shapeEls.length === 0) {
+      // No shapes — reset to default view
+      resetView();
+      return;
+    }
+
+    // Compute union bbox of all shapes in document (SVG) coordinate space.
+    // We get screen bboxes and divide by current zoom to convert to doc coords,
+    // since the viewer transform is scale(zoom) translate(panX, panY).
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const el of shapeEls) {
+      const r = el.getBoundingClientRect();
+      const x = (r.left - viewer.getBoundingClientRect().left) / zoom;
+      const y = (r.top - viewer.getBoundingClientRect().top) / zoom;
+      const w = r.width / zoom;
+      const h = r.height / zoom;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x + w > maxX) maxX = x + w;
+      if (y + h > maxY) maxY = y + h;
+    }
+
+    if (minX === Infinity) {
+      resetView();
+      return;
+    }
+
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+    if (contentW <= 0 || contentH <= 0) {
+      resetView();
+      return;
+    }
+
+    const containerRect = viewer.getBoundingClientRect();
+    const availW = containerRect.width * (1 - padding * 2);
+    const availH = containerRect.height * (1 - padding * 2);
+
+    const newZoom = Math.max(0.1, Math.min(5, Math.min(availW / contentW, availH / contentH)));
+
+    // Center content: pan so content center aligns with viewport center
+    const contentCenterX = (minX + maxX) / 2;
+    const contentCenterY = (minY + maxY) / 2;
+    const viewportCenterX = containerRect.width / 2;
+    const viewportCenterY = containerRect.height / 2;
+
+    const newPanX = viewportCenterX / newZoom - contentCenterX;
+    const newPanY = viewportCenterY / newZoom - contentCenterY;
+
+    zoom = newZoom;
+    panX = newPanX;
+    panY = newPanY;
+    applyTransform();
+    container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom } }));
   }
 
   // ─── Mouse wheel → zoom ───────────────────────────────────────────────────
@@ -171,5 +235,5 @@ export function setupZoomPan(
     if (e.button === 1) e.preventDefault();
   });
 
-  return { setZoom, getZoom, resetView, setPan, clientToDoc };
+  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView };
 }

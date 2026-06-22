@@ -78,6 +78,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
       <path d="M12 16h8M12 12h8M12 20h4"/>
     </svg>
     <p>Select a shape to edit its properties</p>
+    <p class="actionable-hint">Click a shape on the canvas, then use the tools below</p>
   `;
   stylePane.appendChild(noSelectionMsg);
 
@@ -457,6 +458,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
       <path d="M6 8h20M6 14h14M6 20h17"/>
     </svg>
     <p>Select a shape to edit text properties</p>
+    <p class="actionable-hint">Click a shape on the canvas to edit its text</p>
   `;
   textPane.appendChild(textNoSelMsg);
 
@@ -589,6 +591,25 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   arrangePane.className = 'inspector-pane';
   arrangePane.setAttribute('data-testid', 'inspector-pane-arrange');
 
+  // Arrange empty state (new for PR #N.6)
+  const arrangeNoSelMsg = document.createElement('div');
+  arrangeNoSelMsg.className = 'no-selection-msg';
+  arrangeNoSelMsg.innerHTML = `
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6" y="6" width="20" height="20" rx="2"/>
+      <path d="M12 16h8M16 12v8"/>
+    </svg>
+    <p>Select a shape to arrange it</p>
+    <p class="actionable-hint">Click a shape on the canvas, then use the tools below</p>
+  `;
+  arrangeNoSelMsg.hidden = false;
+  arrangePane.appendChild(arrangeNoSelMsg);
+
+  // Arrange fields wrapper (for show/hide based on selection)
+  const arrangeFields = document.createElement('div');
+  arrangeFields.className = 'inspector-fields';
+  arrangeFields.hidden = true;
+
   // Helper to create arrange button
   function makeArrangeButton(testId: string, label: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
@@ -634,7 +655,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   alignSection.appendChild(alignRow2);
   alignButtons.push(alignTopBtn, alignCenterVBtn, alignBottomBtn);
 
-  arrangePane.appendChild(alignSection);
+  arrangeFields.appendChild(alignSection);
 
   // Distribute section
   const distributeSection = document.createElement('div');
@@ -653,7 +674,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   distributeSection.appendChild(distributeRow);
   distributeButtons.push(distributeHBtn, distributeVBtn);
 
-  arrangePane.appendChild(distributeSection);
+  arrangeFields.appendChild(distributeSection);
 
   // Same Size section
   const sameSizeSection = document.createElement('div');
@@ -674,7 +695,9 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   sameSizeSection.appendChild(sameSizeRow);
   sameSizeButtons.push(sameWidthBtn, sameHeightBtn, sameBothBtn);
 
-  arrangePane.appendChild(sameSizeSection);
+  arrangeFields.appendChild(sameSizeSection);
+
+  arrangePane.appendChild(arrangeFields);
 
   container.appendChild(arrangePane);
 
@@ -1485,6 +1508,8 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
     styleFields.hidden = !hasSelection;
     textNoSelMsg.hidden = hasSelection;
     textFields.hidden = !hasSelection;
+    arrangeNoSelMsg.hidden = hasSelection;
+    arrangeFields.hidden = !hasSelection;
 
     // Update shadow section based on selection
     updateShadowSection(selection);

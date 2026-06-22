@@ -5,6 +5,8 @@
  * All state is in the engine; this is pure UI building and event wiring.
  */
 
+import { ICONS } from './icon';
+
 export interface NavbarControls {
   container: HTMLElement;
   fileInput: HTMLInputElement;
@@ -22,8 +24,9 @@ export function buildNavbar(): NavbarControls {
   // ─── Brand ───────────────────────────────────────────────────────────────
   const brand = document.createElement('span');
   brand.className = 'navbar-brand';
-  brand.textContent = 'Hodei';
+  brand.innerHTML = ICONS.BRAND;
   brand.setAttribute('data-testid', 'navbar-brand');
+  brand.setAttribute('aria-label', 'Hodei Diagrams');
   container.appendChild(brand);
 
   // ─── Menu bar ────────────────────────────────────────────────────────────
@@ -200,7 +203,7 @@ export function buildNavbar(): NavbarControls {
   // Undo button
   const undoBtn = document.createElement('button');
   undoBtn.className = 'quick-btn';
-  undoBtn.textContent = '↩';
+  undoBtn.innerHTML = ICONS.UNDO;
   undoBtn.title = 'Undo (Ctrl+Z)';
   undoBtn.disabled = true;
   undoBtn.setAttribute('data-testid', 'undo-btn');
@@ -209,13 +212,13 @@ export function buildNavbar(): NavbarControls {
   // Redo button
   const redoBtn = document.createElement('button');
   redoBtn.className = 'quick-btn';
-  redoBtn.textContent = '↪';
+  redoBtn.innerHTML = ICONS.REDO;
   redoBtn.title = 'Redo (Ctrl+Y)';
   redoBtn.disabled = true;
   redoBtn.setAttribute('data-testid', 'redo-btn');
   quickControls.appendChild(redoBtn);
 
-  // Separator
+  // Visual separator between Undo/Redo and Zoom/Save
   const sep1 = document.createElement('span');
   sep1.className = 'quick-sep';
   quickControls.appendChild(sep1);

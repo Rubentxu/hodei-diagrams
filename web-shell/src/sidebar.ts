@@ -123,26 +123,7 @@ const GENERAL_SHAPES: ShapeEntry[] = [
   },
 ];
 
-/** Category icons mapping for future categories */
-const CATEGORY_ICONS: Record<string, string> = {
-  'General': '⬜',
-  'Stencils': '📋',
-  'Arrows': '➡️',
-  'Flowchart': '🔄',
-  'UML': '📐',
-  'BPMN': '🏭',
-  'AWS': '☁️',
-  'Azure': '🔷',
-  'GCP': '🌐',
-  'Kubernetes': '⚙️',
-  'Terraform': '🏗️',
-  'Jenkins': '🔧',
-  'Databases': '🗄️',
-  'C4': '🏛️',
-  'Network': '🌐',
-  'Database': '🗄️',
-  'Mockups': '📱',
-};
+import { CATEGORY_ICONS_SVG, categoryIcon } from './icon';
 
 const FUTURE_CATEGORIES = [
   'Arrows',
@@ -230,13 +211,19 @@ export function buildSidebar(): SidebarControls {
 
   const generalIcon = document.createElement('span');
   generalIcon.className = 'category-icon';
-  generalIcon.textContent = '⬜';
+  generalIcon.innerHTML = categoryIcon('General');
   generalHeader.appendChild(generalIcon);
 
   const generalTitle = document.createElement('span');
   generalTitle.className = 'category-title';
   generalTitle.textContent = 'General';
   generalHeader.appendChild(generalTitle);
+
+  const generalCount = document.createElement('span');
+  generalCount.className = 'category-count';
+  generalCount.setAttribute('data-testid', 'category-count-general');
+  generalCount.textContent = '11';
+  generalHeader.appendChild(generalCount);
 
   const generalChevron = document.createElement('span');
   generalChevron.className = 'category-chevron';
@@ -321,13 +308,19 @@ export function buildSidebar(): SidebarControls {
 
   const stencilIcon = document.createElement('span');
   stencilIcon.className = 'category-icon';
-  stencilIcon.textContent = CATEGORY_ICONS['Stencils'] ?? '📋';
+  stencilIcon.innerHTML = categoryIcon('Stencils');
   stencilHeader.appendChild(stencilIcon);
 
   const stencilTitle = document.createElement('span');
   stencilTitle.className = 'category-title';
   stencilTitle.textContent = 'Stencils';
   stencilHeader.appendChild(stencilTitle);
+
+  const stencilCount = document.createElement('span');
+  stencilCount.className = 'category-count';
+  stencilCount.setAttribute('data-testid', 'category-count-stencils');
+  stencilCount.textContent = '10';
+  stencilHeader.appendChild(stencilCount);
 
   stencilCat.appendChild(stencilHeader);
 
@@ -450,22 +443,39 @@ export function buildSidebar(): SidebarControls {
   container.appendChild(generalCat);
 
   // ─── Future categories (grayed out with lock) ───────────────────────────
+  // Warn once if duplicate keys exist (Databases and Database map to same icon)
+  const seenCats = new Set<string>();
+  for (const cat of FUTURE_CATEGORIES) {
+    if (seenCats.has(cat)) {
+      console.warn(`[sidebar] Duplicate category key: "${cat}" — both map to the same SVG icon`);
+    }
+    seenCats.add(cat);
+  }
+
   for (const cat of FUTURE_CATEGORIES) {
     const catEl = document.createElement('div');
     catEl.className = 'shape-category disabled';
 
     const catHeader = document.createElement('div');
     catHeader.className = 'category-header';
+    const slug = cat.toLowerCase().replace(/\s+/g, '-');
+    catHeader.setAttribute('data-testid', `category-header-${slug}`);
 
     const catIcon = document.createElement('span');
     catIcon.className = 'category-icon';
-    catIcon.textContent = CATEGORY_ICONS[cat] ?? '📄';
+    catIcon.innerHTML = categoryIcon(cat);
     catHeader.appendChild(catIcon);
 
     const catTitle = document.createElement('span');
     catTitle.className = 'category-title';
     catTitle.textContent = cat;
     catHeader.appendChild(catTitle);
+
+    const catCount = document.createElement('span');
+    catCount.className = 'category-count category-coming-soon';
+    catCount.setAttribute('data-testid', `category-count-${slug}`);
+    catCount.textContent = '0';
+    catHeader.appendChild(catCount);
 
     const lockIcon = document.createElement('span');
     lockIcon.innerHTML = LOCK_ICON;
