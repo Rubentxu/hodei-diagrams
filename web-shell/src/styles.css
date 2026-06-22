@@ -58,7 +58,7 @@
   /* Slice B: Density tokens */
   --hud-h: 28px;
   --grid-cell: 20px;
-  --grid-color: #1e293b;
+  --grid-color: #64748b;
   --compact-label-size: 12px;
   --compact-label-transform: uppercase;
   --compact-label-letter-spacing: 0.05em;
@@ -651,7 +651,7 @@ button:disabled {
   background-size: calc(var(--grid-cell) * var(--zoom, 1)) calc(var(--grid-cell) * var(--zoom, 1));
   pointer-events: none;
   z-index: 0;
-  opacity: 0.5;
+  opacity: 1.0;
 }
 
 .canvas-container.show-grid .viewer {
