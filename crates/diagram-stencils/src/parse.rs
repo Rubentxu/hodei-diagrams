@@ -44,7 +44,7 @@ pub fn parse_stencil_library(xml: &str) -> Result<Vec<Stencil>, StencilError> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     /// Finalize the current shape and add to results.
-    /// Returns true if a shape was finalized.
+    #[allow(clippy::too_many_arguments)]
     fn finalize_shape(
         shape_name: Option<String>,
         shape_w: f64,
