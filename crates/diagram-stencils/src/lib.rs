@@ -24,7 +24,7 @@ mod error;
 mod parse;
 
 pub use error::{Diagnostic, StencilError};
-pub use parse::parse_stencil;
+pub use parse::{parse_stencil, parse_stencil_library};
 
 /// A parsed draw.io stencil.
 #[derive(Debug, Clone, PartialEq)]
