@@ -21,7 +21,7 @@ export interface HudControls {
 
 export function buildHud(): HudControls {
   const container = document.createElement('div');
-  container.className = 'hud';
+  container.className = 'hud hud-weighted';
   container.setAttribute('data-testid', 'hud');
 
   // ─── Selection info ────────────────────────────────────────────────────────

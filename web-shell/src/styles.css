@@ -660,6 +660,10 @@ button:disabled {
   overflow: hidden;
 }
 
+.hud-weighted {
+  background: var(--hud-weight-bg);
+}
+
 .hud-item {
   display: flex;
   align-items: center;
@@ -673,7 +677,7 @@ button:disabled {
 }
 
 .hud-value {
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .hud-sep {

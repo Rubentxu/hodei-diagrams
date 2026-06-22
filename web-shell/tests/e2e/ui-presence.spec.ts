@@ -41,8 +41,11 @@ test.describe('Slice A: Product Presence UI', () => {
       await page.goto('/');
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('[data-testid="navbar-brand"]')).toBeVisible();
-      await expect(page.locator('[data-testid="navbar-brand"]')).toHaveText('Hodei');
+      const brand = page.locator('[data-testid="navbar-brand"]');
+      await expect(brand).toBeVisible();
+      // Brand is now an SVG with aria-label
+      await expect(brand).toHaveAttribute('aria-label', 'Hodei Diagrams');
+      await expect(brand.locator('svg')).toBeVisible();
     });
 
     test('menu items have hover states', async ({ page }) => {
