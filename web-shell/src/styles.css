@@ -65,6 +65,14 @@
   --sidebar-thumb-size: 40px;
   --sidebar-thumb-gap: 4px;
   --sidebar-category-font: 10px;
+
+  /* Slice A: Icon sizing and visual weight tokens */
+  --icon-size: 16px;
+  --icon-size-sm: 12px;
+  --rail-tool-size: 28px;
+  --category-header-h: 24px;
+  --hud-weight-bg: var(--bg-tertiary);
+  --badge-radius: 999px;
 }
 
 /* ─── Reset & Base ───────────────────────────────────────────────────────── */
