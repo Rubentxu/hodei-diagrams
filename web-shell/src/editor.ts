@@ -412,7 +412,11 @@ export class Editor {
 
     if (bounds.length < 2) return;
 
-    // Compute selection bounding box
+    // Anchor = first selected shape (bounds[0], not moved).
+    // Target = collective bounding-box edge/center of the full selection.
+    // This matches draw.io/Figma semantics: "align left" → all shapes share the
+    // same left edge as the leftmost shape in the group (which may or may not be
+    // the first-selected, depending on selection order).
     const minX = Math.min(...bounds.map((b) => b.geom.x));
     const maxX = Math.max(...bounds.map((b) => b.geom.x + b.geom.width));
     const minY = Math.min(...bounds.map((b) => b.geom.y));
@@ -465,7 +469,8 @@ export class Editor {
 
     if (bounds.length < 3) return;
 
-    // Sort by coordinate along the axis
+    // Sort by coordinate along the axis.
+    // Extremes (first/last in sorted order) stay fixed; middle shapes are distributed.
     const sorted = [...bounds].sort((a, b) =>
       axis === 'horizontal' ? a.geom.x - b.geom.x : a.geom.y - b.geom.y,
     );
