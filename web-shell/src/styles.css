@@ -1288,17 +1288,13 @@ button:disabled {
   height: 100%;
 }
 
-.diagnostics-area[hidden] {
-  display: none;
-}
-
 .diagnostics-badge {
   display: flex;
   align-items: center;
   gap: var(--xs);
   padding: 2px var(--sm);
   background: rgba(239, 68, 68, 0.15);
-  border-radius: var(--radius-sm);
+  border-radius: var(--badge-radius);
   font-weight: 500;
   cursor: pointer;
   transition: background var(--transition-fast);
@@ -1306,6 +1302,19 @@ button:disabled {
 
 .diagnostics-badge:hover {
   background: rgba(239, 68, 68, 0.25);
+}
+
+.diagnostics-badge[data-state='clean'] {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.diagnostics-badge[data-state='clean']:hover {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+.diagnostics-badge span {
+  font-size: 11px;
 }
 
 .dismiss-btn {

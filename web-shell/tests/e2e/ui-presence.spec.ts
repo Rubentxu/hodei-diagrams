@@ -158,6 +158,36 @@ test.describe('Slice A: Product Presence UI', () => {
       const diagnostics = page.locator('[data-testid="error-banner"]');
       await expect(diagnostics).toBeAttached();
     });
+
+    test('diagnostics badge hidden on fresh load (idle state)', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const badge = page.locator('[data-testid="diagnostics-badge"]');
+      await expect(badge).toBeHidden();
+    });
+
+    test('diagnostics badge shows clean state after successful import', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+      const badge = page.locator('[data-testid="diagnostics-badge"]');
+      await expect(badge).toBeVisible();
+      await expect(badge).toHaveAttribute('data-state', 'clean');
+      await expect(badge).toHaveAttribute('aria-label', 'No issues');
+    });
+
+    test('page-tab-add affordance is visible', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const addBtn = page.locator('[data-testid="page-tab-add"]');
+      await expect(addBtn).toBeVisible();
+      await expect(addBtn).toHaveText('+');
+    });
   });
 
   test.describe('CSS Grid Layout', () => {

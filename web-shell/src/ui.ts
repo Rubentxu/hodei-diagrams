@@ -10,6 +10,9 @@ import { buildNavbar } from './navbar.js';
 import { buildSidebar } from './sidebar.js';
 import { buildRail, type RailCallbacks } from './rail.js';
 import { buildHud, type HudControls } from './hud.js';
+import { ICONS } from './icon.js';
+
+export type DiagnosticState = 'idle' | 'clean' | 'error';
 
 export interface UiElements {
   // Zone 0: Rail
@@ -62,6 +65,11 @@ export interface UiElements {
   errorMessage: HTMLElement;
   dismissButton: HTMLButtonElement;
   pageTabContainer: HTMLElement;
+  pageTabAdd: HTMLButtonElement;
+
+  // Diagnostics
+  diagnosticsBadge: HTMLElement;
+  setDiagnostics(state: DiagnosticState, msg?: string): void;
 
   // Core containers
   app: HTMLElement;
@@ -126,12 +134,13 @@ export function buildEmptyUi(
   pageTabContainer.setAttribute('data-testid', 'page-tabs');
   bottomBar.appendChild(pageTabContainer);
 
-  // Page add button (deferred)
+  // Page add button
   const addPageBtn = document.createElement('button');
   addPageBtn.className = 'page-tab-add';
+  addPageBtn.setAttribute('data-testid', 'page-tab-add');
   addPageBtn.textContent = '+';
-  addPageBtn.title = 'Add page (v1.1)';
-  addPageBtn.disabled = true;
+  addPageBtn.title = 'Add page';
+  addPageBtn.disabled = true; // page creation not yet wired
   bottomBar.appendChild(addPageBtn);
 
   const bottomSpacer = document.createElement('div');
@@ -152,8 +161,16 @@ export function buildEmptyUi(
   dismissButton.textContent = '✕';
   dismissButton.setAttribute('data-testid', 'dismiss-error');
 
+  // Diagnostics badge (idle by default, shown on clean/error)
+  const diagnosticsBadge = document.createElement('div');
+  diagnosticsBadge.className = 'diagnostics-badge';
+  diagnosticsBadge.setAttribute('data-testid', 'diagnostics-badge');
+  diagnosticsBadge.hidden = true;
+
+  errorBanner.hidden = true;
   errorBanner.appendChild(errorMessage);
   errorBanner.appendChild(dismissButton);
+  errorBanner.appendChild(diagnosticsBadge);
   bottomBar.appendChild(errorBanner);
 
   // ─── Assemble into grid ──────────────────────────────────────────────────
@@ -188,6 +205,31 @@ export function buildEmptyUi(
     }
   } catch {
     // localStorage may be unavailable
+  }
+
+  // Diagnostics state management
+  function setDiagnostics(state: DiagnosticState, msg?: string): void {
+    diagnosticsBadge.hidden = true;
+    errorBanner.hidden = true;
+
+    if (state === 'idle') {
+      return;
+    }
+
+    if (state === 'clean') {
+      errorBanner.hidden = false;
+      diagnosticsBadge.hidden = false;
+      diagnosticsBadge.dataset['state'] = 'clean';
+      diagnosticsBadge.innerHTML = `${ICONS.CLEAN.replace('width="16" height="16"', 'width="14" height="14"').replace('stroke="currentColor"', 'stroke="var(--accent)"')} <span>Clean</span>`;
+      diagnosticsBadge.setAttribute('aria-label', 'No issues');
+      return;
+    }
+
+    if (state === 'error') {
+      errorBanner.hidden = false;
+      errorMessage.textContent = msg ?? 'Import failed';
+      return;
+    }
   }
 
   return {
@@ -241,6 +283,11 @@ export function buildEmptyUi(
     errorMessage,
     dismissButton,
     pageTabContainer,
+    pageTabAdd: addPageBtn,
+
+    // Diagnostics
+    diagnosticsBadge,
+    setDiagnostics,
 
     // Core
     app: root,

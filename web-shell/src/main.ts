@@ -257,14 +257,20 @@ async function bootstrap(): Promise<void> {
     const importResult = activeSession.importDrawio(xml);
     if (!importResult.ok) {
       showError(ui.errorBanner, ui.errorMessage, 'Import failed: ' + importResult.error);
+      ui.setDiagnostics('error', 'Import failed: ' + importResult.error);
       return;
     }
 
     const renderResult = activeSession.renderAllPages();
     if (!renderResult.ok) {
       showError(ui.errorBanner, ui.errorMessage, 'Render failed: ' + renderResult.error);
+      ui.setDiagnostics('error', 'Render failed: ' + renderResult.error);
       return;
     }
+
+    // Successful import — show clean diagnostics badge
+    ui.setDiagnostics('clean');
+
     activePages = renderResult.value;
     if (activePages.length > 0) {
       mountSvg(ui.viewer, activePages[0]!.svg);
