@@ -29,6 +29,7 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       connect_vertices: mod.connect_vertices,
       disconnect_edge: mod.disconnect_edge,
       parse_stencil_xml: mod.parse_stencil_xml,
+      get_resolved_style: mod.get_resolved_style,
     };
 
     return ok(wasm);

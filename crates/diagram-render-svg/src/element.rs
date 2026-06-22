@@ -9,6 +9,7 @@ use diagram_scene::{
 };
 
 use crate::clip::ClipPathManager;
+use crate::defs::DefsManager;
 use crate::escape::escape_text;
 use crate::style::{AttrContext, style_to_attrs};
 
@@ -28,29 +29,31 @@ fn vid_attr(id: &VertexId) -> String {
 /// Converts a `VisualElement` to an SVG string.
 ///
 /// Returns the SVG representation of the element, indented with 2 spaces per
-/// depth level. Takes a `ClipPathManager` to register clip paths for groups.
+/// depth level. Takes a `ClipPathManager` for group clip paths and a
+/// `DefsManager` for gradients and filters.
 pub(crate) fn element_to_svg(
     elem: &VisualElement,
     clip: &mut ClipPathManager,
+    defs: &mut DefsManager,
     indent: usize,
 ) -> String {
     match elem {
-        VisualElement::Rect(r) => rect_to_svg(r, indent),
-        VisualElement::RoundedRect(r) => rounded_rect_to_svg(r, indent),
-        VisualElement::Ellipse(e) => ellipse_to_svg(e, indent),
-        VisualElement::Diamond(d) => diamond_to_svg(d, indent),
-        VisualElement::Triangle(t) => triangle_to_svg(t, indent),
-        VisualElement::Hexagon(h) => hexagon_to_svg(h, indent),
-        VisualElement::Cylinder(c) => cylinder_to_svg(c, indent),
-        VisualElement::Cloud(c) => cloud_to_svg(c, indent),
-        VisualElement::Parallelogram(p) => parallelogram_to_svg(p, indent),
-        VisualElement::Trapezoid(t) => trapezoid_to_svg(t, indent),
-        VisualElement::Polygon(p) => polygon_to_svg(p, indent),
-        VisualElement::Text(t) => text_to_svg(t, indent),
-        VisualElement::Line(l) => line_to_svg(l, indent),
-        VisualElement::Path(p) => path_to_svg(p, indent),
-        VisualElement::Group(g) => group_to_svg(g, clip, indent),
-        VisualElement::Stencil(s) => stencil_to_svg(s, indent),
+        VisualElement::Rect(r) => rect_to_svg(r, defs, indent),
+        VisualElement::RoundedRect(r) => rounded_rect_to_svg(r, defs, indent),
+        VisualElement::Ellipse(e) => ellipse_to_svg(e, defs, indent),
+        VisualElement::Diamond(d) => diamond_to_svg(d, defs, indent),
+        VisualElement::Triangle(t) => triangle_to_svg(t, defs, indent),
+        VisualElement::Hexagon(h) => hexagon_to_svg(h, defs, indent),
+        VisualElement::Cylinder(c) => cylinder_to_svg(c, defs, indent),
+        VisualElement::Cloud(c) => cloud_to_svg(c, defs, indent),
+        VisualElement::Parallelogram(p) => parallelogram_to_svg(p, defs, indent),
+        VisualElement::Trapezoid(t) => trapezoid_to_svg(t, defs, indent),
+        VisualElement::Polygon(p) => polygon_to_svg(p, defs, indent),
+        VisualElement::Text(t) => text_to_svg(t, defs, indent),
+        VisualElement::Line(l) => line_to_svg(l, defs, indent),
+        VisualElement::Path(p) => path_to_svg(p, defs, indent),
+        VisualElement::Group(g) => group_to_svg(g, clip, defs, indent),
+        VisualElement::Stencil(s) => stencil_to_svg(s, defs, indent),
         _ => String::new(),
     }
 }
@@ -83,9 +86,9 @@ fn compute_transform(
     )
 }
 
-fn rect_to_svg(r: &RectElement, indent: usize) -> String {
+fn rect_to_svg(r: &RectElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&r.style, AttrContext::Shape);
+    let style = shape_style_defaults(&r.style, AttrContext::Shape, defs);
     let vid = vid_attr(&r.id);
     let xform = compute_transform(&r.bounds, r.rotation, r.flip_h, r.flip_v);
     format!(
@@ -101,9 +104,9 @@ fn rect_to_svg(r: &RectElement, indent: usize) -> String {
     )
 }
 
-fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
+fn rounded_rect_to_svg(r: &RoundedRectElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&r.style, AttrContext::Shape);
+    let style = shape_style_defaults(&r.style, AttrContext::Shape, defs);
     let vid = vid_attr(&r.id);
     let xform = compute_transform(&r.bounds, r.rotation, r.flip_h, r.flip_v);
     format!(
@@ -121,9 +124,9 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, indent: usize) -> String {
     )
 }
 
-fn ellipse_to_svg(e: &EllipseElement, indent: usize) -> String {
+fn ellipse_to_svg(e: &EllipseElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&e.style, AttrContext::Shape);
+    let style = shape_style_defaults(&e.style, AttrContext::Shape, defs);
     let vid = vid_attr(&e.id);
     let cx = e.bounds.origin.x + e.bounds.size.width / 2.0;
     let cy = e.bounds.origin.y + e.bounds.size.height / 2.0;
@@ -136,9 +139,9 @@ fn ellipse_to_svg(e: &EllipseElement, indent: usize) -> String {
     )
 }
 
-fn diamond_to_svg(d: &DiamondElement, indent: usize) -> String {
+fn diamond_to_svg(d: &DiamondElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&d.style, AttrContext::Shape);
+    let style = shape_style_defaults(&d.style, AttrContext::Shape, defs);
     let vid = vid_attr(&d.id);
     let x = d.bounds.origin.x;
     let y = d.bounds.origin.y;
@@ -163,9 +166,9 @@ fn diamond_to_svg(d: &DiamondElement, indent: usize) -> String {
     )
 }
 
-fn triangle_to_svg(t: &TriangleElement, indent: usize) -> String {
+fn triangle_to_svg(t: &TriangleElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&t.style, AttrContext::Shape);
+    let style = shape_style_defaults(&t.style, AttrContext::Shape, defs);
     let vid = vid_attr(&t.id);
     let x = t.bounds.origin.x;
     let y = t.bounds.origin.y;
@@ -188,9 +191,9 @@ fn triangle_to_svg(t: &TriangleElement, indent: usize) -> String {
     )
 }
 
-fn hexagon_to_svg(h: &HexagonElement, indent: usize) -> String {
+fn hexagon_to_svg(h: &HexagonElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&h.style, AttrContext::Shape);
+    let style = shape_style_defaults(&h.style, AttrContext::Shape, defs);
     let vid = vid_attr(&h.id);
     let x = h.bounds.origin.x;
     let y = h.bounds.origin.y;
@@ -219,9 +222,9 @@ fn hexagon_to_svg(h: &HexagonElement, indent: usize) -> String {
     )
 }
 
-fn cylinder_to_svg(c: &CylinderElement, indent: usize) -> String {
+fn cylinder_to_svg(c: &CylinderElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&c.style, AttrContext::Shape);
+    let style = shape_style_defaults(&c.style, AttrContext::Shape, defs);
     let vid = vid_attr(&c.id);
     let x = c.bounds.origin.x;
     let y = c.bounds.origin.y;
@@ -253,9 +256,9 @@ fn cylinder_to_svg(c: &CylinderElement, indent: usize) -> String {
     format!("{}<path d=\"{}\"{}{}{}/>", ind, path, vid, xform, style)
 }
 
-fn cloud_to_svg(c: &CloudElement, indent: usize) -> String {
+fn cloud_to_svg(c: &CloudElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&c.style, AttrContext::Shape);
+    let style = shape_style_defaults(&c.style, AttrContext::Shape, defs);
     let vid = vid_attr(&c.id);
     let x = c.bounds.origin.x;
     let y = c.bounds.origin.y;
@@ -301,9 +304,9 @@ fn cloud_to_svg(c: &CloudElement, indent: usize) -> String {
     format!("{}<path d=\"{}\"{}{}{}/>", ind, path, vid, xform, style)
 }
 
-fn parallelogram_to_svg(p: &ParallelogramElement, indent: usize) -> String {
+fn parallelogram_to_svg(p: &ParallelogramElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&p.style, AttrContext::Shape);
+    let style = shape_style_defaults(&p.style, AttrContext::Shape, defs);
     let vid = vid_attr(&p.id);
     let x = p.bounds.origin.x;
     let y = p.bounds.origin.y;
@@ -329,9 +332,9 @@ fn parallelogram_to_svg(p: &ParallelogramElement, indent: usize) -> String {
     )
 }
 
-fn trapezoid_to_svg(t: &TrapezoidElement, indent: usize) -> String {
+fn trapezoid_to_svg(t: &TrapezoidElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&t.style, AttrContext::Shape);
+    let style = shape_style_defaults(&t.style, AttrContext::Shape, defs);
     let vid = vid_attr(&t.id);
     let x = t.bounds.origin.x;
     let y = t.bounds.origin.y;
@@ -357,9 +360,9 @@ fn trapezoid_to_svg(t: &TrapezoidElement, indent: usize) -> String {
     )
 }
 
-fn polygon_to_svg(p: &PolygonElement, indent: usize) -> String {
+fn polygon_to_svg(p: &PolygonElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = shape_style_defaults(&p.style, AttrContext::Shape);
+    let style = shape_style_defaults(&p.style, AttrContext::Shape, defs);
     let vid = vid_attr(&p.id);
 
     let points_str = if p.points.is_empty() {
@@ -386,10 +389,14 @@ fn polygon_to_svg(p: &PolygonElement, indent: usize) -> String {
 /// black would make unstyled shapes invisible. We default unstyled shapes
 /// to a light-blue fill and a visible stroke, matching the draw.io default
 /// visual baseline and ensuring shapes are always visible.
-fn shape_style_defaults(style: &diagram_scene::ResolvedStyle, ctx: AttrContext) -> String {
+fn shape_style_defaults(
+    style: &diagram_scene::ResolvedStyle,
+    ctx: AttrContext,
+    defs: &mut DefsManager,
+) -> String {
     let has_fill = !matches!(style.fill_color.as_deref(), None | Some("none"));
     let has_stroke = !matches!(style.stroke_color.as_deref(), None | Some("none"));
-    let mut attrs = style_to_attrs(style, ctx);
+    let mut attrs = style_to_attrs(style, ctx, defs);
     if !has_fill {
         attrs.push_str(" fill=\"#dae8fc\"");
     }
@@ -399,9 +406,9 @@ fn shape_style_defaults(style: &diagram_scene::ResolvedStyle, ctx: AttrContext) 
     attrs
 }
 
-fn text_to_svg(t: &TextElement, indent: usize) -> String {
+fn text_to_svg(t: &TextElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = style_to_attrs(&t.style, AttrContext::Text);
+    let style = style_to_attrs(&t.style, AttrContext::Text, defs);
     let escaped = escape_text(&t.text);
     format!(
         "{}<text x=\"{}\" y=\"{}\"{}>{}</text>",
@@ -409,18 +416,18 @@ fn text_to_svg(t: &TextElement, indent: usize) -> String {
     )
 }
 
-fn line_to_svg(l: &LineElement, indent: usize) -> String {
+fn line_to_svg(l: &LineElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = style_to_attrs(&l.style, AttrContext::Edge);
+    let style = style_to_attrs(&l.style, AttrContext::Edge, defs);
     format!(
         "{}<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{}/>",
         ind, l.from.x, l.from.y, l.to.x, l.to.y, style
     )
 }
 
-fn path_to_svg(p: &PathElement, indent: usize) -> String {
+fn path_to_svg(p: &PathElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
-    let style = style_to_attrs(&p.style, AttrContext::Edge);
+    let style = style_to_attrs(&p.style, AttrContext::Edge, defs);
 
     let d = if p.points.is_empty() {
         String::new()
@@ -440,7 +447,7 @@ fn path_to_svg(p: &PathElement, indent: usize) -> String {
     format!("{}<path d=\"{}\"{}/>", ind, d, style)
 }
 
-fn stencil_to_svg(s: &StencilElement, indent: usize) -> String {
+fn stencil_to_svg(s: &StencilElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
     let vid = vid_attr(&s.id);
     let xform = compute_transform(&s.bounds, s.rotation, s.flip_h, s.flip_v);
@@ -449,8 +456,8 @@ fn stencil_to_svg(s: &StencilElement, indent: usize) -> String {
     let bg_d = build_path_d(&s.background, s.bounds.size.width, s.bounds.size.height);
     let fg_d = build_path_d(&s.foreground, s.bounds.size.width, s.bounds.size.height);
 
-    let bg_style = shape_style_defaults(&s.style, AttrContext::Shape);
-    let fg_style = style_to_attrs(&s.style, AttrContext::Shape);
+    let bg_style = shape_style_defaults(&s.style, AttrContext::Shape, defs);
+    let fg_style = style_to_attrs(&s.style, AttrContext::Shape, defs);
 
     let mut parts = Vec::new();
 
@@ -556,7 +563,12 @@ fn build_path_d(commands: &[PathCommand], width: f64, height: f64) -> String {
     d.trim_end().to_owned()
 }
 
-fn group_to_svg(g: &GroupElement, clip: &mut ClipPathManager, indent: usize) -> String {
+fn group_to_svg(
+    g: &GroupElement,
+    clip: &mut ClipPathManager,
+    defs: &mut DefsManager,
+    indent: usize,
+) -> String {
     let ind = make_indent(indent);
     let child_indent = indent + 1;
 
@@ -564,7 +576,7 @@ fn group_to_svg(g: &GroupElement, clip: &mut ClipPathManager, indent: usize) -> 
     let children_svg: Vec<String> = g
         .children
         .iter()
-        .map(|child| element_to_svg(child, clip, child_indent))
+        .map(|child| element_to_svg(child, clip, defs, child_indent))
         .collect();
 
     let (open_tag, close_tag) = if g.clip {
@@ -621,7 +633,8 @@ mod tests {
             flip_v: false,
             style: empty_style(),
         };
-        let result = rect_to_svg(&rect, 1);
+        let mut defs = DefsManager::new();
+        let result = rect_to_svg(&rect, &mut defs, 1);
         assert!(result.contains("<rect x=\"10\" y=\"20\" width=\"80\" height=\"40\""));
     }
 
@@ -646,7 +659,8 @@ mod tests {
                 ..Default::default()
             },
         };
-        let result = rect_to_svg(&rect, 0);
+        let mut defs = DefsManager::new();
+        let result = rect_to_svg(&rect, &mut defs, 0);
         assert!(result.contains("fill=\"#dae8fc\""));
         assert!(result.contains("stroke=\"#6c8ebf\""));
         assert!(result.contains("stroke-width=\"2\""));
@@ -669,7 +683,8 @@ mod tests {
             flip_v: false,
             style: empty_style(),
         };
-        let result = rounded_rect_to_svg(&rect, 0);
+        let mut defs = DefsManager::new();
+        let result = rounded_rect_to_svg(&rect, &mut defs, 0);
         assert!(result.contains("rx=\"8\""));
         assert!(result.contains("ry=\"8\""));
     }
@@ -690,7 +705,8 @@ mod tests {
             flip_v: false,
             style: empty_style(),
         };
-        let result = ellipse_to_svg(&ellipse, 0);
+        let mut defs = DefsManager::new();
+        let result = ellipse_to_svg(&ellipse, &mut defs, 0);
         // cx = 10 + 80/2 = 50, cy = 20 + 40/2 = 40, rx = 40, ry = 20
         assert!(result.contains("cx=\"50\""));
         assert!(result.contains("cy=\"40\""));
@@ -706,7 +722,8 @@ mod tests {
             text: "if x < 5 && y > 3".to_owned(),
             style: empty_style(),
         };
-        let result = text_to_svg(&text, 0);
+        let mut defs = DefsManager::new();
+        let result = text_to_svg(&text, &mut defs, 0);
         assert!(result.contains("if x &lt; 5 &amp;&amp; y &gt; 3"));
     }
 
@@ -718,7 +735,8 @@ mod tests {
             to: Point { x: 100.0, y: 100.0 },
             style: empty_style(),
         };
-        let result = line_to_svg(&line, 0);
+        let mut defs = DefsManager::new();
+        let result = line_to_svg(&line, &mut defs, 0);
         assert!(result.contains("x1=\"0\""));
         assert!(result.contains("y1=\"0\""));
         assert!(result.contains("x2=\"100\""));
@@ -734,7 +752,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&path, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
         assert!(result.contains("d=\"\""));
     }
 
@@ -751,7 +770,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&path, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
         assert!(result.contains("M 10 10 L 50 30 L 90 10"));
     }
 
@@ -771,7 +791,8 @@ mod tests {
             clip: false,
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&group, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
         assert!(result.contains("<g>"));
         assert!(result.contains("</g>"));
         assert!(!result.contains("clip-path"));
@@ -794,7 +815,8 @@ mod tests {
             clip: true,
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&group, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
         assert!(result.contains("clip-path=\"url(#clip_0)\""));
     }
 
@@ -829,7 +851,8 @@ mod tests {
             clip: false,
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&group, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
         assert!(result.contains("<g>"));
         assert!(result.contains("</g>"));
         assert!(result.contains("<rect"));
@@ -854,7 +877,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&diamond, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&diamond, &mut clip, &mut defs, 0);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
         // Diamond points should include center-top, right, center-bottom, left
@@ -881,7 +905,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&triangle, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&triangle, &mut clip, &mut defs, 0);
         assert!(result.contains("<polygon"));
         // Triangle: top-center, bottom-right, bottom-left
         assert!(result.contains("50,0")); // top-center
@@ -906,7 +931,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&hexagon, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&hexagon, &mut clip, &mut defs, 0);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -928,7 +954,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&cylinder, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&cylinder, &mut clip, &mut defs, 0);
         assert!(result.contains("<path"));
         assert!(result.contains("d="));
     }
@@ -950,7 +977,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&cloud, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&cloud, &mut clip, &mut defs, 0);
         assert!(result.contains("<path"));
         assert!(result.contains("d="));
     }
@@ -972,7 +1000,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&para, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&para, &mut clip, &mut defs, 0);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -994,7 +1023,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&trap, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&trap, &mut clip, &mut defs, 0);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -1023,7 +1053,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&polygon, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&polygon, &mut clip, &mut defs, 0);
         assert!(result.contains("<polygon"));
         assert!(result.contains("10,10"));
         assert!(result.contains("50,10"));
@@ -1049,7 +1080,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&polygon, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&polygon, &mut clip, &mut defs, 0);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -1079,7 +1111,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&stencil, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&stencil, &mut clip, &mut defs, 0);
         // Background path has scaled coordinates (0 * 80 = 0, 0 * 40 = 0)
         assert!(
             result.contains("M 0 0"),
@@ -1108,7 +1141,8 @@ mod tests {
             style: empty_style(),
         });
         let mut clip = ClipPathManager::new();
-        let result = element_to_svg(&diamond, &mut clip, 0);
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&diamond, &mut clip, &mut defs, 0);
         // Should have default fill #dae8fc and stroke #6c8ebf
         assert!(result.contains("fill=\"#dae8fc\""));
         assert!(result.contains("stroke=\"#6c8ebf\""));

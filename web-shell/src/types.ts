@@ -31,6 +31,7 @@ export type WasmModule = {
   connect_vertices(_h: number, _from: number, _to: number, _routingKind: number): number;
   disconnect_edge(_h: number, _edgeId: number): void;
   parse_stencil_xml(_xml: string): string;
+  get_resolved_style(_h: number, _vertexId: number): string;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
@@ -128,4 +129,62 @@ export interface StencilInfo {
 export interface StencilDiagnostic {
   code: string;
   message: string;
+}
+
+// ─── Effect Types ─────────────────────────────────────────────────────────────
+
+/** Shadow effect configuration. Corresponds to diagram_scene::resolver::ShadowConfig. */
+export interface ShadowConfig {
+  enabled: boolean;
+  dx: number;
+  dy: number;
+  blur: number;
+  color: string;
+}
+
+/** Glass effect configuration. Corresponds to diagram_scene::resolver::GlassConfig. */
+export interface GlassConfig {
+  enabled: boolean;
+  opacity: number;
+}
+
+/** A single color stop in a gradient. Corresponds to diagram_scene::resolver::GradientStop. */
+export interface GradientStop {
+  offset: number;
+  color: string;
+}
+
+/** Gradient kind. Corresponds to diagram_scene::resolver::GradientKind. */
+export type GradientKind = 'Linear' | 'Radial';
+
+/** Gradient effect configuration. Corresponds to diagram_scene::resolver::GradientConfig. */
+export interface GradientConfig {
+  kind: GradientKind;
+  angle: number;
+  fx: number;
+  fy: number;
+  stops: GradientStop[];
+}
+
+/**
+ * Resolved style with typed effect fields.
+ * Corresponds to diagram_scene::resolver::ResolvedStyle.
+ *
+ * Returned by `session.getResolvedStyle()`.
+ */
+export interface ResolvedStyle {
+  fill_color: string | null;
+  stroke_color: string | null;
+  stroke_width: number | null;
+  rounded: boolean | null;
+  dashed: boolean | null;
+  font_color: string | null;
+  font_size: number | null;
+  font_family: string | null;
+  opacity: number | null;
+  shadow: ShadowConfig | null;
+  glass: GlassConfig | null;
+  gradient: GradientConfig | null;
+  /** Unknown keys preserved from the original StyleMap. */
+  remaining: Record<string, string>;
 }

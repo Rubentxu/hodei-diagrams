@@ -1,7 +1,8 @@
 //! Style to SVG presentation attribute mapping.
 
+use crate::defs::{DefsManager, GradientStop as DefsGradientStop};
 use crate::escape::escape_attr;
-use diagram_scene::ResolvedStyle;
+use diagram_scene::{ResolvedStyle, resolver::GradientKind};
 
 /// The rendering context that determines which attributes are emitted.
 #[derive(Clone, Copy)]
@@ -19,7 +20,11 @@ pub(crate) enum AttrContext {
 /// Returns a space-prefixed string of `key="value"` pairs, or an empty string.
 /// Default-omit: None fields are not emitted.
 /// Edge context always emits `fill="none"` as the first attribute.
-pub(crate) fn style_to_attrs(style: &ResolvedStyle, ctx: AttrContext) -> String {
+pub(crate) fn style_to_attrs(
+    style: &ResolvedStyle,
+    ctx: AttrContext,
+    defs: &mut DefsManager,
+) -> String {
     let mut attrs = String::new();
 
     // Edge context: always emit fill="none" first
@@ -27,9 +32,51 @@ pub(crate) fn style_to_attrs(style: &ResolvedStyle, ctx: AttrContext) -> String 
         attrs.push_str(" fill=\"none\"");
     }
 
-    // fill_color -> fill (Shape only)
+    // ── Gradient fill (Shape only, takes precedence over fill_color) ────────
     if matches!(ctx, AttrContext::Shape) {
-        if let Some(ref c) = style.fill_color {
+        if let Some(ref gc) = style.gradient {
+            let stops: Vec<DefsGradientStop> = gc
+                .stops
+                .iter()
+                .map(|s| DefsGradientStop {
+                    offset: s.offset,
+                    color: s.color.clone(),
+                    opacity: None,
+                })
+                .collect();
+
+            let (x1, y1, x2, y2) = match gc.kind {
+                GradientKind::Linear => {
+                    let rad = gc.angle.to_radians();
+                    (rad.cos(), rad.sin(), (-rad).cos(), (-rad).sin())
+                }
+                GradientKind::Radial => (0.0, 0.0, 0.0, 0.0),
+            };
+
+            let grad_id = if matches!(gc.kind, GradientKind::Linear) {
+                defs.add_linear_gradient(
+                    format!("grad_{:p}", gc as *const _ as *const ()),
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    stops,
+                )
+            } else {
+                defs.add_radial_gradient(
+                    format!("radgrad_{:p}", gc as *const _ as *const ()),
+                    gc.fx,
+                    gc.fy,
+                    0.5,
+                    stops,
+                )
+            };
+
+            attrs.push_str(" fill=\"url(#");
+            attrs.push_str(&grad_id);
+            attrs.push_str(")\"");
+        } else if let Some(ref c) = style.fill_color {
+            // Fallback: solid fill only when no gradient
             attrs.push_str(" fill=\"");
             attrs.push_str(c);
             attrs.push('"');
@@ -66,6 +113,35 @@ pub(crate) fn style_to_attrs(style: &ResolvedStyle, ctx: AttrContext) -> String 
     // dashed -> stroke-dasharray
     if matches!(ctx, AttrContext::Shape | AttrContext::Edge) && style.dashed == Some(true) {
         attrs.push_str(" stroke-dasharray=\"8 8\"");
+    }
+
+    // ── Drop shadow filter (Shape only) ──────────────────────────────────────
+    if matches!(ctx, AttrContext::Shape) {
+        if let Some(ref sc) = style.shadow {
+            if sc.enabled {
+                let shadow_id = defs.add_drop_shadow_filter(
+                    format!("shadow_{:p}", sc as *const _ as *const ()),
+                    sc.dx,
+                    sc.dy,
+                    sc.blur,
+                    sc.color.clone(),
+                );
+                attrs.push_str(" filter=\"url(#");
+                attrs.push_str(&shadow_id);
+                attrs.push_str(")\"");
+            }
+        }
+    }
+
+    // ── Glass effect: fill-opacity override (Shape only) ───────────────────────
+    if matches!(ctx, AttrContext::Shape) {
+        if let Some(ref gc) = style.glass {
+            if gc.enabled {
+                attrs.push_str(" fill-opacity=\"");
+                attrs.push_str(&gc.opacity.to_string());
+                attrs.push('"');
+            }
+        }
     }
 
     // font_size -> font-size (Text only)
@@ -203,53 +279,68 @@ mod tests {
 
     #[test]
     fn empty_style_yields_empty_attrs() {
-        assert_eq!(style_to_attrs(&empty_style(), AttrContext::Shape), "");
+        let mut defs = DefsManager::new();
+        assert_eq!(
+            style_to_attrs(&empty_style(), AttrContext::Shape, &mut defs),
+            ""
+        );
     }
 
     #[test]
     fn fill_color_emits_fill_attr() {
+        let mut defs = DefsManager::new();
         assert_eq!(
-            style_to_attrs(&style_with_fill(), AttrContext::Shape),
+            style_to_attrs(&style_with_fill(), AttrContext::Shape, &mut defs),
             " fill=\"#ff0000\""
         );
     }
 
     #[test]
     fn font_color_emits_fill_attr_for_text() {
+        let mut defs = DefsManager::new();
         assert_eq!(
-            style_to_attrs(&style_with_font_color(), AttrContext::Text),
+            style_to_attrs(&style_with_font_color(), AttrContext::Text, &mut defs),
             " fill=\"#333333\""
         );
     }
 
     #[test]
     fn dashed_true_emits_stroke_dasharray() {
-        let result = style_to_attrs(&style_with_dashed_true(), AttrContext::Edge);
+        let mut defs = DefsManager::new();
+        let result = style_to_attrs(&style_with_dashed_true(), AttrContext::Edge, &mut defs);
         // stroke_color="#000000" is emitted before stroke-dasharray per design table
         assert!(result.starts_with(" fill=\"none\" stroke=\"#000000\" stroke-dasharray=\"8 8\""));
     }
 
     #[test]
     fn dashed_false_omits_stroke_dasharray() {
-        let result = style_to_attrs(&style_with_dashed_false(), AttrContext::Edge);
+        let mut defs = DefsManager::new();
+        let result = style_to_attrs(&style_with_dashed_false(), AttrContext::Edge, &mut defs);
         assert!(!result.contains("stroke-dasharray"));
     }
 
     #[test]
     fn dashed_none_omits_stroke_dasharray() {
-        let result = style_to_attrs(&style_with_dashed_none(), AttrContext::Edge);
+        let mut defs = DefsManager::new();
+        let result = style_to_attrs(&style_with_dashed_none(), AttrContext::Edge, &mut defs);
         assert!(!result.contains("stroke-dasharray"));
     }
 
     #[test]
     fn remaining_emits_style_attr_sorted() {
-        let result = style_to_attrs(&style_with_remaining(), AttrContext::Shape);
+        let mut defs = DefsManager::new();
+        let result = style_to_attrs(&style_with_remaining(), AttrContext::Shape, &mut defs);
         assert!(result.contains(" style=\"a=1;b=2\""));
     }
 
     #[test]
     fn remaining_escapes_values() {
-        let result = style_to_attrs(&style_with_remaining_escaped(), AttrContext::Shape);
+        let mut defs = DefsManager::new();
+        let result = style_to_attrs(
+            &style_with_remaining_escaped(),
+            AttrContext::Shape,
+            &mut defs,
+        );
         assert!(result.contains(" style=\"x=y&amp;z\""));
     }
 }

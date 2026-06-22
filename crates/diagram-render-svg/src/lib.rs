@@ -11,6 +11,7 @@
 #![deny(unsafe_code)]
 
 pub mod clip;
+pub mod defs;
 pub mod element;
 pub mod error;
 pub mod escape;

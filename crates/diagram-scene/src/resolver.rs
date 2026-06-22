@@ -6,6 +6,67 @@
 use diagram_core::StyleMap;
 use serde::{Deserialize, Serialize};
 
+/// Shadow configuration for a shape.
+/// SVG: emitted as `<feDropShadow>` inside a `<filter>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ShadowConfig {
+    /// Enable shadow.
+    pub enabled: bool,
+    /// Horizontal offset in user-space units.
+    pub dx: f64,
+    /// Vertical offset in user-space units.
+    pub dy: f64,
+    /// Blur standard deviation.
+    pub blur: f64,
+    /// Shadow color as hex string, e.g. "#00000080".
+    pub color: String,
+}
+
+/// Glass effect configuration for a shape.
+/// SVG: emitted as `fill-opacity`. CSS `backdrop-filter` is applied via
+/// the `shape--glass` class in the web-shell.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GlassConfig {
+    /// Enable glass effect.
+    pub enabled: bool,
+    /// Fill opacity in 0.0..1.0 range.
+    pub opacity: f64,
+}
+
+/// Gradient kind.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GradientKind {
+    /// Linear gradient with an angle.
+    Linear,
+    /// Radial gradient with a focal point.
+    Radial,
+}
+
+/// A single color stop in a gradient.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GradientStop {
+    /// Stop position as fraction 0.0..1.0.
+    pub offset: f64,
+    /// Hex color string.
+    pub color: String,
+}
+
+/// Gradient configuration for a shape fill.
+/// SVG: emitted as `<linearGradient>` or `<radialGradient>` inside `<defs>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GradientConfig {
+    /// Gradient kind.
+    pub kind: GradientKind,
+    /// Rotation angle in degrees for Linear gradients. Ignored for Radial.
+    pub angle: f64,
+    /// Radial focal point X (0..1, relative to bounding box). Only for Radial.
+    pub fx: f64,
+    /// Radial focal point Y (0..1, relative to bounding box). Only for Radial.
+    pub fy: f64,
+    /// Color stops, ordered by offset.
+    pub stops: Vec<GradientStop>,
+}
+
 /// The resolved style with typed hot-key fields and a `remaining` tail.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ResolvedStyle {
@@ -27,6 +88,12 @@ pub struct ResolvedStyle {
     pub font_family: Option<String>,
     /// Opacity — parsed as `f64`, clamped to 0.0–1.0.
     pub opacity: Option<f64>,
+    /// Drop shadow configuration.
+    pub shadow: Option<ShadowConfig>,
+    /// Glass effect configuration.
+    pub glass: Option<GlassConfig>,
+    /// Gradient fill configuration.
+    pub gradient: Option<GradientConfig>,
     /// Unknown keys preserved from the original `StyleMap`.
     pub remaining: StyleMap,
 }
@@ -43,6 +110,9 @@ impl ResolvedStyle {
             && self.font_size.is_none()
             && self.font_family.is_none()
             && self.opacity.is_none()
+            && self.shadow.is_none()
+            && self.glass.is_none()
+            && self.gradient.is_none()
             && self.remaining.is_empty()
     }
 }
@@ -103,6 +173,21 @@ impl StyleResolver {
             "fontSize",
             "fontFamily",
             "opacity",
+            "shadow",
+            "shadowDx",
+            "shadowDy",
+            "shadowBlur",
+            "shadowColor",
+            "glass",
+            "glassOpacity",
+            "gradient",
+            "gradientType",
+            "gradientAngle",
+            "gradientColor1",
+            "gradientColor2",
+            "gradientColor3",
+            "gradientColor4",
+            "gradientColor5",
         ]
     }
 
@@ -122,6 +207,21 @@ impl StyleResolver {
         let mut font_size = None;
         let mut font_family = None;
         let mut opacity = None;
+
+        // Effect fields collected in first pass
+        let mut shadow_enabled = false;
+        let mut shadow_dx: Option<f64> = None;
+        let mut shadow_dy: Option<f64> = None;
+        let mut shadow_blur: Option<f64> = None;
+        let mut shadow_color: Option<String> = None;
+
+        let mut glass_enabled = false;
+        let mut glass_opacity: Option<f64> = None;
+
+        let mut gradient_enabled = false;
+        let mut gradient_kind: Option<GradientKind> = None;
+        let mut gradient_angle: Option<f64> = None;
+        let mut gradient_stops: Vec<(usize, String)> = Vec::new();
 
         for (key, value) in style.iter() {
             match key {
@@ -166,11 +266,124 @@ impl StyleResolver {
                         remaining.insert(key, value.as_str());
                     }
                 }
+                // Shadow keys
+                "shadow" => {
+                    if let Some(b) = parse_bool(value.as_str()) {
+                        shadow_enabled = b;
+                    }
+                }
+                "shadowDx" => {
+                    if let Ok(v) = value.as_str().parse::<f64>() {
+                        shadow_dx = Some(v);
+                    }
+                }
+                "shadowDy" => {
+                    if let Ok(v) = value.as_str().parse::<f64>() {
+                        shadow_dy = Some(v);
+                    }
+                }
+                "shadowBlur" => {
+                    if let Ok(v) = value.as_str().parse::<f64>() {
+                        shadow_blur = Some(v);
+                    }
+                }
+                "shadowColor" => {
+                    shadow_color = Some(value.as_str().to_owned());
+                }
+                // Glass keys
+                "glass" => {
+                    if let Some(b) = parse_bool(value.as_str()) {
+                        glass_enabled = b;
+                    }
+                }
+                "glassOpacity" => {
+                    if let Ok(v) = value.as_str().parse::<f64>() {
+                        glass_opacity = Some(v.clamp(0.0, 1.0));
+                    }
+                }
+                // Gradient keys
+                "gradient" => {
+                    if let Some(b) = parse_bool(value.as_str()) {
+                        gradient_enabled = b;
+                    }
+                }
+                "gradientType" => {
+                    if value.as_str() == "radial" {
+                        gradient_kind = Some(GradientKind::Radial);
+                    } else {
+                        gradient_kind = Some(GradientKind::Linear);
+                    }
+                }
+                "gradientAngle" => {
+                    if let Ok(v) = value.as_str().parse::<f64>() {
+                        gradient_angle = Some(v);
+                    }
+                }
+                k if k.starts_with("gradientColor") => {
+                    // gradientColor1=#ff0000, gradientColor2=#0000ff, ...
+                    // Collect into gradient_stops_collected for sorting.
+                    // Actual building of sorted stops happens after the loop.
+                    if let Some(idx_str) = k.strip_prefix("gradientColor") {
+                        if let Ok(idx) = idx_str.parse::<usize>() {
+                            gradient_stops.push((idx, value.as_str().to_owned()));
+                        }
+                    }
+                }
                 _ => {
                     remaining.insert(key, value.as_str());
                 }
             }
         }
+
+        // Sort gradient stops by key index and build proper GradientStop list
+        gradient_stops.sort_by_key(|(idx, _)| *idx);
+        let n = gradient_stops.len();
+        let gradient_stops: Vec<GradientStop> = gradient_stops
+            .into_iter()
+            .enumerate()
+            .map(|(i, (_, color))| {
+                let offset = if n == 1 {
+                    0.5
+                } else {
+                    i as f64 / (n - 1) as f64
+                };
+                GradientStop { offset, color }
+            })
+            .collect();
+
+        // Build effect configs only if enabled
+        let shadow = if shadow_enabled {
+            Some(ShadowConfig {
+                enabled: true,
+                dx: shadow_dx.unwrap_or(3.0),
+                dy: shadow_dy.unwrap_or(3.0),
+                blur: shadow_blur.unwrap_or(3.0),
+                color: shadow_color.unwrap_or_else(|| "#00000040".to_owned()),
+            })
+        } else {
+            None
+        };
+
+        let glass = if glass_enabled {
+            Some(GlassConfig {
+                enabled: true,
+                opacity: glass_opacity.unwrap_or(0.5),
+            })
+        } else {
+            None
+        };
+
+        let gradient = if gradient_enabled && !gradient_stops.is_empty() {
+            Some(GradientConfig {
+                kind: gradient_kind.unwrap_or(GradientKind::Linear),
+                angle: gradient_angle.unwrap_or(0.0),
+                fx: 0.5,
+                fy: 0.5,
+                stops: gradient_stops,
+            })
+        } else {
+            None
+        };
 
         ResolvedStyle {
             fill_color,
@@ -182,6 +395,9 @@ impl StyleResolver {
             font_size,
             font_family,
             opacity,
+            shadow,
+            glass,
+            gradient,
             remaining,
         }
     }
@@ -584,6 +800,21 @@ mod tests {
             "fontSize",
             "fontFamily",
             "opacity",
+            "shadow",
+            "shadowDx",
+            "shadowDy",
+            "shadowBlur",
+            "shadowColor",
+            "glass",
+            "glassOpacity",
+            "gradient",
+            "gradientType",
+            "gradientAngle",
+            "gradientColor1",
+            "gradientColor2",
+            "gradientColor3",
+            "gradientColor4",
+            "gradientColor5",
         ];
         assert_eq!(keys.len(), expected.len());
         for k in expected {

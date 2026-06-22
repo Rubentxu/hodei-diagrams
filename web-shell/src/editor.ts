@@ -1,5 +1,5 @@
 import type { DiagramEngineSession } from './session.js';
-import type { SlotmapId, ScenePage, Vertex } from './types.js';
+import type { ResolvedStyle, SlotmapId, ScenePage, Vertex, GlassConfig, GradientConfig } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 
 /** Active tool from the palette. */
@@ -875,6 +875,187 @@ export class Editor {
       this.#onError(r.error);
       return;
     }
+    this.#replay();
+  }
+
+  /**
+   * Get the resolved style for a vertex.
+   * Returns typed effect fields (shadow, glass, gradient) plus remaining unknown keys.
+   */
+  getResolvedStyle(vertexId: SlotmapId): ResolvedStyle | null {
+    const result = this.#session.getResolvedStyle(vertexId);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return null;
+    }
+    return result.value;
+  }
+
+  /**
+   * Apply a shadow configuration to all selected vertices.
+   *
+   * If commit=true: builds a full ShadowConfig StyleMap and dispatches a single
+   * executeTransaction with ChangeStyle commands for all selected vertices —
+   * one undo entry reverses all.
+   *
+   * If commit=false: applies temporary shadow style directly to the DOM for
+   * real-time preview without engine mutation or undo entries.
+   */
+  applyShadowToSelection(shadow: Partial<import('./types.js').ShadowConfig>, commit: boolean): void {
+    if (this.#selection.size === 0) return;
+
+    if (!commit) {
+      // Real-time preview: apply filter directly to DOM elements
+      const config = shadow as import('./types.js').ShadowConfig;
+      for (const id of this.#selection) {
+        const el = this.#viewer.querySelector(
+          `[data-vertex-id="${id.idx}:${id.version}"]`,
+        );
+        if (!el) continue;
+        if (config.enabled) {
+          const filterId = `shadow-preview-${id.idx}`;
+          (el as SVGElement).setAttribute('filter', `url(#${filterId})`);
+        } else {
+          (el as SVGElement).removeAttribute('filter');
+        }
+      }
+      return;
+    }
+
+    // Commit: build full ShadowConfig and dispatch via executeTransaction
+    const enabled = shadow.enabled ?? false;
+    const commands: string[] = [];
+
+    for (const id of this.#selection) {
+      const style: Record<string, string> = {
+        shadow: enabled ? '1' : '0',
+      };
+      if (enabled) {
+        style['shadowDx'] = String(shadow.dx ?? 3);
+        style['shadowDy'] = String(shadow.dy ?? 3);
+        style['shadowBlur'] = String(shadow.blur ?? 5);
+        style['shadowColor'] = shadow.color ?? '#000000';
+      }
+      commands.push(JSON.stringify({
+        ChangeStyle: {
+          id: slotmapIdToField(id),
+          style,
+        },
+      }));
+    }
+
+    if (commands.length === 0) return;
+    this.#session.executeTransaction(commands);
+    this.#replay();
+  }
+
+  /**
+   * Apply a glass configuration to all selected vertices.
+   *
+   * If commit=true: builds a full GlassConfig StyleMap and dispatches a single
+   * executeTransaction with ChangeStyle commands for all selected vertices —
+   * one undo entry reverses all.
+   *
+   * If commit=false: applies temporary fill-opacity directly to the DOM for
+   * real-time preview without engine mutation or undo entries.
+   */
+  applyGlassToSelection(glass: GlassConfig | null, commit: boolean): void {
+    if (this.#selection.size === 0) return;
+
+    if (!commit) {
+      // Real-time preview: apply fill-opacity directly to DOM elements
+      for (const id of this.#selection) {
+        const el = this.#viewer.querySelector(
+          `[data-vertex-id="${id.idx}:${id.version}"]`,
+        );
+        if (!el) continue;
+        if (glass !== null && glass.enabled) {
+          (el as SVGElement).setAttribute('fill-opacity', String(glass.opacity));
+        } else {
+          (el as SVGElement).removeAttribute('fill-opacity');
+        }
+      }
+      return;
+    }
+
+    // Commit: build full GlassConfig and dispatch via executeTransaction
+    const enabled = glass !== null && glass.enabled;
+    const opacity = glass?.opacity ?? 0.5;
+    const commands: string[] = [];
+
+    for (const id of this.#selection) {
+      const style: Record<string, string> = {
+        glass: enabled ? '1' : '0',
+      };
+      if (enabled) {
+        style['glassOpacity'] = String(opacity);
+      }
+      commands.push(JSON.stringify({
+        ChangeStyle: {
+          id: slotmapIdToField(id),
+          style,
+        },
+      }));
+    }
+
+    if (commands.length === 0) return;
+    this.#session.executeTransaction(commands);
+    this.#replay();
+  }
+
+  /**
+   * Apply a gradient configuration to all selected vertices.
+   *
+   * If commit=true: builds a full GradientConfig StyleMap and dispatches a single
+   * executeTransaction with ChangeStyle commands for all selected vertices —
+   * one undo entry reverses all.
+   *
+   * If commit=false: applies temporary gradient fill directly to the DOM for
+   * real-time preview without engine mutation or undo entries.
+   */
+  applyGradientToSelection(gradient: GradientConfig | null, commit: boolean): void {
+    if (this.#selection.size === 0) return;
+
+    if (!commit) {
+      // Real-time preview: apply gradient fill directly to DOM elements
+      for (const id of this.#selection) {
+        const el = this.#viewer.querySelector(
+          `[data-vertex-id="${id.idx}:${id.version}"]`,
+        );
+        if (!el) continue;
+        if (gradient !== null) {
+          (el as SVGElement).setAttribute('fill', `url(#grad-preview-${id.idx})`);
+        } else {
+          (el as SVGElement).removeAttribute('fill');
+        }
+      }
+      return;
+    }
+
+    // Commit: build full GradientConfig and dispatch via executeTransaction
+    const enabled = gradient !== null;
+    const commands: string[] = [];
+
+    for (const id of this.#selection) {
+      const style: Record<string, string> = {
+        gradient: enabled ? '1' : '0',
+      };
+      if (enabled && gradient !== null) {
+        style['gradientType'] = gradient.kind === 'Linear' ? 'linear' : 'radial';
+        style['gradientAngle'] = String(gradient.angle);
+        style['gradientColor1'] = gradient.stops[0]?.color ?? '#ffffff';
+        style['gradientColor2'] = gradient.stops[1]?.color ?? '#000000';
+      }
+      commands.push(JSON.stringify({
+        ChangeStyle: {
+          id: slotmapIdToField(id),
+          style,
+        },
+      }));
+    }
+
+    if (commands.length === 0) return;
+    this.#session.executeTransaction(commands);
     this.#replay();
   }
 

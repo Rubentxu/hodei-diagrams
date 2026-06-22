@@ -2,6 +2,7 @@
 
 use crate::engine::{with_editor, with_editor_mut};
 use diagram_commands::{Command, RoutingKind, Transaction};
+use diagram_scene::resolver::StyleResolver;
 use wasm_bindgen::prelude::*;
 
 /// Execute a command on an engine from a JSON string.
@@ -324,6 +325,59 @@ mod tests {
             _ => panic!("expected RemoveVertex"),
         }
     }
+
+    /// Verify resolve_returns_nulls_when_no_effects.
+    #[test]
+    fn resolve_returns_nulls_when_no_effects() {
+        use diagram_core::StyleMap;
+        use diagram_scene::resolver::StyleResolver;
+
+        let map = StyleMap::new();
+        let resolved = StyleResolver::new().resolve(&map);
+        assert!(resolved.shadow.is_none());
+        assert!(resolved.glass.is_none());
+        assert!(resolved.gradient.is_none());
+        assert!(resolved.fill_color.is_none());
+    }
+
+    /// Verify resolve_is_stateless_repeatable.
+    #[test]
+    fn resolve_is_stateless_repeatable() {
+        use diagram_core::StyleMap;
+        use diagram_scene::resolver::StyleResolver;
+
+        let mut map = StyleMap::new();
+        map.insert("fillColor", "#dae8fc");
+        map.insert("shadow", "1");
+        map.insert("shadowDx", "5");
+        map.insert("shadowDy", "5");
+        map.insert("shadowBlur", "3");
+        map.insert("shadowColor", "#00000040");
+
+        let resolver = StyleResolver::new();
+        let first = resolver.resolve(&map);
+        let second = resolver.resolve(&map);
+        assert_eq!(first, second);
+    }
+
+    /// Verify resolve_preserves_unknown_keys_in_remaining.
+    #[test]
+    fn resolve_preserves_unknown_keys_in_remaining() {
+        use diagram_core::StyleMap;
+        use diagram_scene::resolver::StyleResolver;
+
+        let mut map = StyleMap::new();
+        map.insert("fillColor", "#ffffff");
+        map.insert("customKey", "foo");
+
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(resolved.fill_color, Some("#ffffff".to_owned()));
+        assert_eq!(resolved.remaining.len(), 1);
+        assert_eq!(
+            resolved.remaining.get("customKey").map(|v| v.as_str()),
+            Some("foo")
+        );
+    }
 }
 
 /// Disconnect an edge (remove it from the model).
@@ -349,6 +403,72 @@ pub fn disconnect_edge(handle: u32, edge_id: u32) -> Result<(), JsValue> {
 
     match result {
         Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Get the resolved style for a vertex.
+///
+/// `handle` is the engine handle (u32).
+/// `vertex_id` is the vertex slotmap index (the `idx` field from SlotmapId).
+///
+/// Returns a JSON string of the resolved `ResolvedStyle` with typed effect fields,
+/// or an error string if the vertex is not found.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `VertexNotFound` if the vertex ID does not exist in the model
+#[wasm_bindgen]
+pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValue> {
+    let result = with_editor(handle, |editor| {
+        // Find the vertex by its slotmap index
+        let vid = match find_vertex_by_idx(editor.model(), vertex_id) {
+            Some(v) => v,
+            None => {
+                return Err("VertexNotFound");
+            }
+        };
+
+        // Look up the vertex in the store
+        let vertex = match editor.model().store.vertex(vid) {
+            Some(v) => v,
+            None => {
+                return Err("VertexNotFound");
+            }
+        };
+
+        // Get the style via style_id
+        let style_id = match vertex.style_id {
+            Some(sid) => sid,
+            None => {
+                return Err("VertexHasNoStyle");
+            }
+        };
+
+        // Look up the StyleMap
+        let style = match editor.model().store.style(style_id) {
+            Some(s) => s,
+            None => {
+                return Err("StyleNotFound");
+            }
+        };
+
+        // Resolve the style
+        let resolver = StyleResolver::new();
+        let resolved = resolver.resolve(style);
+
+        // Serialize to JSON
+        match serde_json::to_string(&resolved) {
+            Ok(json) => Ok(json),
+            Err(e) => Err(Box::leak(format!("Serialize: {e}").into_boxed_str()) as &str),
+        }
+    });
+
+    // Flatten the nested Result: Result<Result<String, &str>, &'static str>
+    match result {
+        Ok(Ok(json)) => Ok(JsValue::from_str(&json)),
         Ok(Err(e)) => Err(JsValue::from_str(e)),
         Err(e) => Err(JsValue::from_str(e)),
     }

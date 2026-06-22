@@ -222,11 +222,11 @@ async function bootstrap(): Promise<void> {
 
   // Selection change → inspector update + HUD update
   const onSelectionChange = (ids: SlotmapId[]) => {
-    // Update inspector with current selection and scene data (inspector uses first item)
+    // Update inspector with current selection and scene data
     if (activeEditor) {
       const scene = activeEditor.getSceneCache();
       const sceneData = scene.ok ? scene.value : [];
-      inspector.update(ids[0] ?? null, sceneData, activeEditor.activePageIdx);
+      inspector.update(ids, sceneData, activeEditor.activePageIdx);
       // Update arrange button states based on selection size
       inspector.setSelectionSize(ids.length);
       // Update HUD selection label
