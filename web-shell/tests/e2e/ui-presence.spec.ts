@@ -163,7 +163,59 @@ test.describe('Slice A: Product Presence UI', () => {
       const stylePane = page.locator('[data-testid="inspector-pane-style"]');
       const noSelection = stylePane.locator('.no-selection-msg');
       await expect(noSelection).toBeVisible();
-      await expect(noSelection.locator('p')).toContainText('Select a shape');
+      // Select the first <p> (main guidance), not the actionable-hint <p>
+      await expect(noSelection.locator('p').first()).toContainText('Select a shape');
+    });
+
+    test('Arrange tab empty state shows icon, guidance, and actionable hint', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Click Arrange tab
+      await page.locator('[data-testid="inspector-tab-arrange"]').click();
+
+      const arrangePane = page.locator('[data-testid="inspector-pane-arrange"]');
+      const noSelection = arrangePane.locator('.no-selection-msg');
+      await expect(noSelection).toBeVisible();
+      // Main guidance text
+      await expect(noSelection.locator('p').first()).toContainText('Select a shape');
+      // Actionable hint
+      await expect(noSelection.locator('.actionable-hint')).toContainText('Click a shape on the canvas');
+    });
+
+    test('Text tab empty state shows icon, guidance, and actionable hint', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Click Text tab
+      await page.locator('[data-testid="inspector-tab-text"]').click();
+
+      const textPane = page.locator('[data-testid="inspector-pane-text"]');
+      const noSelection = textPane.locator('.no-selection-msg');
+      await expect(noSelection).toBeVisible();
+      // Main guidance text
+      await expect(noSelection.locator('p').first()).toContainText('Select a shape');
+      // Actionable hint
+      await expect(noSelection.locator('.actionable-hint')).toContainText('Click a shape on the canvas');
+    });
+
+    test('effect-section testids are preserved (shadow/glass/gradient structurally unchanged)', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Verify all effect-section testids still resolve
+      await expect(page.locator('[data-testid="inspector-shadow-section"]')).toBeAttached();
+      await expect(page.locator('[data-testid="shadow-toggle"]')).toBeAttached();
+      await expect(page.locator('[data-testid="shadow-dx-slider"]')).toBeAttached();
+      await expect(page.locator('[data-testid="inspector-glass-section"]')).toBeAttached();
+      await expect(page.locator('[data-testid="glass-toggle"]')).toBeAttached();
+      await expect(page.locator('[data-testid="glass-opacity-slider"]')).toBeAttached();
+      await expect(page.locator('[data-testid="inspector-gradient-section"]')).toBeAttached();
+      await expect(page.locator('[data-testid="gradient-toggle"]')).toBeAttached();
+      await expect(page.locator('[data-testid="gradient-type-select"]')).toBeAttached();
+      await expect(page.locator('[data-testid="gradient-angle-slider"]')).toBeAttached();
+      await expect(page.locator('[data-testid="gradient-color-1"]')).toBeAttached();
+      await expect(page.locator('[data-testid="gradient-color-2"]')).toBeAttached();
     });
 
     test('style tab has section headers', async ({ page }) => {
