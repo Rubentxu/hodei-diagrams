@@ -17,6 +17,10 @@ export interface HudControls {
   setZoom: (percent: number) => void;
   setMode: (mode: 'Edit' | 'Read Only' | 'Present') => void;
   onZoomClick: (handler: () => void) => void;
+  setSnap: (enabled: boolean) => void;
+  setGrid: (visible: boolean) => void;
+  setCursor: (x: number, y: number) => void;
+  setSelectionCount: (n: number) => void;
 }
 
 export function buildHud(): HudControls {
@@ -40,6 +44,84 @@ export function buildHud(): HudControls {
   selItem.appendChild(selLabel);
   selItem.appendChild(selValue);
   container.appendChild(selItem);
+
+  // ─── Snap indicator ────────────────────────────────────────────────────────
+  const snapItem = document.createElement('div');
+  snapItem.className = 'hud-item hud-snap';
+
+  const snapLabel = document.createElement('span');
+  snapLabel.className = 'hud-label';
+  snapLabel.textContent = 'Snap:';
+
+  const snapValue = document.createElement('span');
+  snapValue.className = 'hud-value';
+  snapValue.setAttribute('data-testid', 'hud-snap');
+  snapValue.textContent = 'Off';
+
+  snapItem.appendChild(snapLabel);
+  snapItem.appendChild(snapValue);
+  container.appendChild(snapItem);
+
+  // ─── Grid indicator ───────────────────────────────────────────────────────
+  const gridItem = document.createElement('div');
+  gridItem.className = 'hud-item hud-grid';
+
+  const gridLabel = document.createElement('span');
+  gridLabel.className = 'hud-label';
+  gridLabel.textContent = 'Grid:';
+
+  const gridValue = document.createElement('span');
+  gridValue.className = 'hud-value';
+  gridValue.setAttribute('data-testid', 'hud-grid');
+  gridValue.textContent = 'Off';
+
+  gridItem.appendChild(gridLabel);
+  gridItem.appendChild(gridValue);
+  container.appendChild(gridItem);
+
+  // ─── Cursor position ───────────────────────────────────────────────────────
+  const cursorItem = document.createElement('div');
+  cursorItem.className = 'hud-item hud-cursor';
+
+  const cursorLabel = document.createElement('span');
+  cursorLabel.className = 'hud-label';
+  cursorLabel.textContent = 'X:';
+
+  const cursorXValue = document.createElement('span');
+  cursorXValue.className = 'hud-value';
+  cursorXValue.setAttribute('data-testid', 'hud-cursor');
+  cursorXValue.textContent = '0';
+
+  const cursorSep = document.createElement('span');
+  cursorSep.className = 'hud-value';
+  cursorSep.textContent = ' Y:';
+
+  const cursorYValue = document.createElement('span');
+  cursorYValue.className = 'hud-value';
+  cursorYValue.textContent = '0';
+
+  cursorItem.appendChild(cursorLabel);
+  cursorItem.appendChild(cursorXValue);
+  cursorItem.appendChild(cursorSep);
+  cursorItem.appendChild(cursorYValue);
+  container.appendChild(cursorItem);
+
+  // ─── Selection count ──────────────────────────────────────────────────────
+  const countItem = document.createElement('div');
+  countItem.className = 'hud-item hud-count';
+
+  const countLabel = document.createElement('span');
+  countLabel.className = 'hud-label';
+  countLabel.textContent = 'Count:';
+
+  const countValue = document.createElement('span');
+  countValue.className = 'hud-value';
+  countValue.setAttribute('data-testid', 'hud-count');
+  countValue.textContent = '0';
+
+  countItem.appendChild(countLabel);
+  countItem.appendChild(countValue);
+  container.appendChild(countItem);
 
   // ─── Separator ────────────────────────────────────────────────────────────
   const sep1 = document.createElement('div');
@@ -130,6 +212,19 @@ export function buildHud(): HudControls {
     },
     onZoomClick: (handler: () => void) => {
       zoomClickHandler = handler;
+    },
+    setSnap: (enabled: boolean) => {
+      snapValue.textContent = enabled ? 'On' : 'Off';
+    },
+    setGrid: (visible: boolean) => {
+      gridValue.textContent = visible ? 'On' : 'Off';
+    },
+    setCursor: (x: number, y: number) => {
+      cursorXValue.textContent = String(Math.round(x));
+      cursorYValue.textContent = String(Math.round(y));
+    },
+    setSelectionCount: (n: number) => {
+      countValue.textContent = String(n);
     },
   };
 }

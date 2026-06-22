@@ -723,6 +723,17 @@ button:disabled {
   color: var(--text);
 }
 
+/* ─── HUD new item selectors (C2) ──────────────────────────────────────────── */
+.hud-snap,
+.hud-grid,
+.hud-cursor,
+.hud-count {
+  display: flex;
+  align-items: center;
+  gap: var(--xs);
+  white-space: nowrap;
+}
+
 /* ─── Zone 4: Inspector ────────────────────────────────────────────────────── */
 .inspector {
   grid-area: inspector;
