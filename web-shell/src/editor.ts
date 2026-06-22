@@ -1,5 +1,5 @@
 import type { DiagramEngineSession } from './session.js';
-import type { SlotmapId, ScenePage, Vertex } from './types.js';
+import type { ResolvedStyle, SlotmapId, ScenePage, Vertex } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 
 /** Active tool from the palette. */
@@ -876,6 +876,19 @@ export class Editor {
       return;
     }
     this.#replay();
+  }
+
+  /**
+   * Get the resolved style for a vertex.
+   * Returns typed effect fields (shadow, glass, gradient) plus remaining unknown keys.
+   */
+  getResolvedStyle(vertexId: SlotmapId): ResolvedStyle | null {
+    const result = this.#session.getResolvedStyle(vertexId);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return null;
+    }
+    return result.value;
   }
 
   /**

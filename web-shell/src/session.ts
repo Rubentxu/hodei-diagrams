@@ -7,6 +7,7 @@ import type {
   ScenePage,
   SlotmapId,
   StyleChanges,
+  ResolvedStyle,
 } from './types.js';
 import { ok, err, slotmapIdToField } from './types.js';
 import type { WasmModule } from './types.js';
@@ -371,5 +372,27 @@ export class DiagramEngineSession {
       },
     });
     return this.executeCommand(cmd);
+  }
+
+  /**
+   * Get the resolved style for a vertex.
+   * @param id The vertex's SlotmapId
+   * @returns The resolved style with typed effect fields, or an error
+   */
+  getResolvedStyle(id: SlotmapId): Result<ResolvedStyle, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const raw = this.wasm.get_resolved_style(this.handle as number, id.idx);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return err('ResolvedStyleParse: ' + (e instanceof Error ? e.message : String(e)));
+      }
+      return ok(parsed as ResolvedStyle);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
   }
 }
