@@ -244,6 +244,7 @@ async function bootstrap(): Promise<void> {
     const visible = ui.canvasContainer.classList.toggle('show-grid');
     setGridVisible(visible);
     gridMenuItem?.classList.toggle('has-checkmark', visible);
+    ui.hud.setGrid(visible);
   }
 
   gridMenuItem?.addEventListener('click', () => {
@@ -291,6 +292,8 @@ async function bootstrap(): Promise<void> {
       inspector.setSelectionSize(ids.length);
       // Update HUD selection label
       ui.hud.setSelection(getSelectionLabel(ids, sceneData));
+      // Update HUD selection count
+      ui.hud.setSelectionCount(ids.length);
     }
     // Update zoom display
     ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
@@ -345,6 +348,9 @@ async function bootstrap(): Promise<void> {
       );
       activeEditor.attach();
 
+      // Wire cursor position to HUD (rAF-throttled)
+      activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
+
       // ── Snap menu ───────────────────────────────────────────────────────────────
       const snapMenuItem = document.getElementById('menu-item-snap');
       function updateSnapCheckState(): void {
@@ -356,6 +362,7 @@ async function bootstrap(): Promise<void> {
         if (!activeEditor) return;
         activeEditor.toggleSnap();
         updateSnapCheckState();
+        ui.hud.setSnap(activeEditor.snapEnabled);
       });
 
       // Wire inspector to editor for arrange operations
