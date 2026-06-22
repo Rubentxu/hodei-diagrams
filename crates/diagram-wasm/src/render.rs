@@ -1,6 +1,6 @@
 //! SVG rendering: render scene pages to SVG strings.
 
-use crate::engine::with_editor;
+use crate::engine::with_engine;
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::SceneBuilder;
 use wasm_bindgen::prelude::*;
@@ -22,9 +22,9 @@ struct PageRender {
 /// - `PageNotFound: <page_idx>` if the requested page does not exist
 #[wasm_bindgen]
 pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
-    with_editor(handle, |e| {
+    with_engine(handle, |e| {
         let scene = SceneBuilder::new()
-            .build(e.model())
+            .build(e.editor.model())
             .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
 
         // Find the page whose slotmap idx matches the flat u64 index
@@ -57,9 +57,9 @@ pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
 /// - `SceneError: <detail>` if scene building fails
 #[wasm_bindgen]
 pub fn render_pages(handle: u32) -> Result<String, JsValue> {
-    with_editor(handle, |e| {
+    with_engine(handle, |e| {
         let scene = SceneBuilder::new()
-            .build(e.model())
+            .build(e.editor.model())
             .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
 
         let pages: Vec<PageRender> = SvgRenderer::new()
