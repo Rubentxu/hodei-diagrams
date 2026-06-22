@@ -27,6 +27,14 @@
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', monospace;
 
+  /* Font size scale */
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-base: 12px;
+  --font-size-lg: 13px;
+  --font-size-xl: 14px;
+  --font-size-2xl: 16px;
+
   /* Spacing (DESIGN.md scale) */
   --xs: 4px;
   --sm: 8px;
@@ -43,10 +51,6 @@
   --motion-fast: 120ms ease;
   --motion-normal: 180ms ease;
   --motion-slow: 280ms ease;
-
-  /* Legacy alias for backward compat */
-  --transition-fast: var(--motion-fast);
-  --transition-normal: var(--motion-normal);
 
   /* Layout */
   --navbar-h: 44px;
@@ -202,8 +206,8 @@ button:disabled {
   border-radius: var(--radius-sm);
   color: var(--text-dim);
   transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
+    background var(--motion-fast),
+    color var(--motion-fast);
   position: relative;
 }
 
@@ -251,8 +255,8 @@ button:disabled {
   font-weight: 500;
   color: var(--text-dim);
   transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
+    color var(--motion-fast),
+    background var(--motion-fast);
   user-select: none;
 }
 
@@ -281,7 +285,7 @@ button:disabled {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   padding: var(--xs) 0;
   z-index: 100;
-  animation: dropdown-in var(--transition-fast);
+  animation: dropdown-in var(--motion-fast);
 }
 
 @keyframes dropdown-in {
@@ -303,8 +307,8 @@ button:disabled {
   font-size: 12px;
   color: var(--text-dim);
   transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
+    background var(--motion-fast),
+    color var(--motion-fast);
   white-space: nowrap;
 }
 
@@ -344,7 +348,7 @@ button:disabled {
   font-size: 13px;
   height: 28px;
   min-width: 28px;
-  transition: background var(--transition-fast);
+  transition: background var(--motion-fast);
 }
 
 .quick-btn:hover:not(:disabled) {
@@ -385,7 +389,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  transition: opacity var(--transition-normal);
+  transition: opacity var(--motion-normal);
 }
 
 .sidebar.collapsed {
@@ -416,8 +420,8 @@ button:disabled {
   font-size: 10px;
   color: var(--text-dim);
   transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
+    color var(--motion-fast),
+    background var(--motion-fast);
 }
 
 .collapse-btn:hover {
@@ -449,7 +453,7 @@ button:disabled {
   color: var(--text);
   font-size: 12px;
   outline: none;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--motion-fast);
 }
 
 .sidebar-search::placeholder {
@@ -509,7 +513,7 @@ button:disabled {
 .category-chevron {
   font-size: 10px;
   color: var(--text-dim);
-  transition: transform var(--transition-fast);
+  transition: transform var(--motion-fast);
 }
 
 .category-coming-soon {
@@ -540,8 +544,8 @@ button:disabled {
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
+    border-color var(--motion-fast),
+    background var(--motion-fast);
   aspect-ratio: 1;
   width: var(--sidebar-thumb-size);
   height: var(--sidebar-thumb-size);
@@ -585,8 +589,8 @@ button:disabled {
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
   transition:
-    border-color var(--transition-fast),
-    color var(--transition-fast);
+    border-color var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .more-shapes-btn:hover:not(:disabled) {
@@ -759,8 +763,8 @@ button:disabled {
   color: var(--text-dim);
   border-bottom: 2px solid transparent;
   transition:
-    color var(--transition-fast),
-    border-color var(--transition-fast);
+    color var(--motion-fast),
+    border-color var(--motion-fast);
 }
 
 .inspector-tab:hover {
@@ -1270,9 +1274,9 @@ button:disabled {
   border: none;
   border-bottom: 2px solid transparent;
   transition:
-    color var(--transition-fast),
-    border-color var(--transition-fast),
-    background var(--transition-fast);
+    color var(--motion-fast),
+    border-color var(--motion-fast),
+    background var(--motion-fast);
   cursor: pointer;
   height: 100%;
   display: flex;
@@ -1297,7 +1301,7 @@ button:disabled {
   color: var(--text-dim);
   background: transparent;
   border: none;
-  transition: color var(--transition-fast);
+  transition: color var(--motion-fast);
   height: 100%;
   display: flex;
   align-items: center;
@@ -1331,7 +1335,7 @@ button:disabled {
   border-radius: var(--badge-radius);
   font-weight: 500;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--motion-fast);
 }
 
 .diagnostics-badge:hover {
@@ -1358,7 +1362,7 @@ button:disabled {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: color var(--transition-fast);
+  transition: color var(--motion-fast);
 }
 
 .dismiss-btn:hover {
