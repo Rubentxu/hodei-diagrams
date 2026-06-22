@@ -7,7 +7,7 @@
 
 import type { DiagramEngineSession } from './session.js';
 import type { Editor } from './editor.js';
-import type { SlotmapId, ScenePage, ShadowConfig } from './types.js';
+import type { SlotmapId, ScenePage, ShadowConfig, GlassConfig, GradientConfig } from './types.js';
 import { slotmapIdToField } from './types.js';
 
 export interface InspectorControls {
@@ -281,6 +281,167 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   styleFields.appendChild(shadowSection);
   styleFields.appendChild(optionsSection);
+
+  // ─── Glass section — PR-SP3 ─────────────────────────────────────────────
+  const glassSection = document.createElement('div');
+  glassSection.className = 'inspector-section';
+  glassSection.setAttribute('data-testid', 'inspector-glass-section');
+
+  const glassHeader = document.createElement('div');
+  glassHeader.className = 'inspector-section-header';
+  glassSection.appendChild(glassHeader);
+
+  const glassTitle = document.createElement('span');
+  glassTitle.className = 'inspector-section-title';
+  glassTitle.textContent = 'Glass';
+  glassHeader.appendChild(glassTitle);
+
+  const glassToggleWrap = document.createElement('label');
+  glassToggleWrap.className = 'toggle-switch';
+  glassHeader.appendChild(glassToggleWrap);
+
+  const glassToggle = document.createElement('input');
+  glassToggle.type = 'checkbox';
+  glassToggle.setAttribute('data-testid', 'glass-toggle');
+  glassToggleWrap.appendChild(glassToggle);
+
+  const glassSliderEl = document.createElement('span');
+  glassSliderEl.className = 'slider';
+  glassToggleWrap.appendChild(glassSliderEl);
+
+  const glassBody = document.createElement('div');
+  glassBody.className = 'inspector-section-body';
+  glassBody.id = 'glass-controls';
+  glassBody.hidden = true;
+  glassSection.appendChild(glassBody);
+
+  // Opacity slider
+  const glassOpacityGroup = document.createElement('div');
+  glassOpacityGroup.className = 'slider-label';
+  const glassOpacityLabel = document.createElement('span');
+  glassOpacityLabel.textContent = 'Opacity';
+  glassOpacityGroup.appendChild(glassOpacityLabel);
+
+  const glassOpacityInput = document.createElement('input');
+  glassOpacityInput.type = 'range';
+  glassOpacityInput.min = '0';
+  glassOpacityInput.max = '1';
+  glassOpacityInput.step = '0.05';
+  glassOpacityInput.value = '0.5';
+  glassOpacityInput.setAttribute('data-testid', 'glass-opacity-slider');
+  glassOpacityGroup.appendChild(glassOpacityInput);
+
+  const glassOpacityValue = document.createElement('span');
+  glassOpacityValue.className = 'slider-value';
+  glassOpacityValue.textContent = '0.5';
+  glassOpacityGroup.appendChild(glassOpacityValue);
+  glassBody.appendChild(glassOpacityGroup);
+
+  styleFields.appendChild(glassSection);
+
+  // ─── Gradient section — PR-SP3 ────────────────────────────────────────────
+  const gradientSection = document.createElement('div');
+  gradientSection.className = 'inspector-section';
+  gradientSection.setAttribute('data-testid', 'inspector-gradient-section');
+
+  const gradientHeader = document.createElement('div');
+  gradientHeader.className = 'inspector-section-header';
+  gradientSection.appendChild(gradientHeader);
+
+  const gradientTitle = document.createElement('span');
+  gradientTitle.className = 'inspector-section-title';
+  gradientTitle.textContent = 'Gradient';
+  gradientHeader.appendChild(gradientTitle);
+
+  const gradientToggleWrap = document.createElement('label');
+  gradientToggleWrap.className = 'toggle-switch';
+  gradientHeader.appendChild(gradientToggleWrap);
+
+  const gradientToggle = document.createElement('input');
+  gradientToggle.type = 'checkbox';
+  gradientToggle.setAttribute('data-testid', 'gradient-toggle');
+  gradientToggleWrap.appendChild(gradientToggle);
+
+  const gradientSliderEl = document.createElement('span');
+  gradientSliderEl.className = 'slider';
+  gradientToggleWrap.appendChild(gradientSliderEl);
+
+  const gradientBody = document.createElement('div');
+  gradientBody.className = 'inspector-section-body';
+  gradientBody.id = 'gradient-controls';
+  gradientBody.hidden = true;
+  gradientSection.appendChild(gradientBody);
+
+  // Type selector
+  const gradientTypeLabel = document.createElement('label');
+  gradientTypeLabel.className = 'control-label';
+  gradientTypeLabel.textContent = 'Type';
+  gradientBody.appendChild(gradientTypeLabel);
+
+  const gradientTypeSelect = document.createElement('select');
+  gradientTypeSelect.setAttribute('data-testid', 'gradient-type-select');
+  const optLinear = document.createElement('option');
+  optLinear.value = 'linear';
+  optLinear.textContent = 'Linear';
+  gradientTypeSelect.appendChild(optLinear);
+  const optRadial = document.createElement('option');
+  optRadial.value = 'radial';
+  optRadial.textContent = 'Radial';
+  gradientTypeSelect.appendChild(optRadial);
+  gradientBody.appendChild(gradientTypeSelect);
+
+  // Angle slider (only for linear)
+  const gradientAngleRow = document.createElement('div');
+  gradientAngleRow.className = 'slider-label';
+  gradientAngleRow.id = 'gradient-angle-row';
+
+  const gradientAngleLabelEl = document.createElement('span');
+  gradientAngleLabelEl.textContent = 'Angle';
+  gradientAngleRow.appendChild(gradientAngleLabelEl);
+
+  const gradientAngleInput = document.createElement('input');
+  gradientAngleInput.type = 'range';
+  gradientAngleInput.min = '0';
+  gradientAngleInput.max = '360';
+  gradientAngleInput.step = '15';
+  gradientAngleInput.value = '0';
+  gradientAngleInput.setAttribute('data-testid', 'gradient-angle-slider');
+  gradientAngleRow.appendChild(gradientAngleInput);
+
+  const gradientAngleValue = document.createElement('span');
+  gradientAngleValue.className = 'slider-value';
+  gradientAngleValue.textContent = '0°';
+  gradientAngleRow.appendChild(gradientAngleValue);
+  gradientBody.appendChild(gradientAngleRow);
+
+  // Color stops
+  const gradientStopsLabel = document.createElement('label');
+  gradientStopsLabel.className = 'control-label';
+  gradientStopsLabel.textContent = 'Colors';
+  gradientBody.appendChild(gradientStopsLabel);
+
+  const gradientStops = document.createElement('div');
+  gradientStops.className = 'gradient-stops';
+
+  const gradientColor1 = document.createElement('input');
+  gradientColor1.type = 'color';
+  gradientColor1.value = '#ffffff';
+  gradientColor1.setAttribute('data-testid', 'gradient-color-1');
+  gradientStops.appendChild(gradientColor1);
+
+  const gradientArrow = document.createElement('span');
+  gradientArrow.textContent = '→';
+  gradientStops.appendChild(gradientArrow);
+
+  const gradientColor2 = document.createElement('input');
+  gradientColor2.type = 'color';
+  gradientColor2.value = '#000000';
+  gradientColor2.setAttribute('data-testid', 'gradient-color-2');
+  gradientStops.appendChild(gradientColor2);
+
+  gradientBody.appendChild(gradientStops);
+
+  styleFields.appendChild(gradientSection);
 
   stylePane.appendChild(styleFields);
   container.appendChild(stylePane);
@@ -754,9 +915,19 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   // Escape key reverts shadow preview
   container.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && shadowDraft !== null) {
-      shadowDraft = null;
-      revertShadowPreview();
+    if (e.key === 'Escape') {
+      if (shadowDraft !== null) {
+        shadowDraft = null;
+        revertShadowPreview();
+      }
+      if (glassDraft !== null) {
+        glassDraft = null;
+        revertGlassPreview();
+      }
+      if (gradientDraft !== null) {
+        gradientDraft = null;
+        revertGradientPreview();
+      }
     }
   });
 
@@ -839,6 +1010,440 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
     }
   }
 
+  // ─── Glass section handlers (PR-SP3) ──────────────────────────────────────
+  let glassDraft: GlassConfig | null = null;
+  let glassCommitted: GlassConfig | null = null;
+
+  /** Build a full GlassConfig from the current control values */
+  function getGlassConfig(): GlassConfig {
+    return {
+      enabled: glassToggle.checked,
+      opacity: parseFloat(glassOpacityInput.value) || 0.5,
+    };
+  }
+
+  /** Apply glass config to all selected vertices via a single transaction */
+  function applyGlassConfig(config: GlassConfig): void {
+    if (currentSelection.length === 0) return;
+
+    const commands: string[] = [];
+    for (const id of currentSelection) {
+      const style: Record<string, string> = {
+        glass: config.enabled ? '1' : '0',
+      };
+      if (config.enabled) {
+        style['glassOpacity'] = String(config.opacity);
+      }
+      commands.push(JSON.stringify({
+        ChangeStyle: {
+          id: slotmapIdToField(id),
+          style,
+        },
+      }));
+    }
+
+    if (commands.length === 0) return;
+    const result = session.executeTransaction(commands);
+    if (!result.ok) {
+      console.warn('[inspector] Glass ChangeStyle failed:', result.error);
+    }
+  }
+
+  /** Apply glass preview directly to DOM (fill-opacity, no engine mutation, no undo) */
+  function applyGlassPreview(config: GlassConfig): void {
+    if (currentSelection.length === 0) return;
+
+    for (const id of currentSelection) {
+      const el = container.ownerDocument.querySelector(
+        `[data-vertex-id="${id.idx}:${id.version}"]`,
+      );
+      if (!el) continue;
+
+      if (config.enabled) {
+        (el as SVGElement).setAttribute('fill-opacity', String(config.opacity));
+      } else {
+        (el as SVGElement).removeAttribute('fill-opacity');
+      }
+    }
+  }
+
+  /** Revert preview and restore last committed state */
+  function revertGlassPreview(): void {
+    if (glassCommitted !== null) {
+      applyGlassPreview(glassCommitted);
+    } else {
+      for (const id of currentSelection) {
+        const el = container.ownerDocument.querySelector(
+          `[data-vertex-id="${id.idx}:${id.version}"]`,
+        );
+        if (el) {
+          (el as SVGElement).removeAttribute('fill-opacity');
+        }
+      }
+    }
+  }
+
+  // Glass toggle handler
+  glassToggle.addEventListener('change', () => {
+    const config = getGlassConfig();
+    glassDraft = config;
+    if (glassToggle.checked) {
+      applyGlassConfig(config);
+      glassCommitted = config;
+      glassBody.hidden = false;
+    } else {
+      applyGlassConfig({ ...config, enabled: false });
+      glassCommitted = { ...config, enabled: false };
+      glassBody.hidden = true;
+    }
+  });
+
+  // Glass opacity slider - real-time preview during drag, commit on release
+  glassOpacityInput.addEventListener('input', () => {
+    glassOpacityValue.textContent = glassOpacityInput.value;
+    if (!glassToggle.checked) return;
+
+    const draft: GlassConfig = {
+      enabled: true,
+      opacity: parseFloat(glassOpacityInput.value) || 0.5,
+    };
+    glassDraft = draft;
+    applyGlassPreview(draft);
+  });
+
+  glassOpacityInput.addEventListener('change', () => {
+    if (!glassToggle.checked) return;
+    const config = getGlassConfig();
+    glassCommitted = config;
+    applyGlassConfig(config);
+    glassDraft = null;
+  });
+
+  glassOpacityInput.addEventListener('pointerup', () => {
+    if (!glassToggle.checked) return;
+    const config = getGlassConfig();
+    glassCommitted = config;
+    applyGlassConfig(config);
+    glassDraft = null;
+  });
+
+  /** Update glass section UI based on resolved styles from the engine */
+  function updateGlassSection(selection: readonly SlotmapId[]): void {
+    if (selection.length === 0) {
+      glassSection.classList.add('disabled');
+      glassToggle.checked = false;
+      glassBody.hidden = true;
+      glassCommitted = null;
+      glassDraft = null;
+      return;
+    }
+
+    glassSection.classList.remove('disabled');
+
+    // Get resolved style for all selected vertices
+    const resolvedStyles: (GlassConfig | null)[] = [];
+    for (const id of selection) {
+      const result = session.getResolvedStyle(id);
+      if (result.ok && result.value.glass) {
+        resolvedStyles.push(result.value.glass);
+      } else {
+        resolvedStyles.push(null);
+      }
+    }
+
+    const nonNull = resolvedStyles.filter((s): s is GlassConfig => s !== null);
+
+    if (nonNull.length === 0) {
+      glassToggle.checked = false;
+      glassBody.hidden = true;
+      glassOpacityInput.value = '0.5';
+      glassOpacityValue.textContent = '0.5';
+      glassCommitted = null;
+    } else {
+      const first = nonNull[0]!;
+      const allMatch = nonNull.every(
+        (s) => s.enabled === first.enabled && s.opacity === first.opacity,
+      );
+
+      if (allMatch) {
+        glassToggle.checked = first.enabled;
+        glassBody.hidden = !first.enabled;
+        glassOpacityInput.value = String(first.opacity);
+        glassOpacityValue.textContent = String(first.opacity);
+        glassCommitted = first;
+      } else {
+        glassToggle.checked = false;
+        glassBody.hidden = true;
+        glassOpacityInput.value = '0.5';
+        glassOpacityValue.textContent = '—';
+        glassCommitted = null;
+      }
+    }
+  }
+
+  // ─── Gradient section handlers (PR-SP3) ────────────────────────────────────
+  let gradientDraft: GradientConfig | null = null;
+  let gradientCommitted: GradientConfig | null = null;
+
+  /** Build a full GradientConfig from the current control values */
+  function getGradientConfig(): GradientConfig {
+    const kind = gradientTypeSelect.value === 'linear' ? 'Linear' : 'Radial';
+    return {
+      kind,
+      angle: parseInt(gradientAngleInput.value, 10) || 0,
+      fx: 0.5,
+      fy: 0.5,
+      stops: [
+        { offset: 0, color: gradientColor1.value },
+        { offset: 1, color: gradientColor2.value },
+      ],
+    };
+  }
+
+  /** Apply gradient config to all selected vertices via a single transaction */
+  function applyGradientConfig(config: GradientConfig): void {
+    if (currentSelection.length === 0) return;
+
+    const commands: string[] = [];
+    for (const id of currentSelection) {
+      const style: Record<string, string> = {
+        gradient: config.kind !== null ? '1' : '0',
+        gradientType: config.kind === 'Linear' ? 'linear' : 'radial',
+        gradientAngle: String(config.angle),
+        gradientColor1: config.stops[0]?.color ?? '#ffffff',
+        gradientColor2: config.stops[1]?.color ?? '#000000',
+      };
+      commands.push(JSON.stringify({
+        ChangeStyle: {
+          id: slotmapIdToField(id),
+          style,
+        },
+      }));
+    }
+
+    if (commands.length === 0) return;
+    const result = session.executeTransaction(commands);
+    if (!result.ok) {
+      console.warn('[inspector] Gradient ChangeStyle failed:', result.error);
+    }
+  }
+
+  /** Apply gradient preview directly to DOM (no engine mutation, no undo) */
+  function applyGradientPreview(config: GradientConfig): void {
+    if (currentSelection.length === 0) return;
+
+    for (const id of currentSelection) {
+      const el = container.ownerDocument.querySelector(
+        `[data-vertex-id="${id.idx}:${id.version}"]`,
+      );
+      if (!el) continue;
+
+      if (config.kind !== null) {
+        // For preview, we use a gradient fill - the actual rendering
+        // will use the gradient def from the engine. For real-time preview,
+        // we set a temporary fill attribute.
+        (el as SVGElement).setAttribute('fill', `url(#grad-preview-${id.idx})`);
+      } else {
+        (el as SVGElement).removeAttribute('fill');
+      }
+    }
+  }
+
+  /** Revert preview and restore last committed state */
+  function revertGradientPreview(): void {
+    if (gradientCommitted !== null) {
+      applyGradientPreview(gradientCommitted);
+    } else {
+      for (const id of currentSelection) {
+        const el = container.ownerDocument.querySelector(
+          `[data-vertex-id="${id.idx}:${id.version}"]`,
+        );
+        if (el) {
+          (el as SVGElement).removeAttribute('fill');
+        }
+      }
+    }
+  }
+
+  // Gradient toggle handler
+  gradientToggle.addEventListener('change', () => {
+    const config = getGradientConfig();
+    gradientDraft = config;
+    if (gradientToggle.checked) {
+      applyGradientConfig(config);
+      gradientCommitted = config;
+      gradientBody.hidden = false;
+      // Show/hide angle row based on type
+      gradientAngleRow.style.display = config.kind === 'Linear' ? 'flex' : 'none';
+    } else {
+      applyGradientConfig({ ...config, kind: null as never });
+      gradientCommitted = { ...config, kind: null as never };
+      gradientBody.hidden = true;
+    }
+  });
+
+  // Gradient type selector
+  gradientTypeSelect.addEventListener('change', () => {
+    const config = getGradientConfig();
+    gradientAngleRow.style.display = config.kind === 'Linear' ? 'flex' : 'none';
+    if (!gradientToggle.checked) return;
+    gradientDraft = config;
+    applyGradientPreview(config);
+  });
+
+  // Gradient angle slider - real-time preview during drag, commit on release
+  gradientAngleInput.addEventListener('input', () => {
+    gradientAngleValue.textContent = `${gradientAngleInput.value}°`;
+    if (!gradientToggle.checked) return;
+
+    const draft: GradientConfig = {
+      kind: gradientTypeSelect.value === 'linear' ? 'Linear' : 'Radial',
+      angle: parseInt(gradientAngleInput.value, 10) || 0,
+      fx: 0.5,
+      fy: 0.5,
+      stops: [
+        { offset: 0, color: gradientColor1.value },
+        { offset: 1, color: gradientColor2.value },
+      ],
+    };
+    gradientDraft = draft;
+    applyGradientPreview(draft);
+  });
+
+  gradientAngleInput.addEventListener('change', () => {
+    if (!gradientToggle.checked) return;
+    const config = getGradientConfig();
+    gradientCommitted = config;
+    applyGradientConfig(config);
+    gradientDraft = null;
+  });
+
+  gradientAngleInput.addEventListener('pointerup', () => {
+    if (!gradientToggle.checked) return;
+    const config = getGradientConfig();
+    gradientCommitted = config;
+    applyGradientConfig(config);
+    gradientDraft = null;
+  });
+
+  // Gradient color stop handlers
+  gradientColor1.addEventListener('input', () => {
+    if (!gradientToggle.checked) return;
+    const draft: GradientConfig = {
+      kind: gradientTypeSelect.value === 'linear' ? 'Linear' : 'Radial',
+      angle: parseInt(gradientAngleInput.value, 10) || 0,
+      fx: 0.5,
+      fy: 0.5,
+      stops: [
+        { offset: 0, color: gradientColor1.value },
+        { offset: 1, color: gradientColor2.value },
+      ],
+    };
+    gradientDraft = draft;
+    applyGradientPreview(draft);
+  });
+
+  gradientColor1.addEventListener('change', () => {
+    if (!gradientToggle.checked) return;
+    const config = getGradientConfig();
+    gradientCommitted = config;
+    applyGradientConfig(config);
+    gradientDraft = null;
+  });
+
+  gradientColor2.addEventListener('input', () => {
+    if (!gradientToggle.checked) return;
+    const draft: GradientConfig = {
+      kind: gradientTypeSelect.value === 'linear' ? 'Linear' : 'Radial',
+      angle: parseInt(gradientAngleInput.value, 10) || 0,
+      fx: 0.5,
+      fy: 0.5,
+      stops: [
+        { offset: 0, color: gradientColor1.value },
+        { offset: 1, color: gradientColor2.value },
+      ],
+    };
+    gradientDraft = draft;
+    applyGradientPreview(draft);
+  });
+
+  gradientColor2.addEventListener('change', () => {
+    if (!gradientToggle.checked) return;
+    const config = getGradientConfig();
+    gradientCommitted = config;
+    applyGradientConfig(config);
+    gradientDraft = null;
+  });
+
+  /** Update gradient section UI based on resolved styles from the engine */
+  function updateGradientSection(selection: readonly SlotmapId[]): void {
+    if (selection.length === 0) {
+      gradientSection.classList.add('disabled');
+      gradientToggle.checked = false;
+      gradientBody.hidden = true;
+      gradientCommitted = null;
+      gradientDraft = null;
+      return;
+    }
+
+    gradientSection.classList.remove('disabled');
+
+    // Get resolved style for all selected vertices
+    const resolvedStyles: (GradientConfig | null)[] = [];
+    for (const id of selection) {
+      const result = session.getResolvedStyle(id);
+      if (result.ok && result.value.gradient) {
+        resolvedStyles.push(result.value.gradient);
+      } else {
+        resolvedStyles.push(null);
+      }
+    }
+
+    const nonNull = resolvedStyles.filter((s): s is GradientConfig => s !== null);
+
+    if (nonNull.length === 0) {
+      gradientToggle.checked = false;
+      gradientBody.hidden = true;
+      gradientTypeSelect.value = 'linear';
+      gradientAngleInput.value = '0';
+      gradientAngleValue.textContent = '0°';
+      gradientColor1.value = '#ffffff';
+      gradientColor2.value = '#000000';
+      gradientAngleRow.style.display = 'flex';
+      gradientCommitted = null;
+    } else {
+      const first = nonNull[0]!;
+      const allMatch = nonNull.every(
+        (s) =>
+          s.kind === first.kind &&
+          s.angle === first.angle &&
+          s.stops[0]?.color === first.stops[0]?.color &&
+          s.stops[1]?.color === first.stops[1]?.color,
+      );
+
+      if (allMatch) {
+        gradientToggle.checked = true;
+        gradientBody.hidden = false;
+        gradientTypeSelect.value = first.kind === 'Linear' ? 'linear' : 'radial';
+        gradientAngleInput.value = String(first.angle);
+        gradientAngleValue.textContent = `${first.angle}°`;
+        gradientColor1.value = first.stops[0]?.color ?? '#ffffff';
+        gradientColor2.value = first.stops[1]?.color ?? '#000000';
+        gradientAngleRow.style.display = first.kind === 'Linear' ? 'flex' : 'none';
+        gradientCommitted = first;
+      } else {
+        gradientToggle.checked = false;
+        gradientBody.hidden = true;
+        gradientTypeSelect.value = 'linear';
+        gradientAngleInput.value = '0';
+        gradientAngleValue.textContent = '—';
+        gradientColor1.value = '#ffffff';
+        gradientColor2.value = '#000000';
+        gradientCommitted = null;
+      }
+    }
+  }
+
   // ─── Arrange buttons state ────────────────────────────────────────────────
   let activeEditor: Editor | null = null;
   let selectionSize = 0;
@@ -883,6 +1488,12 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
     // Update shadow section based on selection
     updateShadowSection(selection);
+
+    // Update glass section based on selection
+    updateGlassSection(selection);
+
+    // Update gradient section based on selection
+    updateGradientSection(selection);
 
     // When no selection, clear previous debounce
     if (!hasSelection && debounceTimer) {

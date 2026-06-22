@@ -1031,6 +1031,140 @@ button:disabled {
   font-style: italic;
 }
 
+/* ─── Glass Section (PR-SP3) ──────────────────────────────────────────────── */
+
+#inspector-glass-section {
+  margin-bottom: var(--sm);
+}
+
+/* Glass sliders */
+#glass-controls input[type='range'] {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--accent);
+}
+
+/* Glass section disabled state */
+#inspector-glass-section.disabled .toggle-switch,
+#inspector-glass-section.disabled .slider-label {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ─── Gradient Section (PR-SP3) ───────────────────────────────────────────── */
+
+#inspector-gradient-section {
+  margin-bottom: var(--sm);
+}
+
+/* Gradient controls */
+#gradient-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm);
+}
+
+/* Type selector */
+#gradient-type-select {
+  width: 100%;
+  padding: var(--xs) var(--sm);
+  border: 1px solid var(--bg-surface);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text);
+  font-size: 11px;
+  outline: none;
+}
+
+#gradient-type-select:focus {
+  border-color: var(--accent);
+}
+
+/* Angle slider */
+#gradient-angle-slider {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--accent);
+}
+
+/* Gradient disabled state */
+#inspector-gradient-section.disabled .toggle-switch,
+#inspector-gradient-section.disabled .slider-label,
+#inspector-gradient-section.disabled .control-label,
+#inspector-gradient-section.disabled #gradient-type-select {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Gradient angle row hidden for radial */
+#gradient-angle-row[hidden] {
+  display: none;
+}
+
+/* ─── Shared Controls (PR-SP3) ────────────────────────────────────────────── */
+
+/* Slider label: label + range + value in a row */
+.slider-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  font-size: var(--compact-label-size);
+  color: var(--text-dim);
+}
+
+.slider-label span:first-child {
+  min-width: 48px;
+  text-transform: var(--compact-label-transform);
+  letter-spacing: var(--compact-label-letter-spacing);
+}
+
+.slider-label input[type='range'] {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--accent);
+}
+
+.slider-label .slider-value {
+  min-width: 32px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Control label: text label above a control */
+.control-label {
+  display: block;
+  font-size: var(--compact-label-size);
+  text-transform: var(--compact-label-transform);
+  letter-spacing: var(--compact-label-letter-spacing);
+  color: var(--text-dim);
+  margin-bottom: var(--xs);
+}
+
+/* Gradient color stops: color inputs in a row */
+.gradient-stops {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+}
+
+.gradient-stops input[type='color'] {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  background: var(--bg-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.gradient-stops span {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 /* Bold/Italic toggle buttons */
 .field-control .style-toggle {
   width: 28px;
