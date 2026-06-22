@@ -395,6 +395,156 @@ export class Editor {
     this.#replay();
   }
 
+  // ─── Arrange Operations ──────────────────────────────────────────────────
+
+  /**
+   * Align all selected shapes along the specified edge or center.
+   * Requires at least 2 selected shapes.
+   * Dispatches MoveVertex commands via executeTransaction for atomic undo.
+   */
+  alignSelection(mode: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom'): void {
+    if (this.#selection.size < 2) return;
+
+    const ids = Array.from(this.#selection);
+    const bounds = ids
+      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .filter((b): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } => b.geom !== null);
+
+    if (bounds.length < 2) return;
+
+    // Anchor = first selected shape (bounds[0], not moved).
+    // Target = collective bounding-box edge/center of the full selection.
+    // This matches draw.io/Figma semantics: "align left" → all shapes share the
+    // same left edge as the leftmost shape in the group (which may or may not be
+    // the first-selected, depending on selection order).
+    const minX = Math.min(...bounds.map((b) => b.geom.x));
+    const maxX = Math.max(...bounds.map((b) => b.geom.x + b.geom.width));
+    const minY = Math.min(...bounds.map((b) => b.geom.y));
+    const maxY = Math.max(...bounds.map((b) => b.geom.y + b.geom.height));
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+
+    const commands: string[] = bounds.slice(1).map((b) => {
+      const newGeom = { ...b.geom };
+      switch (mode) {
+        case 'left':
+          newGeom.x = minX;
+          break;
+        case 'center-h':
+          newGeom.x = midX - b.geom.width / 2;
+          break;
+        case 'right':
+          newGeom.x = maxX - b.geom.width;
+          break;
+        case 'top':
+          newGeom.y = minY;
+          break;
+        case 'center-v':
+          newGeom.y = midY - b.geom.height / 2;
+          break;
+        case 'bottom':
+          newGeom.y = maxY - b.geom.height;
+          break;
+      }
+      return this.#buildMoveVertexCmd(b.id, newGeom);
+    });
+
+    if (commands.length > 0) {
+      this.executeTransaction(commands);
+    }
+  }
+
+  /**
+   * Distribute selected shapes evenly along an axis.
+   * Requires at least 3 selected shapes. First and last shapes stay fixed.
+   * Dispatches MoveVertex commands via executeTransaction for atomic undo.
+   */
+  distributeSelection(axis: 'horizontal' | 'vertical'): void {
+    if (this.#selection.size < 3) return;
+
+    const ids = Array.from(this.#selection);
+    const bounds = ids
+      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .filter((b): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } => b.geom !== null);
+
+    if (bounds.length < 3) return;
+
+    // Sort by coordinate along the axis.
+    // Extremes (first/last in sorted order) stay fixed; middle shapes are distributed.
+    const sorted = [...bounds].sort((a, b) =>
+      axis === 'horizontal' ? a.geom.x - b.geom.x : a.geom.y - b.geom.y,
+    );
+
+    const first = sorted[0]!;
+    const last = sorted[sorted.length - 1]!;
+
+    if (axis === 'horizontal') {
+      const totalSpan = last.geom.x - first.geom.x;
+      const gap = (totalSpan - (last.geom.x + last.geom.width - first.geom.x - first.geom.width)) / (sorted.length - 1);
+      const commands: string[] = [];
+      let cursor = first.geom.x + first.geom.width + gap;
+      for (let i = 1; i < sorted.length - 1; i++) {
+        const b = sorted[i]!;
+        const newGeom = { ...b.geom };
+        newGeom.x = cursor;
+        commands.push(this.#buildMoveVertexCmd(b.id, newGeom));
+        cursor += b.geom.width + gap;
+      }
+      if (commands.length > 0) {
+        this.executeTransaction(commands);
+      }
+    } else {
+      const totalSpan = last.geom.y - first.geom.y;
+      const gap = (totalSpan - (last.geom.y + last.geom.height - first.geom.y - first.geom.height)) / (sorted.length - 1);
+      const commands: string[] = [];
+      let cursor = first.geom.y + first.geom.height + gap;
+      for (let i = 1; i < sorted.length - 1; i++) {
+        const b = sorted[i]!;
+        const newGeom = { ...b.geom };
+        newGeom.y = cursor;
+        commands.push(this.#buildMoveVertexCmd(b.id, newGeom));
+        cursor += b.geom.height + gap;
+      }
+      if (commands.length > 0) {
+        this.executeTransaction(commands);
+      }
+    }
+  }
+
+  /**
+   * Resize selected shapes to match the anchor (first-selected) shape's dimensions.
+   * Requires at least 2 selected shapes.
+   * Dispatches MoveVertex commands via executeTransaction for atomic undo.
+   */
+  sameSizeSelection(what: 'width' | 'height' | 'both'): void {
+    if (this.#selection.size < 2) return;
+
+    const ids = Array.from(this.#selection);
+    const bounds = ids
+      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .filter((b): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } => b.geom !== null);
+
+    if (bounds.length < 2) return;
+
+    // Anchor is the first shape in Set iteration order
+    const anchor = bounds[0]!;
+
+    const commands: string[] = bounds.slice(1).map((b) => {
+      const newGeom = { ...b.geom };
+      if (what === 'width' || what === 'both') {
+        newGeom.width = anchor.geom.width;
+      }
+      if (what === 'height' || what === 'both') {
+        newGeom.height = anchor.geom.height;
+      }
+      return this.#buildMoveVertexCmd(b.id, newGeom);
+    });
+
+    if (commands.length > 0) {
+      this.executeTransaction(commands);
+    }
+  }
+
   // ─── Active Tool ──────────────────────────────────────────────────────────
 
   /** Current active tool. */
@@ -971,10 +1121,13 @@ export class Editor {
       }
     }
 
+    const guides: { x?: number; y?: number } = {};
+    if (bestX !== undefined) guides.x = bestX;
+    if (bestY !== undefined) guides.y = bestY;
     return {
       x: bestX !== undefined ? bestX : x,
       y: bestY !== undefined ? bestY : y,
-      guides: { x: bestX, y: bestY },
+      guides,
     };
   }
 

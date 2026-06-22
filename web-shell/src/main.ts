@@ -227,6 +227,8 @@ async function bootstrap(): Promise<void> {
       const scene = activeEditor.getSceneCache();
       const sceneData = scene.ok ? scene.value : [];
       inspector.update(ids[0] ?? null, sceneData, activeEditor.activePageIdx);
+      // Update arrange button states based on selection size
+      inspector.setSelectionSize(ids.length);
       // Update HUD selection label
       ui.hud.setSelection(getSelectionLabel(ids, sceneData));
     }
@@ -289,7 +291,9 @@ async function bootstrap(): Promise<void> {
         activeEditor.toggleSnap();
         updateSnapCheckState();
       });
-      // Initial sync: snap starts disabled so checkmark is already absent (correct)
+
+      // Wire inspector to editor for arrange operations
+      inspector.setEditor(activeEditor);
 
       // ── Stencil drag-and-drop ─────────────────────────────────────────────
       // Wire dragstart on all stencil sidebar buttons
