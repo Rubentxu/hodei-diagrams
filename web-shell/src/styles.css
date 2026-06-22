@@ -488,6 +488,22 @@ button:disabled {
 .category-icon {
   font-size: 12px;
   margin-right: var(--xs);
+  display: flex;
+  align-items: center;
+}
+
+.category-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--badge-radius);
+  background: var(--bg-tertiary);
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.category-count.category-coming-soon {
+  opacity: 0.5;
 }
 
 .category-chevron {

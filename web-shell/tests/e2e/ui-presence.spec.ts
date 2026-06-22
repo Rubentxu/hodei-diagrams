@@ -138,8 +138,8 @@ test.describe('Slice A: Product Presence UI', () => {
       await page.goto('/');
       await page.waitForLoadState('networkidle');
 
-      // Disabled categories have coming-soon text
-      const comingSoon = page.locator('.category-coming-soon');
+      // Disabled categories have coming-soon div (not the count badge span) with text "Soon"
+      const comingSoon = page.locator('.shape-category.disabled div.category-coming-soon');
       await expect(comingSoon.first()).toBeVisible();
       await expect(comingSoon.first()).toHaveText('Soon');
     });
