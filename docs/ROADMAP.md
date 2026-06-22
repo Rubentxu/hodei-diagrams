@@ -5,10 +5,10 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.17.0 — Fases 0-8 completadas (Edges, Shapes, Multi-select, Text, Rotate/Flip, Layers, Stencils, Snap/Align, Effects).**
+**v0.18.0 — Fase 6 completada (Stencils: XML library parsing, WASM cache, scene resolution, web-shell loading).**
 Motor Rust sólido con round-trip `.drawio` en archivo real de 4MB (21 celdas,
 AWS-Admisión). 11 crates, 431 tests Rust, ~100+ tests E2E.
-61 ADRs (0001-0061). UI con paridad ~45% vs draw.io. Próximo: Fase 6 — Stencils (⏸️ deferred).
+62 ADRs (0001-0062). UI con paridad ~45% vs draw.io. Próximo: Fase 9 — Toolbar/Status bar.
 
 | Crate | Capa | Status |
 |-------|------|--------|
@@ -33,9 +33,9 @@ AWS-Admisión). 11 crates, 431 tests Rust, ~100+ tests E2E.
 
 ## 🎯 Active Track: Paridad Funcional con draw.io
 
-**Plan documentado en ADRs 0050-0061.** Fases 0-5 completadas. La UI tiene
+**Plan documentado en ADRs 0050-0062.** Fases 0-6 completadas. La UI tiene
 **~45% de paridad** con draw.io. El plan cubre 8 fases secuenciales.
-Fase 6 (Stencils) activa — en desarrollo.
+Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 
 | Fase | Tag | Foco | ADRs | Estado |
 |------|-----|------|------|--------|
@@ -45,7 +45,7 @@ Fase 6 (Stencils) activa — en desarrollo.
 | 3. Text editing | v0.12.0 | Inline label edit (desbloquea 6 tests skipped) | 0056 | ✅ Completada |
 | 4. Rotate/flip | v0.13.0 | Transform en geometry, resize handles | 0057 | ✅ Completada |
 | 5. Layers | v0.14.0 | Z-order, lock, visibility, ordering | 0058 | ✅ Completada (PR-L1) |
-| 6. Stencils | v0.15.0 | UML, BPMN, Flowchart, AWS (open source subset) | 0059 | 🔲 Pendiente |
+| 6. Stencils | v0.18.0 | XML library parsing, WASM cache, scene resolution, web-shell loading | 0059, 0062 | ✅ Completada (PR #44) |
 | 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 | ✅ Completada (PR #41, #42) |
 | 8. Effects | v0.17.0 | Shadow, glass, gradient (SVG-native) | 0061 | ✅ Completada (PR #43) |
 | **v1.0.0** | **NO automático** | Decisión del usuario | — | — |
@@ -94,13 +94,12 @@ Fase 6 (Stencils) activa — en desarrollo.
 - **Tests**: 15 E2E
 - **ADR**: 0058
 
-### Fase 6 — Stencils (PR-ST1, ST2)
-- **Rust (format)**: parser stencils.xml (draw.io subset)
-- **WASM**: `parse_stencil(url)`
-- **TS (sidebar)**: cargar stencils bundled (general, uml, bpmn, flowchart)
-- **TS (palette)**: drag-stencil-to-canvas
-- **Tests**: 20 E2E
-- **ADR**: 0059
+### Fase 6 — Stencils (PR-ST1, ST2, ST3) ✅
+- **Rust (stencils)**: `Stencil::normalize()`, `parse_stencil_library()` multi-shape XML parser
+- **Rust (scene)**: `StencilProvider` trait, `SceneBuilder.with_stencil_provider()`, `stencil:<library>:<name>` resolution
+- **WASM**: `StencilDto` con bg/fg path arrays, `parse_stencil_library_xml`, `WasmEngine` con cache `HashMap<String, Vec<Stencil>>`
+- **TS**: `loadStencilLibrary()`, `general.xml` fixture copiado a web-shell
+- **ADR**: 0059 (path format), 0062 (parse-time normalization)
 
 ### Fase 7 — Snap/align (PR-SP1, SP2)
 - **TS**: snap to grid (8px), snap to shape, guides visuales
