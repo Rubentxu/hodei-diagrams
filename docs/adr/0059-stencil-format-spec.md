@@ -17,13 +17,7 @@ Stencils are XML files with this shape:
 <shapes name="uml">
   <shape name="Class" aspect="variable" w="120" h="60">
     <background>
-      <path>
-        <move x="0" y="0"/>
-        <line x="120" y="0"/>
-        <line x="120" y="60"/>
-        <line x="0" y="60"/>
-        <close/>
-      </path>
+      <path>M 0,0 L 120,0 L 120,60 L 0,60 Z</path>
     </background>
     <foreground>
       <fillstroke/>
@@ -31,6 +25,11 @@ Stencils are XML files with this shape:
   </shape>
 </shapes>
 ```
+
+Path commands use **compact SVG path text syntax** (same as SVG `d` attribute):
+`M`=move, `L`=line, `Q`=quadratic bezier, `C`=cubic bezier,
+`A`=arc, `Z`=close. Coordinates are absolute, relative to the shape's `w`/`h`.
+Child-element form (`<move x="0" y="0"/>`) is **not supported**.
 
 ### Where stencils live
 
@@ -60,8 +59,8 @@ Drop a stencil on the canvas:
 
 ### Stencils subset supported
 
-v1 supports: `move`, `line`, `quad`, `curve`, `arc`, `close`, `fillstroke`.
-Deferred: text styling, gradients, image fills.
+v1 supports: `M` (move), `L` (line), `Q` (quadratic bezier), `C` (cubic bezier), `A` (arc), `Z` (close).
+Deferred: text styling, gradients, image fills, `<fillstroke/>` as child element (emit diagnostics only).
 
 ### Licensing
 
@@ -91,5 +90,11 @@ file includes a `<!-- license: MIT -->` comment. Restricted stencils
 ## References
 
 - ADR-0052: Shape Catalog
-- `/var/home/rubentxu/Proyectos/rust/_upstream/mxgraph/javascript/examples/stencils.xml`
+- `diagram-stencils/src/parse.rs` — parser implementation (compact SVG path text format)
 - ADR-0024: Preserve Unknown When Safe
+
+## Amendment History
+
+| Date | Change |
+|------|--------|
+| 2026-06-22 | Corrected path format: child-element syntax (`<move x="0" y="0"/>`) is not supported; compact SVG text syntax (`M 0,0 L 120,0 ...`) is the only supported format. ADR example updated. |
