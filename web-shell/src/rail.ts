@@ -1,21 +1,38 @@
 /**
  * rail.ts — Zone 0: Left Tool Rail
  *
- * Vertical icon bar with Select, Shapes, Connector tools.
- * Active tool highlighted with accent color.
+ * Vertical icon bar with Select, Shapes, Connector, Text, Zoom-to-fit tools,
+ * and a Help button at the bottom. Active tool highlighted with accent color.
  */
+
+import { ICONS } from './icon.js';
+
+export type RailToolId = 'select' | 'shapes' | 'connector' | 'text' | 'zoom-fit' | 'help';
+
+export interface RailTool {
+  id: RailToolId;
+  label: string;
+  icon: string;
+  shortcut: string;
+}
 
 export interface RailControls {
   container: HTMLElement;
   selectBtn: HTMLButtonElement;
   shapesBtn: HTMLButtonElement;
   connectorBtn: HTMLButtonElement;
+  textBtn: HTMLButtonElement;
+  zoomFitBtn: HTMLButtonElement;
+  helpBtn: HTMLButtonElement;
 }
 
 export interface RailCallbacks {
   onSelectTool: () => void;
   onShapesTool: () => void;
   onConnectorTool: () => void;
+  onTextTool: () => void;
+  onZoomFit: () => void;
+  onHelp: () => void;
 }
 
 const RAIL_ICONS = {
@@ -74,15 +91,65 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
   });
   container.appendChild(connectorBtn);
 
-  // Separator
-  const sep = document.createElement('div');
-  sep.className = 'rail-sep';
-  container.appendChild(sep);
+  // Separator between main tools and text/zoom tools
+  const sep1 = document.createElement('div');
+  sep1.className = 'rail-sep';
+  container.appendChild(sep1);
 
-  function setActiveTool(tool: 'select' | 'shapes' | 'connector'): void {
+  // Text tool
+  const textBtn = document.createElement('button');
+  textBtn.className = 'rail-btn';
+  textBtn.title = 'Text (T)';
+  textBtn.setAttribute('data-testid', 'rail-text-btn');
+  textBtn.innerHTML = ICONS.TEXT;
+  textBtn.addEventListener('click', () => {
+    setActiveTool('text');
+    callbacks.onTextTool();
+  });
+  container.appendChild(textBtn);
+
+  // Zoom-to-fit tool
+  const zoomFitBtn = document.createElement('button');
+  zoomFitBtn.className = 'rail-btn';
+  zoomFitBtn.title = 'Zoom to Fit (F)';
+  zoomFitBtn.setAttribute('data-testid', 'rail-zoom-fit-btn');
+  zoomFitBtn.innerHTML = ICONS.ZOOM_FIT;
+  zoomFitBtn.addEventListener('click', () => {
+    setActiveTool('zoom-fit');
+    callbacks.onZoomFit();
+  });
+  container.appendChild(zoomFitBtn);
+
+  // Separator between tools and Help section
+  const sep2 = document.createElement('div');
+  sep2.className = 'rail-sep';
+  sep2.setAttribute('data-testid', 'rail-separator');
+  container.appendChild(sep2);
+
+  // Spacer to push Help to bottom
+  const spacer = document.createElement('div');
+  spacer.style.flex = '1';
+  container.appendChild(spacer);
+
+  // Help tool (at bottom)
+  const helpBtn = document.createElement('button');
+  helpBtn.className = 'rail-btn';
+  helpBtn.title = 'Help (?)';
+  helpBtn.setAttribute('data-testid', 'rail-help-btn');
+  helpBtn.innerHTML = ICONS.HELP;
+  helpBtn.addEventListener('click', () => {
+    setActiveTool('help');
+    callbacks.onHelp();
+  });
+  container.appendChild(helpBtn);
+
+  function setActiveTool(tool: RailToolId): void {
     selectBtn.classList.toggle('active', tool === 'select');
     shapesBtn.classList.toggle('active', tool === 'shapes');
     connectorBtn.classList.toggle('active', tool === 'connector');
+    textBtn.classList.toggle('active', tool === 'text');
+    zoomFitBtn.classList.toggle('active', tool === 'zoom-fit');
+    helpBtn.classList.toggle('active', tool === 'help');
   }
 
   return {
@@ -90,5 +157,8 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
     selectBtn,
     shapesBtn,
     connectorBtn,
+    textBtn,
+    zoomFitBtn,
+    helpBtn,
   };
 }

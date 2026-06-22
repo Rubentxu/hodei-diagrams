@@ -197,8 +197,8 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--rail-tool-size);
+  height: var(--rail-tool-size);
   border-radius: var(--radius-sm);
   color: var(--text-dim);
   transition:

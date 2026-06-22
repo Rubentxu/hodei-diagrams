@@ -5,17 +5,28 @@ const SIMPLE_RECT_PATH =
 
 test.describe('Slice A: Product Presence UI', () => {
   test.describe('Zone 0: Left Rail', () => {
-    test('rail is visible with 3 tool buttons', async ({ page }) => {
+    test('rail is visible with 6 tool buttons', async ({ page }) => {
       await page.goto('/');
       await page.waitForLoadState('networkidle');
 
       const rail = page.locator('[data-testid="rail"]');
       await expect(rail).toBeVisible();
 
-      // Rail buttons
+      // Rail buttons: 3 original + Text + Zoom-fit + Help
       await expect(page.locator('[data-testid="rail-select-btn"]')).toBeVisible();
       await expect(page.locator('[data-testid="rail-shapes-btn"]')).toBeVisible();
       await expect(page.locator('[data-testid="rail-connector-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="rail-text-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="rail-zoom-fit-btn"]')).toBeVisible();
+      await expect(page.locator('[data-testid="rail-help-btn"]')).toBeVisible();
+    });
+
+    test('rail separator is visible between tools and Help section', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      const separator = page.locator('[data-testid="rail-separator"]');
+      await expect(separator).toBeVisible();
     });
 
     test('select tool is active by default', async ({ page }) => {
@@ -33,6 +44,40 @@ test.describe('Slice A: Product Presence UI', () => {
       await expect(page.locator('[data-testid="rail-select-btn"]')).toHaveAttribute('title', 'Select (V)');
       await expect(page.locator('[data-testid="rail-shapes-btn"]')).toHaveAttribute('title', 'Shapes (R)');
       await expect(page.locator('[data-testid="rail-connector-btn"]')).toHaveAttribute('title', 'Connector (C)');
+      await expect(page.locator('[data-testid="rail-text-btn"]')).toHaveAttribute('title', 'Text (T)');
+      await expect(page.locator('[data-testid="rail-zoom-fit-btn"]')).toHaveAttribute('title', 'Zoom to Fit (F)');
+      await expect(page.locator('[data-testid="rail-help-btn"]')).toHaveAttribute('title', 'Help (?)');
+    });
+
+    test('only one rail tool is active at a time', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Click each tool and verify only that one is active
+      for (const btn of [
+        '[data-testid="rail-select-btn"]',
+        '[data-testid="rail-shapes-btn"]',
+        '[data-testid="rail-connector-btn"]',
+        '[data-testid="rail-text-btn"]',
+        '[data-testid="rail-zoom-fit-btn"]',
+        '[data-testid="rail-help-btn"]',
+      ]) {
+        await page.locator(btn).click();
+        // The clicked button should be active
+        await expect(page.locator(btn)).toHaveClass(/active/);
+        // Other buttons should not be active
+        const otherBtns = [
+          '[data-testid="rail-select-btn"]',
+          '[data-testid="rail-shapes-btn"]',
+          '[data-testid="rail-connector-btn"]',
+          '[data-testid="rail-text-btn"]',
+          '[data-testid="rail-zoom-fit-btn"]',
+          '[data-testid="rail-help-btn"]',
+        ].filter((b) => b !== btn);
+        for (const other of otherBtns) {
+          await expect(page.locator(other)).not.toHaveClass(/active/);
+        }
+      }
     });
   });
 

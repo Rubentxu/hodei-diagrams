@@ -96,6 +96,9 @@ export function buildEmptyUi(
         onSelectTool: () => {},
         onShapesTool: () => {},
         onConnectorTool: () => {},
+        onTextTool: () => {},
+        onZoomFit: () => {},
+        onHelp: () => {},
       });
 
   // ─── Zone 1: Navbar ──────────────────────────────────────────────────────

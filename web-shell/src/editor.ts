@@ -562,6 +562,21 @@ export class Editor {
     this.#onToolChange(tool);
   }
 
+  /**
+   * Enter label placement mode: next click on canvas creates a text shape
+   * and immediately opens it for text editing.
+   * Composes: shape placement mode + on-place callback that calls #startTextEdit.
+   */
+  enterLabelPlacement(): void {
+    // Set a flag so the next canvas click creates a label
+    this.#labelPlacementActive = true;
+    // Clear any active tool first
+    this.setActiveTool(null);
+  }
+
+  // Internal flag for label placement mode
+  #labelPlacementActive = false;
+
   /** Current active page index. */
   get activePageIdx(): number {
     return this.#activePageIdx;
@@ -1607,6 +1622,43 @@ export class Editor {
   #onPointerDown(e: PointerEvent): void {
     // Ignore non-primary button
     if (e.button !== 0) return;
+
+    // Label placement mode: create a label shape and immediately open text editor
+    if (this.#labelPlacementActive) {
+      this.#labelPlacementActive = false;
+      const docPos = this.#clientToDoc(e.clientX, e.clientY);
+      // Create a small rectangle as the label container
+      const cmd = this.#buildAddVertexCmd('Rectangle', docPos.x - 40, docPos.y - 10);
+      const r = this.#session.executeCommand(cmd);
+      if (r.ok) {
+        this.#replay();
+        // Find the newly created vertex by searching for an element near the click
+        // We use a marker approach: set a data attribute during creation
+        // Since we can't easily get the new ID, position the input at click coords
+        const fakeEvent = { clientX: e.clientX, clientY: e.clientY } as MouseEvent;
+        // Find the vertex near the click by searching DOM
+        const shapes = this.#viewer.querySelectorAll('[data-vertex-id]');
+        let targetId: SlotmapId | null = null;
+        let minDist = Infinity;
+        for (const shape of shapes) {
+          const rect = shape.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dist = Math.hypot(cx - e.clientX, cy - e.clientY);
+          if (dist < minDist && dist < 100) {
+            minDist = dist;
+            const idAttr = shape.getAttribute('data-vertex-id');
+            if (idAttr) {
+              targetId = parseSlotmapAttr(idAttr);
+            }
+          }
+        }
+        if (targetId) {
+          this.#startTextEdit(targetId, fakeEvent);
+        }
+      }
+      return;
+    }
 
     // Connect mode is handled via a separate two-click FSM — check BEFORE palette tools
     if (this.#activeTool === 'connector') {

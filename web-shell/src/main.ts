@@ -159,6 +159,14 @@ async function bootstrap(): Promise<void> {
   // ─── 4. Build Inspector (needed before UI for update wiring) ──────────────
   const inspector = buildInspector(activeSession);
 
+  // ─── 4.5. Create zoom/pan controls early so rail callbacks can reference them ─
+  // We create a minimal container just for zoom/pan, then rebuild properly in buildEmptyUi
+  const zoomPanPlaceholder = document.createElement('div');
+  const viewerPlaceholder = document.createElement('div');
+  // Store zoomPan in a mutable binding so rail callbacks can access it
+  // eslint-disable-next-line prefer-const
+  let zoomPan = setupZoomPan(zoomPanPlaceholder, viewerPlaceholder);
+
   // ─── 5. Build 5-zone UI with inspector ────────────────────────────────────
   const ui = buildEmptyUi(root, inspector.container, {
     onSelectTool: () => {
@@ -176,6 +184,52 @@ async function bootstrap(): Promise<void> {
     },
     onConnectorTool: () => {
       activeEditor?.setActiveTool('connector');
+    },
+    onTextTool: () => {
+      activeEditor?.enterLabelPlacement();
+    },
+    onZoomFit: () => {
+      zoomPan.fitToView();
+      ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+      ui.hud.setZoom(zoomPan.getZoom() * 100);
+      ui.canvasContainer.style.setProperty('--zoom', String(zoomPan.getZoom()));
+    },
+    onHelp: () => {
+      // Toggle keyboard shortcuts overlay
+      const existing = document.getElementById('keyboard-shortcuts-overlay');
+      if (existing) {
+        existing.remove();
+      } else {
+        const overlay = document.createElement('div');
+        overlay.id = 'keyboard-shortcuts-overlay';
+        overlay.style.cssText = `
+          position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 2000;
+          display: flex; align-items: center; justify-content: center;
+        `;
+        overlay.innerHTML = `
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border);
+                      border-radius: 10px; padding: 24px; min-width: 300px; color: var(--text);">
+            <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600;">Keyboard Shortcuts</h3>
+            <div style="display: grid; gap: 8px; font-size: 12px;">
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">V</kbd> Select</div>
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">R</kbd> Shapes</div>
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">C</kbd> Connector</div>
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">T</kbd> Text</div>
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">F</kbd> Zoom to Fit</div>
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Del</kbd> Delete</div>
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Z</kbd> Undo</div>
+              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Y</kbd> Redo</div>
+            </div>
+            <button id="close-shortcuts" style="
+              margin-top: 16px; width: 100%; padding: 8px; background: var(--accent);
+              color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;
+            ">Close</button>
+          </div>
+        `;
+        overlay.querySelector('#close-shortcuts')?.addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+      }
     },
   });
 
@@ -214,7 +268,8 @@ async function bootstrap(): Promise<void> {
   });
 
   // ─── 5. Zoom/Pan on canvas container ──────────────────────────────────────
-  const zoomPan = setupZoomPan(ui.canvasContainer, ui.viewer);
+  // zoomPan was created with placeholder elements above; now recreate with real DOM
+  zoomPan = setupZoomPan(ui.canvasContainer, ui.viewer);
 
   // ─── 6. Editor ────────────────────────────────────────────────────────────
   const onEditorError = (msg: string) => {
