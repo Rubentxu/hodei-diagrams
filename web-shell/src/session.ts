@@ -146,6 +146,24 @@ export class DiagramEngineSession {
     }
   }
 
+  /**
+   * Execute multiple commands atomically as a single transaction.
+   * All commands are applied in one undo entry; on error all are rolled back.
+   * Empty array is a no-op (succeeds without pushing to history).
+   */
+  executeTransaction(cmdJsons: string[]): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const json = JSON.stringify(cmdJsons);
+      this.wasm.execute_transaction(this.handle as number, json);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   #onStateChange: (() => void) | null = null;
 
   /**

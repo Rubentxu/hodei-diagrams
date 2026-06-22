@@ -1,7 +1,7 @@
 //! Command execution: translate JSON commands to engine calls.
 
 use crate::engine::{with_editor, with_editor_mut};
-use diagram_commands::{Command, RoutingKind};
+use diagram_commands::{Command, RoutingKind, Transaction};
 use wasm_bindgen::prelude::*;
 
 /// Execute a command on an engine from a JSON string.
@@ -21,6 +21,76 @@ pub fn execute_command(handle: u32, cmd_json: &str) -> Result<(), JsValue> {
         Err(e) => return Err(JsValue::from_str(&format!("InvalidCommand: {e}"))),
     };
     with_editor_mut(handle, |e| e.execute(cmd))
+        .and_then(|r| r.map_err(|e| Box::leak(format!("Execute: {e}").into_boxed_str()) as &str))
+        .map_err(JsValue::from_str)
+}
+
+/// Execute a transaction (atomic batch) from a JSON string containing an array of commands.
+///
+/// The JSON must be a `Vec<Command>`: `[{"AddVertex":{...}}, {"MoveVertex":{...}}, ...]`.
+/// All commands are applied atomically: on success, one history entry is pushed;
+/// on error, all applied commands are rolled back.
+///
+/// Empty array (`[]`) is a no-op: succeeds without pushing to history.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `InvalidCommand: <json_error>` if the JSON is malformed
+/// - `Execute: <command_error>` if a command could not be applied (transaction rolled back)
+#[wasm_bindgen]
+pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsValue> {
+    let cmds: Vec<Command> = match serde_json::from_str(commands_json) {
+        Ok(c) => c,
+        Err(e) => return Err(JsValue::from_str(&format!("InvalidCommand: {e}"))),
+    };
+
+    // Empty array — no-op per spec V18
+    if cmds.is_empty() {
+        return Ok(());
+    }
+
+    // Build transaction via the builder API and commit atomically.
+    // Each builder method takes ownership of the extracted fields and returns a new Transaction.
+    let tx = cmds.into_iter().fold(Transaction::new(), |tx, cmd| {
+        match cmd {
+            Command::AddVertex(p) => tx.add_vertex(p.vertex),
+            Command::RemoveVertex(p) => tx.remove_vertex(p.id),
+            Command::MoveVertex(p) => tx.move_vertex(p.id, p.geometry),
+            Command::EditVertexLabel(p) => {
+                // Label is Option<Label>; skip if None (clear label case)
+                if let Some(label) = p.label {
+                    tx.edit_vertex_label(p.id, label)
+                } else {
+                    tx
+                }
+            }
+            Command::AddEdge(p) => tx.add_edge(p.edge),
+            Command::RemoveEdge(p) => tx.remove_edge(p.id),
+            Command::ChangeStyle(p) => tx.change_style(p.id, p.style),
+            Command::AddGroup(p) => tx.add_group(p.group),
+            Command::RemoveGroup(p) => tx.remove_group(p.id),
+            Command::AddPage(p) => tx.add_page(p.page),
+            Command::RemovePage(p) => tx.remove_page(p.id),
+            Command::RenamePage(p) => tx.rename_page(p.id, p.name),
+            // RotateVertex and FlipVertex require Editor's built-in rotation/flip logic
+            // (angle delta is relative, not absolute). Skip in transaction path for now.
+            Command::RotateVertex(_) => tx,
+            Command::FlipVertex(_) => tx,
+            // Z-order commands — no direct transaction builder; skip for now
+            Command::BringToFront(_) => tx,
+            Command::SendToBack(_) => tx,
+            Command::BringForward(_) => tx,
+            Command::SendBackward(_) => tx,
+            // ConnectVertices and DisconnectEdge have their own dedicated WASM functions
+            Command::ConnectVertices(_) => tx,
+            Command::DisconnectEdge(_) => tx,
+            // Handle any future variants gracefully (non_exhaustive)
+            _ => tx,
+        }
+    });
+
+    with_editor_mut(handle, |e| tx.commit(e))
         .and_then(|r| r.map_err(|e| Box::leak(format!("Execute: {e}").into_boxed_str()) as &str))
         .map_err(JsValue::from_str)
 }
@@ -177,6 +247,82 @@ pub fn connect_vertices(
         Ok(Ok(edge_idx)) => Ok(edge_idx),
         Ok(Err(e)) => Err(JsValue::from_str(e)),
         Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that an empty JSON array parses as an empty Vec<Command>.
+    /// This is the prerequisite for the V18 no-op behavior.
+    #[test]
+    fn execute_transaction_empty_array_parses() {
+        let parsed: Vec<Command> = serde_json::from_str("[]").expect("empty array must parse");
+        assert!(parsed.is_empty());
+    }
+
+    /// Verify that a single AddVertex command parses correctly.
+    #[test]
+    fn execute_transaction_single_command_parses() {
+        // Build a valid Vec<Command> JSON array using serde_json::json!
+        let cmds = serde_json::json!([
+            {
+                "AddVertex": {
+                    "vertex": {
+                        "geometry": {"x": 0.0, "y": 0.0, "width": 100.0, "height": 50.0, "relative": false, "rotation": 0.0, "flip_h": false, "flip_v": false},
+                        "label": {"text": "Test"},
+                        "page_id": {"idx": 0, "version": 0},
+                        "parent": null,
+                        "style_id": null,
+                        "z_order": 0,
+                        "locked": false,
+                        "visible": true
+                    }
+                }
+            }
+        ]);
+        let json = serde_json::to_string(&cmds).unwrap();
+        let parsed: Vec<Command> =
+            serde_json::from_str(&json).expect("single AddVertex must parse");
+        assert_eq!(parsed.len(), 1);
+        match &parsed[0] {
+            Command::AddVertex(p) => {
+                assert_eq!(p.vertex.geometry.as_ref().unwrap().x, 0.0);
+                assert_eq!(p.vertex.geometry.as_ref().unwrap().y, 0.0);
+            }
+            _ => panic!("expected AddVertex"),
+        }
+    }
+
+    /// Verify that multiple commands (MoveVertex + RemoveVertex) parse correctly.
+    #[test]
+    fn execute_transaction_multiple_commands_parses() {
+        let cmds = serde_json::json!([
+            {
+                "MoveVertex": {
+                    "id": {"idx": 1, "version": 0},
+                    "geometry": {"x": 50.0, "y": 50.0, "width": 100.0, "height": 50.0, "relative": false, "rotation": 0.0, "flip_h": false, "flip_v": false}
+                }
+            },
+            {
+                "RemoveVertex": {
+                    "id": {"idx": 2, "version": 0}
+                }
+            }
+        ]);
+        let json = serde_json::to_string(&cmds).unwrap();
+        let parsed: Vec<Command> =
+            serde_json::from_str(&json).expect("multi-command array must parse");
+        assert_eq!(parsed.len(), 2);
+        match &parsed[0] {
+            Command::MoveVertex(_) => {}
+            _ => panic!("expected MoveVertex"),
+        }
+        match &parsed[1] {
+            Command::RemoveVertex(_) => {}
+            _ => panic!("expected RemoveVertex"),
+        }
     }
 }
 

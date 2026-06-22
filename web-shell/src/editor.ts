@@ -100,6 +100,10 @@ export class Editor {
   #stencilPreviewEl: SVGGElement | null = null;
   #stencilDragTool: string | null = null;
 
+  // ─── Snap ────────────────────────────────────────────────────────────────
+  #snapEnabled: boolean = false;
+  #snapThreshold: number = 8;
+
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
   #textEdit: TextEditState = null;
 
@@ -374,6 +378,20 @@ export class Editor {
     }
 
     this.#session.executeCommands(commands);
+    this.#replay();
+  }
+
+  /**
+   * Execute an array of commands atomically as a single transaction.
+   * On success, one undo entry is pushed; on error all commands are rolled back.
+   * Empty array is a no-op (no undo entry, no error).
+   */
+  executeTransaction(commands: string[]): void {
+    const result = this.#session.executeTransaction(commands);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
     this.#replay();
   }
 
@@ -863,6 +881,163 @@ export class Editor {
     };
   }
 
+  // ─── Snap Math ────────────────────────────────────────────────────────────
+
+  /** Snap a document-space point to the nearest grid line within threshold. No-op when snap is disabled. */
+  #snapToGrid(x: number, y: number): { x: number; y: number } {
+    if (!this.#snapEnabled) return { x, y };
+    const gridSize = 20;
+    const snapX = Math.round(x / gridSize) * gridSize;
+    const snapY = Math.round(y / gridSize) * gridSize;
+    return {
+      x: Math.abs(snapX - x) <= this.#snapThreshold ? snapX : x,
+      y: Math.abs(snapY - y) <= this.#snapThreshold ? snapY : y,
+    };
+  }
+
+  /**
+   * Snap a document-space point to nearby shape edges/centers.
+   * Returns snapped coordinates and active guide targets.
+   * No-op when snap is disabled or excludeId is the only shape on the page.
+   */
+  #snapToShape(
+    x: number,
+    y: number,
+    excludeId: SlotmapId,
+  ): { x: number; y: number; guides: { x?: number; y?: number } } {
+    if (!this.#snapEnabled) return { x, y, guides: {} };
+
+    // Collect all peer shape bounds (excluding the dragged one)
+    const peers: { id: SlotmapId; x: number; y: number; width: number; height: number }[] = [];
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of Editor.#SHAPE_KEYS) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField) continue;
+          const id = { idx: idField.idx!, version: idField.version! };
+          if (id.idx === excludeId.idx && id.version === excludeId.version) continue;
+          const bounds = variant['bounds'] as
+            | { origin?: Record<string, number>; size?: Record<string, number> }
+            | undefined;
+          if (!bounds?.origin || !bounds?.size) continue;
+          peers.push({
+            id,
+            x: (bounds.origin['x'] as number) ?? 0,
+            y: (bounds.origin['y'] as number) ?? 0,
+            width: (bounds.size['width'] as number) ?? 0,
+            height: (bounds.size['height'] as number) ?? 0,
+          });
+        }
+      }
+    }
+
+    if (peers.length === 0) return { x, y, guides: {} };
+
+    let bestX: number | undefined;
+    let bestY: number | undefined;
+    let bestDistX = this.#snapThreshold + 1;
+    let bestDistY = this.#snapThreshold + 1;
+
+    for (const peer of peers) {
+      // X-axis candidates: left, center, right
+      const peerLeft = peer.x;
+      const peerCenterX = peer.x + peer.width / 2;
+      const peerRight = peer.x + peer.width;
+
+      const candX = [peerLeft, peerCenterX, peerRight];
+      for (const cx of candX) {
+        const dist = Math.abs(cx - x);
+        if (dist <= this.#snapThreshold && dist < bestDistX) {
+          bestDistX = dist;
+          bestX = cx;
+        }
+      }
+
+      // Y-axis candidates: top, middle, bottom
+      const peerTop = peer.y;
+      const peerMiddleY = peer.y + peer.height / 2;
+      const peerBottom = peer.y + peer.height;
+
+      const candY = [peerTop, peerMiddleY, peerBottom];
+      for (const cy of candY) {
+        const dist = Math.abs(cy - y);
+        if (dist <= this.#snapThreshold && dist < bestDistY) {
+          bestDistY = dist;
+          bestY = cy;
+        }
+      }
+    }
+
+    return {
+      x: bestX !== undefined ? bestX : x,
+      y: bestY !== undefined ? bestY : y,
+      guides: { x: bestX, y: bestY },
+    };
+  }
+
+  // ─── Snap Guides ──────────────────────────────────────────────────────────
+
+  #activeGuides: { x?: number; y?: number } = {};
+
+  /** Render snap guide SVG lines at the given guide coordinates. */
+  #renderGuides(guides: { x?: number; y?: number }): void {
+    this.#clearGuides();
+    this.#activeGuides = guides;
+
+    const svg = this.#viewer.querySelector('svg');
+    if (!svg) return;
+
+    if (guides.x !== undefined) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', String(guides.x));
+      line.setAttribute('y1', '0');
+      line.setAttribute('x2', String(guides.x));
+      line.setAttribute('y2', String(this.#viewer.getBoundingClientRect().height));
+      line.setAttribute('class', 'snap-guide snap-guide-x');
+      line.setAttribute('data-testid', 'snap-guide');
+      line.setAttribute('data-axis', 'x');
+      svg.appendChild(line);
+    }
+
+    if (guides.y !== undefined) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', '0');
+      line.setAttribute('y1', String(guides.y));
+      line.setAttribute('x2', String(this.#viewer.getBoundingClientRect().width));
+      line.setAttribute('y2', String(guides.y));
+      line.setAttribute('class', 'snap-guide snap-guide-y');
+      line.setAttribute('data-testid', 'snap-guide');
+      line.setAttribute('data-axis', 'y');
+      svg.appendChild(line);
+    }
+  }
+
+  /** Remove all snap guide elements from the DOM. */
+  #clearGuides(): void {
+    this.#viewer.querySelectorAll('[data-testid="snap-guide"]').forEach((el) => el.remove());
+    this.#activeGuides = {};
+  }
+
+  // ─── Public Snap API ─────────────────────────────────────────────────────
+
+  /** Toggle snap-to-grid and snap-to-shape on/off. */
+  toggleSnap(): void {
+    this.#snapEnabled = !this.#snapEnabled;
+  }
+
+  /** Check whether snap is currently enabled. */
+  get snapEnabled(): boolean {
+    return this.#snapEnabled;
+  }
+
+  /** Set snap enabled state. */
+  setSnapEnabled(enabled: boolean): void {
+    this.#snapEnabled = enabled;
+  }
+
   /** Refresh scene cache and re-render. Called after commands. */
   #replay(): void {
     // Refresh scene cache
@@ -937,38 +1112,11 @@ export class Editor {
   #reapplySelection(): void {
     if (this.#selection.size === 0) return;
 
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-
-    // Validate each selected ID still exists
+    // Validate each selected ID still exists in the scene
     const validIds = new Set<SlotmapId>();
     for (const id of this.#selection) {
-      const stillExists = this.#sceneCache.some((page) =>
-        page.display_list.some((elem: unknown) => {
-          const e = elem as Record<string, unknown>;
-          for (const key of shapeKeys) {
-            const variant = e[key] as Record<string, unknown> | undefined;
-            if (!variant) continue;
-            const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-            if (idField?.idx === id.idx && idField?.version === id.version) {
-              return true;
-            }
-          }
-          return false;
-        }),
-      );
-      if (stillExists) {
+      const variant = this.#findShapeById(id);
+      if (variant) {
         validIds.add(id);
       }
     }
@@ -1086,24 +1234,11 @@ export class Editor {
   /** Get all shape SlotmapIds whose bounds intersect the given rect. */
   #getIntersectingIds(rect: { x: number; y: number; width: number; height: number }): SlotmapId[] {
     const result: SlotmapId[] = [];
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
 
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
+        for (const key of Editor.#SHAPE_KEYS) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
@@ -1215,8 +1350,18 @@ export class Editor {
 
     // Handle shape dragging
     if (!this.#dragState) return;
-    this.#dragState.currentX = docPos.x;
-    this.#dragState.currentY = docPos.y;
+
+    // Apply snap: grid first, then shape
+    const gridSnapped = this.#snapToGrid(docPos.x, docPos.y);
+    const shapeSnapped = this.#snapToShape(
+      gridSnapped.x,
+      gridSnapped.y,
+      this.#dragState.vertexId,
+    );
+
+    this.#renderGuides(shapeSnapped.guides);
+    this.#dragState.currentX = shapeSnapped.x;
+    this.#dragState.currentY = shapeSnapped.y;
 
     const dx = this.#dragState.currentX - this.#dragState.startX;
     const dy = this.#dragState.currentY - this.#dragState.startY;
@@ -1234,6 +1379,9 @@ export class Editor {
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
+
+    // Remove snap guides
+    this.#clearGuides();
 
     // Handle marquee end
     if (this.#marquee) {
@@ -1437,88 +1585,53 @@ export class Editor {
   #findOriginalGeometry(
     vid: SlotmapId,
   ): { x: number; y: number; width: number; height: number } | null {
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          if (idField.idx === vid.idx && idField.version === vid.version) {
-            const bounds = variant['bounds'] as
-              | { origin?: Record<string, number>; size?: Record<string, number> }
-              | undefined;
-            if (bounds?.origin && bounds?.size) {
-              return {
-                x: (bounds.origin['x'] as number) ?? 0,
-                y: (bounds.origin['y'] as number) ?? 0,
-                width: (bounds.size['width'] as number) ?? 0,
-                height: (bounds.size['height'] as number) ?? 0,
-              };
-            }
-          }
-        }
-      }
-    }
-    return null;
+    const variant = this.#findShapeById(vid);
+    if (!variant) return null;
+    const bounds = variant['bounds'] as
+      | { origin?: Record<string, number>; size?: Record<string, number> }
+      | undefined;
+    if (!bounds?.origin || !bounds?.size) return null;
+    return {
+      x: (bounds.origin['x'] as number) ?? 0,
+      y: (bounds.origin['y'] as number) ?? 0,
+      width: (bounds.size['width'] as number) ?? 0,
+      height: (bounds.size['height'] as number) ?? 0,
+    };
   }
 
-  // ─── Vertex Access ────────────────────────────────────────────────────────
+  // ─── Shape Lookup Helpers ─────────────────────────────────────────────────
 
-  /** Get a vertex object by SlotmapId from the scene cache. */
-  #getVertex(id: SlotmapId): Vertex | null {
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
+  /** Shape type keys used across scene-walk helpers. */
+  static readonly #SHAPE_KEYS = [
+    'Rect',
+    'RoundedRect',
+    'Ellipse',
+    'Diamond',
+    'Triangle',
+    'Hexagon',
+    'Cylinder',
+    'Cloud',
+    'Parallelogram',
+    'Trapezoid',
+    'Polygon',
+  ] as const;
 
+  /**
+   * Find the display-list variant data for a shape by its SlotmapId.
+   * Returns the variant record (e.g. `{id, bounds, style}`) or null if not found.
+   * This is the single source of truth for scene-walking by ID.
+   */
+  #findShapeById(id: SlotmapId): Record<string, unknown> | null {
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
+        for (const key of Editor.#SHAPE_KEYS) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
           if (!idField) continue;
           if (idField.idx === id.idx && idField.version === id.version) {
-            const bounds = variant['bounds'] as
-              | { origin?: Record<string, number>; size?: Record<string, number> }
-              | undefined;
-            if (bounds?.origin && bounds?.size) {
-              return {
-                geometry: {
-                  x: (bounds.origin['x'] as number) ?? 0,
-                  y: (bounds.origin['y'] as number) ?? 0,
-                  width: (bounds.size['width'] as number) ?? 0,
-                  height: (bounds.size['height'] as number) ?? 0,
-                },
-                style: (variant['style'] as Record<string, unknown>) ?? {},
-              };
-            }
+            return variant;
           }
         }
       }
@@ -1526,26 +1639,31 @@ export class Editor {
     return null;
   }
 
+  /** Get a vertex object by SlotmapId from the scene cache. */
+  #getVertex(id: SlotmapId): Vertex | null {
+    const variant = this.#findShapeById(id);
+    if (!variant) return null;
+    const bounds = variant['bounds'] as
+      | { origin?: Record<string, number>; size?: Record<string, number> }
+      | undefined;
+    if (!bounds?.origin || !bounds?.size) return null;
+    return {
+      geometry: {
+        x: (bounds.origin['x'] as number) ?? 0,
+        y: (bounds.origin['y'] as number) ?? 0,
+        width: (bounds.size['width'] as number) ?? 0,
+        height: (bounds.size['height'] as number) ?? 0,
+      },
+      style: (variant['style'] as Record<string, unknown>) ?? {},
+    };
+  }
+
   /** Find a vertex SlotmapId at the given document position (within tolerance). */
   #findVertexAt(x: number, y: number, tolerance = 5): SlotmapId | null {
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
-        for (const key of shapeKeys) {
+        for (const key of Editor.#SHAPE_KEYS) {
           const variant = e[key] as Record<string, unknown> | undefined;
           if (!variant) continue;
           const idField = variant['id'] as { idx?: number; version?: number } | undefined;
@@ -1577,20 +1695,7 @@ export class Editor {
   /** Extract SlotmapId from a display list element. */
   #extractIdFromDisplayElem(elem: unknown): SlotmapId | null {
     const e = elem as Record<string, unknown>;
-    const shapeKeys = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-    for (const key of shapeKeys) {
+    for (const key of Editor.#SHAPE_KEYS) {
       const variant = e[key] as Record<string, unknown> | undefined;
       if (!variant) continue;
       const idField = variant['id'] as { idx?: number; version?: number } | undefined;
@@ -1806,6 +1911,13 @@ export class Editor {
     // Ignore when focused on input elements
     const tag = (e.target as HTMLElement | null)?.tagName ?? '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    // Ctrl+Shift+G → toggle snap
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'g') {
+      e.preventDefault();
+      this.toggleSnap();
+      return;
+    }
 
     const hasMod = e.ctrlKey || e.metaKey;
 
