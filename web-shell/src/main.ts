@@ -151,10 +151,15 @@ async function bootstrap(): Promise<void> {
 
   activeSession = sessionResult.value;
 
-  // ─── 3. Build Inspector (needed before UI for update wiring) ──────────────
+  // ─── 3. Load stencil libraries ─────────────────────────────────────────────
+  // Load the general.xml stencil library (Rectangle, Ellipse from draw.io)
+  // This makes stencil:general:Rectangle and stencil:general:Ellipse available
+  activeSession.loadStencilLibrary('general', '/fixtures/general.xml');
+
+  // ─── 4. Build Inspector (needed before UI for update wiring) ──────────────
   const inspector = buildInspector(activeSession);
 
-  // ─── 4. Build 5-zone UI with inspector ────────────────────────────────────
+  // ─── 5. Build 5-zone UI with inspector ────────────────────────────────────
   const ui = buildEmptyUi(root, inspector.container, {
     onSelectTool: () => {
       activeEditor?.setActiveTool(null);
