@@ -52,9 +52,8 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   textTab.setAttribute('data-testid', 'inspector-tab-text');
 
   const arrangeTab = document.createElement('button');
-  arrangeTab.className = 'inspector-tab disabled-tab';
-  arrangeTab.textContent = 'Arrange';
-  arrangeTab.title = 'Disponible en v1.1';
+  arrangeTab.className = 'inspector-tab';
+  arrangeTab.textContent = 'Align & Distribute';
   arrangeTab.setAttribute('data-testid', 'inspector-tab-arrange');
 
   tabBar.appendChild(styleTab);
@@ -323,14 +322,50 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   textPane.appendChild(textFields);
   container.appendChild(textPane);
 
-  // Arrange pane (grayed out)
+  // Arrange pane
   const arrangePane = document.createElement('div');
-  arrangePane.className = 'inspector-pane disabled-pane';
+  arrangePane.className = 'inspector-pane';
   arrangePane.setAttribute('data-testid', 'inspector-pane-arrange');
-  const comingSoon = document.createElement('div');
-  comingSoon.className = 'coming-soon';
-  comingSoon.textContent = 'Disponible en v1.1';
-  arrangePane.appendChild(comingSoon);
+
+  // Align section (buttons added in PR-SP2)
+  const alignSection = document.createElement('div');
+  alignSection.className = 'inspector-section';
+  const alignTitle = document.createElement('div');
+  alignTitle.className = 'inspector-section-title';
+  alignTitle.textContent = 'Align';
+  alignSection.appendChild(alignTitle);
+  const alignButtons = document.createElement('div');
+  alignButtons.className = 'arrange-buttons';
+  alignButtons.setAttribute('data-testid', 'arrange-align-buttons');
+  alignSection.appendChild(alignButtons);
+  arrangePane.appendChild(alignSection);
+
+  // Distribute section (buttons added in PR-SP2)
+  const distributeSection = document.createElement('div');
+  distributeSection.className = 'inspector-section';
+  const distributeTitle = document.createElement('div');
+  distributeTitle.className = 'inspector-section-title';
+  distributeTitle.textContent = 'Distribute';
+  distributeSection.appendChild(distributeTitle);
+  const distributeButtons = document.createElement('div');
+  distributeButtons.className = 'arrange-buttons';
+  distributeButtons.setAttribute('data-testid', 'arrange-distribute-buttons');
+  distributeSection.appendChild(distributeButtons);
+  arrangePane.appendChild(distributeSection);
+
+  // Size section (buttons added in PR-SP2)
+  const sizeSection = document.createElement('div');
+  sizeSection.className = 'inspector-section';
+  const sizeTitle = document.createElement('div');
+  sizeTitle.className = 'inspector-section-title';
+  sizeTitle.textContent = 'Size';
+  sizeSection.appendChild(sizeTitle);
+  const sizeButtons = document.createElement('div');
+  sizeButtons.className = 'arrange-buttons';
+  sizeButtons.setAttribute('data-testid', 'arrange-size-buttons');
+  sizeSection.appendChild(sizeButtons);
+  arrangePane.appendChild(sizeSection);
+
   container.appendChild(arrangePane);
 
   // ─── Tab switching ────────────────────────────────────────────────────────
