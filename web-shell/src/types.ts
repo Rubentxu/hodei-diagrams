@@ -31,6 +31,8 @@ export type WasmModule = {
   connect_vertices(_h: number, _from: number, _to: number, _routingKind: number): number;
   disconnect_edge(_h: number, _edgeId: number): void;
   parse_stencil_xml(_xml: string): string;
+  parse_stencil_library_xml(_xml: string): string;
+  set_stencil_library(_h: number, _library: string, _xml: string): void;
   get_resolved_style(_h: number, _vertexId: number): string;
 };
 
@@ -112,15 +114,37 @@ export interface Vertex {
 
 // ─── Stencil Types ─────────────────────────────────────────────────────────────
 
-/** Parsed stencil metadata returned by parse_stencil_xml. */
+/**
+ * A path command from a parsed stencil.
+ * Mirrors `PathCommandDto` from diagram-wasm (serde tag = "kind").
+ */
+export type PathCommand =
+  | { kind: 'Move'; x: number; y: number }
+  | { kind: 'Line'; x: number; y: number }
+  | { kind: 'Quad'; cx: number; cy: number; x: number; y: number }
+  | { kind: 'Curve'; c1x: number; c1y: number; c2x: number; c2y: number; x: number; y: number }
+  | {
+      kind: 'Arc';
+      rx: number;
+      ry: number;
+      x_axis_rotation: number;
+      large_arc: boolean;
+      sweep: boolean;
+      x: number;
+      y: number;
+    }
+  | { kind: 'Close' }
+  | { kind: 'FillStroke' };
+
+/** Parsed stencil metadata returned by parse_stencil_xml / parse_stencil_library_xml. */
 export interface StencilInfo {
   library: string;
   name: string;
   width: number;
   height: number;
   aspect: 'fixed' | 'variable';
-  bg_len: number;
-  fg_len: number;
+  background: PathCommand[];
+  foreground: PathCommand[];
   license: string | null;
   diagnostics: StencilDiagnostic[];
 }

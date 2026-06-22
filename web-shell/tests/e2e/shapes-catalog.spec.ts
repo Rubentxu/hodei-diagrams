@@ -308,7 +308,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
 
     for (let i = 0; i < shapeTools.length; i++) {
       await page.click(`[data-testid="${shapeTools[i]}"]`);
-      await viewer.click({ position: positions[i] });
+      await viewer.click({ position: positions[i]! });
       await page.waitForTimeout(200);
     }
 

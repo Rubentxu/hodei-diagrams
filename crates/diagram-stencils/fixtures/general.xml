@@ -10,9 +10,8 @@
   </shape>
   <shape name="Ellipse" w="40" h="40" aspect="fixed">
     <background>
-      <path>
-        <!-- ellipse approximation via bezier -->
-      </path>
+      <!-- Ellipse approximated with 4 cubic bezier curves (kappa ≈ 0.552285) -->
+      <path>M 40,20 C 40,31.0856 31.0856,40 20,40 C 8.9144,40 0,31.0856 0,20 C 0,8.9144 8.9144,0 20,0 C 31.0856,0 40,8.9144 40,20 Z</path>
     </background>
     <foreground>
       <fillstroke/>

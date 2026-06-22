@@ -208,7 +208,7 @@ test.describe('Slice B: Professional Density UI', () => {
       await expect(italicBtn).toBeVisible();
 
       // Bold button should be 28px square
-      const boldWidth = await boldBtn.evaluate((el) => el.offsetWidth);
+      const boldWidth = await boldBtn.evaluate((el) => (el as HTMLElement).offsetWidth);
       expect(boldWidth).toBe(28);
 
       // Click bold - should get active class
@@ -233,7 +233,7 @@ test.describe('Slice B: Professional Density UI', () => {
 
       const fontSelect = page.locator('[data-testid="inspector-font-family"]');
       await expect(fontSelect).toBeVisible();
-      const width = await fontSelect.evaluate((el) => el.offsetWidth);
+      const width = await fontSelect.evaluate((el) => (el as HTMLElement).offsetWidth);
       expect(width).toBeLessThanOrEqual(130);
     });
   });
@@ -246,8 +246,8 @@ test.describe('Slice B: Professional Density UI', () => {
       const rectBtn = page.locator('[data-testid="rect-tool-btn"]');
       await expect(rectBtn).toBeVisible();
 
-      const width = await rectBtn.evaluate((el) => el.offsetWidth);
-      const height = await rectBtn.evaluate((el) => el.offsetHeight);
+      const width = await rectBtn.evaluate((el) => (el as HTMLElement).offsetWidth);
+      const height = await rectBtn.evaluate((el) => (el as HTMLElement).offsetHeight);
 
       // Should be 40x40
       expect(width).toBeLessThanOrEqual(44);
@@ -260,7 +260,7 @@ test.describe('Slice B: Professional Density UI', () => {
 
       const search = page.locator('[data-testid="sidebar-search"]');
       await expect(search).toBeVisible();
-      const height = await search.evaluate((el) => el.offsetHeight);
+      const height = await search.evaluate((el) => (el as HTMLElement).offsetHeight);
       expect(height).toBe(28);
     });
 
