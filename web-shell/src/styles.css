@@ -606,6 +606,16 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* ─── Snap guides ──────────────────────────────────────────────────────────── */
+.snap-guide {
+  stroke: var(--accent, #3b82f6);
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+  pointer-events: none;
+}
+.snap-guide-x { stroke: #3b82f6; }
+.snap-guide-y { stroke: #8b5cf6; }
+
 /* ─── Slice B: Grid Overlay ─────────────────────────────────────────────────── */
 .canvas-container.show-grid::before {
   content: '';

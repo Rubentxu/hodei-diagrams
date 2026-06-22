@@ -277,6 +277,20 @@ async function bootstrap(): Promise<void> {
       );
       activeEditor.attach();
 
+      // ── Snap menu ───────────────────────────────────────────────────────────────
+      const snapMenuItem = document.getElementById('menu-item-snap');
+      function updateSnapCheckState(): void {
+        if (!activeEditor) return;
+        const snapEnabled = activeEditor.snapEnabled;
+        snapMenuItem?.classList.toggle('has-checkmark', snapEnabled);
+      }
+      snapMenuItem?.addEventListener('click', () => {
+        if (!activeEditor) return;
+        activeEditor.toggleSnap();
+        updateSnapCheckState();
+      });
+      // Initial sync: snap starts disabled so checkmark is already absent (correct)
+
       // ── Stencil drag-and-drop ─────────────────────────────────────────────
       // Wire dragstart on all stencil sidebar buttons
       const stencilBtns = [
