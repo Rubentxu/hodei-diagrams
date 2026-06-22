@@ -82,9 +82,12 @@ impl From<&diagram_stencils::PathCommand> for PathCommandDto {
         match cmd {
             diagram_stencils::PathCommand::Move { x, y } => PathCommandDto::Move { x: *x, y: *y },
             diagram_stencils::PathCommand::Line { x, y } => PathCommandDto::Line { x: *x, y: *y },
-            diagram_stencils::PathCommand::Quad { cx, cy, x, y } => {
-                PathCommandDto::Quad { cx: *cx, cy: *cy, x: *x, y: *y }
-            }
+            diagram_stencils::PathCommand::Quad { cx, cy, x, y } => PathCommandDto::Quad {
+                cx: *cx,
+                cy: *cy,
+                x: *x,
+                y: *y,
+            },
             diagram_stencils::PathCommand::Curve {
                 c1x,
                 c1y,
@@ -194,6 +197,19 @@ mod tests {
         assert!(json.contains(r#""x":10"#));
         assert!(json.contains(r#""y":20"#));
     }
+
+    #[test]
+    fn parse_stencil_library_xml_parses_multiple_shapes() {
+        let xml = r#"<shapes name="test">
+            <shape name="Rect" w="100" h="100"/>
+            <shape name="Circle" w="80" h="80"/>
+        </shapes>"#;
+        let json = parse_stencil_library_xml(xml).expect("should parse");
+        assert!(json.contains(r#""name":"Rect""#));
+        assert!(json.contains(r#""name":"Circle""#));
+        assert!(json.starts_with('['));
+        assert!(json.ends_with(']'));
+    }
 }
 
 impl From<&diagram_stencils::Stencil> for StencilDto {
@@ -263,5 +279,38 @@ pub fn parse_stencil_xml(xml: &str) -> Result<String, JsValue> {
 
     let dto = StencilDto::from(&stencil);
     serde_json::to_string(&dto)
+        .map_err(|e| JsValue::from_str(&format!("StencilSerializeError: {e}")))
+}
+
+/// Parses a full stencil library XML file (multiple `<shape>` elements).
+///
+/// Returns a JSON array string of all successfully parsed stencils, each
+/// normalized to [0,1] unit square coordinates with full path arrays.
+///
+/// Malformed individual shapes emit diagnostics but do not cause the whole
+/// file to fail.
+///
+/// # Errors
+///
+/// Returns `Err(JsValue)` if the XML cannot be parsed at all.
+///
+/// # JSON output
+///
+/// Returns a JSON string containing an array of stencil objects.
+#[wasm_bindgen]
+pub fn parse_stencil_library_xml(xml: &str) -> Result<String, JsValue> {
+    let stencils = diagram_stencils::parse_stencil_library(xml)
+        .map_err(|e| JsValue::from_str(&format!("StencilParseError: {e}")))?;
+
+    // Normalize each stencil and convert to DTO
+    let normalized: Vec<StencilDto> = stencils
+        .iter()
+        .map(|s| {
+            let normalized = s.normalize();
+            StencilDto::from(&normalized)
+        })
+        .collect();
+
+    serde_json::to_string(&normalized)
         .map_err(|e| JsValue::from_str(&format!("StencilSerializeError: {e}")))
 }
