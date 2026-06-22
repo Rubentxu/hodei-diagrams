@@ -100,6 +100,10 @@ export class Editor {
   #stencilPreviewEl: SVGGElement | null = null;
   #stencilDragTool: string | null = null;
 
+  // ─── Snap ────────────────────────────────────────────────────────────────
+  #snapEnabled: boolean = false;
+  #snapThreshold: number = 8;
+
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
   #textEdit: TextEditState = null;
 
@@ -877,6 +881,163 @@ export class Editor {
     };
   }
 
+  // ─── Snap Math ────────────────────────────────────────────────────────────
+
+  /** Snap a document-space point to the nearest grid line within threshold. No-op when snap is disabled. */
+  #snapToGrid(x: number, y: number): { x: number; y: number } {
+    if (!this.#snapEnabled) return { x, y };
+    const gridSize = 20;
+    const snapX = Math.round(x / gridSize) * gridSize;
+    const snapY = Math.round(y / gridSize) * gridSize;
+    return {
+      x: Math.abs(snapX - x) <= this.#snapThreshold ? snapX : x,
+      y: Math.abs(snapY - y) <= this.#snapThreshold ? snapY : y,
+    };
+  }
+
+  /**
+   * Snap a document-space point to nearby shape edges/centers.
+   * Returns snapped coordinates and active guide targets.
+   * No-op when snap is disabled or excludeId is the only shape on the page.
+   */
+  #snapToShape(
+    x: number,
+    y: number,
+    excludeId: SlotmapId,
+  ): { x: number; y: number; guides: { x?: number; y?: number } } {
+    if (!this.#snapEnabled) return { x, y, guides: {} };
+
+    // Collect all peer shape bounds (excluding the dragged one)
+    const peers: { id: SlotmapId; x: number; y: number; width: number; height: number }[] = [];
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of Editor.#SHAPE_KEYS) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField) continue;
+          const id = { idx: idField.idx!, version: idField.version! };
+          if (id.idx === excludeId.idx && id.version === excludeId.version) continue;
+          const bounds = variant['bounds'] as
+            | { origin?: Record<string, number>; size?: Record<string, number> }
+            | undefined;
+          if (!bounds?.origin || !bounds?.size) continue;
+          peers.push({
+            id,
+            x: (bounds.origin['x'] as number) ?? 0,
+            y: (bounds.origin['y'] as number) ?? 0,
+            width: (bounds.size['width'] as number) ?? 0,
+            height: (bounds.size['height'] as number) ?? 0,
+          });
+        }
+      }
+    }
+
+    if (peers.length === 0) return { x, y, guides: {} };
+
+    let bestX: number | undefined;
+    let bestY: number | undefined;
+    let bestDistX = this.#snapThreshold + 1;
+    let bestDistY = this.#snapThreshold + 1;
+
+    for (const peer of peers) {
+      // X-axis candidates: left, center, right
+      const peerLeft = peer.x;
+      const peerCenterX = peer.x + peer.width / 2;
+      const peerRight = peer.x + peer.width;
+
+      const candX = [peerLeft, peerCenterX, peerRight];
+      for (const cx of candX) {
+        const dist = Math.abs(cx - x);
+        if (dist <= this.#snapThreshold && dist < bestDistX) {
+          bestDistX = dist;
+          bestX = cx;
+        }
+      }
+
+      // Y-axis candidates: top, middle, bottom
+      const peerTop = peer.y;
+      const peerMiddleY = peer.y + peer.height / 2;
+      const peerBottom = peer.y + peer.height;
+
+      const candY = [peerTop, peerMiddleY, peerBottom];
+      for (const cy of candY) {
+        const dist = Math.abs(cy - y);
+        if (dist <= this.#snapThreshold && dist < bestDistY) {
+          bestDistY = dist;
+          bestY = cy;
+        }
+      }
+    }
+
+    return {
+      x: bestX !== undefined ? bestX : x,
+      y: bestY !== undefined ? bestY : y,
+      guides: { x: bestX, y: bestY },
+    };
+  }
+
+  // ─── Snap Guides ──────────────────────────────────────────────────────────
+
+  #activeGuides: { x?: number; y?: number } = {};
+
+  /** Render snap guide SVG lines at the given guide coordinates. */
+  #renderGuides(guides: { x?: number; y?: number }): void {
+    this.#clearGuides();
+    this.#activeGuides = guides;
+
+    const svg = this.#viewer.querySelector('svg');
+    if (!svg) return;
+
+    if (guides.x !== undefined) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', String(guides.x));
+      line.setAttribute('y1', '0');
+      line.setAttribute('x2', String(guides.x));
+      line.setAttribute('y2', String(this.#viewer.getBoundingClientRect().height));
+      line.setAttribute('class', 'snap-guide snap-guide-x');
+      line.setAttribute('data-testid', 'snap-guide');
+      line.setAttribute('data-axis', 'x');
+      svg.appendChild(line);
+    }
+
+    if (guides.y !== undefined) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', '0');
+      line.setAttribute('y1', String(guides.y));
+      line.setAttribute('x2', String(this.#viewer.getBoundingClientRect().width));
+      line.setAttribute('y2', String(guides.y));
+      line.setAttribute('class', 'snap-guide snap-guide-y');
+      line.setAttribute('data-testid', 'snap-guide');
+      line.setAttribute('data-axis', 'y');
+      svg.appendChild(line);
+    }
+  }
+
+  /** Remove all snap guide elements from the DOM. */
+  #clearGuides(): void {
+    this.#viewer.querySelectorAll('[data-testid="snap-guide"]').forEach((el) => el.remove());
+    this.#activeGuides = {};
+  }
+
+  // ─── Public Snap API ─────────────────────────────────────────────────────
+
+  /** Toggle snap-to-grid and snap-to-shape on/off. */
+  toggleSnap(): void {
+    this.#snapEnabled = !this.#snapEnabled;
+  }
+
+  /** Check whether snap is currently enabled. */
+  get snapEnabled(): boolean {
+    return this.#snapEnabled;
+  }
+
+  /** Set snap enabled state. */
+  setSnapEnabled(enabled: boolean): void {
+    this.#snapEnabled = enabled;
+  }
+
   /** Refresh scene cache and re-render. Called after commands. */
   #replay(): void {
     // Refresh scene cache
@@ -1189,8 +1350,18 @@ export class Editor {
 
     // Handle shape dragging
     if (!this.#dragState) return;
-    this.#dragState.currentX = docPos.x;
-    this.#dragState.currentY = docPos.y;
+
+    // Apply snap: grid first, then shape
+    const gridSnapped = this.#snapToGrid(docPos.x, docPos.y);
+    const shapeSnapped = this.#snapToShape(
+      gridSnapped.x,
+      gridSnapped.y,
+      this.#dragState.vertexId,
+    );
+
+    this.#renderGuides(shapeSnapped.guides);
+    this.#dragState.currentX = shapeSnapped.x;
+    this.#dragState.currentY = shapeSnapped.y;
 
     const dx = this.#dragState.currentX - this.#dragState.startX;
     const dy = this.#dragState.currentY - this.#dragState.startY;
@@ -1208,6 +1379,9 @@ export class Editor {
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
+
+    // Remove snap guides
+    this.#clearGuides();
 
     // Handle marquee end
     if (this.#marquee) {
@@ -1737,6 +1911,13 @@ export class Editor {
     // Ignore when focused on input elements
     const tag = (e.target as HTMLElement | null)?.tagName ?? '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    // Ctrl+Shift+G → toggle snap
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'g') {
+      e.preventDefault();
+      this.toggleSnap();
+      return;
+    }
 
     const hasMod = e.ctrlKey || e.metaKey;
 

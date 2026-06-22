@@ -258,8 +258,7 @@ mod tests {
     /// This is the prerequisite for the V18 no-op behavior.
     #[test]
     fn execute_transaction_empty_array_parses() {
-        let parsed: Vec<Command> =
-            serde_json::from_str("[]").expect("empty array must parse");
+        let parsed: Vec<Command> = serde_json::from_str("[]").expect("empty array must parse");
         assert!(parsed.is_empty());
     }
 
@@ -284,8 +283,8 @@ mod tests {
             }
         ]);
         let json = serde_json::to_string(&cmds).unwrap();
-        let parsed: Vec<Command> = serde_json::from_str(&json)
-            .expect("single AddVertex must parse");
+        let parsed: Vec<Command> =
+            serde_json::from_str(&json).expect("single AddVertex must parse");
         assert_eq!(parsed.len(), 1);
         match &parsed[0] {
             Command::AddVertex(p) => {
@@ -313,8 +312,8 @@ mod tests {
             }
         ]);
         let json = serde_json::to_string(&cmds).unwrap();
-        let parsed: Vec<Command> = serde_json::from_str(&json)
-            .expect("multi-command array must parse");
+        let parsed: Vec<Command> =
+            serde_json::from_str(&json).expect("multi-command array must parse");
         assert_eq!(parsed.len(), 2);
         match &parsed[0] {
             Command::MoveVertex(_) => {}

@@ -151,6 +151,13 @@ export function buildNavbar(): NavbarControls {
   gridItem.id = 'menu-item-grid';
   viewList.appendChild(gridItem);
 
+  const snapItem = document.createElement('button');
+  snapItem.className = 'menu-item has-checkmark';
+  snapItem.setAttribute('data-testid', 'menu-snap');
+  snapItem.textContent = 'Snap';
+  snapItem.id = 'menu-item-snap';
+  viewList.appendChild(snapItem);
+
   const presentItem = document.createElement('button');
   presentItem.className = 'menu-item';
   presentItem.textContent = 'Present';
