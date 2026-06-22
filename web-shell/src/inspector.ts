@@ -6,11 +6,14 @@
  */
 
 import type { DiagramEngineSession } from './session.js';
+import type { Editor } from './editor.js';
 import type { SlotmapId, ScenePage } from './types.js';
 import { slotmapIdToField } from './types.js';
 
 export interface InspectorControls {
   container: HTMLElement;
+  setEditor(editor: Editor): void;
+  setSelectionSize(count: number): void;
   update(
     selection: SlotmapId | null,
     sceneCache: ScenePage[],
@@ -22,14 +25,14 @@ export interface InspectorControls {
 interface StyleChanges {
   fillColor?: string;
   strokeColor?: string;
-  strokeWidth?: number;
-  dashed?: boolean;
-  rounded?: boolean;
+  strokeWidth?: string;
+  dashed?: string;
+  rounded?: string;
   fontFamily?: string;
-  fontSize?: number;
+  fontSize?: string;
   fontColor?: string;
-  bold?: boolean;
-  italic?: boolean;
+  bold?: string;
+  italic?: string;
 }
 
 export function buildInspector(session: DiagramEngineSession): InspectorControls {
@@ -322,49 +325,102 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   textPane.appendChild(textFields);
   container.appendChild(textPane);
 
+  // Arrange button references for disabled state management
+  const alignButtons: HTMLButtonElement[] = [];
+  const distributeButtons: HTMLButtonElement[] = [];
+  const sameSizeButtons: HTMLButtonElement[] = [];
+
   // Arrange pane
   const arrangePane = document.createElement('div');
   arrangePane.className = 'inspector-pane';
   arrangePane.setAttribute('data-testid', 'inspector-pane-arrange');
 
-  // Align section (buttons added in PR-SP2)
+  // Helper to create arrange button
+  function makeArrangeButton(testId: string, label: string, onClick: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'arrange-btn disabled-btn';
+    btn.setAttribute('data-testid', testId);
+    btn.textContent = label;
+    btn.disabled = true;
+    btn.addEventListener('click', () => {
+      if (!btn.disabled && activeEditor) {
+        onClick();
+      }
+    });
+    return btn;
+  }
+
+  // Align section
   const alignSection = document.createElement('div');
   alignSection.className = 'inspector-section';
   const alignTitle = document.createElement('div');
   alignTitle.className = 'inspector-section-title';
   alignTitle.textContent = 'Align';
   alignSection.appendChild(alignTitle);
-  const alignButtons = document.createElement('div');
-  alignButtons.className = 'arrange-buttons';
-  alignButtons.setAttribute('data-testid', 'arrange-align-buttons');
-  alignSection.appendChild(alignButtons);
+
+  const alignRow1 = document.createElement('div');
+  alignRow1.className = 'arrange-row';
+  const alignLeftBtn = makeArrangeButton('arrange-btn-align-left', '⇤', () => activeEditor?.alignSelection('left'));
+  const alignCenterHBtn = makeArrangeButton('arrange-btn-align-center-h', '⇔', () => activeEditor?.alignSelection('center-h'));
+  const alignRightBtn = makeArrangeButton('arrange-btn-align-right', '⇥', () => activeEditor?.alignSelection('right'));
+  alignRow1.appendChild(alignLeftBtn);
+  alignRow1.appendChild(alignCenterHBtn);
+  alignRow1.appendChild(alignRightBtn);
+  alignSection.appendChild(alignRow1);
+  alignButtons.push(alignLeftBtn, alignCenterHBtn, alignRightBtn);
+
+  const alignRow2 = document.createElement('div');
+  alignRow2.className = 'arrange-row';
+  const alignTopBtn = makeArrangeButton('arrange-btn-align-top', '⇑', () => activeEditor?.alignSelection('top'));
+  const alignCenterVBtn = makeArrangeButton('arrange-btn-align-center-v', '⇕', () => activeEditor?.alignSelection('center-v'));
+  const alignBottomBtn = makeArrangeButton('arrange-btn-align-bottom', '⇓', () => activeEditor?.alignSelection('bottom'));
+  alignRow2.appendChild(alignTopBtn);
+  alignRow2.appendChild(alignCenterVBtn);
+  alignRow2.appendChild(alignBottomBtn);
+  alignSection.appendChild(alignRow2);
+  alignButtons.push(alignTopBtn, alignCenterVBtn, alignBottomBtn);
+
   arrangePane.appendChild(alignSection);
 
-  // Distribute section (buttons added in PR-SP2)
+  // Distribute section
   const distributeSection = document.createElement('div');
   distributeSection.className = 'inspector-section';
   const distributeTitle = document.createElement('div');
   distributeTitle.className = 'inspector-section-title';
   distributeTitle.textContent = 'Distribute';
   distributeSection.appendChild(distributeTitle);
-  const distributeButtons = document.createElement('div');
-  distributeButtons.className = 'arrange-buttons';
-  distributeButtons.setAttribute('data-testid', 'arrange-distribute-buttons');
-  distributeSection.appendChild(distributeButtons);
+
+  const distributeRow = document.createElement('div');
+  distributeRow.className = 'arrange-row';
+  const distributeHBtn = makeArrangeButton('arrange-btn-distribute-h', '→═←', () => activeEditor?.distributeSelection('horizontal'));
+  const distributeVBtn = makeArrangeButton('arrange-btn-distribute-v', '↑═↓', () => activeEditor?.distributeSelection('vertical'));
+  distributeRow.appendChild(distributeHBtn);
+  distributeRow.appendChild(distributeVBtn);
+  distributeSection.appendChild(distributeRow);
+  distributeButtons.push(distributeHBtn, distributeVBtn);
+
   arrangePane.appendChild(distributeSection);
 
-  // Size section (buttons added in PR-SP2)
-  const sizeSection = document.createElement('div');
-  sizeSection.className = 'inspector-section';
-  const sizeTitle = document.createElement('div');
-  sizeTitle.className = 'inspector-section-title';
-  sizeTitle.textContent = 'Size';
-  sizeSection.appendChild(sizeTitle);
-  const sizeButtons = document.createElement('div');
-  sizeButtons.className = 'arrange-buttons';
-  sizeButtons.setAttribute('data-testid', 'arrange-size-buttons');
-  sizeSection.appendChild(sizeButtons);
-  arrangePane.appendChild(sizeSection);
+  // Same Size section
+  const sameSizeSection = document.createElement('div');
+  sameSizeSection.className = 'inspector-section';
+  const sameSizeTitle = document.createElement('div');
+  sameSizeTitle.className = 'inspector-section-title';
+  sameSizeTitle.textContent = 'Same Size';
+  sameSizeSection.appendChild(sameSizeTitle);
+
+  const sameSizeRow = document.createElement('div');
+  sameSizeRow.className = 'arrange-row';
+  const sameWidthBtn = makeArrangeButton('arrange-btn-same-width', '↔', () => activeEditor?.sameSizeSelection('width'));
+  const sameHeightBtn = makeArrangeButton('arrange-btn-same-height', '↕', () => activeEditor?.sameSizeSelection('height'));
+  const sameBothBtn = makeArrangeButton('arrange-btn-same-both', '⬜', () => activeEditor?.sameSizeSelection('both'));
+  sameSizeRow.appendChild(sameWidthBtn);
+  sameSizeRow.appendChild(sameHeightBtn);
+  sameSizeRow.appendChild(sameBothBtn);
+  sameSizeSection.appendChild(sameSizeRow);
+  sameSizeButtons.push(sameWidthBtn, sameHeightBtn, sameBothBtn);
+
+  arrangePane.appendChild(sameSizeSection);
 
   container.appendChild(arrangePane);
 
@@ -439,6 +495,34 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
     ctrl.addEventListener('input', debouncedDispatch);
   }
 
+  // ─── Arrange buttons state ────────────────────────────────────────────────
+  let activeEditor: Editor | null = null;
+  let selectionSize = 0;
+
+  function updateArrangeButtonStates(): void {
+    for (const btn of alignButtons) {
+      btn.disabled = selectionSize < 2;
+      btn.classList.toggle('disabled-btn', selectionSize < 2);
+    }
+    for (const btn of distributeButtons) {
+      btn.disabled = selectionSize < 3;
+      btn.classList.toggle('disabled-btn', selectionSize < 3);
+    }
+    for (const btn of sameSizeButtons) {
+      btn.disabled = selectionSize < 2;
+      btn.classList.toggle('disabled-btn', selectionSize < 2);
+    }
+  }
+
+  function setEditor(editor: Editor): void {
+    activeEditor = editor;
+  }
+
+  function setSelectionSize(count: number): void {
+    selectionSize = count;
+    updateArrangeButtonStates();
+  }
+
   // ─── Update function (called on selection change) ─────────────────────────
   function update(
     selection: SlotmapId | null,
@@ -463,7 +547,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   // Initial state: no selection
   update(null, [], 0);
 
-  return { container, update };
+  return { container, setEditor, setSelectionSize, update };
 }
 
 // ─── Field group helper ───────────────────────────────────────────────────────
