@@ -63,6 +63,117 @@ export const ICONS = {
   </svg>`,
 } as const satisfies Record<string, string>;
 
+// ─── Arrange icons (align/distribute/rotate) ──────────────────────────────────
+
+/**
+ * 12 arrange SVG icons for inspector arrange buttons.
+ * Canonical geometry: viewBox="0 0 16 16", stroke="currentColor",
+ * stroke-width="1.5", fill="none", stroke-linecap="round", stroke-linejoin="round"
+ */
+export const ARRANGE_ICONS = {
+  /** Align left — three horizontal bars, leftmost longest */
+  'align-left': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 3H10"/>
+    <path d="M2 8H14"/>
+    <path d="M2 13H10"/>
+  </svg>`,
+
+  /** Align center horizontal — three horizontal bars centered */
+  'align-center-h': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 3H13"/>
+    <path d="M2 8H14"/>
+    <path d="M3 13H13"/>
+  </svg>`,
+
+  /** Align right — three horizontal bars, rightmost longest */
+  'align-right': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 3H14"/>
+    <path d="M2 8H14"/>
+    <path d="M6 13H14"/>
+  </svg>`,
+
+  /** Align top — three vertical bars, topmost longest */
+  'align-top': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 2V10"/>
+    <path d="M8 2V14"/>
+    <path d="M13 2V10"/>
+  </svg>`,
+
+  /** Align center vertical — three vertical bars centered */
+  'align-center-v': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 3V13"/>
+    <path d="M8 2V14"/>
+    <path d="M13 3V13"/>
+  </svg>`,
+
+  /** Align bottom — three vertical bars, bottommost longest */
+  'align-bottom': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6V14"/>
+    <path d="M8 2V14"/>
+    <path d="M13 6V14"/>
+  </svg>`,
+
+  /** Distribute horizontal — three horizontal bars equally spaced */
+  'distribute-h': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 3H6"/>
+    <path d="M2 8H14"/>
+    <path d="M10 8H14"/>
+    <path d="M2 13H6"/>
+    <path d="M10 13H14"/>
+  </svg>`,
+
+  /** Distribute vertical — three vertical bars equally spaced */
+  'distribute-v': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 2V6"/>
+    <path d="M3 10V14"/>
+    <path d="M8 2V14"/>
+    <path d="M13 2V6"/>
+    <path d="M13 10V14"/>
+  </svg>`,
+
+  /** Same width — two vertical edges with horizontal arrows between */
+  'same-width': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 4V12"/>
+    <path d="M13 4V12"/>
+    <path d="M3 8H6"/>
+    <path d="M10 8H13"/>
+    <path d="M6 7L8 4L10 7"/>
+    <path d="M6 9L8 12L10 9"/>
+  </svg>`,
+
+  /** Same height — two horizontal edges with vertical arrows between */
+  'same-height': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 3H12"/>
+    <path d="M4 13H12"/>
+    <path d="M8 3V6"/>
+    <path d="M8 10V13"/>
+    <path d="M7 6L4 8L7 10"/>
+    <path d="M9 6L12 8L9 10"/>
+  </svg>`,
+
+  /** Same both — four arrows from corner to width + height indicators */
+  'same-both': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="2" width="4" height="4"/>
+    <rect x="10" y="10" width="4" height="4"/>
+    <path d="M6 4H10"/>
+    <path d="M4 6V10"/>
+    <path d="M4 6L6 4"/>
+    <path d="M10 4H12"/>
+    <path d="M12 6V10"/>
+    <path d="M12 6L10 4"/>
+    <path d="M4 10L6 12"/>
+    <path d="M10 12L12 10"/>
+    <path d="M6 12H10"/>
+  </svg>`,
+
+  /** Rotate — curved arrow around a central pivot */
+  'rotate': `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 8C13 11.31 10.31 14 7 14C4.5 14 2.5 12.5 1.5 10.5"/>
+    <path d="M1.5 10.5L3 10.5L3 9"/>
+    <path d="M3 3L3 6.5L5.5 6.5"/>
+  </svg>`,
+} as const satisfies Record<string, string>;
+
 // ─── Category icons ───────────────────────────────────────────────────────────
 
 /** Fallback icon for unknown category keys */

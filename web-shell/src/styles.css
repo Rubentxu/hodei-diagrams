@@ -1015,6 +1015,95 @@ button:disabled {
   display: none;
 }
 
+/* Arrange buttons */
+.arrange-row {
+  display: flex;
+  gap: var(--xs);
+  margin-bottom: var(--sm);
+}
+
+.arrange-btn {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.arrange-btn:hover:not(.disabled-btn) {
+  background: var(--bg-surface);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.arrange-btn svg {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: block;
+}
+
+.arrange-btn.disabled-btn {
+  /* inherits existing .disabled-btn semantics from B1: reduced opacity, cursor: not-allowed, no click */
+}
+
+/* Position section inputs */
+.position-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--xs);
+  margin-bottom: var(--sm);
+}
+
+.position-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--xs);
+}
+
+.position-input-group label {
+  font-size: var(--font-size-xs);
+  color: var(--text-dim);
+  min-width: 14px;
+}
+
+.position-input-group input[type='number'] {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 var(--xs);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+}
+
+.position-input-group input[type='number']:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.position-rotate-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--sm);
+}
+
+.position-rotate-row .arrange-btn {
+  flex: 0 0 auto;
+  min-width: 28px;
+  padding: 0 var(--xs);
+}
+
 /* Toggle switch */
 .toggle-switch {
   position: relative;
