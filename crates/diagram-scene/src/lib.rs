@@ -31,6 +31,7 @@ pub mod element;
 pub mod error;
 pub mod resolver;
 pub mod scene;
+pub mod stencil_provider;
 pub mod stencil_registry;
 
 pub use builder::SceneBuilder;
@@ -44,3 +45,4 @@ pub use element::{
 pub use error::{SceneError, SceneResult};
 pub use resolver::{ResolvedStyle, ShapeKind, StyleResolver};
 pub use scene::{PageScene, Scene};
+pub use stencil_provider::StencilProvider;

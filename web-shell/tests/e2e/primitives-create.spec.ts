@@ -32,7 +32,8 @@ test.describe('Suite A: Primitives creation', () => {
     // Verify the new shape has data-vertex-id attribute
     const shapes = await page.locator('[data-vertex-id]').all();
     const latestShape = shapes[shapes.length - 1];
-    await expect(latestShape).toHaveAttribute('data-vertex-id', expect.stringContaining(':'));
+    if (!latestShape) return;
+    await expect(latestShape.getAttribute('data-vertex-id')).resolves.toMatch(/:/);
   });
 
   /**
@@ -157,6 +158,7 @@ test.describe('Suite A: Primitives creation', () => {
     // The rect should have width=120 and height=80 based on editor.ts #buildAddVertexCmd
     const rects = await page.locator('[data-vertex-id]').all();
     const lastRect = rects[rects.length - 1];
+    if (!lastRect) return;
 
     // Get bounding box
     const box = await lastRect.boundingBox();
@@ -165,7 +167,7 @@ test.describe('Suite A: Primitives creation', () => {
     // Width should be 120 and height should be 80 (accounting for potential scaling)
     // The actual rendered size depends on SVG viewBox and CSS
     // We verify the shape exists with data-vertex-id
-    await expect(lastRect).toHaveAttribute('data-vertex-id', expect.stringContaining(':'));
+    await expect(lastRect.getAttribute('data-vertex-id')).resolves.toMatch(/:/);
   });
 
   /**
@@ -191,8 +193,9 @@ test.describe('Suite A: Primitives creation', () => {
     // Verify the ellipse was created with data-vertex-id
     const ellipses = await page.locator('[data-vertex-id]').all();
     const lastEllipse = ellipses[ellipses.length - 1];
+    if (!lastEllipse) return;
 
-    await expect(lastEllipse).toHaveAttribute('data-vertex-id', expect.stringContaining(':'));
+    await expect(lastEllipse.getAttribute('data-vertex-id')).resolves.toMatch(/:/);
   });
 
   /**

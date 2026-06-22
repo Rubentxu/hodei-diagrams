@@ -43,4 +43,12 @@ impl Diagnostic {
             message: message.into(),
         }
     }
+
+    /// Create a degenerate-aspect diagnostic (w or h is zero).
+    pub fn degenerate_aspect() -> Self {
+        Self {
+            location: "<shape>".into(),
+            message: "degenerate aspect ratio (w=0 or h=0) — clamped to 1.0".into(),
+        }
+    }
 }

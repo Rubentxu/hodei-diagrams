@@ -17,18 +17,45 @@ use crate::element::{
 };
 use crate::error::{SceneError, SceneResult};
 use crate::resolver::StyleResolver;
+use crate::stencil_provider::StencilProvider;
 use crate::{PageScene, Scene};
 
 /// The scene builder — constructs a `Scene` from a `DiagramModel`.
-#[derive(Debug, Default)]
 pub struct SceneBuilder {
     resolver: StyleResolver,
+    stencil_provider: Option<Box<dyn StencilProvider>>,
+}
+
+impl Default for SceneBuilder {
+    fn default() -> Self {
+        Self {
+            resolver: StyleResolver,
+            stencil_provider: None,
+        }
+    }
+}
+
+impl std::fmt::Debug for SceneBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SceneBuilder")
+            .field("resolver", &self.resolver)
+            .finish_non_exhaustive()
+    }
 }
 
 impl SceneBuilder {
     /// Creates a new `SceneBuilder`.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Attach an external stencil provider (e.g. WASM engine library cache).
+    ///
+    /// When set, the builder will use this provider as a fallback after the
+    /// built-in `stencil_registry` lookup fails.
+    pub fn with_stencil_provider(mut self, provider: Box<dyn StencilProvider>) -> Self {
+        self.stencil_provider = Some(provider);
+        self
     }
 
     /// Builds a `Scene` from the given diagram model.
@@ -307,14 +334,22 @@ impl SceneBuilder {
                 }))
             }
             crate::resolver::ShapeKind::Stencil => {
-                // Extract stencil name from shape=stencil:<name> or stencil=<name>
-                let stencil_name = resolved_style
+                // Extract stencil ref from shape=stencil:<library>:<name> or stencil=<name>
+                // The "builtin:" prefix is used for built-in stencils; absent prefix means built-in too.
+                let (library, stencil_name) = resolved_style
                     .remaining
                     .get("shape")
                     .and_then(|v| {
                         let s = v.as_str();
-                        if s.starts_with("stencil:") {
-                            Some(s.trim_start_matches("stencil:").to_owned())
+                        if let Some(rest) = s.strip_prefix("stencil:") {
+                            let parts: Vec<&str> = rest.split(':').collect();
+                            if parts.len() >= 2 {
+                                // stencil:<library>:<name>
+                                Some((Some(parts[0].to_string()), parts[1].to_string()))
+                            } else {
+                                // stencil:<name> (built-in, no library)
+                                Some((None, rest.to_string()))
+                            }
                         } else {
                             None
                         }
@@ -323,18 +358,55 @@ impl SceneBuilder {
                         resolved_style
                             .remaining
                             .get("stencil")
-                            .map(|v| v.as_str().to_owned())
+                            .map(|v| (None, v.as_str().to_string()))
                     })
-                    .unwrap_or_default();
+                    .unwrap_or((None, String::new()));
 
-                let def = crate::stencil_registry::lookup(&stencil_name);
-                let (aspect, bg, fg) = match def {
-                    Some(s) => (s.aspect, s.background.to_vec(), s.foreground.to_vec()),
-                    None => (StencilAspect::Variable, vec![], vec![]),
-                };
+                let (aspect, bg, fg, resolved_library) =
+                    if let Some(builtin_def) = crate::stencil_registry::lookup(&stencil_name) {
+                        // Built-in stencil found
+                        (
+                            builtin_def.aspect,
+                            builtin_def.background.to_vec(),
+                            builtin_def.foreground.to_vec(),
+                            "builtin".to_string(),
+                        )
+                    } else if library.is_some() {
+                        // Not a built-in: try external provider (e.g. WASM XML library cache)
+                        if let Some(ref provider) = self.stencil_provider {
+                            if let Some((asp, bg_cmds, fg_cmds)) =
+                                provider.lookup(library.as_deref().unwrap_or(""), &stencil_name)
+                            {
+                                (asp, bg_cmds, fg_cmds, library.clone().unwrap_or_default())
+                            } else {
+                                (
+                                    StencilAspect::Variable,
+                                    vec![],
+                                    vec![],
+                                    library.clone().unwrap_or_default(),
+                                )
+                            }
+                        } else {
+                            (
+                                StencilAspect::Variable,
+                                vec![],
+                                vec![],
+                                library.clone().unwrap_or_default(),
+                            )
+                        }
+                    } else {
+                        // Built-in not found, no library specified
+                        (
+                            StencilAspect::Variable,
+                            vec![],
+                            vec![],
+                            "builtin".to_string(),
+                        )
+                    };
+
                 Ok(VisualElement::Stencil(StencilElement {
                     id: vid,
-                    library: "builtin".into(),
+                    library: resolved_library,
                     name: stencil_name,
                     bounds,
                     aspect,

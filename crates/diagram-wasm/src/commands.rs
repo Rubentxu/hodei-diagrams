@@ -1,6 +1,6 @@
 //! Command execution: translate JSON commands to engine calls.
 
-use crate::engine::{with_editor, with_editor_mut};
+use crate::engine::{with_engine, with_engine_mut};
 use diagram_commands::{Command, RoutingKind, Transaction};
 use diagram_scene::resolver::StyleResolver;
 use wasm_bindgen::prelude::*;
@@ -21,7 +21,7 @@ pub fn execute_command(handle: u32, cmd_json: &str) -> Result<(), JsValue> {
         Ok(c) => c,
         Err(e) => return Err(JsValue::from_str(&format!("InvalidCommand: {e}"))),
     };
-    with_editor_mut(handle, |e| e.execute(cmd))
+    with_engine_mut(handle, |e| e.editor.execute(cmd))
         .and_then(|r| r.map_err(|e| Box::leak(format!("Execute: {e}").into_boxed_str()) as &str))
         .map_err(JsValue::from_str)
 }
@@ -91,7 +91,7 @@ pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsVal
         }
     });
 
-    with_editor_mut(handle, |e| tx.commit(e))
+    with_engine_mut(handle, |e| tx.commit(&mut e.editor))
         .and_then(|r| r.map_err(|e| Box::leak(format!("Execute: {e}").into_boxed_str()) as &str))
         .map_err(JsValue::from_str)
 }
@@ -101,7 +101,7 @@ pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsVal
 /// No-op if undo history is empty.
 #[wasm_bindgen]
 pub fn undo(handle: u32) -> Result<(), JsValue> {
-    with_editor_mut(handle, |e| e.undo())
+    with_engine_mut(handle, |e| e.editor.undo())
         .and_then(|r| r.map_err(|e| Box::leak(format!("{e}").into_boxed_str()) as &str))
         .map_err(JsValue::from_str)
 }
@@ -111,7 +111,7 @@ pub fn undo(handle: u32) -> Result<(), JsValue> {
 /// No-op if redo history is empty.
 #[wasm_bindgen]
 pub fn redo(handle: u32) -> Result<(), JsValue> {
-    with_editor_mut(handle, |e| e.redo())
+    with_engine_mut(handle, |e| e.editor.redo())
         .and_then(|r| r.map_err(|e| Box::leak(format!("{e}").into_boxed_str()) as &str))
         .map_err(JsValue::from_str)
 }
@@ -119,7 +119,7 @@ pub fn redo(handle: u32) -> Result<(), JsValue> {
 /// Check if undo is available on an engine.
 #[wasm_bindgen]
 pub fn engine_can_undo(handle: u32) -> Result<bool, JsValue> {
-    match with_editor(handle, |e| e.can_undo()) {
+    match with_engine(handle, |e| e.editor.can_undo()) {
         Ok(v) => Ok(v),
         Err(e) => Err(JsValue::from_str(e)),
     }
@@ -128,7 +128,7 @@ pub fn engine_can_undo(handle: u32) -> Result<bool, JsValue> {
 /// Check if redo is available on an engine.
 #[wasm_bindgen]
 pub fn engine_can_redo(handle: u32) -> Result<bool, JsValue> {
-    match with_editor(handle, |e| e.can_redo()) {
+    match with_engine(handle, |e| e.editor.can_redo()) {
         Ok(v) => Ok(v),
         Err(e) => Err(JsValue::from_str(e)),
     }
@@ -215,21 +215,22 @@ pub fn connect_vertices(
 ) -> Result<u32, JsValue> {
     let kind = routing_kind_from_u32(routing_kind);
 
-    // First: validate handle (with_editor_mut returns Err on invalid handle)
-    let result = with_editor_mut(handle, |e| {
-        let from_id = match find_vertex_by_idx(e.model(), from) {
+    // First: validate handle (with_engine_mut returns Err on invalid handle)
+    let result = with_engine_mut(handle, |e| {
+        let from_id = match find_vertex_by_idx(e.editor.model(), from) {
             Some(id) => id,
             None => {
                 return Err("ConnectError: source vertex not found");
             }
         };
-        let to_id = match find_vertex_by_idx(e.model(), to) {
+        let to_id = match find_vertex_by_idx(e.editor.model(), to) {
             Some(id) => id,
             None => {
                 return Err("ConnectError: target vertex not found");
             }
         };
-        e.connect_vertices(from_id, to_id, kind)
+        e.editor
+            .connect_vertices(from_id, to_id, kind)
             .map(|edge_id| {
                 let json = match serde_json::to_value(edge_id) {
                     Ok(v) => v,
@@ -390,14 +391,15 @@ mod tests {
 /// - `DisconnectError: <reason>` if the edge could not be removed
 #[wasm_bindgen]
 pub fn disconnect_edge(handle: u32, edge_id: u32) -> Result<(), JsValue> {
-    let result = with_editor_mut(handle, |e| {
-        let eid = match find_edge_by_idx(e.model(), edge_id) {
+    let result = with_engine_mut(handle, |e| {
+        let eid = match find_edge_by_idx(e.editor.model(), edge_id) {
             Some(id) => id,
             None => {
                 return Err("DisconnectError: edge not found");
             }
         };
-        e.disconnect_edge(eid)
+        e.editor
+            .disconnect_edge(eid)
             .map_err(|e| Box::leak(format!("{e}").into_boxed_str()) as &str)
     });
 
@@ -422,9 +424,9 @@ pub fn disconnect_edge(handle: u32, edge_id: u32) -> Result<(), JsValue> {
 /// - `VertexNotFound` if the vertex ID does not exist in the model
 #[wasm_bindgen]
 pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValue> {
-    let result = with_editor(handle, |editor| {
+    let result = with_engine(handle, |e| {
         // Find the vertex by its slotmap index
-        let vid = match find_vertex_by_idx(editor.model(), vertex_id) {
+        let vid = match find_vertex_by_idx(e.editor.model(), vertex_id) {
             Some(v) => v,
             None => {
                 return Err("VertexNotFound");
@@ -432,7 +434,7 @@ pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValu
         };
 
         // Look up the vertex in the store
-        let vertex = match editor.model().store.vertex(vid) {
+        let vertex = match e.editor.model().store.vertex(vid) {
             Some(v) => v,
             None => {
                 return Err("VertexNotFound");
@@ -448,7 +450,7 @@ pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValu
         };
 
         // Look up the StyleMap
-        let style = match editor.model().store.style(style_id) {
+        let style = match e.editor.model().store.style(style_id) {
             Some(s) => s,
             None => {
                 return Err("StyleNotFound");

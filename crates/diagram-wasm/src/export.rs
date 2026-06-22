@@ -18,7 +18,7 @@
 //! - `ExportFailed: to_raw: <error>` if domain→raw mapping fails
 //! - `ExportFailed: write: <error>` if XML serialization fails
 
-use crate::engine::with_editor;
+use crate::engine::with_engine;
 use diagram_format_drawio::DrawioMapping;
 use wasm_bindgen::prelude::*;
 
@@ -32,13 +32,13 @@ use wasm_bindgen::prelude::*;
 /// lock, delegate to format crate, return `Result<String, JsValue>`.
 #[wasm_bindgen]
 pub fn export_drawio(handle: u32) -> Result<String, JsValue> {
-    with_editor(handle, |e| {
+    with_engine(handle, |e| {
         // Guard: require an import-time IdMap
-        let id_map = e.id_map().ok_or("ExportFailed: no import context")?;
+        let id_map = e.editor.id_map().ok_or("ExportFailed: no import context")?;
 
         // Convert domain model back to raw drawio document
         let raw = DrawioMapping::new()
-            .to_raw(e.model(), id_map, &mut Vec::new())
+            .to_raw(e.editor.model(), id_map, &mut Vec::new())
             .map_err(|e| {
                 Box::leak(format!("ExportFailed: to_raw: {e:?}").into_boxed_str()) as &str
             })?;

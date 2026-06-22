@@ -395,4 +395,28 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Load a stencil library XML file from a URL into the engine's cache.
+   *
+   * After loading, shapes in the library can be referenced as
+   * `stencil:<library>:<name>` (e.g. `stencil:general:Rectangle`).
+   *
+   * Failures are logged to the console and do not throw.
+   */
+  async loadStencilLibrary(library: string, url: string): Promise<void> {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        console.error(`[session] Failed to fetch stencil library "${library}" from ${url}: ${resp.status} ${resp.statusText}`);
+        return;
+      }
+      const xml = await resp.text();
+      // Validate that the XML parses before calling set_stencil_library
+      this.wasm.parse_stencil_library_xml(xml); // throws on parse error
+      this.wasm.set_stencil_library(this.handle as number, library, xml);
+    } catch (e) {
+      console.error(`[session] Failed to load stencil library "${library}": ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 }

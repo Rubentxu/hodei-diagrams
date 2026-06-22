@@ -1,6 +1,6 @@
 //! Drawio import: parse, replace engine model, and retain IdMap for export.
 
-use crate::engine::with_editor_mut;
+use crate::engine::with_engine_mut;
 use diagram_format_drawio::DrawioMapping;
 use wasm_bindgen::prelude::*;
 
@@ -22,7 +22,7 @@ use wasm_bindgen::prelude::*;
 /// - `ImportFailed: mapping: <error>` if domain mapping fails
 #[wasm_bindgen]
 pub fn import_drawio(handle: u32, xml: &str) -> Result<(), JsValue> {
-    with_editor_mut(handle, |e| {
+    with_engine_mut(handle, |e| {
         // Parse raw XML
         let raw = diagram_format_drawio::parse_drawio(xml).map_err(|e| {
             Box::leak(format!("ImportFailed: parse: {e:?}").into_boxed_str()) as &str
@@ -34,7 +34,7 @@ pub fn import_drawio(handle: u32, xml: &str) -> Result<(), JsValue> {
         })?;
 
         // Replace model atomically, storing the IdMap for later export
-        e.replace_model(model, Some(id_map));
+        e.editor.replace_model(model, Some(id_map));
         Ok(())
     })
     .and_then(|r| r)

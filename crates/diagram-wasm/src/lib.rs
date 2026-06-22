@@ -45,4 +45,4 @@ pub use export::export_drawio;
 pub use import::import_drawio;
 pub use render::{render_pages, render_svg};
 pub use scene::get_scene;
-pub use stencil::parse_stencil_xml;
+pub use stencil::{PathCommandDto, parse_stencil_library_xml, parse_stencil_xml};
