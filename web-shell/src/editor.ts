@@ -100,6 +100,10 @@ export class Editor {
   #stencilPreviewEl: SVGGElement | null = null;
   #stencilDragTool: string | null = null;
 
+  // ─── Cursor Move Callback (rAF-throttled) ─────────────────────────────────
+  #cursorMoveCb: ((p: { x: number; y: number }) => void) | null = null;
+  #cursorMoveRafId: number | null = null;
+
   // ─── Snap ────────────────────────────────────────────────────────────────
   #snapEnabled: boolean = false;
   #snapThreshold: number = 8;
@@ -820,6 +824,26 @@ export class Editor {
       default:
         return null;
     }
+  }
+
+  // ─── Cursor Move Callback ──────────────────────────────────────────────────
+
+  /**
+   * Register a callback that fires at most once per animation frame
+   * whenever the pointer moves over the canvas.
+   * Coordinates are in document space (accounting for zoom).
+   */
+  onCursorMove(cb: (p: { x: number; y: number }) => void): void {
+    this.#cursorMoveCb = cb;
+  }
+
+  // ─── Coordinate Conversion (public for HUD wiring) ────────────────────────
+
+  /**
+   * Convert screen client coordinates to document-space coordinates, accounting for zoom.
+   */
+  clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
+    return this.#clientToDoc(clientX, clientY);
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -1727,6 +1751,16 @@ export class Editor {
 
   #onPointerMove(e: PointerEvent): void {
     const docPos = this.#clientToDoc(e.clientX, e.clientY);
+
+    // Emit cursor position to registered callback (rAF-throttled)
+    if (this.#cursorMoveCb && this.#cursorMoveRafId === null) {
+      const x = Math.round(docPos.x);
+      const y = Math.round(docPos.y);
+      this.#cursorMoveRafId = requestAnimationFrame(() => {
+        this.#cursorMoveCb!({ x, y });
+        this.#cursorMoveRafId = null;
+      });
+    }
 
     // Handle marquee dragging
     if (this.#marquee) {
