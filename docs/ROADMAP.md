@@ -5,7 +5,7 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.5.4 — Fases 0-5 completadas (Edges, Shapes, Multi-select, Text, Rotate/Flip, Layers).**
+**v0.16.0 — Fases 0-7 completadas (Edges, Shapes, Multi-select, Text, Rotate/Flip, Layers, Stencils, Snap/Align).**
 Motor Rust sólido con round-trip `.drawio` en archivo real de 4MB (21 celdas,
 AWS-Admisión). 11 crates, 431 tests Rust, ~100+ tests E2E.
 61 ADRs (0001-0061). UI con paridad ~45% vs draw.io. Próximo: Fase 6 — Stencils (⏸️ deferred).
@@ -46,7 +46,7 @@ Fase 6 (Stencils) activa — en desarrollo.
 | 4. Rotate/flip | v0.13.0 | Transform en geometry, resize handles | 0057 | ✅ Completada |
 | 5. Layers | v0.14.0 | Z-order, lock, visibility, ordering | 0058 | ✅ Completada (PR-L1) |
 | 6. Stencils | v0.15.0 | UML, BPMN, Flowchart, AWS (open source subset) | 0059 | 🔲 Pendiente |
-| 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 | ⏸️ Deferred |
+| 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 | ✅ Completada (PR #41, #42) |
 | 8. Effects | v0.17.0 | Shadow, glass, gradient (SVG-native) | 0061 | ⏸️ Deferred |
 | **v1.0.0** | **NO automático** | Decisión del usuario | — | — |
 
