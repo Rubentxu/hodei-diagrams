@@ -15,7 +15,7 @@ export interface InspectorControls {
   setEditor(editor: Editor): void;
   setSelectionSize(count: number): void;
   update(
-    selection: SlotmapId | null,
+    selection: readonly SlotmapId[],
     sceneCache: ScenePage[],
     activePageIdx: number,
   ): void;
@@ -441,7 +441,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   // ─── Debounce helper and command dispatch ─────────────────────────────────
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let currentSelection: SlotmapId | null = null;
+  let currentSelection: readonly SlotmapId[] = [];
 
   function getChanges(): StyleChanges {
     const changes: StyleChanges = {};
@@ -459,13 +459,15 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   }
 
   function dispatchChange(): void {
-    if (!currentSelection) {
+    if (currentSelection.length === 0) {
       return;
     }
     const changes = getChanges();
+    // For now, dispatch to the first selected vertex (multi-select broadcast comes in PR-SP2)
+    const id = currentSelection[0]!;
     const cmd = JSON.stringify({
       ChangeStyle: {
-        id: slotmapIdToField(currentSelection),
+        id: slotmapIdToField(id),
         style: changes,
       },
     });
@@ -525,13 +527,13 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   // ─── Update function (called on selection change) ─────────────────────────
   function update(
-    selection: SlotmapId | null,
+    selection: readonly SlotmapId[],
     _sceneCache: ScenePage[],
     _activePageIdx: number,
   ): void {
     currentSelection = selection;
 
-    const hasSelection = selection !== null;
+    const hasSelection = selection.length > 0;
     noSelectionMsg.hidden = hasSelection;
     styleFields.hidden = !hasSelection;
     textNoSelMsg.hidden = hasSelection;
@@ -545,7 +547,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   }
 
   // Initial state: no selection
-  update(null, [], 0);
+  update([], [], 0);
 
   return { container, setEditor, setSelectionSize, update };
 }
