@@ -892,6 +892,64 @@ export class Editor {
   }
 
   /**
+   * Apply a shadow configuration to all selected vertices.
+   *
+   * If commit=true: builds a full ShadowConfig StyleMap and dispatches a single
+   * executeTransaction with ChangeStyle commands for all selected vertices —
+   * one undo entry reverses all.
+   *
+   * If commit=false: applies temporary shadow style directly to the DOM for
+   * real-time preview without engine mutation or undo entries.
+   */
+  applyShadowToSelection(shadow: Partial<import('./types.js').ShadowConfig>, commit: boolean): void {
+    if (this.#selection.size === 0) return;
+
+    if (!commit) {
+      // Real-time preview: apply filter directly to DOM elements
+      const config = shadow as import('./types.js').ShadowConfig;
+      for (const id of this.#selection) {
+        const el = this.#viewer.querySelector(
+          `[data-vertex-id="${id.idx}:${id.version}"]`,
+        );
+        if (!el) continue;
+        if (config.enabled) {
+          const filterId = `shadow-preview-${id.idx}`;
+          (el as SVGElement).setAttribute('filter', `url(#${filterId})`);
+        } else {
+          (el as SVGElement).removeAttribute('filter');
+        }
+      }
+      return;
+    }
+
+    // Commit: build full ShadowConfig and dispatch via executeTransaction
+    const enabled = shadow.enabled ?? false;
+    const commands: string[] = [];
+
+    for (const id of this.#selection) {
+      const style: Record<string, string> = {
+        shadow: enabled ? '1' : '0',
+      };
+      if (enabled) {
+        style['shadowDx'] = String(shadow.dx ?? 3);
+        style['shadowDy'] = String(shadow.dy ?? 3);
+        style['shadowBlur'] = String(shadow.blur ?? 5);
+        style['shadowColor'] = shadow.color ?? '#000000';
+      }
+      commands.push(JSON.stringify({
+        ChangeStyle: {
+          id: slotmapIdToField(id),
+          style,
+        },
+      }));
+    }
+
+    if (commands.length === 0) return;
+    this.#session.executeTransaction(commands);
+    this.#replay();
+  }
+
+  /**
    * Trigger a re-render of the current page.
    * Called externally when state changes (e.g., from inspector via session callback).
    */
