@@ -9,6 +9,7 @@ import type { DiagramEngineSession } from './session.js';
 import type { Editor } from './editor.js';
 import type { SlotmapId, ScenePage, ShadowConfig, GlassConfig, GradientConfig } from './types.js';
 import { slotmapIdToField } from './types.js';
+import { ARRANGE_ICONS } from './icon.js';
 
 export interface InspectorControls {
   container: HTMLElement;
@@ -610,12 +611,123 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   arrangeFields.className = 'inspector-fields';
   arrangeFields.hidden = true;
 
-  // Helper to create arrange button
-  function makeArrangeButton(testId: string, label: string, onClick: () => void): HTMLButtonElement {
+  // Position section (at top of Arrange pane — design B2 §Data Flow)
+  const positionSection = document.createElement('div');
+  positionSection.className = 'inspector-section';
+  const positionTitle = document.createElement('div');
+  positionTitle.className = 'inspector-section-title';
+  positionTitle.textContent = 'Position';
+  positionSection.appendChild(positionTitle);
+
+  const xInput = document.createElement('input');
+  xInput.type = 'number';
+  xInput.step = '1';
+  xInput.setAttribute('data-testid', 'arrange-field-x-input');
+  const yInput = document.createElement('input');
+  yInput.type = 'number';
+  yInput.step = '1';
+  yInput.setAttribute('data-testid', 'arrange-field-y-input');
+  const wInput = document.createElement('input');
+  wInput.type = 'number';
+  wInput.step = '1';
+  wInput.min = '1';
+  wInput.setAttribute('data-testid', 'arrange-field-w-input');
+  const hInput = document.createElement('input');
+  hInput.type = 'number';
+  hInput.step = '1';
+  hInput.min = '1';
+  hInput.setAttribute('data-testid', 'arrange-field-h-input');
+
+  const xyRow = document.createElement('div');
+  xyRow.className = 'position-row';
+  const xGroup = document.createElement('div');
+  xGroup.className = 'position-input-group';
+  const xLabel = document.createElement('label');
+  xLabel.textContent = 'X';
+  xGroup.appendChild(xLabel);
+  xGroup.appendChild(xInput);
+  const yGroup = document.createElement('div');
+  yGroup.className = 'position-input-group';
+  const yLabel = document.createElement('label');
+  yLabel.textContent = 'Y';
+  yGroup.appendChild(yLabel);
+  yGroup.appendChild(yInput);
+  xyRow.appendChild(xGroup);
+  xyRow.appendChild(yGroup);
+  positionSection.appendChild(xyRow);
+
+  const whRow = document.createElement('div');
+  whRow.className = 'position-row';
+  const wGroup = document.createElement('div');
+  wGroup.className = 'position-input-group';
+  const wLabel = document.createElement('label');
+  wLabel.textContent = 'W';
+  wGroup.appendChild(wLabel);
+  wGroup.appendChild(wInput);
+  const hGroup = document.createElement('div');
+  hGroup.className = 'position-input-group';
+  const hLabel = document.createElement('label');
+  hLabel.textContent = 'H';
+  hGroup.appendChild(hLabel);
+  hGroup.appendChild(hInput);
+  whRow.appendChild(wGroup);
+  whRow.appendChild(hGroup);
+  positionSection.appendChild(whRow);
+
+  // Rotate row (write-only — no degree field per Option B)
+  const rotateRow = document.createElement('div');
+  rotateRow.className = 'position-rotate-row';
+  const rotateBtn = makeArrangeButton(
+    'arrange-btn-rotate',
+    ARRANGE_ICONS['rotate'],
+    () => {
+      if (currentSelection.length > 0 && activeEditor) {
+        activeEditor.rotateSelection(Math.PI / 12); // +15°
+      }
+    },
+  );
+  rotateRow.appendChild(rotateBtn);
+  positionSection.appendChild(rotateRow);
+
+  arrangeFields.insertBefore(positionSection, arrangeFields.firstChild);
+
+  // Position button tracking for disabled state
+  const positionButtons: HTMLButtonElement[] = [rotateBtn];
+
+  // Commit handler for Position inputs (debounced)
+  function commitPositionChange(): void {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      if (currentSelection.length !== 1 || !activeEditor) return;
+      const id = currentSelection[0]!;
+      const x = parseFloat(xInput.value);
+      const y = parseFloat(yInput.value);
+      const w = parseFloat(wInput.value);
+      const h = parseFloat(hInput.value);
+      // Clamp: ignore non-numeric and non-positive W/H (X/Y may legitimately be negative)
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h)) {
+        return; // revert visual state on next update() — no dispatch
+      }
+      const clampedW = Math.max(1, w);
+      const clampedH = Math.max(1, h);
+      activeEditor.setVertexGeometry(id, { x, y, width: clampedW, height: clampedH });
+    }, 300);
+  }
+  for (const input of [xInput, yInput, wInput, hInput]) {
+    input.addEventListener('change', commitPositionChange);
+    input.addEventListener('blur', commitPositionChange);
+    input.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') commitPositionChange();
+    });
+  }
+
+  // Helper to create arrange button (SVG icon)
+  function makeArrangeButton(testId: string, iconSvg: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = 'arrange-btn disabled-btn';
     btn.setAttribute('data-testid', testId);
-    btn.textContent = label;
+    btn.innerHTML = iconSvg;
     btn.disabled = true;
     btn.addEventListener('click', () => {
       if (!btn.disabled && activeEditor) {
@@ -635,9 +747,9 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   const alignRow1 = document.createElement('div');
   alignRow1.className = 'arrange-row';
-  const alignLeftBtn = makeArrangeButton('arrange-btn-align-left', '⇤', () => activeEditor?.alignSelection('left'));
-  const alignCenterHBtn = makeArrangeButton('arrange-btn-align-center-h', '⇔', () => activeEditor?.alignSelection('center-h'));
-  const alignRightBtn = makeArrangeButton('arrange-btn-align-right', '⇥', () => activeEditor?.alignSelection('right'));
+  const alignLeftBtn = makeArrangeButton('arrange-btn-align-left', ARRANGE_ICONS['align-left'], () => activeEditor?.alignSelection('left'));
+  const alignCenterHBtn = makeArrangeButton('arrange-btn-align-center-h', ARRANGE_ICONS['align-center-h'], () => activeEditor?.alignSelection('center-h'));
+  const alignRightBtn = makeArrangeButton('arrange-btn-align-right', ARRANGE_ICONS['align-right'], () => activeEditor?.alignSelection('right'));
   alignRow1.appendChild(alignLeftBtn);
   alignRow1.appendChild(alignCenterHBtn);
   alignRow1.appendChild(alignRightBtn);
@@ -646,9 +758,9 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   const alignRow2 = document.createElement('div');
   alignRow2.className = 'arrange-row';
-  const alignTopBtn = makeArrangeButton('arrange-btn-align-top', '⇑', () => activeEditor?.alignSelection('top'));
-  const alignCenterVBtn = makeArrangeButton('arrange-btn-align-center-v', '⇕', () => activeEditor?.alignSelection('center-v'));
-  const alignBottomBtn = makeArrangeButton('arrange-btn-align-bottom', '⇓', () => activeEditor?.alignSelection('bottom'));
+  const alignTopBtn = makeArrangeButton('arrange-btn-align-top', ARRANGE_ICONS['align-top'], () => activeEditor?.alignSelection('top'));
+  const alignCenterVBtn = makeArrangeButton('arrange-btn-align-center-v', ARRANGE_ICONS['align-center-v'], () => activeEditor?.alignSelection('center-v'));
+  const alignBottomBtn = makeArrangeButton('arrange-btn-align-bottom', ARRANGE_ICONS['align-bottom'], () => activeEditor?.alignSelection('bottom'));
   alignRow2.appendChild(alignTopBtn);
   alignRow2.appendChild(alignCenterVBtn);
   alignRow2.appendChild(alignBottomBtn);
@@ -667,8 +779,8 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   const distributeRow = document.createElement('div');
   distributeRow.className = 'arrange-row';
-  const distributeHBtn = makeArrangeButton('arrange-btn-distribute-h', '→═←', () => activeEditor?.distributeSelection('horizontal'));
-  const distributeVBtn = makeArrangeButton('arrange-btn-distribute-v', '↑═↓', () => activeEditor?.distributeSelection('vertical'));
+  const distributeHBtn = makeArrangeButton('arrange-btn-distribute-h', ARRANGE_ICONS['distribute-h'], () => activeEditor?.distributeSelection('horizontal'));
+  const distributeVBtn = makeArrangeButton('arrange-btn-distribute-v', ARRANGE_ICONS['distribute-v'], () => activeEditor?.distributeSelection('vertical'));
   distributeRow.appendChild(distributeHBtn);
   distributeRow.appendChild(distributeVBtn);
   distributeSection.appendChild(distributeRow);
@@ -686,9 +798,9 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
 
   const sameSizeRow = document.createElement('div');
   sameSizeRow.className = 'arrange-row';
-  const sameWidthBtn = makeArrangeButton('arrange-btn-same-width', '↔', () => activeEditor?.sameSizeSelection('width'));
-  const sameHeightBtn = makeArrangeButton('arrange-btn-same-height', '↕', () => activeEditor?.sameSizeSelection('height'));
-  const sameBothBtn = makeArrangeButton('arrange-btn-same-both', '⬜', () => activeEditor?.sameSizeSelection('both'));
+  const sameWidthBtn = makeArrangeButton('arrange-btn-same-width', ARRANGE_ICONS['same-width'], () => activeEditor?.sameSizeSelection('width'));
+  const sameHeightBtn = makeArrangeButton('arrange-btn-same-height', ARRANGE_ICONS['same-height'], () => activeEditor?.sameSizeSelection('height'));
+  const sameBothBtn = makeArrangeButton('arrange-btn-same-both', ARRANGE_ICONS['same-both'], () => activeEditor?.sameSizeSelection('both'));
   sameSizeRow.appendChild(sameWidthBtn);
   sameSizeRow.appendChild(sameHeightBtn);
   sameSizeRow.appendChild(sameBothBtn);
@@ -1498,7 +1610,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   // ─── Update function (called on selection change) ─────────────────────────
   function update(
     selection: readonly SlotmapId[],
-    _sceneCache: ScenePage[],
+    sceneCache: ScenePage[],
     _activePageIdx: number,
   ): void {
     currentSelection = selection;
@@ -1510,6 +1622,52 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
     textFields.hidden = !hasSelection;
     arrangeNoSelMsg.hidden = hasSelection;
     arrangeFields.hidden = !hasSelection;
+
+    // Populate Position inputs from scene geometry (single-selection only)
+    if (selection.length === 1 && sceneCache.length > 0) {
+      const id = selection[0]!;
+      let geom: { x: number; y: number; width: number; height: number } | null = null;
+      outer: for (const page of sceneCache) {
+        for (const elem of page.display_list) {
+          const e = elem as Record<string, unknown>;
+          for (const key of ['Rect', 'RoundedRect', 'Ellipse'] as const) {
+            const variant = e[key] as Record<string, unknown> | undefined;
+            if (!variant) continue;
+            const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+            if (!idField) continue;
+            if (idField.idx === id.idx && idField.version === id.version) {
+              const bounds = variant['bounds'] as
+                | { origin?: { x?: number; y?: number }; size?: { width?: number; height?: number } }
+                | undefined;
+              if (bounds?.origin && bounds?.size) {
+                geom = {
+                  x: bounds.origin.x ?? 0,
+                  y: bounds.origin.y ?? 0,
+                  width: bounds.size.width ?? 0,
+                  height: bounds.size.height ?? 0,
+                };
+              }
+              break outer;
+            }
+          }
+        }
+      }
+      if (geom) {
+        xInput.value = String(Math.round(geom.x));
+        yInput.value = String(Math.round(geom.y));
+        wInput.value = String(Math.round(geom.width));
+        hInput.value = String(Math.round(geom.height));
+      }
+    }
+
+    // Disable Position inputs when not single-selected
+    const singleSelection = selection.length === 1;
+    xInput.disabled = !singleSelection;
+    yInput.disabled = !singleSelection;
+    wInput.disabled = !singleSelection;
+    hInput.disabled = !singleSelection;
+    rotateBtn.disabled = !singleSelection;
+    rotateBtn.classList.toggle('disabled-btn', !singleSelection);
 
     // Update shadow section based on selection
     updateShadowSection(selection);

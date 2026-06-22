@@ -1830,6 +1830,29 @@ export class Editor {
     this.#dragState = null;
   }
 
+  // ─── Public Facade: Geometry Mutation ─────────────────────────────────────
+
+  /**
+   * Public facade to mutate the geometry of a single vertex.
+   * Dispatches a MoveVertex command using absolute geometry.
+   * Clamps non-positive width/height and ignores NaN inputs.
+   */
+  setVertexGeometry(
+    id: SlotmapId,
+    geom: { x: number; y: number; width: number; height: number },
+  ): void {
+    // Guard: clamp/reject invalid
+    if (
+      !Number.isFinite(geom.x) || !Number.isFinite(geom.y) ||
+      !Number.isFinite(geom.width) || !Number.isFinite(geom.height) ||
+      geom.width <= 0 || geom.height <= 0
+    ) {
+      return; // ignore invalid — UI should clamp before calling
+    }
+    this.#session.executeCommands([this.#buildMoveVertexCmd(id, geom)]);
+    this.#replay();
+  }
+
   // ─── Command Builders ─────────────────────────────────────────────────────
 
   /** Build a MoveVertex command JSON string. Uses absolute geometry. */

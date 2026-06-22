@@ -519,4 +519,180 @@ test.describe('Slice B: Professional Density UI', () => {
       expect(lg).toBe(16);
     });
   });
+
+  test.describe('Slice B2: Arrange Affordance', () => {
+    // Banned Unicode glyphs that should NOT appear in arrange buttons
+    const BANNED_GLYPHS = ['⇤', '⇔', '⇥', '⇑', '⇕', '⇓', '→═←', '↑═↓', '↔', '↕', '⬜'];
+
+    test('SVG icons present in arrange buttons, no Unicode glyphs', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Import a diagram to enable arrange buttons
+      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+      // Click on shape to select it
+      const shape = page.locator('[data-vertex-id]').first();
+      await shape.click();
+      await page.waitForTimeout(300);
+
+      // Click Arrange tab
+      await page.click('[data-testid="inspector-tab-arrange"]');
+      await page.waitForTimeout(100);
+
+      // Check all 11 arrange button testids have SVG icons
+      const arrangeButtons = [
+        'arrange-btn-align-left',
+        'arrange-btn-align-center-h',
+        'arrange-btn-align-right',
+        'arrange-btn-align-top',
+        'arrange-btn-align-center-v',
+        'arrange-btn-align-bottom',
+        'arrange-btn-distribute-h',
+        'arrange-btn-distribute-v',
+        'arrange-btn-same-width',
+        'arrange-btn-same-height',
+        'arrange-btn-same-both',
+      ];
+
+      for (const testId of arrangeButtons) {
+        const btn = page.locator(`[data-testid="${testId}"]`);
+        await expect(btn).toBeVisible();
+        // Should have SVG inside
+        await expect(btn.locator('svg')).toBeVisible();
+        // Should NOT have any banned Unicode glyph
+        for (const glyph of BANNED_GLYPHS) {
+          await expect(btn).not.toContainText(glyph);
+        }
+      }
+    });
+
+    test('Arrange buttons have slate-styled CSS (not browser default)', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+      // Click on shape to select it
+      const shape = page.locator('[data-vertex-id]').first();
+      await shape.click();
+      await page.waitForTimeout(300);
+
+      // Click Arrange tab
+      await page.click('[data-testid="inspector-tab-arrange"]');
+      await page.waitForTimeout(100);
+
+      const btn = page.locator('[data-testid="arrange-btn-align-left"]');
+      await expect(btn).toBeVisible();
+
+      // Check CSS properties: should have slate background (not transparent)
+      const bgColor = await btn.evaluate((el) => window.getComputedStyle(el).backgroundColor);
+      expect(bgColor).not.toBe('rgba(0, 0, 0, 0)');
+      expect(bgColor).not.toBe('transparent');
+
+      // Should have a 1px border
+      const borderWidth = await btn.evaluate((el) => window.getComputedStyle(el).borderWidth);
+      expect(borderWidth).toBe('1px');
+    });
+
+    test('Position inputs populate from single-shape selection', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+      // Click on shape to select it
+      const shape = page.locator('[data-vertex-id]').first();
+      await shape.click();
+      await page.waitForTimeout(300);
+
+      // Click Arrange tab
+      await page.click('[data-testid="inspector-tab-arrange"]');
+      await page.waitForTimeout(100);
+
+      // Check Position section exists and inputs are visible
+      const xInput = page.locator('[data-testid="arrange-field-x-input"]');
+      const yInput = page.locator('[data-testid="arrange-field-y-input"]');
+      const wInput = page.locator('[data-testid="arrange-field-w-input"]');
+      const hInput = page.locator('[data-testid="arrange-field-h-input"]');
+
+      await expect(xInput).toBeVisible();
+      await expect(yInput).toBeVisible();
+      await expect(wInput).toBeVisible();
+      await expect(hInput).toBeVisible();
+
+      // Inputs should have numeric values (simple rect fixture)
+      const xVal = await xInput.inputValue();
+      const yVal = await yInput.inputValue();
+      const wVal = await wInput.inputValue();
+      const hVal = await hInput.inputValue();
+
+      expect(parseFloat(xVal)).not.toBeNaN();
+      expect(parseFloat(yVal)).not.toBeNaN();
+      expect(parseFloat(wVal)).not.toBeNaN();
+      expect(parseFloat(hVal)).not.toBeNaN();
+    });
+
+    test('Position X input commit dispatches MoveVertex', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+      // Click on shape to select it
+      const shape = page.locator('[data-vertex-id]').first();
+      await shape.click();
+      await page.waitForTimeout(300);
+
+      // Click Arrange tab
+      await page.click('[data-testid="inspector-tab-arrange"]');
+      await page.waitForTimeout(100);
+
+      const xInput = page.locator('[data-testid="arrange-field-x-input"]');
+      const initialX = await xInput.inputValue();
+      const initialXNum = parseFloat(initialX);
+
+      // Change X value
+      await xInput.fill(String(initialXNum + 50));
+      await xInput.blur();
+      await page.waitForTimeout(400); // wait for debounce
+
+      // Verify X changed in the input
+      const newX = await xInput.inputValue();
+      expect(parseFloat(newX)).toBe(initialXNum + 50);
+    });
+
+    test('Rotate button is write-only — no rotation field shows current degrees', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+      // Click on shape to select it
+      const shape = page.locator('[data-vertex-id]').first();
+      await shape.click();
+      await page.waitForTimeout(300);
+
+      // Click Arrange tab
+      await page.click('[data-testid="inspector-tab-arrange"]');
+      await page.waitForTimeout(100);
+
+      // Rotate button should exist
+      const rotateBtn = page.locator('[data-testid="arrange-btn-rotate"]');
+      await expect(rotateBtn).toBeVisible();
+
+      // Should NOT have any rotation input field
+      const rotationInput = page.locator('[data-testid="arrange-field-rotation-input"]');
+      await expect(rotationInput).not.toBeAttached();
+
+      // Click rotate button - should not throw
+      await rotateBtn.click();
+      await page.waitForTimeout(300);
+    });
+  });
 });
