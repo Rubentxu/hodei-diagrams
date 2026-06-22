@@ -1,6 +1,6 @@
 //! Scene export: build and serialize scene from engine model.
 
-use crate::engine::with_engine;
+use crate::engine::{WasmStencilProvider, with_engine};
 use diagram_scene::SceneBuilder;
 use wasm_bindgen::prelude::*;
 
@@ -17,7 +17,9 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub fn get_scene(handle: u32) -> Result<String, JsValue> {
     with_engine(handle, |e| {
+        let provider = WasmStencilProvider::new(e.stencil_libraries.clone());
         let scene = SceneBuilder::new()
+            .with_stencil_provider(Box::new(provider))
             .build(e.editor.model())
             .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
         serde_json::to_string(&scene)

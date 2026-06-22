@@ -228,11 +228,7 @@ fn normalize_commands(
 
 /// Normalize a single coordinate: divide by dim, clamping to 1.0 if degenerate.
 fn normalize_coord(value: f64, dim: f64, degenerate: bool) -> f64 {
-    if degenerate {
-        1.0
-    } else {
-        value / dim
-    }
+    if degenerate { 1.0 } else { value / dim }
 }
 
 #[cfg(test)]
@@ -282,10 +278,22 @@ mod tests {
 
         let normalized = stencil.normalize();
         assert_eq!(normalized.background.len(), 6);
-        assert_eq!(normalized.background[0], PathCommand::Move { x: 0.0, y: 0.0 });
-        assert_eq!(normalized.background[1], PathCommand::Line { x: 1.0, y: 0.0 });
-        assert_eq!(normalized.background[2], PathCommand::Line { x: 1.0, y: 1.0 });
-        assert_eq!(normalized.background[3], PathCommand::Line { x: 0.0, y: 1.0 });
+        assert_eq!(
+            normalized.background[0],
+            PathCommand::Move { x: 0.0, y: 0.0 }
+        );
+        assert_eq!(
+            normalized.background[1],
+            PathCommand::Line { x: 1.0, y: 0.0 }
+        );
+        assert_eq!(
+            normalized.background[2],
+            PathCommand::Line { x: 1.0, y: 1.0 }
+        );
+        assert_eq!(
+            normalized.background[3],
+            PathCommand::Line { x: 0.0, y: 1.0 }
+        );
         assert_eq!(normalized.background[4], PathCommand::Close);
         assert_eq!(normalized.background[5], PathCommand::FillStroke);
     }
@@ -309,8 +317,14 @@ mod tests {
         };
 
         let normalized = stencil.normalize();
-        assert_eq!(normalized.background[0], PathCommand::Move { x: 0.5, y: 0.5 });
-        assert_eq!(normalized.background[1], PathCommand::Line { x: 0.75, y: 0.75 });
+        assert_eq!(
+            normalized.background[0],
+            PathCommand::Move { x: 0.5, y: 0.5 }
+        );
+        assert_eq!(
+            normalized.background[1],
+            PathCommand::Line { x: 0.75, y: 0.75 }
+        );
     }
 
     #[test]
@@ -329,11 +343,16 @@ mod tests {
 
         let normalized = stencil.normalize();
         // x clamped to 1.0, y = 30/60 = 0.5
-        assert_eq!(normalized.background[0], PathCommand::Move { x: 1.0, y: 0.5 });
-        assert!(normalized
-            .diagnostics
-            .iter()
-            .any(|d| d.message.contains("degenerate")));
+        assert_eq!(
+            normalized.background[0],
+            PathCommand::Move { x: 1.0, y: 0.5 }
+        );
+        assert!(
+            normalized
+                .diagnostics
+                .iter()
+                .any(|d| d.message.contains("degenerate"))
+        );
     }
 
     #[test]

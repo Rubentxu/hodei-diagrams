@@ -2,6 +2,9 @@
 
 use diagram_commands::Editor;
 use diagram_core::DiagramModel;
+use diagram_scene::{
+    PathCommand as ScenePathCommand, StencilAspect as SceneStencilAspect, StencilProvider,
+};
 use diagram_stencils::Stencil;
 use parking_lot::Mutex;
 use slab::Slab;
@@ -135,6 +138,44 @@ pub fn set_stencil_library(handle: u32, library: &str, xml: &str) -> Result<(), 
             .insert(library.to_string(), normalized);
     })
     .map_err(|_| JsValue::from_str(ERR_INVALID_HANDLE))
+}
+
+/// A `StencilProvider` backed by a HashMap of parsed stencil libraries.
+///
+/// This is constructed in `get_scene()` with a clone of the engine's
+/// `stencil_libraries` cache, allowing the scene builder to resolve
+/// `stencil:<library>:<name>` references without a direct dependency on
+/// `diagram-stencils`.
+#[derive(Clone)]
+pub struct WasmStencilProvider {
+    libraries: HashMap<String, Vec<Stencil>>,
+}
+
+impl WasmStencilProvider {
+    pub fn new(libraries: HashMap<String, Vec<Stencil>>) -> Self {
+        Self { libraries }
+    }
+}
+
+impl StencilProvider for WasmStencilProvider {
+    fn lookup(
+        &self,
+        library: &str,
+        name: &str,
+    ) -> Option<(
+        SceneStencilAspect,
+        Vec<ScenePathCommand>,
+        Vec<ScenePathCommand>,
+    )> {
+        let stencils = self.libraries.get(library)?;
+        let stencil = stencils.iter().find(|s| s.name == name)?;
+        // PathCommand is re-exported identically from diagram_stencils via diagram_scene
+        Some((
+            stencil.aspect.into(),
+            stencil.background.clone(),
+            stencil.foreground.clone(),
+        ))
+    }
 }
 
 #[cfg(test)]
