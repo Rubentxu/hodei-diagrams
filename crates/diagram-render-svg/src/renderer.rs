@@ -3,6 +3,7 @@
 use diagram_scene::{PageId, PageScene, Scene};
 
 use crate::clip::ClipPathManager;
+use crate::defs::DefsManager;
 use crate::element::element_to_svg;
 use crate::error::RenderError;
 use crate::escape::escape_text;
@@ -49,6 +50,7 @@ impl SvgRenderer {
 
     fn render_page(&self, page: &PageScene) -> String {
         let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
         let mut output = String::new();
 
         let (view_x, view_y, view_w, view_h) = effective_view_box(page);
@@ -68,17 +70,20 @@ impl SvgRenderer {
             view_x, view_y, view_w, view_h
         ));
 
-        // Walk display list
+        // Walk display list — pass defs manager so elements can register gradients/filters
         for elem in &page.display_list {
-            output.push_str(&element_to_svg(elem, &mut clip, 1));
+            output.push_str(&element_to_svg(elem, &mut clip, &mut defs, 1));
             output.push('\n');
         }
 
-        // Emit defs block if there are clip paths
-        let defs = clip.render_defs(1);
-        if !defs.is_empty() {
-            output.push_str(&defs);
-            output.push('\n');
+        // Emit defs block if there are clip paths or gradient/filter defs
+        let clip_defs = clip.render_defs(1);
+        let fx_defs = defs.to_defs_markup();
+        if !clip_defs.is_empty() || !fx_defs.is_empty() {
+            output.push_str("<defs>");
+            output.push_str(&clip_defs);
+            output.push_str(&fx_defs);
+            output.push_str("</defs>\n");
         }
 
         // Close svg
