@@ -119,6 +119,14 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 
 ## ✅ Released — MVP
 
+### HTML Export as Standalone SVG Wrapper
+- **PR**: feat/html-export
+- **Feature**: Standalone HTML export wrapping the engine's SVG output. HTML menu item in File > Export submenu with `downloadHtml()` function creating a self-contained HTML file.
+- **Trigger**: File > Export > HTML
+- **Invariant**: Zero Rust/WASM surface; HTML is assembled entirely in the web shell from engine SVG output
+- **Code**: `downloadHtml()` in `web-shell/src/main.ts:165-180`, menu wiring at `main.ts:905-917`, navbar item at `navbar.ts:99-104`
+- **Tests**: E2E `export-advanced.spec.ts` (7 tests), vitest 136 passed, playwright 258 passed
+
 ### PNG Export via SVG Rasterization
 - **PR**: feat/png-export (PR #53)
 - **Feature**: Browser Canvas API rasterization of engine-produced SVG → PNG download. PNG menu item enabled in File > Export, tooltip corrected (was "Requires WebGPU renderer").
