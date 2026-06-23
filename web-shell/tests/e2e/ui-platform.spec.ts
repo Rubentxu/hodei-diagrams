@@ -178,7 +178,7 @@ test.describe('Slice C: Platform Surface UI', () => {
       await expect(page.locator('[data-testid="properties-dialog"]')).toHaveAttribute('hidden');
     });
 
-    test('Dialog has footnote about v2', async ({ page }) => {
+    test('Dialog does not have v2 footnote', async ({ page }) => {
       await page.goto('/');
       await page.waitForLoadState('networkidle');
 
@@ -186,9 +186,8 @@ test.describe('Slice C: Platform Surface UI', () => {
       await page.locator('[data-testid="menu-file"] summary').click();
       await page.locator('[data-testid="menu-properties"]').click();
 
-      // Check footnote
-      const footnote = page.locator('.dialog-footnote');
-      await expect(footnote).toContainText('v2');
+      // Footnote should be absent (engine metadata is now fully supported)
+      await expect(page.locator('.dialog-footnote')).toHaveCount(0);
     });
 
     test('Escape closes dialog', async ({ page }) => {

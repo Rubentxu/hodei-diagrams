@@ -32,6 +32,7 @@ pub use group::Group;
 pub use id::{EdgeId, GroupId, PageId, StyleId, VertexId};
 pub use label::Label;
 pub use model::DiagramModel;
+pub use model::Metadata;
 pub use page::Page;
 pub use store::ModelStore;
 pub use style::{StyleMap, StyleValue};

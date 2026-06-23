@@ -56,6 +56,8 @@ function createMockWasm() {
     parse_stencil_library_xml: vi.fn(),
     set_stencil_library: vi.fn(),
     get_resolved_style: vi.fn(),
+    get_metadata: vi.fn(),
+    set_metadata: vi.fn(),
   };
 }
 

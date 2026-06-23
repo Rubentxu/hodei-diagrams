@@ -32,6 +32,8 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       parse_stencil_library_xml: mod.parse_stencil_library_xml,
       set_stencil_library: mod.set_stencil_library,
       get_resolved_style: mod.get_resolved_style,
+      get_metadata: mod.get_metadata,
+      set_metadata: mod.set_metadata,
     };
 
     return ok(wasm);
