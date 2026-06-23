@@ -1908,3 +1908,66 @@ svg [data-editing='true'] text.vertex-label,
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-dim);
 }
+
+/* ─── Slice D: PDF Export via Browser Print ─────────────────────────────────── */
+
+/**
+ * PDF print stylesheet.
+ *
+ * Layout strategy:
+ *   1. Hide chrome: navbar, sidebar, rail, inspector, HUD, bottom-bar
+ *   2. Expand canvas to its intrinsic (SVG) dimensions so the browser prints
+ *      exactly what the diagram looks like at native size.
+ *   3. Override inline zoom/pan transforms so the diagram prints at scale=1,
+ *      none — this is the `transform` set by renderer.ts:83:
+ *        container.style.transform = `scale(${zoom}) translate(...)`
+ *      We use `transform: none !important` to cancel it out.
+ *   4. White page background so the dark canvas doesn't look odd on paper.
+ */
+
+@media print {
+  /* Hide all application chrome */
+  .navbar,
+  .sidebar,
+  .rail,
+  .inspector,
+  .hud,
+  .bottom-bar {
+    display: none !important;
+  }
+
+  /* Expand canvas to fill the page (intrinsic SVG dimensions) */
+  #app {
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    grid-template-areas: none !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
+  }
+
+  /* Canvas takes full intrinsic space */
+  .canvas-container {
+    position: static !important;
+    overflow: visible !important;
+    background: white !important;
+    /* Override inline zoom/pan transform from renderer.ts:83 */
+    transform: none !important;
+  }
+
+  .viewer {
+    width: intrinsic !important;
+    height: intrinsic !important;
+  }
+
+  /* Remove dashed selection outline from print output */
+  .viewer .selected {
+    outline: none !important;
+  }
+
+  /* White background for the page */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
