@@ -20,7 +20,7 @@ pub mod raw;
 pub mod writer;
 
 pub use error::{Diagnostic, FormatError, FormatResult};
-pub use mapping::{DrawioMapping, IdMap, format_style_string};
+pub use mapping::{DrawioMapping, IdMap, format_style_string, synthesize_id_map};
 pub use parser::DrawioParser;
 pub use raw::{RawDrawioCell, RawDrawioDiagram, RawDrawioDocument, RawDrawioGeometry};
 pub use writer::DrawioWriter;
