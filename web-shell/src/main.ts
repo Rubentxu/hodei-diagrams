@@ -17,6 +17,7 @@ import {
   wireDismiss,
   buildPropertiesDialog,
   showDialog,
+  hideDialog,
 } from './ui.js';
 import { buildInspector } from './inspector.js';
 import { type HudControls } from './hud.js';
@@ -86,6 +87,84 @@ function exitPresentationMode(): void {
   document.body.classList.remove('presentation-mode');
   hideExitHint();
   document.exitFullscreen?.().catch(() => {});
+}
+
+// ─── Keyboard Shortcuts Overlay ──────────────────────────────────────────────
+
+function toggleShortcutsOverlay(): void {
+  const existing = document.getElementById('keyboard-shortcuts-overlay');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+  const overlay = document.createElement('div');
+  overlay.id = 'keyboard-shortcuts-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+  `;
+  overlay.innerHTML = `
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border);
+                border-radius: 10px; padding: 24px; min-width: 300px; color: var(--text);">
+      <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600;">Keyboard Shortcuts</h3>
+      <div style="display: grid; gap: 8px; font-size: 12px;">
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">V</kbd> Select</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">R</kbd> Shapes</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">C</kbd> Connector</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">T</kbd> Text</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">F</kbd> Zoom to Fit</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Del</kbd> Delete</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Z</kbd> Undo</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Y</kbd> Redo</div>
+      </div>
+      <button id="close-shortcuts" style="
+        margin-top: 16px; width: 100%; padding: 8px; background: var(--accent);
+        color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;
+      ">Close</button>
+    </div>
+  `;
+  overlay.querySelector('#close-shortcuts')?.addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
+// ─── About Dialog ────────────────────────────────────────────────────────────
+
+function showAboutDialog(): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'dialog-overlay';
+  overlay.setAttribute('data-testid', 'about-dialog');
+  overlay.innerHTML = `
+    <div class="dialog">
+      <div class="dialog-header">
+        <span class="dialog-title">About Hodei Diagrams</span>
+        <button class="dialog-close" data-testid="about-dialog-close" aria-label="Close">✕</button>
+      </div>
+      <div class="dialog-body" style="gap: 8px;">
+        <p style="font-size: 13px; color: var(--text); margin: 0;">Hodei Diagrams</p>
+        <p style="font-size: 12px; color: var(--text-dim); margin: 0;">Version 0.1.0</p>
+        <p style="font-size: 12px; color: var(--text-dim); margin: 0;">Built with Rust + WebAssembly</p>
+      </div>
+      <div class="dialog-footer">
+        <button class="dialog-save" data-testid="about-dialog-ok">OK</button>
+      </div>
+    </div>
+  `;
+
+  overlay.querySelector('[data-testid="about-dialog-close"]')?.addEventListener('click', () => {
+    hideDialog(overlay);
+  });
+  overlay.querySelector('[data-testid="about-dialog-ok"]')?.addEventListener('click', () => {
+    hideDialog(overlay);
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) hideDialog(overlay);
+  });
+
+  document.body.appendChild(overlay);
+  showDialog(overlay);
 }
 
 // fullscreenchange — single source of truth for presentation mode state
@@ -422,45 +501,7 @@ async function bootstrap(): Promise<void> {
       ui.canvasContainer.style.setProperty('--zoom', String(zoomPan?.getZoom() ?? 1));
     },
     onHelp: () => {
-      // Toggle keyboard shortcuts overlay
-      const existing = document.getElementById('keyboard-shortcuts-overlay');
-      if (existing) {
-        existing.remove();
-      } else {
-        const overlay = document.createElement('div');
-        overlay.id = 'keyboard-shortcuts-overlay';
-        overlay.style.cssText = `
-          position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 2000;
-          display: flex; align-items: center; justify-content: center;
-        `;
-        overlay.innerHTML = `
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border);
-                      border-radius: 10px; padding: 24px; min-width: 300px; color: var(--text);">
-            <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600;">Keyboard Shortcuts</h3>
-            <div style="display: grid; gap: 8px; font-size: 12px;">
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">V</kbd> Select</div>
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">R</kbd> Shapes</div>
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">C</kbd> Connector</div>
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">T</kbd> Text</div>
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">F</kbd> Zoom to Fit</div>
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Del</kbd> Delete</div>
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Z</kbd> Undo</div>
-              <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Y</kbd> Redo</div>
-            </div>
-            <button id="close-shortcuts" style="
-              margin-top: 16px; width: 100%; padding: 8px; background: var(--accent);
-              color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;
-            ">Close</button>
-          </div>
-        `;
-        overlay
-          .querySelector('#close-shortcuts')
-          ?.addEventListener('click', () => overlay.remove());
-        overlay.addEventListener('click', (e) => {
-          if (e.target === overlay) overlay.remove();
-        });
-        document.body.appendChild(overlay);
-      }
+      toggleShortcutsOverlay();
     },
   });
 
@@ -1023,6 +1064,105 @@ async function bootstrap(): Promise<void> {
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
     downloadHtml(svg, `diagram-${safeName}-${pageIdx + 1}.html`);
+  });
+
+  // ─── 13.7. Wire Arrange > Z-order ─────────────────────────────────────────
+  const menuBringFront = document.querySelector('[data-testid="menu-bring-front"]');
+  menuBringFront?.addEventListener('click', () => {
+    activeEditor?.bringToFront();
+  });
+
+  const menuSendBack = document.querySelector('[data-testid="menu-send-back"]');
+  menuSendBack?.addEventListener('click', () => {
+    activeEditor?.sendToBack();
+  });
+
+  const menuBringForward = document.querySelector('[data-testid="menu-bring-forward"]');
+  menuBringForward?.addEventListener('click', () => {
+    activeEditor?.bringForward();
+  });
+
+  const menuSendBackward = document.querySelector('[data-testid="menu-send-backward"]');
+  menuSendBackward?.addEventListener('click', () => {
+    activeEditor?.sendBackward();
+  });
+
+  // ─── 13.7.1. Wire Arrange > Align ────────────────────────────────────────
+  const menuAlignLeft = document.querySelector('[data-testid="menu-align-left"]');
+  menuAlignLeft?.addEventListener('click', () => {
+    activeEditor?.alignSelection('left');
+  });
+
+  const menuAlignCenter = document.querySelector('[data-testid="menu-align-center"]');
+  menuAlignCenter?.addEventListener('click', () => {
+    activeEditor?.alignSelection('center-h');
+  });
+
+  const menuAlignRight = document.querySelector('[data-testid="menu-align-right"]');
+  menuAlignRight?.addEventListener('click', () => {
+    activeEditor?.alignSelection('right');
+  });
+
+  const menuAlignTop = document.querySelector('[data-testid="menu-align-top"]');
+  menuAlignTop?.addEventListener('click', () => {
+    activeEditor?.alignSelection('top');
+  });
+
+  const menuAlignMiddle = document.querySelector('[data-testid="menu-align-middle"]');
+  menuAlignMiddle?.addEventListener('click', () => {
+    activeEditor?.alignSelection('center-v');
+  });
+
+  const menuAlignBottom = document.querySelector('[data-testid="menu-align-bottom"]');
+  menuAlignBottom?.addEventListener('click', () => {
+    activeEditor?.alignSelection('bottom');
+  });
+
+  // ─── 13.7.2. Wire Arrange > Distribute ────────────────────────────────────
+  const menuDistributeH = document.querySelector('[data-testid="menu-distribute-h"]');
+  menuDistributeH?.addEventListener('click', () => {
+    activeEditor?.distributeSelection('horizontal');
+  });
+
+  const menuDistributeV = document.querySelector('[data-testid="menu-distribute-v"]');
+  menuDistributeV?.addEventListener('click', () => {
+    activeEditor?.distributeSelection('vertical');
+  });
+
+  // ─── 13.7.3. Wire Arrange > Rotate ────────────────────────────────────────
+  const menuRotateCw = document.querySelector('[data-testid="menu-rotate-cw"]');
+  menuRotateCw?.addEventListener('click', () => {
+    activeEditor?.rotateSelection(Math.PI / 2);
+  });
+
+  const menuRotateCcw = document.querySelector('[data-testid="menu-rotate-ccw"]');
+  menuRotateCcw?.addEventListener('click', () => {
+    activeEditor?.rotateSelection(-Math.PI / 2);
+  });
+
+  // ─── 13.7.4. Wire Arrange > Flip ─────────────────────────────────────────
+  const menuFlipH = document.querySelector('[data-testid="menu-flip-h"]');
+  menuFlipH?.addEventListener('click', () => {
+    activeEditor?.flipSelection('horizontal');
+  });
+
+  const menuFlipV = document.querySelector('[data-testid="menu-flip-v"]');
+  menuFlipV?.addEventListener('click', () => {
+    activeEditor?.flipSelection('vertical');
+  });
+
+  // Note: Arrange > Group and Ungroup are disabled — no wiring (per spec)
+
+  // ─── 13.8. Wire Help > Keyboard Shortcuts ───────────────────────────────────
+  const menuShortcuts = document.querySelector('[data-testid="menu-shortcuts"]');
+  menuShortcuts?.addEventListener('click', () => {
+    toggleShortcutsOverlay();
+  });
+
+  // ─── 13.8.1. Wire Help > About ───────────────────────────────────────────
+  const menuAbout = document.querySelector('[data-testid="menu-about"]');
+  menuAbout?.addEventListener('click', () => {
+    showAboutDialog();
   });
 
   // ─── 13.6. Wire File > Properties ────────────────────────────────────────
