@@ -7,6 +7,7 @@
 import { loadWasm } from './wasm-loader.js';
 import { DiagramEngineSession } from './session.js';
 import { mountSvg, setupZoomPan } from './renderer.js';
+import { rasterizeSvgToPng } from './export-raster.js';
 import {
   buildEmptyUi,
   populatePageTabs,
@@ -861,6 +862,20 @@ async function bootstrap(): Promise<void> {
     const pageName = page.name ?? 'page';
     const safeName = pageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     downloadSvg(svg, `diagram-${safeName}-${pageIdx + 1}.svg`);
+  });
+
+  // ─── 13.5. Wire File > Export > PNG ─────────────────────────────────────
+  const menuExportPng = document.querySelector('[data-testid="menu-export-png"]');
+  menuExportPng?.addEventListener('click', () => {
+    if (!activeSession || activePages.length === 0) return;
+    const pageIdx = activeEditorIdx ?? 0;
+    const page = activePages[pageIdx];
+    if (!page) return;
+    const svg = activeSession.getPage(page.pageId);
+    if (!svg) return;
+    const pageName = page.name ?? 'page';
+    const safeName = pageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    rasterizeSvgToPng(svg, `diagram-${safeName}-${pageIdx + 1}.png`);
   });
 
   // ─── 13.6. Wire File > Properties ────────────────────────────────────────

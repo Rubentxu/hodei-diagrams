@@ -83,10 +83,10 @@ export function buildNavbar(): NavbarControls {
   exportItem.appendChild(exportList);
 
   const pngExportItem = document.createElement('button');
-  pngExportItem.className = 'menu-item disabled-item';
+  pngExportItem.className = 'menu-item';
   pngExportItem.textContent = 'PNG';
   pngExportItem.setAttribute('data-testid', 'menu-export-png');
-  pngExportItem.title = 'Requires WebGPU renderer';
+  pngExportItem.title = 'Export diagram as PNG';
   exportList.appendChild(pngExportItem);
 
   exportItem.addEventListener('mouseenter', () => {

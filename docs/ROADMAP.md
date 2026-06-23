@@ -119,6 +119,24 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 
 ## ✅ Released — MVP
 
+### PNG Export via SVG Rasterization
+- **PR**: feat/png-export (PR #53)
+- **Feature**: Browser Canvas API rasterization of engine-produced SVG → PNG download. PNG menu item enabled in File > Export, tooltip corrected (was "Requires WebGPU renderer").
+- **Trigger**: File > Export > PNG
+- **ADRs**: 0046 (WebGPU renderer — PNG decoupled), 0047 (navbar export submenu), 0015 (Scene/Model separation)
+- **E2E tests**: `export-advanced.spec.ts` (7 tests)
+- **Unit tests**: `export-raster.test.ts` (8 tests for `parseSvgDimensions`)
+- **Invariant**: Canvas stays untainted — engine SVG has no external refs
+
+### Presentation Mode — Native Fullscreen (ADR-0048)
+- **PR**: feat/presentation-mode-fullscreen (PR-45)
+- **Feature**: Native fullscreen via `requestFullscreen()` API, `fullscreenchange` as single source of truth, `fitToView()` auto-fit on enter, 3s fade exit overlay, graceful fallback when fullscreen denied
+- **Trigger**: Ctrl+Shift+P, View > Present menu, F11 (native browser)
+- **Exit**: Escape key, browser native exit
+- **ADRs**: 0048 (Presentation Mode v2 had "Engine dependency: None" — confirmed)
+- **E2E tests**: `tests/e2e/presentation-fullscreen.spec.ts` (8 tests)
+- **Invariant**: `isPresentationMode === !!document.fullscreenElement` always holds
+
 ### Version History Timeline (ADR-0064, ADR-0065, ADR-0066)
 - **PR**: feat/version-history-ui-integration (PR-3)
 - **Feature**: IndexedDB persistence, 30s auto-save idle debounce, Zone 2 sidebar panel, restore/delete actions
@@ -131,7 +149,6 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 ## ⏸️ Deferred (no en plan activo, documentados en ADR-0048)
 
 - Properties dialog (Metadata en DiagramModel)
-- Presentation mode advanced (F11, fullscreen)
 - Real-time collaboration (CRDT)
 - AI assistant (LLM integration)
 - Backend / cloud sync (offline-first, ADR-0002)
