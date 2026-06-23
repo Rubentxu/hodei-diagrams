@@ -598,6 +598,147 @@ button:disabled {
   color: var(--text);
 }
 
+/* ─── Zone 2: Version History Panel ───────────────────────────────────────── */
+.history-section {
+  border-top: 1px solid var(--border);
+  margin-top: var(--xs);
+}
+
+.history-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--xs);
+  padding: var(--sm) var(--sm);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.history-summary-icon {
+  font-size: 12px;
+}
+
+.history-summary-text {
+  flex: 1;
+}
+
+.history-section[open] .history-summary-icon {
+  /* rotated chevron indicator via transform */
+}
+
+.history-save-btn {
+  display: block;
+  width: calc(100% - var(--sm) * 2);
+  margin: var(--xs) var(--sm) var(--sm);
+  padding: 6px var(--sm);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent-text, #fff);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+
+.history-save-btn:hover {
+  background: var(--accent-hover, #2563eb);
+}
+
+.history-list {
+  padding: 0 var(--sm) var(--sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--xs);
+}
+
+.history-empty {
+  padding: var(--sm) 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  font-style: italic;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--xs);
+  padding: 5px var(--xs);
+  border-radius: var(--radius-sm);
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+}
+
+.history-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-row-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-row-time {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.history-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.history-action-btn {
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    color var(--motion-fast),
+    border-color var(--motion-fast),
+    background var(--motion-fast);
+}
+
+.history-action-btn:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+  background: var(--surface-hover);
+}
+
+.history-restore-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.history-delete-btn:hover {
+  color: var(--error, #ef4444);
+  border-color: var(--error, #ef4444);
+}
+
 /* ─── Zone 3: Canvas ──────────────────────────────────────────────────────── */
 .canvas-container {
   grid-area: canvas;

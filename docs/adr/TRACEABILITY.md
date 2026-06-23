@@ -38,8 +38,16 @@ Generated from OpenCode session database (`~/.local/share/opencode/opencode.db`)
 | 0064 | 0048 | Supersedes §1 (version history snapshot serialization) |
 | 0064 | 0023 | Synthesized IdMap (engine-owned stable IDs) |
 | 0064 | 0063 | Snapshot metadata uses `vars` format |
-| 0065 | 0047 | Amends Zone 5 placement |
+| 0065 | 0047 | Amends Zone 2 sidebar placement (supersedes Zone 5) |
 | 0066 | 0041 | First runtime dependency in web-shell toolchain |
+
+## SDDK Change: version-history-mvp
+
+| PR | Branch | Scope | ADRs |
+|----|--------|-------|------|
+| PR-1 | `feat/version-history-snapshot-foundation` | Rust IdMap synthesis, export fallback | 0064, 0065, 0066 |
+| PR-2 | `feat/version-history-idb-layer` | idb dep, VersionStore class, manual save wiring | 0066 |
+| PR-3 | `feat/version-history-ui-integration` | Zone 2 HistoryPanel, auto-save debounce, E2E tests | 0064, 0065, 0066 |
 
 ## Note on ADRs 0008, 0009, 0012
 
