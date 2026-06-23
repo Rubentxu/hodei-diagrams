@@ -1,5 +1,12 @@
 import type { DiagramEngineSession } from './session.js';
-import type { ResolvedStyle, SlotmapId, ScenePage, Vertex, GlassConfig, GradientConfig } from './types.js';
+import type {
+  ResolvedStyle,
+  SlotmapId,
+  ScenePage,
+  Vertex,
+  GlassConfig,
+  GradientConfig,
+} from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 
 /** Active tool from the palette. */
@@ -385,6 +392,66 @@ export class Editor {
     this.#replay();
   }
 
+  // ─── Z-Order Operations ───────────────────────────────────────────────────
+
+  /**
+   * Bring all selected shapes to the front (top of z-order).
+   * Dispatches BringToFront per shape via executeTransaction (atomic, single undo).
+   */
+  bringToFront(): void {
+    this.#dispatchZOrder('BringToFront');
+  }
+
+  /**
+   * Send all selected shapes to the back (bottom of z-order).
+   * Dispatches SendToBack per shape via executeTransaction (atomic, single undo).
+   */
+  sendToBack(): void {
+    this.#dispatchZOrder('SendToBack');
+  }
+
+  /**
+   * Bring all selected shapes one step forward in z-order.
+   * Dispatches BringForward per shape via executeTransaction (atomic, single undo).
+   */
+  bringForward(): void {
+    this.#dispatchZOrder('BringForward');
+  }
+
+  /**
+   * Send all selected shapes one step backward in z-order.
+   * Dispatches SendBackward per shape via executeTransaction (atomic, single undo).
+   */
+  sendBackward(): void {
+    this.#dispatchZOrder('SendBackward');
+  }
+
+  /**
+   * Dispatch a z-order command for all selected shapes.
+   * @param commandName - One of 'BringToFront' | 'SendToBack' | 'BringForward' | 'SendBackward'
+   */
+  #dispatchZOrder(
+    commandName: 'BringToFront' | 'SendToBack' | 'BringForward' | 'SendBackward',
+  ): void {
+    if (this.#selection.size === 0) return;
+
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      commands.push(
+        JSON.stringify({
+          [commandName]: { target: { kind: 'Vertex', ...slotmapIdToField(id) } },
+        }),
+      );
+    }
+
+    const result = this.#session.executeTransaction(commands);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    this.#replay();
+  }
+
   /**
    * Execute an array of commands atomically as a single transaction.
    * On success, one undo entry is pushed; on error all commands are rolled back.
@@ -412,7 +479,12 @@ export class Editor {
     const ids = Array.from(this.#selection);
     const bounds = ids
       .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
-      .filter((b): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } => b.geom !== null);
+      .filter(
+        (
+          b,
+        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } =>
+          b.geom !== null,
+      );
 
     if (bounds.length < 2) return;
 
@@ -469,7 +541,12 @@ export class Editor {
     const ids = Array.from(this.#selection);
     const bounds = ids
       .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
-      .filter((b): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } => b.geom !== null);
+      .filter(
+        (
+          b,
+        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } =>
+          b.geom !== null,
+      );
 
     if (bounds.length < 3) return;
 
@@ -484,7 +561,9 @@ export class Editor {
 
     if (axis === 'horizontal') {
       const totalSpan = last.geom.x - first.geom.x;
-      const gap = (totalSpan - (last.geom.x + last.geom.width - first.geom.x - first.geom.width)) / (sorted.length - 1);
+      const gap =
+        (totalSpan - (last.geom.x + last.geom.width - first.geom.x - first.geom.width)) /
+        (sorted.length - 1);
       const commands: string[] = [];
       let cursor = first.geom.x + first.geom.width + gap;
       for (let i = 1; i < sorted.length - 1; i++) {
@@ -499,7 +578,9 @@ export class Editor {
       }
     } else {
       const totalSpan = last.geom.y - first.geom.y;
-      const gap = (totalSpan - (last.geom.y + last.geom.height - first.geom.y - first.geom.height)) / (sorted.length - 1);
+      const gap =
+        (totalSpan - (last.geom.y + last.geom.height - first.geom.y - first.geom.height)) /
+        (sorted.length - 1);
       const commands: string[] = [];
       let cursor = first.geom.y + first.geom.height + gap;
       for (let i = 1; i < sorted.length - 1; i++) {
@@ -526,7 +607,12 @@ export class Editor {
     const ids = Array.from(this.#selection);
     const bounds = ids
       .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
-      .filter((b): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } => b.geom !== null);
+      .filter(
+        (
+          b,
+        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } =>
+          b.geom !== null,
+      );
 
     if (bounds.length < 2) return;
 
@@ -656,7 +742,8 @@ export class Editor {
     const pos = this.#clientToDoc(clientX, clientY);
     const tool = this.#stencilDragTool;
 
-    const kindMap: Record<string,
+    const kindMap: Record<
+      string,
       | 'Rectangle'
       | 'RoundedRect'
       | 'Ellipse'
@@ -940,16 +1027,17 @@ export class Editor {
    * If commit=false: applies temporary shadow style directly to the DOM for
    * real-time preview without engine mutation or undo entries.
    */
-  applyShadowToSelection(shadow: Partial<import('./types.js').ShadowConfig>, commit: boolean): void {
+  applyShadowToSelection(
+    shadow: Partial<import('./types.js').ShadowConfig>,
+    commit: boolean,
+  ): void {
     if (this.#selection.size === 0) return;
 
     if (!commit) {
       // Real-time preview: apply filter directly to DOM elements
       const config = shadow as import('./types.js').ShadowConfig;
       for (const id of this.#selection) {
-        const el = this.#viewer.querySelector(
-          `[data-vertex-id="${id.idx}:${id.version}"]`,
-        );
+        const el = this.#viewer.querySelector(`[data-vertex-id="${id.idx}:${id.version}"]`);
         if (!el) continue;
         if (config.enabled) {
           const filterId = `shadow-preview-${id.idx}`;
@@ -975,12 +1063,14 @@ export class Editor {
         style['shadowBlur'] = String(shadow.blur ?? 5);
         style['shadowColor'] = shadow.color ?? '#000000';
       }
-      commands.push(JSON.stringify({
-        ChangeStyle: {
-          id: slotmapIdToField(id),
-          style,
-        },
-      }));
+      commands.push(
+        JSON.stringify({
+          ChangeStyle: {
+            id: slotmapIdToField(id),
+            style,
+          },
+        }),
+      );
     }
 
     if (commands.length === 0) return;
@@ -1004,9 +1094,7 @@ export class Editor {
     if (!commit) {
       // Real-time preview: apply fill-opacity directly to DOM elements
       for (const id of this.#selection) {
-        const el = this.#viewer.querySelector(
-          `[data-vertex-id="${id.idx}:${id.version}"]`,
-        );
+        const el = this.#viewer.querySelector(`[data-vertex-id="${id.idx}:${id.version}"]`);
         if (!el) continue;
         if (glass !== null && glass.enabled) {
           (el as SVGElement).setAttribute('fill-opacity', String(glass.opacity));
@@ -1029,12 +1117,14 @@ export class Editor {
       if (enabled) {
         style['glassOpacity'] = String(opacity);
       }
-      commands.push(JSON.stringify({
-        ChangeStyle: {
-          id: slotmapIdToField(id),
-          style,
-        },
-      }));
+      commands.push(
+        JSON.stringify({
+          ChangeStyle: {
+            id: slotmapIdToField(id),
+            style,
+          },
+        }),
+      );
     }
 
     if (commands.length === 0) return;
@@ -1058,9 +1148,7 @@ export class Editor {
     if (!commit) {
       // Real-time preview: apply gradient fill directly to DOM elements
       for (const id of this.#selection) {
-        const el = this.#viewer.querySelector(
-          `[data-vertex-id="${id.idx}:${id.version}"]`,
-        );
+        const el = this.#viewer.querySelector(`[data-vertex-id="${id.idx}:${id.version}"]`);
         if (!el) continue;
         if (gradient !== null) {
           (el as SVGElement).setAttribute('fill', `url(#grad-preview-${id.idx})`);
@@ -1085,12 +1173,14 @@ export class Editor {
         style['gradientColor1'] = gradient.stops[0]?.color ?? '#ffffff';
         style['gradientColor2'] = gradient.stops[1]?.color ?? '#000000';
       }
-      commands.push(JSON.stringify({
-        ChangeStyle: {
-          id: slotmapIdToField(id),
-          style,
-        },
-      }));
+      commands.push(
+        JSON.stringify({
+          ChangeStyle: {
+            id: slotmapIdToField(id),
+            style,
+          },
+        }),
+      );
     }
 
     if (commands.length === 0) return;
@@ -1773,11 +1863,7 @@ export class Editor {
 
     // Apply snap: grid first, then shape
     const gridSnapped = this.#snapToGrid(docPos.x, docPos.y);
-    const shapeSnapped = this.#snapToShape(
-      gridSnapped.x,
-      gridSnapped.y,
-      this.#dragState.vertexId,
-    );
+    const shapeSnapped = this.#snapToShape(gridSnapped.x, gridSnapped.y, this.#dragState.vertexId);
 
     this.#renderGuides(shapeSnapped.guides);
     this.#dragState.currentX = shapeSnapped.x;
@@ -1843,9 +1929,12 @@ export class Editor {
   ): void {
     // Guard: clamp/reject invalid
     if (
-      !Number.isFinite(geom.x) || !Number.isFinite(geom.y) ||
-      !Number.isFinite(geom.width) || !Number.isFinite(geom.height) ||
-      geom.width <= 0 || geom.height <= 0
+      !Number.isFinite(geom.x) ||
+      !Number.isFinite(geom.y) ||
+      !Number.isFinite(geom.width) ||
+      !Number.isFinite(geom.height) ||
+      geom.width <= 0 ||
+      geom.height <= 0
     ) {
       return; // ignore invalid — UI should clamp before calling
     }
