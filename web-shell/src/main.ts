@@ -21,12 +21,17 @@ import { buildInspector } from './inspector.js';
 import { Editor } from './editor.js';
 import type { PageToken, PageRender, SlotmapId, ScenePage } from './types.js';
 import { EMPTY_METADATA } from './types.js';
+import { VersionStore } from './version-store.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
 let activePages: PageRender[] = [];
 let activeEditor: Editor | null = null;
 let activeEditorIdx = 0;
+
+// ─── Version history state ─────────────────────────────────────────────────────
+const versionStore = new VersionStore();
+let manualSaveCounter = 0;
 
 // ─── Grid overlay state ───────────────────────────────────────────────────────
 const GRID_LS_KEY = 'hodei:grid-visible';
@@ -91,6 +96,41 @@ function downloadSvg(svg: string, filename: string): void {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Capture the current diagram state and persist it to IndexedDB via VersionStore. */
+async function manualSaveVersion(): Promise<void> {
+  if (!activeSession) {
+    console.warn('[manualSaveVersion] No active session');
+    return;
+  }
+
+  const exportResult = activeSession.exportDrawio();
+  if (!exportResult.ok) {
+    console.error('[manualSaveVersion] Export failed:', exportResult.error);
+    return;
+  }
+
+  const metadataResult = activeSession.getMetadata();
+  const metadataStr = metadataResult.ok ? JSON.stringify(metadataResult.value) : undefined;
+
+  manualSaveCounter++;
+  const name = `Manual: v${manualSaveCounter}`;
+
+  try {
+    const record: Omit<import('./version-store.js').VersionRecord, 'id' | 'created' | 'updated'> = {
+      name,
+      snapshot: exportResult.value,
+      schema_version: 1,
+    };
+    if (metadataStr !== undefined) {
+      record.metadata = metadataStr;
+    }
+    const id = await versionStore.put(record);
+    console.log(`[manualSaveVersion] Saved "${name}" with id=${id}`);
+  } catch (err) {
+    console.error('[manualSaveVersion] IDB put failed:', err);
+  }
 }
 
 /** Get human-readable selection label from scene data */
@@ -260,6 +300,11 @@ async function bootstrap(): Promise<void> {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
       e.preventDefault();
       togglePresentationMode();
+    }
+    // Ctrl+Shift+S / Cmd+Shift+S for manual version save (temporary, removed in PR-3)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+      e.preventDefault();
+      manualSaveVersion();
     }
     // Escape to exit presentation mode
     if (e.key === 'Escape' && isPresentationMode) {
@@ -690,6 +735,12 @@ async function bootstrap(): Promise<void> {
       return result.value;
     },
     getSession: () => activeSession,
+    manualSaveVersion,
+  };
+
+  // ─── 15.5. Expose manual save for console-driven testing ────────────────────
+  (window as unknown as Record<string, unknown>).__hodei = {
+    manualSaveVersion,
   };
 }
 
