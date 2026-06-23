@@ -10,6 +10,7 @@ description = "Diagram layout algorithms (Sugiyama HierarchicalLayout v1)."
 [dependencies]
 diagram-core = { path = "../diagram-core" }
 petgraph = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

@@ -19,6 +19,8 @@ use diagram_core::geometry::{Point, Rect, Size};
 use diagram_core::id::{EdgeId, GroupId, PageId, VertexId};
 use diagram_core::store::ModelStore;
 
+use serde::{Deserialize, Serialize};
+
 use crate::config::{Direction, LayoutConfig};
 use crate::error::{LayoutError, LayoutResult};
 
@@ -52,7 +54,8 @@ pub struct TreeLayoutResult {
 }
 
 /// Kind of tree layout algorithm.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub enum LayoutKind {
     /// The existing Sugiyama hierarchical layout.
     Hierarchical,

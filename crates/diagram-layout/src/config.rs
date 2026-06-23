@@ -1,7 +1,9 @@
 //! Configuration types for the layout engine.
 
+use serde::{Deserialize, Serialize};
+
 /// The direction in which the layout flows.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Direction {
     /// Flow from top to bottom (default).
     TopToBottom,
@@ -14,7 +16,7 @@ pub enum Direction {
 ///
 /// Controls spacing, direction, and iteration limits. Sensible defaults
 /// are provided that match the upstream draw.io layout behaviour.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LayoutConfig {
     /// The direction of the layout flow.
     pub direction: Direction,
