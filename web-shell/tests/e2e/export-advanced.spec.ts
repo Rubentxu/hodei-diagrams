@@ -154,4 +154,49 @@ test.describe('Suite H: export-advanced', () => {
     await expect(page.locator('[data-testid="viewer"]')).toBeVisible();
     await expect(page.locator('body')).not.toHaveClass(/fatal/);
   });
+
+  /**
+   * Test 6: Export PNG → downloaded file is a valid PNG
+   */
+  test('Export PNG → downloaded file is a valid PNG', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Open File menu and hover to trigger export submenu
+    await page.locator('[data-testid="menu-file"] summary').click();
+    await page.locator('[data-testid="menu-export"]').hover();
+    await page.waitForTimeout(200);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('[data-testid="menu-export-png"]');
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(/\.png$/);
+    const content = await (await download.createReadStream()).toArray();
+    const buffer = Buffer.concat(content);
+
+    // PNG files start with a valid signature
+    expect(buffer.slice(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  });
+
+  /**
+   * Test 7: PNG export menu item is enabled and has correct tooltip
+   */
+  test('PNG export menu item is enabled and has correct tooltip', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('[data-testid="menu-file"] summary').click();
+    await page.waitForTimeout(100);
+    await page.locator('[data-testid="menu-export"]').hover();
+    await page.waitForTimeout(100);
+
+    const pngItem = page.locator('[data-testid="menu-export-png"]');
+    await expect(pngItem).toBeVisible();
+    await expect(pngItem).not.toHaveClass(/disabled/);
+    await expect(pngItem).toHaveAttribute('title', 'Export diagram as PNG');
+  });
 });
