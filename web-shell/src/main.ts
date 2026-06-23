@@ -161,6 +161,24 @@ function downloadSvg(svg: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** Create a Blob download of an SVG wrapped in a standalone HTML page. */
+function downloadHtml(svg: string, filename: string): void {
+  const html = `<!DOCTYPE html>
+<html>
+<head><title>${filename.replace('.html', '')}</title>
+<style>body { margin: 0; } svg { display: block; }</style>
+</head>
+<body>${svg}</body>
+</html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** Capture the current diagram state and persist it to IndexedDB via VersionStore. */
 async function manualSaveVersion(): Promise<void> {
   if (!activeSession) {
@@ -882,6 +900,20 @@ async function bootstrap(): Promise<void> {
   const menuExportPdf = document.querySelector('[data-testid="menu-export-pdf"]');
   menuExportPdf?.addEventListener('click', () => {
     window.print();
+  });
+
+  // ─── 13.5.2. Wire File > Export > HTML ──────────────────────────────────
+  const menuExportHtml = document.querySelector('[data-testid="menu-export-html"]');
+  menuExportHtml?.addEventListener('click', () => {
+    if (!activeSession || activePages.length === 0) return;
+    const pageIdx = activeEditorIdx ?? 0;
+    const page = activePages[pageIdx];
+    if (!page) return;
+    const svg = activeSession.getPage(page.pageId);
+    if (!svg) return;
+    const pageName = page.name ?? 'page';
+    const safeName = pageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    downloadHtml(svg, `diagram-${safeName}-${pageIdx + 1}.html`);
   });
 
   // ─── 13.6. Wire File > Properties ────────────────────────────────────────

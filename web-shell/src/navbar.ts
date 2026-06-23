@@ -96,6 +96,13 @@ export function buildNavbar(): NavbarControls {
   pdfExportItem.title = 'Export diagram as PDF via browser print';
   exportList.appendChild(pdfExportItem);
 
+  const htmlExportItem = document.createElement('button');
+  htmlExportItem.className = 'menu-item';
+  htmlExportItem.textContent = 'HTML';
+  htmlExportItem.setAttribute('data-testid', 'menu-export-html');
+  htmlExportItem.title = 'Export diagram as standalone HTML file';
+  exportList.appendChild(htmlExportItem);
+
   exportItem.addEventListener('mouseenter', () => {
     exportList.style.display = 'block';
   });
