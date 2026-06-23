@@ -127,8 +127,6 @@ describe('Auto-save idle debounce', () => {
   // ─── Task 3.6.5: manual save cancels pending timer, only ONE version inserted ──
   it('manual save cancels the pending auto-save timer', () => {
     const IDLE_MS = 30_000;
-    let lastCommandAt = 0;
-    let lastSavedAt = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     function scheduleAutoSave() {
@@ -137,21 +135,18 @@ describe('Auto-save idle debounce', () => {
     }
 
     function manualSave() {
-      // On manual save, we update last_saved_at to suppress the next auto-save
-      lastSavedAt = Date.now();
-      // And cancel any pending timer
+      // Cancel any pending timer
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
       }
     }
 
-    // Command at T0
-    lastCommandAt = Date.now();
+    // Schedule auto-save
     scheduleAutoSave();
     expect(timer).not.toBeNull();
 
-    // Manual save at T0+20s
+    // Manual save cancels the timer
     manualSave();
 
     // Timer should be cancelled

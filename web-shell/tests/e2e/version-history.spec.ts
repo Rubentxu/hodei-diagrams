@@ -13,6 +13,17 @@ const SIMPLE_RECT_PATH =
   '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
 
 test.describe('Version History', () => {
+  // ─── Task 3.7.1: isolate storage state per test ────────────────────────────
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    // Non-blocking IndexedDB cleanup
+    await page.evaluate(() => {
+      indexedDB.deleteDatabase('hodei-diagrams');
+      indexedDB.deleteDatabase('version-store');
+    });
+  });
+
   // ─── Task 3.7.2: creates from-scratch diagram and saves version ─────────────────
   test('creates from-scratch diagram and saves version', async ({ page }) => {
     await page.goto('/');
@@ -43,16 +54,19 @@ test.describe('Version History', () => {
     await page.waitForTimeout(500);
 
     // Should now have one version row
-    const versionRows = page.locator('[data-testid^="history-row-"]');
+    // Use :not() to exclude child elements (label, time) that also start with "history-row-"
+    const versionRows = page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"]):not([data-testid*="label"]):not([data-testid*="time"])');
+    const rowTexts = await versionRows.allTextContents();
+
     await expect(versionRows).toHaveCount(1);
 
     // Row should have a label
     const firstRowLabel = page.locator('[data-testid^="history-row-label-"]').first();
     await expect(firstRowLabel).toContainText('Manual: v1');
 
-    // Row should have a timestamp
+    // Row should have a timestamp (element exists and has text)
     const firstRowTime = page.locator('[data-testid^="history-row-time-"]').first();
-    await expect(firstRowTime).toBeVisible();
+    await expect(firstRowTime).toHaveText(/Just now/);
   });
 
   // ─── Task 3.7.3: survives page reload ─────────────────────────────────────────
@@ -71,7 +85,7 @@ test.describe('Version History', () => {
     await page.waitForTimeout(500);
 
     // Verify version was saved
-    await expect(page.locator('[data-testid^="history-row-"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"])')).toHaveCount(1);
 
     // Reload the page
     await page.reload();
@@ -84,7 +98,7 @@ test.describe('Version History', () => {
 
     // Should still have the saved version
     await page.waitForTimeout(500);
-    await expect(page.locator('[data-testid^="history-row-"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"])')).toHaveCount(1);
     await expect(page.locator('[data-testid^="history-row-label-"]').first()).toContainText('Manual: v1');
   });
 
@@ -140,11 +154,15 @@ test.describe('Version History', () => {
     await viewer.click({ position: { x: 400, y: 200 } });
     await page.waitForTimeout(300);
 
+    // Re-expand history section (model change may have closed <details>)
+    await historySection.locator('summary').click();
+    await page.waitForTimeout(100);
+
     await page.locator('[data-testid="history-save-btn"]').click();
     await page.waitForTimeout(500);
 
     // Should now have 2 versions
-    await expect(page.locator('[data-testid^="history-row-"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"])')).toHaveCount(2);
 
     // Get the first version's id (v1 is most recent in reverse-chron order)
     // Actually in reverse-chronological, v2 is first, v1 is second
@@ -152,6 +170,10 @@ test.describe('Version History', () => {
     const rowLabels = page.locator('[data-testid^="history-row-label-"]').allTextContents();
     // v2 should be most recent (first)
     expect(rowLabels).toBeDefined();
+
+    // Re-expand history section before clicking restore (details may have closed)
+    await historySection.locator('summary').click();
+    await page.waitForTimeout(100);
 
     // Click Restore on the older version (v1 - second row)
     const restoreButtons = page.locator('[data-testid^="history-restore-btn-"]');
@@ -165,7 +187,7 @@ test.describe('Version History', () => {
 
     // The restore should have worked — v1 version is now restored
     // We can verify by checking the version count is still 2 (restore doesn't delete)
-    await expect(page.locator('[data-testid^="history-row-"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"])')).toHaveCount(2);
   });
 
   // ─── Task 3.7.6: delete removes version ────────────────────────────────────────
@@ -189,11 +211,20 @@ test.describe('Version History', () => {
     const viewer = page.locator('[data-testid="viewer"]');
     await viewer.click({ position: { x: 400, y: 200 } });
     await page.waitForTimeout(300);
+
+    // Re-expand history section (model change may have closed <details>)
+    await historySection.locator('summary').click();
+    await page.waitForTimeout(100);
+
     await page.locator('[data-testid="history-save-btn"]').click();
     await page.waitForTimeout(500);
 
     // Should have 2 versions
-    await expect(page.locator('[data-testid^="history-row-"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"])')).toHaveCount(2);
+
+    // Re-expand history section before clicking delete (details may have closed)
+    await historySection.locator('summary').click();
+    await page.waitForTimeout(100);
 
     // Delete the first version (v2 - most recent)
     const deleteButtons = page.locator('[data-testid^="history-delete-btn-"]');
@@ -201,7 +232,7 @@ test.describe('Version History', () => {
     await page.waitForTimeout(500);
 
     // Should now have 1 version
-    await expect(page.locator('[data-testid^="history-row-"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"])')).toHaveCount(1);
 
     // The remaining version should be v1
     await expect(page.locator('[data-testid^="history-row-label-"]').first()).toContainText('Manual: v1');

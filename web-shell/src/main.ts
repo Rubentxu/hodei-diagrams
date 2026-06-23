@@ -848,7 +848,7 @@ async function bootstrap(): Promise<void> {
     ui.hud.setZoom(e.detail.zoom * 100);
     // Update grid scale CSS variable for zoom-responsive grid
     ui.canvasContainer.style.setProperty('--zoom', String(e.detail.zoom));
-  }) as EventListener);
+  }) as (e: Event) => void);
 
   // ─── 14.5. Wire HUD zoom reset button ─────────────────────────────────────
   ui.hud.onZoomClick(() => {
