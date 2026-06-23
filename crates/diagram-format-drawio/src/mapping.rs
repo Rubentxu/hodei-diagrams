@@ -103,6 +103,35 @@ impl IdMap {
     }
 }
 
+/// Synthesize an [`IdMap`] from a [`DiagramModel`] for use when exporting a fresh engine
+/// (one that has no import-time ID mapping).
+///
+/// Walks vertices, edges, and groups in stable slotmap insertion order, assigning
+/// sequential string IDs: `"v0"`, `"v1"`, … for vertices, `"e0"`, `"e1"`, … for edges,
+/// `"g0"`, `"g1"`, … for groups.
+///
+/// Returns an empty [`IdMap`] if the model has no vertices, edges, or groups.
+pub fn synthesize_id_map(model: &DiagramModel) -> IdMap {
+    let mut id_map = IdMap::new();
+
+    for (v_idx, (vid, _vertex)) in model.store.vertices_with_ids().enumerate() {
+        let key = format!("v{v_idx}");
+        id_map.vertices.insert(key, vid);
+    }
+
+    for (e_idx, (eid, _edge)) in model.store.edges_with_ids().enumerate() {
+        let key = format!("e{e_idx}");
+        id_map.edges.insert(key, eid);
+    }
+
+    for (g_idx, (gid, _group)) in model.store.groups_with_ids().enumerate() {
+        let key = format!("g{g_idx}");
+        id_map.groups.insert(key, gid);
+    }
+
+    id_map
+}
+
 /// A reference to a cell's allocated engine ID, tagged by kind.
 #[derive(Clone, Copy)]
 pub(crate) enum CellRef {
@@ -1106,5 +1135,181 @@ mod tests {
         assert_eq!(raw.diagrams[0].cells[0].value.as_deref(), Some("First"));
         assert_eq!(raw.diagrams[1].cells.len(), 1);
         assert_eq!(raw.diagrams[1].cells[0].value.as_deref(), Some("Second"));
+    }
+
+    // =============================================================================
+    // synthesize_id_map tests
+    // =============================================================================
+
+    #[test]
+    fn test_synthesize_id_map_empty_model() {
+        let model = DiagramModel::new();
+        let id_map = synthesize_id_map(&model);
+        assert!(id_map.is_empty());
+    }
+
+    #[test]
+    fn test_synthesize_id_map_single_vertex() {
+        let mapper = DrawioMapping::new();
+        let doc = RawDrawioDocument {
+            diagrams: vec![RawDrawioDiagram {
+                name: Some("Page-1".to_owned()),
+                cells: vec![RawDrawioCell {
+                    id: "v-original".to_owned(),
+                    value: Some("Test".to_owned()),
+                    style: None,
+                    vertex: true,
+                    edge: false,
+                    parent: None,
+                    source: None,
+                    target: None,
+                    geometry: None,
+                    extra: Default::default(),
+                }],
+            }],
+        };
+        let (model, _id_map) = mapper.to_domain(&doc).unwrap();
+        let synthesized = synthesize_id_map(&model);
+
+        assert_eq!(synthesized.vertices.len(), 1);
+        assert!(synthesized.edges.is_empty());
+        assert!(synthesized.groups.is_empty());
+        // The key should be "v0" regardless of the original raw ID
+        let vid = model.store.vertices_with_ids().next().unwrap().0;
+        assert_eq!(synthesized.get_external_vertex(vid), Some("v0".to_owned()));
+    }
+
+    #[test]
+    fn test_synthesize_id_map_multiple_vertices_sequential_ids() {
+        let mapper = DrawioMapping::new();
+        let doc = RawDrawioDocument {
+            diagrams: vec![RawDrawioDiagram {
+                name: Some("Page-1".to_owned()),
+                cells: vec![
+                    RawDrawioCell {
+                        id: "first".to_owned(),
+                        value: Some("A".to_owned()),
+                        style: None,
+                        vertex: true,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                    RawDrawioCell {
+                        id: "second".to_owned(),
+                        value: Some("B".to_owned()),
+                        style: None,
+                        vertex: true,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                    RawDrawioCell {
+                        id: "third".to_owned(),
+                        value: Some("C".to_owned()),
+                        style: None,
+                        vertex: true,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                ],
+            }],
+        };
+        let (model, _id_map) = mapper.to_domain(&doc).unwrap();
+        let synthesized = synthesize_id_map(&model);
+
+        let vertices: Vec<_> = model.store.vertices_with_ids().collect();
+        assert_eq!(vertices.len(), 3);
+        assert_eq!(
+            synthesized.get_external_vertex(vertices[0].0),
+            Some("v0".to_owned())
+        );
+        assert_eq!(
+            synthesized.get_external_vertex(vertices[1].0),
+            Some("v1".to_owned())
+        );
+        assert_eq!(
+            synthesized.get_external_vertex(vertices[2].0),
+            Some("v2".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_synthesize_id_map_mixed_cells() {
+        let mapper = DrawioMapping::new();
+        let doc = RawDrawioDocument {
+            diagrams: vec![RawDrawioDiagram {
+                name: Some("Page-1".to_owned()),
+                cells: vec![
+                    RawDrawioCell {
+                        id: "v1".to_owned(),
+                        value: Some("A".to_owned()),
+                        style: None,
+                        vertex: true,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                    RawDrawioCell {
+                        id: "v2".to_owned(),
+                        value: Some("B".to_owned()),
+                        style: None,
+                        vertex: true,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                    RawDrawioCell {
+                        id: "e1".to_owned(),
+                        value: None,
+                        style: None,
+                        vertex: false,
+                        edge: true,
+                        parent: None,
+                        source: Some("v1".to_owned()),
+                        target: Some("v2".to_owned()),
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                    RawDrawioCell {
+                        id: "g1".to_owned(),
+                        value: Some("Group".to_owned()),
+                        style: None,
+                        vertex: false,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                ],
+            }],
+        };
+        let (model, _id_map) = mapper.to_domain(&doc).unwrap();
+        let synthesized = synthesize_id_map(&model);
+
+        // Vertices get v0, v1
+        assert_eq!(synthesized.vertices.len(), 2);
+        // Edge gets e0
+        assert_eq!(synthesized.edges.len(), 1);
+        // Group gets g0
+        assert_eq!(synthesized.groups.len(), 1);
     }
 }
