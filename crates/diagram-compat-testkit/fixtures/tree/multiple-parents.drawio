@@ -1,0 +1,22 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1"/>
+        <!-- C has two parents: A and B -->
+        <mxCell id="2" vertex="1">
+          <mxGeometry x="0" y="0" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" vertex="1">
+          <mxGeometry x="0" y="0" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" vertex="1">
+          <mxGeometry x="0" y="0" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" edge="1" source="2" target="4"/>
+        <mxCell id="6" edge="1" source="3" target="4"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

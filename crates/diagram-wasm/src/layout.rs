@@ -96,7 +96,12 @@ pub fn apply_layout(handle: u32, kind_json: &str, config_json: &str) -> Result<(
     with_engine_mut(handle, |e| {
         // Use the first page as the layout target.
         // Multi-page diagrams require the caller to iterate explicitly.
-        let page_id = e.editor.model().store.pages_with_ids().next()
+        let page_id = e
+            .editor
+            .model()
+            .store
+            .pages_with_ids()
+            .next()
             .map(|(pid, _)| pid)
             .ok_or_else(|| {
                 let msg = "ApplyLayout: no pages in diagram".to_string();
