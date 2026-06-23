@@ -5,10 +5,10 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.18.0 — Fase 6 completada (Stencils: XML library parsing, WASM cache, scene resolution, web-shell loading).**
+**v0.28.0 — Fase 6 completada + 4 features shipped (Tree Layout, PNG, PDF, HTML Export, Presentation Mode).**
 Motor Rust sólido con round-trip `.drawio` en archivo real de 4MB (21 celdas,
-AWS-Admisión). 11 crates, 431 tests Rust, ~100+ tests E2E.
-62 ADRs (0001-0062). UI con paridad ~45% vs draw.io. Próximo: Fase 9 — Toolbar/Status bar.
+AWS-Admisión). 12 crates, ~460+ tests Rust, ~260+ tests E2E.
+68 ADRs (0001-0068). UI con paridad ~55% vs draw.io. Próximo: Fase 9 — Toolbar/Status bar.
 
 | Crate | Capa | Status |
 |-------|------|--------|
@@ -49,6 +49,7 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 | 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 | ✅ Completada (PR #41, #42) |
 | 8. Effects | v0.17.0 | Shadow, glass, gradient (SVG-native) | 0061 | ✅ Completada (PR #43) |
 | **v1.0.0** | **NO automático** | Decisión del usuario | — | — |
+| 9. Toolbar/Status bar | PENDIENTE | Toolbar, status bar, progress indicators | — | ⏸️ Priorizar |
 
 ### Fase 0 — Edges interactivos (PR-E1)
 - **Rust**: `ConnectVerticesCommand`, `DisconnectEdgeCommand`, edge.style routing
@@ -196,7 +197,10 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 | 0049 | UI Gap Alignment + Slice Plan | UI |
 | 0050 | **Edge Creation UX Contract** 🆕 | Phase 0 |
 | 0051 | **Connect/Disconnect Commands** 🆕 | Phase 0 |
+| 0051 | **Slice-A Icon Strategy** 🆕 | UI |
+| 0051 | **Slice-B1 Grid Contrast** 🆕 | UI |
 | 0052 | **Shape Catalog** 🆕 | Phase 1 |
+| 0052 | **Slice-B2 Rotation Deferral** 🆕 | UI |
 | 0053 | **Polygon Generalization** 🆕 | Phase 1 |
 | 0054 | **Multi-Selection Model** 🆕 | Phase 2 |
 | 0055 | **Copy/Paste Strategy** 🆕 | Phase 2 |
@@ -206,6 +210,11 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 | 0059 | **Stencil Format Spec** 🆕 | Phase 6 |
 | 0060 | **Snap/Guides/Alignment** 🆕 | Phase 7 |
 | 0061 | **Advanced Visual Effects** 🆕 | Phase 8 |
+| 0062 | **Stencil Normalization** 🆕 | Phase 6 |
+| 0063 | **mxFile Vars/Metadata** 🆕 | Engine |
+| 0064 | **Snapshot Format (Draw.io XML Canonical)** 🆕 | UI |
+| 0065 | **Version Panel Zone 2 Placement** 🆕 | UI |
+| 0066 | **Web Shell First Runtime Dep (IDB)** 🆕 | UI |
 | 0067 | **Tree Layout Moen** 🆕 | Algorithm |
 
 ## Reglas de Actualización
