@@ -553,6 +553,7 @@ dependencies = [
 name = "diagram-commands"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "diagram-core",
  "diagram-format-drawio",
  "diagram-routing",
@@ -669,6 +670,7 @@ dependencies = [
 name = "diagram-wasm"
 version = "0.4.0"
 dependencies = [
+ "chrono",
  "diagram-commands",
  "diagram-core",
  "diagram-format-drawio",

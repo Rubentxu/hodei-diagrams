@@ -24,7 +24,8 @@ use diagram_core::PageId;
 
 use diagram_wasm::{
     create_engine, dispose_engine, engine_can_redo, engine_can_undo, execute_command,
-    export_drawio, get_scene, import_drawio, redo, render_pages, render_svg, undo,
+    export_drawio, export_drawio_fresh_engine, get_scene, import_drawio, redo, render_pages,
+    render_svg, undo,
 };
 
 /// Helper: create a temporary engine, run f, then dispose it.
@@ -414,16 +415,44 @@ fn export_drawio_roundtrip() {
 }
 
 #[test]
-fn export_drawio_fresh_engine_errors() {
+fn export_drawio_fresh_engine_succeeds() {
     with_engine(|handle| {
-        // Fresh engine with no import — id_map is None
-        let result = export_drawio(handle);
-        assert!(result.is_err(), "export on fresh engine should error");
-        let err = result.unwrap_err();
-        let err_str = format!("{:?}", err);
+        // Add a page and a vertex so the model is non-empty
+        let page_cmd = cmd_add_page();
+        execute_command(handle, &page_cmd).expect("add page should succeed");
+
+        let scene_json = get_scene(handle).expect("get_scene should succeed");
+        let scene: serde_json::Value =
+            serde_json::from_str(&scene_json).expect("scene should be valid JSON");
+        let page_id = page_id_from_scene_value(&scene["pages"][0]);
+
+        let vertex_cmd = cmd_add_vertex(page_id, "Node A", 10.0, 20.0, 100.0, 50.0);
+        execute_command(handle, &vertex_cmd).expect("add vertex should succeed");
+
+        // export_drawio_fresh_engine should succeed without import context
+        let result = export_drawio_fresh_engine(handle);
         assert!(
-            err_str.contains("ExportFailed: no import context"),
-            "error should mention 'no import context': {err_str}"
+            result.is_ok(),
+            "export_drawio_fresh_engine should succeed: {:?}",
+            result
+        );
+        let xml = result.unwrap();
+
+        // Assert exported XML has the expected structure
+        assert!(
+            xml.contains("<mxGraphModel"),
+            "exported XML should contain <mxGraphModel>: {}",
+            xml
+        );
+        assert!(
+            xml.contains("<root>"),
+            "exported XML should contain <root>: {}",
+            xml
+        );
+        assert!(
+            xml.contains("<mxCell"),
+            "exported XML should contain <mxCell>: {}",
+            xml
         );
     });
 }

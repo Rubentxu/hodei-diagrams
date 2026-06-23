@@ -42,7 +42,7 @@ pub use commands::{
     redo, undo,
 };
 pub use engine::{create_engine, dispose_engine};
-pub use export::export_drawio;
+pub use export::{export_drawio, export_drawio_fresh_engine};
 pub use import::import_drawio;
 pub use metadata::{get_metadata, set_metadata};
 pub use render::{render_pages, render_svg};
