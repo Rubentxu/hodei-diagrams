@@ -10,6 +10,9 @@
  * Monospace font, subtle text, minimal visual weight.
  */
 
+export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'auto-saved';
+export type LoadingState = { wasm: boolean; stencil: boolean };
+
 export interface HudControls {
   container: HTMLElement;
   setSelection: (label: string) => void;
@@ -21,6 +24,8 @@ export interface HudControls {
   setGrid: (visible: boolean) => void;
   setCursor: (x: number, y: number) => void;
   setSelectionCount: (n: number) => void;
+  setSaveStatus: (status: SaveStatus) => void;
+  setLoading: (state: LoadingState) => void;
 }
 
 export function buildHud(): HudControls {
@@ -44,6 +49,29 @@ export function buildHud(): HudControls {
   selItem.appendChild(selLabel);
   selItem.appendChild(selValue);
   container.appendChild(selItem);
+
+  // ─── Loading indicator (ephemeral) ─────────────────────────────────────────
+  const loadingItem = document.createElement('div');
+  loadingItem.className = 'hud-item hud-loading';
+  loadingItem.setAttribute('aria-live', 'polite');
+  loadingItem.style.display = 'none';
+
+  const loadingLabel = document.createElement('span');
+  loadingLabel.className = 'hud-label';
+  loadingLabel.textContent = 'Loading:';
+
+  const loadingSpinner = document.createElement('span');
+  loadingSpinner.className = 'hud-spinner';
+  loadingSpinner.setAttribute('aria-hidden', 'true');
+
+  const loadingValue = document.createElement('span');
+  loadingValue.className = 'hud-value';
+  loadingValue.setAttribute('data-testid', 'hud-loading');
+
+  loadingItem.appendChild(loadingLabel);
+  loadingItem.appendChild(loadingSpinner);
+  loadingItem.appendChild(loadingValue);
+  container.appendChild(loadingItem);
 
   // ─── Snap indicator ────────────────────────────────────────────────────────
   const snapItem = document.createElement('div');
@@ -190,6 +218,23 @@ export function buildHud(): HudControls {
   modeItem.appendChild(modeValue);
   container.appendChild(modeItem);
 
+  // ─── Save-status indicator (persistent, right side) ─────────────────────────
+  const saveStatusItem = document.createElement('div');
+  saveStatusItem.className = 'hud-item hud-save-status';
+
+  const saveStatusLabel = document.createElement('span');
+  saveStatusLabel.className = 'hud-label';
+  saveStatusLabel.textContent = 'Save:';
+
+  const saveStatusValue = document.createElement('span');
+  saveStatusValue.className = 'hud-value';
+  saveStatusValue.setAttribute('data-testid', 'hud-save-status');
+  saveStatusValue.textContent = 'Saved';
+
+  saveStatusItem.appendChild(saveStatusLabel);
+  saveStatusItem.appendChild(saveStatusValue);
+  container.appendChild(saveStatusItem);
+
   let zoomClickHandler: (() => void) | null = null;
 
   zoomBtn.addEventListener('click', () => {
@@ -225,6 +270,34 @@ export function buildHud(): HudControls {
     },
     setSelectionCount: (n: number) => {
       countValue.textContent = String(n);
+    },
+    setSaveStatus: (status: SaveStatus) => {
+      saveStatusItem.dataset['status'] = status;
+      switch (status) {
+        case 'saved':
+          saveStatusValue.textContent = 'Saved';
+          break;
+        case 'unsaved':
+          saveStatusValue.textContent = 'Unsaved changes';
+          break;
+        case 'saving':
+          saveStatusValue.textContent = 'Saving...';
+          break;
+        case 'auto-saved':
+          saveStatusValue.textContent = 'Auto-saved';
+          break;
+      }
+    },
+    setLoading: (state: LoadingState) => {
+      const isLoading = state.wasm || state.stencil;
+      loadingItem.style.display = isLoading ? '' : 'none';
+      if (state.wasm) {
+        loadingValue.textContent = 'Engine...';
+      } else if (state.stencil) {
+        loadingValue.textContent = 'Stencils...';
+      } else {
+        loadingValue.textContent = '';
+      }
     },
   };
 }
