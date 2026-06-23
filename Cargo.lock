@@ -607,6 +607,7 @@ dependencies = [
  "diagram-core",
  "diagram-format-drawio",
  "petgraph",
+ "serde",
  "thiserror 2.0.18",
 ]
 
@@ -674,6 +675,7 @@ dependencies = [
  "diagram-commands",
  "diagram-core",
  "diagram-format-drawio",
+ "diagram-layout",
  "diagram-render-svg",
  "diagram-scene",
  "diagram-stencils",

@@ -8,13 +8,13 @@ use crate::error::{CommandError, CommandResult};
 use crate::history::History;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
-    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, MoveVertexPayload,
-    RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload,
-    RenamePagePayload, RoutingKind,
+    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, MoveGroupPayload,
+    MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
+    RemoveVertexPayload, RenamePagePayload, RoutingKind, SetEdgeWaypointsPayload,
 };
 use diagram_core::{
-    CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, StyleMap, Vertex,
-    VertexId,
+    CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, Point, StyleMap,
+    Vertex, VertexId,
 };
 
 /// Editor façade for executing commands with undo/redo support.
@@ -208,6 +208,13 @@ impl Transaction {
         self
     }
 
+    /// Move a group in the transaction.
+    pub fn move_group(mut self, id: GroupId, geometry: CellGeometry) -> Self {
+        self.commands
+            .push(Command::MoveGroup(MoveGroupPayload::new(id, geometry)));
+        self
+    }
+
     /// Edit a vertex label in the transaction.
     pub fn edit_vertex_label(self, id: VertexId, label: Label) -> Self {
         self.edit_vertex_label_impl(id, Some(label))
@@ -235,6 +242,15 @@ impl Transaction {
     pub fn remove_edge(mut self, id: EdgeId) -> Self {
         self.commands
             .push(Command::RemoveEdge(RemoveEdgePayload::new(id)));
+        self
+    }
+
+    /// Set edge waypoints in the transaction.
+    pub fn set_edge_waypoints(mut self, id: EdgeId, waypoints: Vec<Point>) -> Self {
+        self.commands
+            .push(Command::SetEdgeWaypoints(SetEdgeWaypointsPayload::new(
+                id, waypoints,
+            )));
         self
     }
 

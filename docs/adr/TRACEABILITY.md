@@ -40,6 +40,7 @@ Generated from OpenCode session database (`~/.local/share/opencode/opencode.db`)
 | 0064 | 0063 | Snapshot metadata uses `vars` format |
 | 0065 | 0047 | Amends Zone 2 sidebar placement (supersedes Zone 5) |
 | 0066 | 0041 | First runtime dependency in web-shell toolchain |
+| 0067 | 0045 | Tree layout Moen algorithm; conscious divergence from draw.io strict validation |
 
 ## SDDK Change: version-history-mvp
 
@@ -48,6 +49,15 @@ Generated from OpenCode session database (`~/.local/share/opencode/opencode.db`)
 | PR-1 | `feat/version-history-snapshot-foundation` | Rust IdMap synthesis, export fallback | 0064, 0065, 0066 |
 | PR-2 | `feat/version-history-idb-layer` | idb dep, VersionStore class, manual save wiring | 0066 |
 | PR-3 | `feat/version-history-ui-integration` | Zone 2 HistoryPanel, auto-save debounce, E2E tests | 0064, 0065, 0066 |
+
+## SDDK Change: tree-layout-moen
+
+| Slice | Branch | Scope | ADRs |
+|-------|--------|-------|------|
+| Slice 1 | `feat/tree-layout-algorithm` | diagram-layout: TreeLayout, validate_tree, Moen algorithm, LayoutKind | 0067 |
+| Slice 2 | `feat/commands-move-group-waypoints` | diagram-commands: MoveGroupPayload, SetEdgeWaypointsPayload | 0067 |
+| Slice 3 | `feat/wasm-apply-layout` | diagram-wasm: apply_layout export, dispatch to TreeLayout | 0067 |
+| Slice 4 | `feat/tree-layout-moen` | ADR-0067, golden fixtures, ROADMAP refresh | 0067 |
 
 ## Note on ADRs 0008, 0009, 0012
 

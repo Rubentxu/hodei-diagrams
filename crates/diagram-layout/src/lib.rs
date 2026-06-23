@@ -35,6 +35,7 @@ pub mod cycle_removal;
 pub mod error;
 pub mod hierarchy;
 pub mod layer_assignment;
+pub mod tree;
 
 use diagram_core::geometry::CellGeometry;
 use diagram_core::id::PageId;
@@ -48,6 +49,7 @@ use crate::layer_assignment::LayerAssignment;
 
 pub use crate::config::{Direction, LayoutConfig};
 pub use crate::error::{LayoutError, LayoutResult};
+pub use crate::tree::{LayoutKind, TreeLayout, TreeLayoutResult, apply_layout_kind};
 
 /// A stage in the layout pipeline.
 ///

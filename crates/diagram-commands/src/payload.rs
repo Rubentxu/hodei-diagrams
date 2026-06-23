@@ -4,7 +4,7 @@
 //! (initially None or false) that `apply` populates and `undo` consumes.
 
 use diagram_core::{
-    CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, StyleId,
+    CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, Point, StyleId,
     StyleMap, Vertex, VertexId,
 };
 use diagram_routing::{EdgeStyle, RoutingRequest, route};
@@ -1570,6 +1570,124 @@ impl FlipCommand {
                 geo.flip_v = prev_v;
             }
         }
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for moving a group to a new geometry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoveGroupPayload {
+    /// The ID of the group to move.
+    pub id: GroupId,
+    /// The new geometry.
+    pub geometry: CellGeometry,
+    /// The previous geometry. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_geometry: Option<CellGeometry>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl MoveGroupPayload {
+    /// Create a new payload for moving a group.
+    pub fn new(id: GroupId, geometry: CellGeometry) -> Self {
+        Self {
+            id,
+            geometry,
+            prev_geometry: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the move-group operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let group = model
+            .store
+            .group_mut(self.id)
+            .ok_or(CommandError::GroupNotFound(self.id))?;
+
+        // Capture old geometry
+        self.prev_geometry = group.geometry;
+
+        // Apply new geometry
+        group.geometry = Some(self.geometry);
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the move-group operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_geometry.take();
+        let group = model
+            .store
+            .group_mut(self.id)
+            .ok_or(CommandError::GroupNotFound(self.id))?;
+        group.geometry = prev;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// Payload for setting edge waypoints.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetEdgeWaypointsPayload {
+    /// The ID of the edge whose waypoints to set.
+    pub id: EdgeId,
+    /// The new waypoints.
+    pub waypoints: Vec<Point>,
+    /// The previous waypoints. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_waypoints: Option<Vec<Point>>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetEdgeWaypointsPayload {
+    /// Create a new payload for setting edge waypoints.
+    pub fn new(id: EdgeId, waypoints: Vec<Point>) -> Self {
+        Self {
+            id,
+            waypoints,
+            prev_waypoints: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-edge-waypoints operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+
+        // Capture old waypoints
+        self.prev_waypoints = Some(edge.waypoints.clone());
+
+        // Apply new waypoints
+        edge.waypoints = self.waypoints.clone();
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the set-edge-waypoints operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_waypoints.take();
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+        edge.waypoints = prev.unwrap_or_default();
         self.applied = false;
         Ok(())
     }

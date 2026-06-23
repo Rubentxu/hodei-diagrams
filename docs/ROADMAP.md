@@ -119,6 +119,16 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 
 ## ✅ Released — MVP
 
+### Tree Layout with Moen Algorithm (ADR-0067)
+- **PR**: feat/tree-layout-moen (PR #56)
+- **Feature**: Tree layout using Moen (Compact Tree) algorithm ported from `mxCompactTreeLayout.js`. Provides hierarchical tree layouts with jetty routing and group bounding-box resize.
+- **Trigger**: `apply_layout(Tree)` WASM export
+- **ADRs**: 0067 (Tree Layout Moen)
+- **Algorithm**: 7-stage Moen: validate_tree → build_tree_nodes → first_walk → second_walk → apply_coordinates → local_edge_processing → adjust_parents
+- **Validation**: Strict tree validation (typed errors: MultipleRoots, CycleDetected, MultipleParents, NoRoot)
+- **Commands**: `MoveGroupPayload`, `SetEdgeWaypointsPayload` (apply/undo symmetry)
+- **Fixtures**: 10 golden fixtures (chain-3, balanced-7, imbalanced-6, wide-9, deep-20, left-to-right-4, group-with-children + 3 negative validation)
+
 ### HTML Export as Standalone SVG Wrapper
 - **PR**: feat/html-export
 - **Feature**: Standalone HTML export wrapping the engine's SVG output. HTML menu item in File > Export submenu with `downloadHtml()` function creating a self-contained HTML file.
@@ -196,6 +206,7 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 | 0059 | **Stencil Format Spec** 🆕 | Phase 6 |
 | 0060 | **Snap/Guides/Alignment** 🆕 | Phase 7 |
 | 0061 | **Advanced Visual Effects** 🆕 | Phase 8 |
+| 0067 | **Tree Layout Moen** 🆕 | Algorithm |
 
 ## Reglas de Actualización
 

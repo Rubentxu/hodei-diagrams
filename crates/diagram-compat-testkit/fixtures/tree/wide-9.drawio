@@ -1,0 +1,48 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1"/>
+        <!-- Root -->
+        <mxCell id="2" vertex="1">
+          <mxGeometry x="0" y="0" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <!-- 8 children -->
+        <mxCell id="3" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="8" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="9" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" vertex="1">
+          <mxGeometry x="0" y="0" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <!-- Edges -->
+        <mxCell id="11" edge="1" source="2" target="3"/>
+        <mxCell id="12" edge="1" source="2" target="4"/>
+        <mxCell id="13" edge="1" source="2" target="5"/>
+        <mxCell id="14" edge="1" source="2" target="6"/>
+        <mxCell id="15" edge="1" source="2" target="7"/>
+        <mxCell id="16" edge="1" source="2" target="8"/>
+        <mxCell id="17" edge="1" source="2" target="9"/>
+        <mxCell id="18" edge="1" source="2" target="10"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
