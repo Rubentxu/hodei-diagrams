@@ -878,6 +878,12 @@ async function bootstrap(): Promise<void> {
     rasterizeSvgToPng(svg, `diagram-${safeName}-${pageIdx + 1}.png`);
   });
 
+  // ─── 13.5.1. Wire File > Export > PDF ───────────────────────────────────
+  const menuExportPdf = document.querySelector('[data-testid="menu-export-pdf"]');
+  menuExportPdf?.addEventListener('click', () => {
+    window.print();
+  });
+
   // ─── 13.6. Wire File > Properties ────────────────────────────────────────
   // Build the dialog with initial (empty) metadata; fields are populated from
   // the engine each time the dialog opens via showDialogWithMetadata.

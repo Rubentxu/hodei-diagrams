@@ -128,6 +128,13 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 - **Unit tests**: `export-raster.test.ts` (8 tests for `parseSvgDimensions`)
 - **Invariant**: Canvas stays untainted — engine SVG has no external refs
 
+### PDF Export via Browser Print API
+- **PR**: feat/pdf-export
+- **Feature**: Browser-native PDF export via `window.print()` + `@media print` CSS. PDF menu item in File > Export submenu. Print stylesheet hides UI chrome (navbar, sidebar, rail, inspector, hud, bottom-bar), resets canvas transform, sets white background.
+- **Trigger**: File > Export > PDF
+- **Invariant**: Zero Rust/WASM surface; print consumes live `.viewer` DOM only
+- **CSS**: `@media print` block (~45 LOC) in `styles.css:1928-1973`
+
 ### Presentation Mode — Native Fullscreen (ADR-0048)
 - **PR**: feat/presentation-mode-fullscreen (PR-45)
 - **Feature**: Native fullscreen via `requestFullscreen()` API, `fullscreenchange` as single source of truth, `fitToView()` auto-fit on enter, 3s fade exit overlay, graceful fallback when fullscreen denied

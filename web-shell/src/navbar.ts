@@ -89,6 +89,13 @@ export function buildNavbar(): NavbarControls {
   pngExportItem.title = 'Export diagram as PNG';
   exportList.appendChild(pngExportItem);
 
+  const pdfExportItem = document.createElement('button');
+  pdfExportItem.className = 'menu-item';
+  pdfExportItem.textContent = 'PDF';
+  pdfExportItem.setAttribute('data-testid', 'menu-export-pdf');
+  pdfExportItem.title = 'Export diagram as PDF via browser print';
+  exportList.appendChild(pdfExportItem);
+
   exportItem.addEventListener('mouseenter', () => {
     exportList.style.display = 'block';
   });
