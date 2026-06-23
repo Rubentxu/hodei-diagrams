@@ -13,7 +13,8 @@ use crate::payload::{
     RenamePagePayload, RoutingKind,
 };
 use diagram_core::{
-    CellGeometry, Edge, EdgeId, Group, GroupId, Label, Page, PageId, StyleMap, Vertex, VertexId,
+    CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, StyleMap, Vertex,
+    VertexId,
 };
 
 /// Editor façade for executing commands with undo/redo support.
@@ -136,6 +137,18 @@ impl Editor {
         self.model = model;
         self.history = History::default();
         self.id_map = id_map;
+    }
+
+    /// Set the diagram metadata.
+    ///
+    /// Engine-stamps `modified` to the current time; sets `created` if still
+    /// at the default epoch (idempotent — `created` is set only once).
+    ///
+    /// Does NOT participate in undo/redo history.
+    pub fn set_metadata(&mut self, mut metadata: Metadata) {
+        let now = chrono::Utc::now();
+        metadata.touch_modified(now);
+        self.model.set_metadata(metadata);
     }
 
     /// Check if undo is available.

@@ -8,8 +8,9 @@ import type {
   SlotmapId,
   StyleChanges,
   ResolvedStyle,
+  MetadataInfo,
 } from './types.js';
-import { ok, err, slotmapIdToField } from './types.js';
+import { ok, err, slotmapIdToField, EMPTY_METADATA } from './types.js';
 import type { WasmModule } from './types.js';
 
 export class DiagramEngineSession {
@@ -260,6 +261,7 @@ export class DiagramEngineSession {
       | 'ImportFailed'
       | 'InvalidCommand'
       | 'InvalidHandle'
+      | 'MetadataError'
       | 'PageNotFound'
       | 'TooManyEngines'
       | 'Unknown';
@@ -270,6 +272,7 @@ export class DiagramEngineSession {
     if (msg.startsWith('InvalidCommand')) return { kind: 'InvalidCommand', raw: msg };
     if (msg === 'InvalidHandle') return { kind: 'InvalidHandle', raw: msg };
     if (msg.startsWith('InvalidHandle')) return { kind: 'InvalidHandle', raw: msg };
+    if (msg.startsWith('MetadataError')) return { kind: 'MetadataError', raw: msg };
     if (msg.startsWith('PageNotFound')) return { kind: 'PageNotFound', raw: msg };
     if (msg === 'TooManyEngines') return { kind: 'TooManyEngines', raw: msg };
     if (msg.startsWith('TooManyEngines')) return { kind: 'TooManyEngines', raw: msg };
@@ -417,6 +420,50 @@ export class DiagramEngineSession {
       this.wasm.set_stencil_library(this.handle as number, library, xml);
     } catch (e) {
       console.error(`[session] Failed to load stencil library "${library}": ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /**
+   * Get the current diagram metadata from the engine.
+   *
+   * Returns `EMPTY_METADATA` if no metadata has been set.
+   */
+  getMetadata(): Result<MetadataInfo, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const raw = this.wasm.get_metadata(this.handle as number);
+      if (raw === 'null') {
+        return ok(EMPTY_METADATA);
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return err('MetadataError: parse: ' + (e instanceof Error ? e.message : String(e)));
+      }
+      return ok(parsed as MetadataInfo);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Set the diagram metadata in the engine.
+   *
+   * The engine will stamp `modified` to the current time and set `created`
+   * if it is still at the default epoch.
+   */
+  setMetadata(info: MetadataInfo): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      // Serialize with all six fields present (even nulls) to match DTO contract
+      const json = JSON.stringify(info);
+      this.wasm.set_metadata(this.handle as number, json);
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
     }
   }
 }

@@ -31,6 +31,7 @@ mod commands;
 mod engine;
 mod export;
 mod import;
+mod metadata;
 mod render;
 mod scene;
 mod stencil;
@@ -43,6 +44,7 @@ pub use commands::{
 pub use engine::{create_engine, dispose_engine};
 pub use export::export_drawio;
 pub use import::import_drawio;
+pub use metadata::{get_metadata, set_metadata};
 pub use render::{render_pages, render_svg};
 pub use scene::get_scene;
 pub use stencil::{PathCommandDto, parse_stencil_library_xml, parse_stencil_xml};

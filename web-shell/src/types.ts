@@ -34,6 +34,8 @@ export type WasmModule = {
   parse_stencil_library_xml(_xml: string): string;
   set_stencil_library(_h: number, _library: string, _xml: string): void;
   get_resolved_style(_h: number, _vertexId: number): string;
+  get_metadata(_h: number): string;
+  set_metadata(_h: number, _json: string): void;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
@@ -212,3 +214,30 @@ export interface ResolvedStyle {
   /** Unknown keys preserved from the original StyleMap. */
   remaining: Record<string, string>;
 }
+
+// ─── Metadata Types ─────────────────────────────────────────────────────────────
+
+/**
+ * Diagram metadata persisted to the engine via WASM.
+ * Mirrors `MetadataDto` on the Rust side.
+ */
+export interface MetadataInfo {
+  title: string | null;
+  author: string | null;
+  description: string | null;
+  tags: string[];
+  /** ISO-8601 / RFC-3339 timestamp string, or null for default epoch. */
+  created: string | null;
+  /** ISO-8601 / RFC-3339 timestamp string, or null for default epoch. */
+  modified: string | null;
+}
+
+/** Empty metadata sentinel returned when the engine has no metadata set. */
+export const EMPTY_METADATA: MetadataInfo = {
+  title: null,
+  author: null,
+  description: null,
+  tags: [],
+  created: null,
+  modified: null,
+};

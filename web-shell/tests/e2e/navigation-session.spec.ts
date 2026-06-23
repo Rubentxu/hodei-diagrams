@@ -161,9 +161,9 @@ test.describe('Suite I: navigation-session', () => {
   });
 
   /**
-   * Test 6: Properties dialog persists localStorage values across reload
+   * Test 6: Properties dialog persists engine metadata across reload
    */
-  test('Properties dialog persists localStorage values across reload', async ({ page }) => {
+  test('Properties dialog persists engine metadata across reload', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -193,7 +193,7 @@ test.describe('Suite I: navigation-session', () => {
     await page.locator('[data-testid="menu-properties"]').click();
     await expect(page.locator('[data-testid="properties-dialog"]')).toBeVisible();
 
-    // Values should be persisted
+    // Values should be persisted via engine, not localStorage
     await expect(page.locator('#prop-title')).toHaveValue('My Test Diagram');
     await expect(page.locator('#prop-author')).toHaveValue('Test Author');
     await expect(page.locator('#prop-description')).toHaveValue('Test description content');

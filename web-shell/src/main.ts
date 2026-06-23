@@ -16,12 +16,11 @@ import {
   wireDismiss,
   buildPropertiesDialog,
   showDialog,
-  saveProperties,
-  type DiagramProperties,
 } from './ui.js';
 import { buildInspector } from './inspector.js';
 import { Editor } from './editor.js';
 import type { PageToken, PageRender, SlotmapId, ScenePage } from './types.js';
+import { EMPTY_METADATA } from './types.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
@@ -629,14 +628,38 @@ async function bootstrap(): Promise<void> {
   });
 
   // ─── 13.6. Wire File > Properties ────────────────────────────────────────
-  const propsDialog = buildPropertiesDialog((props: DiagramProperties) => {
-    saveProperties(props);
+  // Build the dialog with initial (empty) metadata; fields are populated from
+  // the engine each time the dialog opens via showDialogWithMetadata.
+  const propsDialog = buildPropertiesDialog(EMPTY_METADATA, (info) => {
+    if (activeSession) {
+      const r = activeSession.setMetadata(info);
+      if (!r.ok) showError(ui.errorBanner, ui.errorMessage, r.error);
+      else activeEditor?.refreshScene();
+    }
   });
 
-  const menuProps = document.querySelector('[data-testid="menu-properties"]');
-  menuProps?.addEventListener('click', () => {
+  /**
+   * Update the properties dialog fields with fresh metadata from the engine
+   * and then show the dialog.
+   */
+  function showPropsDialog(): void {
+    if (activeSession) {
+      const meta = activeSession.getMetadata();
+      if (meta.ok && meta.value) {
+        // Update the input fields with current engine metadata
+        const titleInput = propsDialog.querySelector('#prop-title') as HTMLInputElement;
+        const authorInput = propsDialog.querySelector('#prop-author') as HTMLInputElement;
+        const descInput = propsDialog.querySelector('#prop-description') as HTMLTextAreaElement;
+        if (titleInput) titleInput.value = meta.value.title ?? '';
+        if (authorInput) authorInput.value = meta.value.author ?? '';
+        if (descInput) descInput.value = meta.value.description ?? '';
+      }
+    }
     showDialog(propsDialog);
-  });
+  }
+
+  const menuProps = document.querySelector('[data-testid="menu-properties"]');
+  menuProps?.addEventListener('click', showPropsDialog);
 
   // ─── 14. Listen for zoom changes from wheel events ────────────────────────
   ui.canvasContainer.addEventListener('zoomchange', ((e: CustomEvent) => {
