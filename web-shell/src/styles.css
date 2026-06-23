@@ -1636,6 +1636,38 @@ body.presentation-mode .page-tab.active {
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* Exit hint overlay — subtle bottom-center hint */
+#exit-hint-overlay {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: rgba(255, 255, 255, 0.85);
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  user-select: none;
+}
+
+#exit-hint-overlay[aria-hidden="true"] {
+  opacity: 0;
+}
+
+/* :fullscreen background fix — ensure body bg is explicit in FS mode */
+:fullscreen body {
+  background: #0a0f1a;
+}
+
+:fullscreen body #app {
+  background: #0a0f1a;
+}
+
 /* ─── Slice C: Properties Dialog ───────────────────────────────────────────── */
 .dialog-overlay {
   position: fixed;

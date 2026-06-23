@@ -29,6 +29,7 @@ let activeSession: DiagramEngineSession | null = null;
 let activePages: PageRender[] = [];
 let activeEditor: Editor | null = null;
 let activeEditorIdx = 0;
+let zoomPan: ReturnType<typeof setupZoomPan> | null = null;
 
 // ─── Version history state ─────────────────────────────────────────────────────
 const versionStore = new VersionStore();
@@ -61,18 +62,72 @@ function setGridVisible(visible: boolean): void {
 
 // ─── Presentation mode state ──────────────────────────────────────────────────
 let isPresentationMode = false;
+let exitHintTimer: ReturnType<typeof setTimeout> | null = null;
 
 function togglePresentationMode(): void {
-  isPresentationMode = !isPresentationMode;
-  document.body.classList.toggle('presentation-mode', isPresentationMode);
+  const el = document.getElementById('app');
+  if (!el) return;
+  if (!document.fullscreenElement) {
+    el.requestFullscreen?.().catch(() => { /* graceful fallback */ });
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
 }
 
 function exitPresentationMode(): void {
-  if (isPresentationMode) {
-    isPresentationMode = false;
-    document.body.classList.remove('presentation-mode');
+  // Belt-and-suspenders: directly update state in case fullscreenchange doesn't fire
+  isPresentationMode = false;
+  document.body.classList.remove('presentation-mode');
+  hideExitHint();
+  document.exitFullscreen?.().catch(() => {});
+}
+
+// fullscreenchange — single source of truth for presentation mode state
+function onFullscreenChange(): void {
+  const active = document.fullscreenElement !== null;
+  isPresentationMode = active;
+  document.body.classList.toggle('presentation-mode', active);
+  if (active) {
+    zoomPan?.fitToView();
+    showExitHint();
+  } else {
+    hideExitHint();
   }
 }
+
+function showExitHint(): void {
+  let overlay = document.getElementById('exit-hint-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'exit-hint-overlay';
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.textContent = 'Press Esc to exit';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.opacity = '1';
+  overlay.removeAttribute('aria-hidden');
+
+  // Auto-fade after 3s
+  if (exitHintTimer !== null) clearTimeout(exitHintTimer);
+  exitHintTimer = setTimeout(() => {
+    overlay!.style.opacity = '0';
+    overlay!.setAttribute('aria-hidden', 'true');
+  }, 3000);
+}
+
+function hideExitHint(): void {
+  const overlay = document.getElementById('exit-hint-overlay');
+  if (overlay) {
+    overlay.style.opacity = '0';
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  if (exitHintTimer !== null) {
+    clearTimeout(exitHintTimer);
+    exitHintTimer = null;
+  }
+}
+
+document.addEventListener('fullscreenchange', onFullscreenChange);
 
 function updateUndoRedoButtons(
   undoBtn: HTMLButtonElement | undefined,
@@ -267,9 +322,8 @@ async function bootstrap(): Promise<void> {
   // We create a minimal container just for zoom/pan, then rebuild properly in buildEmptyUi
   const zoomPanPlaceholder = document.createElement('div');
   const viewerPlaceholder = document.createElement('div');
-  // Store zoomPan in a mutable binding so rail callbacks can access it
-  // eslint-disable-next-line prefer-const
-  let zoomPan = setupZoomPan(zoomPanPlaceholder, viewerPlaceholder);
+  // Initial zoom/pan setup — recreated with real DOM after buildEmptyUi
+  zoomPan = setupZoomPan(zoomPanPlaceholder, viewerPlaceholder);
 
   // ─── 5. Build 5-zone UI with inspector ────────────────────────────────────
   const ui = buildEmptyUi(root, inspector.container, {
@@ -293,10 +347,10 @@ async function bootstrap(): Promise<void> {
       activeEditor?.enterLabelPlacement();
     },
     onZoomFit: () => {
-      zoomPan.fitToView();
-      ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
-      ui.hud.setZoom(zoomPan.getZoom() * 100);
-      ui.canvasContainer.style.setProperty('--zoom', String(zoomPan.getZoom()));
+      zoomPan?.fitToView();
+      ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
+      ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+      ui.canvasContainer.style.setProperty('--zoom', String(zoomPan?.getZoom() ?? 1));
     },
     onHelp: () => {
       // Toggle keyboard shortcuts overlay
@@ -366,7 +420,8 @@ async function bootstrap(): Promise<void> {
       e.preventDefault();
       togglePresentationMode();
     }
-    // Escape to exit presentation mode
+    // Escape to exit presentation mode (belt-and-suspenders for headless Chromium
+    // where fullscreenchange may not fire reliably on Escape)
     if (e.key === 'Escape' && isPresentationMode) {
       exitPresentationMode();
     }
@@ -474,9 +529,9 @@ async function bootstrap(): Promise<void> {
       ui.hud.setSelectionCount(ids.length);
     }
     // Update zoom display
-    ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
     // Update HUD zoom
-    ui.hud.setZoom(zoomPan.getZoom() * 100);
+    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
   };
 
   // Tool change → UI update (remove active-tool class)
@@ -522,7 +577,7 @@ async function bootstrap(): Promise<void> {
         onStateChange,
         onSelectionChange,
         onToolChange,
-        () => zoomPan.getZoom(),
+        () => zoomPan?.getZoom() ?? 1,
       );
       activeEditor.attach();
 
@@ -623,7 +678,7 @@ async function bootstrap(): Promise<void> {
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
 
     // Reset zoom on import
-    zoomPan.resetView();
+    zoomPan?.resetView();
     ui.zoomDisplay.textContent = '100%';
     ui.hud.setZoom(100);
     ui.canvasContainer.style.setProperty('--zoom', '1');
@@ -648,7 +703,7 @@ async function bootstrap(): Promise<void> {
         // Update HUD page info
         ui.hud.setPage(idx + 1, activePages.length);
         // Reset zoom on page switch
-        zoomPan.resetView();
+        zoomPan?.resetView();
         ui.zoomDisplay.textContent = '100%';
         ui.hud.setZoom(100);
         ui.canvasContainer.style.setProperty('--zoom', '1');
@@ -769,21 +824,21 @@ async function bootstrap(): Promise<void> {
   // View > Zoom In
   const menuZoomIn = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(1)');
   menuZoomIn?.addEventListener('click', () => {
-    zoomPan.setZoom(zoomPan.getZoom() + 0.2);
-    ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
+    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
   });
 
   // View > Zoom Out
   const menuZoomOut = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(2)');
   menuZoomOut?.addEventListener('click', () => {
-    zoomPan.setZoom(zoomPan.getZoom() - 0.2);
-    ui.zoomDisplay.textContent = `${Math.round(zoomPan.getZoom() * 100)}%`;
+    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
+    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
   });
 
   // View > Zoom Reset
   const menuZoomReset = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(3)');
   menuZoomReset?.addEventListener('click', () => {
-    zoomPan.resetView();
+    zoomPan?.resetView();
     ui.zoomDisplay.textContent = '100%';
   });
 
@@ -852,7 +907,7 @@ async function bootstrap(): Promise<void> {
 
   // ─── 14.5. Wire HUD zoom reset button ─────────────────────────────────────
   ui.hud.onZoomClick(() => {
-    zoomPan.resetView();
+    zoomPan?.resetView();
     ui.zoomDisplay.textContent = '100%';
     ui.hud.setZoom(100);
     ui.canvasContainer.style.setProperty('--zoom', '1');
