@@ -10,9 +10,9 @@ use crate::error::CommandResult;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, BringForwardPayload,
     BringToFrontPayload, ChangeStylePayload, ConnectVerticesCommand, DisconnectEdgeCommand,
-    EditLabelPayload, FlipCommand, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload,
-    RemovePagePayload, RemoveVertexPayload, RenamePagePayload, RotateCommand, SendBackwardPayload,
-    SendToBackPayload,
+    EditLabelPayload, FlipCommand, MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload,
+    RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload, RenamePagePayload, RotateCommand,
+    SendBackwardPayload, SendToBackPayload, SetEdgeWaypointsPayload,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -28,6 +28,8 @@ pub enum Command {
     RemoveVertex(RemoveVertexPayload),
     /// Move a vertex to a new position.
     MoveVertex(MoveVertexPayload),
+    /// Move a group to a new geometry.
+    MoveGroup(MoveGroupPayload),
     /// Edit a vertex's label.
     EditVertexLabel(EditLabelPayload),
     /// Add an edge between two vertices.
@@ -38,6 +40,8 @@ pub enum Command {
     ConnectVertices(ConnectVerticesCommand),
     /// Disconnect an edge (remove it).
     DisconnectEdge(DisconnectEdgeCommand),
+    /// Set edge waypoints (used by tree layout).
+    SetEdgeWaypoints(SetEdgeWaypointsPayload),
     /// Change a vertex's style.
     ChangeStyle(ChangeStylePayload),
     /// Add a group to the diagram.
@@ -73,11 +77,13 @@ impl Command {
             Command::AddVertex(p) => p.apply(model),
             Command::RemoveVertex(p) => p.apply(model),
             Command::MoveVertex(p) => p.apply(model),
+            Command::MoveGroup(p) => p.apply(model),
             Command::EditVertexLabel(p) => p.apply(model),
             Command::AddEdge(p) => p.apply(model),
             Command::RemoveEdge(p) => p.apply(model),
             Command::ConnectVertices(p) => p.apply(model),
             Command::DisconnectEdge(p) => p.apply(model),
+            Command::SetEdgeWaypoints(p) => p.apply(model),
             Command::ChangeStyle(p) => p.apply(model),
             Command::AddGroup(p) => p.apply(model),
             Command::RemoveGroup(p) => p.apply(model),
@@ -101,11 +107,13 @@ impl Command {
             Command::AddVertex(p) => p.undo(model),
             Command::RemoveVertex(p) => p.undo(model),
             Command::MoveVertex(p) => p.undo(model),
+            Command::MoveGroup(p) => p.undo(model),
             Command::EditVertexLabel(p) => p.undo(model),
             Command::AddEdge(p) => p.undo(model),
             Command::RemoveEdge(p) => p.undo(model),
             Command::ConnectVertices(p) => p.undo(model),
             Command::DisconnectEdge(p) => p.undo(model),
+            Command::SetEdgeWaypoints(p) => p.undo(model),
             Command::ChangeStyle(p) => p.undo(model),
             Command::AddGroup(p) => p.undo(model),
             Command::RemoveGroup(p) => p.undo(model),
@@ -359,6 +367,265 @@ mod tests {
         // After undo, geometry should be restored to original
         let after_undo = model.store.vertex(vid).unwrap().geometry;
         assert_eq!(original_geom, after_undo);
+    }
+
+    // ─── MoveGroup ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_move_group_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let gid = insert_group(&mut model, pid, "Group");
+
+        let new_geom = CellGeometry {
+            x: 100.0,
+            y: 200.0,
+            width: 150.0,
+            height: 80.0,
+            relative: false,
+            ..Default::default()
+        };
+
+        let mut cmd = Command::MoveGroup(MoveGroupPayload::new(gid, new_geom));
+        cmd.apply(&mut model).unwrap();
+
+        let g = model.store.group(gid).unwrap();
+        assert_eq!(g.geometry.as_ref().unwrap().x, 100.0);
+        assert_eq!(g.geometry.as_ref().unwrap().y, 200.0);
+        assert_eq!(g.geometry.as_ref().unwrap().width, 150.0);
+        assert_eq!(g.geometry.as_ref().unwrap().height, 80.0);
+    }
+
+    #[test]
+    fn undo_move_group_restores_original_geometry() {
+        let (mut model, pid) = make_model_with_page();
+        let gid = insert_group(&mut model, pid, "Group");
+
+        // Set initial geometry
+        {
+            let g = model.store.group_mut(gid).unwrap();
+            g.geometry = Some(CellGeometry {
+                x: 10.0,
+                y: 20.0,
+                width: 100.0,
+                height: 50.0,
+                relative: false,
+                ..Default::default()
+            });
+        }
+
+        // Capture original geometry BEFORE apply
+        let original_geom = model.store.group(gid).unwrap().geometry;
+
+        let new_geom = CellGeometry {
+            x: 100.0,
+            y: 200.0,
+            width: 150.0,
+            height: 80.0,
+            relative: false,
+            ..Default::default()
+        };
+
+        let mut cmd = Command::MoveGroup(MoveGroupPayload::new(gid, new_geom));
+        cmd.apply(&mut model).unwrap();
+
+        // Verify geometry changed
+        let after_apply = model.store.group(gid).unwrap().geometry;
+        assert_ne!(original_geom, after_apply);
+
+        cmd.undo(&mut model).unwrap();
+
+        // After undo, geometry should be restored to original
+        let after_undo = model.store.group(gid).unwrap().geometry;
+        assert_eq!(original_geom, after_undo);
+    }
+
+    #[test]
+    fn apply_move_group_none_geometry_to_some() {
+        let (mut model, pid) = make_model_with_page();
+        let gid = insert_group(&mut model, pid, "Group");
+        // Group starts with no geometry
+
+        let new_geom = CellGeometry {
+            x: 100.0,
+            y: 200.0,
+            width: 150.0,
+            height: 80.0,
+            relative: false,
+            ..Default::default()
+        };
+
+        let mut cmd = Command::MoveGroup(MoveGroupPayload::new(gid, new_geom));
+        cmd.apply(&mut model).unwrap();
+
+        let g = model.store.group(gid).unwrap();
+        assert!(g.geometry.is_some());
+        assert_eq!(g.geometry.as_ref().unwrap().x, 100.0);
+    }
+
+    #[test]
+    fn undo_move_group_restores_none_geometry() {
+        let (mut model, pid) = make_model_with_page();
+        let gid = insert_group(&mut model, pid, "Group");
+        // Group starts with no geometry
+
+        let new_geom = CellGeometry {
+            x: 100.0,
+            y: 200.0,
+            width: 150.0,
+            height: 80.0,
+            relative: false,
+            ..Default::default()
+        };
+
+        let mut cmd = Command::MoveGroup(MoveGroupPayload::new(gid, new_geom));
+        cmd.apply(&mut model).unwrap();
+
+        // Verify geometry is now Some
+        assert!(model.store.group(gid).unwrap().geometry.is_some());
+
+        cmd.undo(&mut model).unwrap();
+
+        // After undo, geometry should be None again
+        let after_undo = model.store.group(gid).unwrap().geometry;
+        assert!(after_undo.is_none());
+    }
+
+    #[test]
+    fn apply_move_group_not_found_error() {
+        let (mut model, _pid) = make_model_with_page();
+        let bogus = diagram_core::GroupId::default();
+
+        let new_geom = CellGeometry {
+            x: 100.0,
+            y: 200.0,
+            width: 150.0,
+            height: 80.0,
+            relative: false,
+            ..Default::default()
+        };
+
+        let mut cmd = Command::MoveGroup(MoveGroupPayload::new(bogus, new_geom));
+        let err = cmd.apply(&mut model).unwrap_err();
+        assert!(matches!(err, crate::error::CommandError::GroupNotFound(_)));
+    }
+
+    // ─── SetEdgeWaypoints ────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_set_edge_waypoints_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            waypoints: Vec::new(),
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+
+        let new_waypoints = vec![
+            diagram_core::geometry::Point { x: 0.0, y: 0.0 },
+            diagram_core::geometry::Point { x: 50.0, y: 25.0 },
+            diagram_core::geometry::Point { x: 100.0, y: 50.0 },
+        ];
+
+        let mut cmd =
+            Command::SetEdgeWaypoints(SetEdgeWaypointsPayload::new(eid, new_waypoints.clone()));
+        cmd.apply(&mut model).unwrap();
+
+        let e = model.store.edge(eid).unwrap();
+        assert_eq!(e.waypoints.len(), 3);
+        assert_eq!(e.waypoints[0].x, 0.0);
+        assert_eq!(e.waypoints[1].x, 50.0);
+        assert_eq!(e.waypoints[2].x, 100.0);
+    }
+
+    #[test]
+    fn undo_set_edge_waypoints_restores_original() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let original_waypoints = vec![
+            diagram_core::geometry::Point { x: 10.0, y: 20.0 },
+            diagram_core::geometry::Point { x: 30.0, y: 40.0 },
+        ];
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            waypoints: original_waypoints.clone(),
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+
+        let new_waypoints = vec![
+            diagram_core::geometry::Point { x: 0.0, y: 0.0 },
+            diagram_core::geometry::Point { x: 50.0, y: 25.0 },
+        ];
+
+        let mut cmd = Command::SetEdgeWaypoints(SetEdgeWaypointsPayload::new(eid, new_waypoints));
+        cmd.apply(&mut model).unwrap();
+
+        // Verify waypoints changed
+        let after_apply = model.store.edge(eid).unwrap().waypoints.clone();
+        assert_ne!(original_waypoints, after_apply);
+
+        cmd.undo(&mut model).unwrap();
+
+        // After undo, waypoints should be restored to original
+        let after_undo = model.store.edge(eid).unwrap().waypoints.clone();
+        assert_eq!(original_waypoints, after_undo);
+    }
+
+    #[test]
+    fn undo_set_edge_waypoints_restores_empty() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        // Edge starts with empty waypoints
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            waypoints: Vec::new(),
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+
+        let new_waypoints = vec![
+            diagram_core::geometry::Point { x: 0.0, y: 0.0 },
+            diagram_core::geometry::Point { x: 50.0, y: 25.0 },
+        ];
+
+        let mut cmd = Command::SetEdgeWaypoints(SetEdgeWaypointsPayload::new(eid, new_waypoints));
+        cmd.apply(&mut model).unwrap();
+
+        // Verify waypoints changed
+        assert!(!model.store.edge(eid).unwrap().waypoints.is_empty());
+
+        cmd.undo(&mut model).unwrap();
+
+        // After undo, waypoints should be empty again
+        let after_undo = model.store.edge(eid).unwrap().waypoints.clone();
+        assert!(after_undo.is_empty());
+    }
+
+    #[test]
+    fn apply_set_edge_waypoints_not_found_error() {
+        let (mut model, _pid) = make_model_with_page();
+        let bogus = diagram_core::EdgeId::default();
+
+        let new_waypoints = vec![diagram_core::geometry::Point { x: 0.0, y: 0.0 }];
+
+        let mut cmd = Command::SetEdgeWaypoints(SetEdgeWaypointsPayload::new(bogus, new_waypoints));
+        let err = cmd.apply(&mut model).unwrap_err();
+        assert!(matches!(err, crate::error::CommandError::EdgeNotFound(_)));
     }
 
     // ─── EditVertexLabel ───────────────────────────────────────────────────────

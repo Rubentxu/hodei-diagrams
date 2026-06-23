@@ -6,7 +6,7 @@
 //! - 3.6: Advisory ceiling warning
 
 use diagram_commands::{Command, Editor, Transaction};
-use diagram_core::geometry::CellGeometry;
+use diagram_core::geometry::{CellGeometry, Point};
 use diagram_core::label::Label;
 use diagram_core::{DiagramModel, Edge, Group, Page, PageId, Vertex, VertexId};
 
@@ -374,6 +374,187 @@ fn transaction_partial_rollback_then_successful_commit() {
 
     assert_eq!(editor.model().store.len_vertex(), 1);
     assert!(editor.can_undo());
+}
+
+#[test]
+fn transaction_move_group_commits_both_undo_reverts_both() {
+    let (model, pid) = make_model_with_page();
+    let mut editor = Editor::new(model);
+
+    let g1 = Group {
+        label: Some(Label::new("G1")),
+        page_id: Some(pid),
+        geometry: Some(CellGeometry {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 50.0,
+            relative: false,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let g2 = Group {
+        label: Some(Label::new("G2")),
+        page_id: Some(pid),
+        geometry: Some(CellGeometry {
+            x: 200.0,
+            y: 0.0,
+            width: 100.0,
+            height: 50.0,
+            relative: false,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    // Add groups first
+    Transaction::new()
+        .add_group(g1)
+        .add_group(g2)
+        .commit(&mut editor)
+        .unwrap();
+
+    let gid1 = editor.model().store.groups_with_ids().next().unwrap().0;
+    let gid2 = editor.model().store.groups_with_ids().nth(1).unwrap().0;
+
+    // Move both groups in a single transaction
+    let new_geom1 = CellGeometry {
+        x: 50.0,
+        y: 100.0,
+        width: 100.0,
+        height: 50.0,
+        relative: false,
+        ..Default::default()
+    };
+    let new_geom2 = CellGeometry {
+        x: 250.0,
+        y: 100.0,
+        width: 100.0,
+        height: 50.0,
+        relative: false,
+        ..Default::default()
+    };
+
+    Transaction::new()
+        .move_group(gid1, new_geom1)
+        .move_group(gid2, new_geom2)
+        .commit(&mut editor)
+        .unwrap();
+
+    // Both groups should have moved
+    assert_eq!(
+        editor
+            .model()
+            .store
+            .group(gid1)
+            .unwrap()
+            .geometry
+            .as_ref()
+            .unwrap()
+            .x,
+        50.0
+    );
+    assert_eq!(
+        editor
+            .model()
+            .store
+            .group(gid2)
+            .unwrap()
+            .geometry
+            .as_ref()
+            .unwrap()
+            .x,
+        250.0
+    );
+
+    // One undo reverts both
+    editor.undo().unwrap();
+    assert_eq!(
+        editor
+            .model()
+            .store
+            .group(gid1)
+            .unwrap()
+            .geometry
+            .as_ref()
+            .unwrap()
+            .x,
+        0.0
+    );
+    assert_eq!(
+        editor
+            .model()
+            .store
+            .group(gid2)
+            .unwrap()
+            .geometry
+            .as_ref()
+            .unwrap()
+            .x,
+        200.0
+    );
+}
+
+#[test]
+fn transaction_set_edge_waypoints_commit_and_undo() {
+    let (model, pid) = make_model_with_page();
+    let mut editor = Editor::new(model);
+
+    let v1 = Vertex {
+        label: Some(Label::new("V1")),
+        page_id: Some(pid),
+        ..Default::default()
+    };
+    let v2 = Vertex {
+        label: Some(Label::new("V2")),
+        page_id: Some(pid),
+        ..Default::default()
+    };
+
+    // Add vertices and edge
+    Transaction::new()
+        .add_vertex(v1)
+        .add_vertex(v2)
+        .commit(&mut editor)
+        .unwrap();
+
+    let vid1 = editor.model().store.vertices_with_ids().next().unwrap().0;
+    let vid2 = editor.model().store.vertices_with_ids().nth(1).unwrap().0;
+
+    let edge = Edge {
+        source: vid1,
+        target: vid2,
+        page_id: Some(pid),
+        waypoints: Vec::new(),
+        ..Default::default()
+    };
+
+    Transaction::new()
+        .add_edge(edge)
+        .commit(&mut editor)
+        .unwrap();
+
+    let eid = editor.model().store.edges_with_ids().next().unwrap().0;
+
+    // Set waypoints in a transaction
+    let waypoints = vec![
+        Point { x: 0.0, y: 0.0 },
+        Point { x: 50.0, y: 25.0 },
+        Point { x: 100.0, y: 50.0 },
+    ];
+
+    Transaction::new()
+        .set_edge_waypoints(eid, waypoints)
+        .commit(&mut editor)
+        .unwrap();
+
+    // Waypoints should be set
+    assert_eq!(editor.model().store.edge(eid).unwrap().waypoints.len(), 3);
+
+    // Undo should restore original (empty)
+    editor.undo().unwrap();
+    assert!(editor.model().store.edge(eid).unwrap().waypoints.is_empty());
 }
 
 // ─── Advisory Ceiling Test ────────────────────────────────────────────────────
