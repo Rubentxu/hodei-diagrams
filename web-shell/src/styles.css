@@ -1917,6 +1917,35 @@ body.presentation-mode .page-tab.active {
   color: var(--text-dim);
 }
 
+/* Disabled state for native HTML disabled attribute */
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu-item:disabled:hover {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+/* Separator within menu lists */
+.menu-items hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+/* Items with submenus — position relative so absoulte submenu anchors correctly */
+.menu-item[data-has-submenu='true'] {
+  position: relative;
+}
+
+.menu-item[data-has-submenu='true']::after {
+  content: '▸';
+  margin-left: 16px;
+  opacity: 0.6;
+}
+
 .menu-item-tooltip {
   position: relative;
 }

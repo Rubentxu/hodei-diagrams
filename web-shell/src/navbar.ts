@@ -199,6 +199,287 @@ export function buildNavbar(): NavbarControls {
   viewMenu.appendChild(viewList);
   menuBar.appendChild(viewMenu);
 
+  // ─── Arrange menu ──────────────────────────────────────────────────────────
+  const arrangeMenu = document.createElement('details');
+  arrangeMenu.className = 'menu-dropdown';
+  arrangeMenu.setAttribute('data-testid', 'menu-arrange');
+  const arrangeSummary = document.createElement('summary');
+  arrangeSummary.textContent = 'Arrange';
+  arrangeMenu.appendChild(arrangeSummary);
+  const arrangeList = document.createElement('div');
+  arrangeList.className = 'menu-items';
+
+  // Z-order items
+  const toFrontItem = document.createElement('button');
+  toFrontItem.className = 'menu-item';
+  toFrontItem.textContent = 'To Front';
+  toFrontItem.setAttribute('data-testid', 'menu-bring-front');
+  arrangeList.appendChild(toFrontItem);
+
+  const toBackItem = document.createElement('button');
+  toBackItem.className = 'menu-item';
+  toBackItem.textContent = 'To Back';
+  toBackItem.setAttribute('data-testid', 'menu-send-back');
+  arrangeList.appendChild(toBackItem);
+
+  const forwardItem = document.createElement('button');
+  forwardItem.className = 'menu-item';
+  forwardItem.textContent = 'Forward';
+  forwardItem.setAttribute('data-testid', 'menu-bring-forward');
+  arrangeList.appendChild(forwardItem);
+
+  const backwardItem = document.createElement('button');
+  backwardItem.className = 'menu-item';
+  backwardItem.textContent = 'Backward';
+  backwardItem.setAttribute('data-testid', 'menu-send-backward');
+  arrangeList.appendChild(backwardItem);
+
+  // Align submenu
+  const alignItem = document.createElement('button');
+  alignItem.className = 'menu-item';
+  alignItem.setAttribute('data-testid', 'menu-arrange-align');
+  alignItem.textContent = 'Align';
+  arrangeList.appendChild(alignItem);
+
+  const alignList = document.createElement('div');
+  alignList.className = 'menu-items';
+  alignList.style.position = 'absolute';
+  alignList.style.left = '100%';
+  alignList.style.top = '0';
+
+  const alignLeftItem = document.createElement('button');
+  alignLeftItem.className = 'menu-item';
+  alignLeftItem.textContent = 'Left';
+  alignLeftItem.setAttribute('data-testid', 'menu-align-left');
+  alignList.appendChild(alignLeftItem);
+
+  const alignCenterHItem = document.createElement('button');
+  alignCenterHItem.className = 'menu-item';
+  alignCenterHItem.textContent = 'Center';
+  alignCenterHItem.setAttribute('data-testid', 'menu-align-center');
+  alignList.appendChild(alignCenterHItem);
+
+  const alignRightItem = document.createElement('button');
+  alignRightItem.className = 'menu-item';
+  alignRightItem.textContent = 'Right';
+  alignRightItem.setAttribute('data-testid', 'menu-align-right');
+  alignList.appendChild(alignRightItem);
+
+  const alignTopItem = document.createElement('button');
+  alignTopItem.className = 'menu-item';
+  alignTopItem.textContent = 'Top';
+  alignTopItem.setAttribute('data-testid', 'menu-align-top');
+  alignList.appendChild(alignTopItem);
+
+  const alignMiddleItem = document.createElement('button');
+  alignMiddleItem.className = 'menu-item';
+  alignMiddleItem.textContent = 'Middle';
+  alignMiddleItem.setAttribute('data-testid', 'menu-align-middle');
+  alignList.appendChild(alignMiddleItem);
+
+  const alignBottomItem = document.createElement('button');
+  alignBottomItem.className = 'menu-item';
+  alignBottomItem.textContent = 'Bottom';
+  alignBottomItem.setAttribute('data-testid', 'menu-align-bottom');
+  alignList.appendChild(alignBottomItem);
+
+  alignItem.appendChild(alignList);
+  alignItem.addEventListener('mouseenter', () => {
+    alignList.style.display = 'block';
+  });
+  alignItem.addEventListener('mouseleave', () => {
+    alignList.style.display = 'none';
+  });
+
+  // Distribute submenu
+  const distributeItem = document.createElement('button');
+  distributeItem.className = 'menu-item';
+  distributeItem.setAttribute('data-testid', 'menu-arrange-distribute');
+  distributeItem.textContent = 'Distribute';
+  arrangeList.appendChild(distributeItem);
+
+  const distributeList = document.createElement('div');
+  distributeList.className = 'menu-items';
+  distributeList.style.position = 'absolute';
+  distributeList.style.left = '100%';
+  distributeList.style.top = '0';
+
+  const distributeHItem = document.createElement('button');
+  distributeHItem.className = 'menu-item';
+  distributeHItem.textContent = 'Horizontal';
+  distributeHItem.setAttribute('data-testid', 'menu-distribute-h');
+  distributeList.appendChild(distributeHItem);
+
+  const distributeVItem = document.createElement('button');
+  distributeVItem.className = 'menu-item';
+  distributeVItem.textContent = 'Vertical';
+  distributeVItem.setAttribute('data-testid', 'menu-distribute-v');
+  distributeList.appendChild(distributeVItem);
+
+  distributeItem.appendChild(distributeList);
+  distributeItem.addEventListener('mouseenter', () => {
+    distributeList.style.display = 'block';
+  });
+  distributeItem.addEventListener('mouseleave', () => {
+    distributeList.style.display = 'none';
+  });
+
+  // Rotate submenu
+  const rotateItem = document.createElement('button');
+  rotateItem.className = 'menu-item';
+  rotateItem.setAttribute('data-testid', 'menu-arrange-rotate');
+  rotateItem.textContent = 'Rotate';
+  arrangeList.appendChild(rotateItem);
+
+  const rotateList = document.createElement('div');
+  rotateList.className = 'menu-items';
+  rotateList.style.position = 'absolute';
+  rotateList.style.left = '100%';
+  rotateList.style.top = '0';
+
+  const rotateCwItem = document.createElement('button');
+  rotateCwItem.className = 'menu-item';
+  rotateCwItem.textContent = '90° CW';
+  rotateCwItem.setAttribute('data-testid', 'menu-rotate-cw');
+  rotateList.appendChild(rotateCwItem);
+
+  const rotateCcwItem = document.createElement('button');
+  rotateCcwItem.className = 'menu-item';
+  rotateCcwItem.textContent = '90° CCW';
+  rotateCcwItem.setAttribute('data-testid', 'menu-rotate-ccw');
+  rotateList.appendChild(rotateCcwItem);
+
+  rotateItem.appendChild(rotateList);
+  rotateItem.addEventListener('mouseenter', () => {
+    rotateList.style.display = 'block';
+  });
+  rotateItem.addEventListener('mouseleave', () => {
+    rotateList.style.display = 'none';
+  });
+
+  // Flip submenu
+  const flipItem = document.createElement('button');
+  flipItem.className = 'menu-item';
+  flipItem.setAttribute('data-testid', 'menu-arrange-flip');
+  flipItem.textContent = 'Flip';
+  arrangeList.appendChild(flipItem);
+
+  const flipList = document.createElement('div');
+  flipList.className = 'menu-items';
+  flipList.style.position = 'absolute';
+  flipList.style.left = '100%';
+  flipList.style.top = '0';
+
+  const flipHItem = document.createElement('button');
+  flipHItem.className = 'menu-item';
+  flipHItem.textContent = 'Horizontal';
+  flipHItem.setAttribute('data-testid', 'menu-flip-h');
+  flipList.appendChild(flipHItem);
+
+  const flipVItem = document.createElement('button');
+  flipVItem.className = 'menu-item';
+  flipVItem.textContent = 'Vertical';
+  flipVItem.setAttribute('data-testid', 'menu-flip-v');
+  flipList.appendChild(flipVItem);
+
+  flipItem.appendChild(flipList);
+  flipItem.addEventListener('mouseenter', () => {
+    flipList.style.display = 'block';
+  });
+  flipItem.addEventListener('mouseleave', () => {
+    flipList.style.display = 'none';
+  });
+
+  // Separator
+  const separator = document.createElement('hr');
+  separator.setAttribute('data-testid', 'menu-arrange-separator');
+  separator.style.border = 'none';
+  separator.style.borderTop = '1px solid var(--border)';
+  separator.style.margin = '4px 0';
+  arrangeList.appendChild(separator);
+
+  // Disabled items: Group, Ungroup
+  const groupItem = document.createElement('button');
+  groupItem.className = 'menu-item';
+  groupItem.textContent = 'Group';
+  groupItem.setAttribute('data-testid', 'menu-group');
+  groupItem.disabled = true;
+  groupItem.title = 'Grouping requires a group to be selected';
+  arrangeList.appendChild(groupItem);
+
+  const ungroupItem = document.createElement('button');
+  ungroupItem.className = 'menu-item';
+  ungroupItem.textContent = 'Ungroup';
+  ungroupItem.setAttribute('data-testid', 'menu-ungroup');
+  ungroupItem.disabled = true;
+  ungroupItem.title = 'Ungrouping requires a group to be selected';
+  arrangeList.appendChild(ungroupItem);
+
+  arrangeMenu.appendChild(arrangeList);
+  menuBar.appendChild(arrangeMenu);
+
+  // ─── Extras menu ──────────────────────────────────────────────────────────
+  const extrasMenu = document.createElement('details');
+  extrasMenu.className = 'menu-dropdown';
+  extrasMenu.setAttribute('data-testid', 'menu-extras');
+  const extrasSummary = document.createElement('summary');
+  extrasSummary.textContent = 'Extras';
+  extrasMenu.appendChild(extrasSummary);
+  const extrasList = document.createElement('div');
+  extrasList.className = 'menu-items';
+
+  const editXmlItem = document.createElement('button');
+  editXmlItem.className = 'menu-item';
+  editXmlItem.textContent = 'Edit XML';
+  editXmlItem.setAttribute('data-testid', 'menu-edit-xml');
+  editXmlItem.disabled = true;
+  editXmlItem.title = 'XML editor not yet available';
+  extrasList.appendChild(editXmlItem);
+
+  const copySvgItem = document.createElement('button');
+  copySvgItem.className = 'menu-item';
+  copySvgItem.textContent = 'Copy as SVG';
+  copySvgItem.setAttribute('data-testid', 'menu-copy-svg');
+  copySvgItem.disabled = true;
+  copySvgItem.title = 'Copy as SVG not yet available';
+  extrasList.appendChild(copySvgItem);
+
+  const preferencesItem = document.createElement('button');
+  preferencesItem.className = 'menu-item';
+  preferencesItem.textContent = 'Preferences';
+  preferencesItem.setAttribute('data-testid', 'menu-preferences');
+  preferencesItem.disabled = true;
+  preferencesItem.title = 'Preferences not yet available';
+  extrasList.appendChild(preferencesItem);
+
+  extrasMenu.appendChild(extrasList);
+  menuBar.appendChild(extrasMenu);
+
+  // ─── Help menu ────────────────────────────────────────────────────────────
+  const helpMenu = document.createElement('details');
+  helpMenu.className = 'menu-dropdown';
+  helpMenu.setAttribute('data-testid', 'menu-help');
+  const helpSummary = document.createElement('summary');
+  helpSummary.textContent = 'Help';
+  helpMenu.appendChild(helpSummary);
+  const helpList = document.createElement('div');
+  helpList.className = 'menu-items';
+
+  const shortcutsItem = document.createElement('button');
+  shortcutsItem.className = 'menu-item';
+  shortcutsItem.textContent = 'Keyboard Shortcuts';
+  shortcutsItem.setAttribute('data-testid', 'menu-shortcuts');
+  helpList.appendChild(shortcutsItem);
+
+  const aboutItem = document.createElement('button');
+  aboutItem.className = 'menu-item';
+  aboutItem.textContent = 'About';
+  aboutItem.setAttribute('data-testid', 'menu-about');
+  helpList.appendChild(aboutItem);
+
+  helpMenu.appendChild(helpList);
+  menuBar.appendChild(helpMenu);
+
   container.appendChild(menuBar);
 
   // ─── Quick controls ───────────────────────────────────────────────────────
