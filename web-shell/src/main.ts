@@ -22,6 +22,7 @@ import { Editor } from './editor.js';
 import type { PageToken, PageRender, SlotmapId, ScenePage } from './types.js';
 import { EMPTY_METADATA } from './types.js';
 import { VersionStore } from './version-store.js';
+import { HistoryPanel } from './history-panel.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
@@ -32,6 +33,12 @@ let activeEditorIdx = 0;
 // ─── Version history state ─────────────────────────────────────────────────────
 const versionStore = new VersionStore();
 let manualSaveCounter = 0;
+
+// ─── Auto-save idle debounce (Task 3.2) ──────────────────────────────────────
+const AUTO_SAVE_IDLE_MS = 30_000;
+let last_command_at = 0;
+let last_saved_at = 0;
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ─── Grid overlay state ───────────────────────────────────────────────────────
 const GRID_LS_KEY = 'hodei:grid-visible';
@@ -128,8 +135,66 @@ async function manualSaveVersion(): Promise<void> {
     }
     const id = await versionStore.put(record);
     console.log(`[manualSaveVersion] Saved "${name}" with id=${id}`);
+    // Suppress next auto-save (Q8: timestamp comparison)
+    last_saved_at = Date.now();
   } catch (err) {
     console.error('[manualSaveVersion] IDB put failed:', err);
+  }
+}
+
+/**
+ * Internal snapshot capture shared by manual and auto-save.
+ * Returns { snapshot, metadataStr } or null if export fails.
+ */
+async function captureSnapshot(): Promise<{ snapshot: string; metadataStr?: string } | null> {
+  if (!activeSession) return null;
+  const exportResult = activeSession.exportDrawio();
+  if (!exportResult.ok) {
+    console.error('[captureSnapshot] Export failed:', exportResult.error);
+    return null;
+  }
+  const metadataResult = activeSession.getMetadata();
+  const metadataStr = metadataResult.ok ? JSON.stringify(metadataResult.value) : undefined;
+  const result: { snapshot: string; metadataStr?: string } = { snapshot: exportResult.value };
+  if (metadataStr !== undefined) {
+    result.metadataStr = metadataStr;
+  }
+  return result;
+}
+
+/** Schedule a pending auto-save timer (clears any existing timer). */
+function scheduleAutoSave(): void {
+  if (autoSaveTimer !== null) {
+    clearTimeout(autoSaveTimer);
+  }
+  autoSaveTimer = setTimeout(autoSaveTick, AUTO_SAVE_IDLE_MS);
+}
+
+/** Fire auto-save if state has changed since last save (Q8: timestamp suppression). */
+async function autoSaveTick(): Promise<void> {
+  autoSaveTimer = null;
+  if (last_command_at <= last_saved_at) {
+    return; // No state change since last save — suppress
+  }
+  const captured = await captureSnapshot();
+  if (!captured) return;
+
+  const time = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  try {
+    const record: Omit<import('./version-store.js').VersionRecord, 'id' | 'created' | 'updated'> = {
+      name: `Auto-save ${time}`,
+      snapshot: captured.snapshot,
+      schema_version: 1,
+    };
+    if (captured.metadataStr !== undefined) {
+      record.metadata = captured.metadataStr;
+    }
+    const id = await versionStore.put(record);
+    last_saved_at = Date.now();
+    console.log(`[autoSaveTick] Saved auto-save with id=${id}`);
+  } catch (err) {
+    console.error('[autoSaveTick] IDB put failed:', err);
+    // Best-effort: editor continues (I10)
   }
 }
 
@@ -301,15 +366,81 @@ async function bootstrap(): Promise<void> {
       e.preventDefault();
       togglePresentationMode();
     }
-    // Ctrl+Shift+S / Cmd+Shift+S for manual version save (temporary, removed in PR-3)
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
-      e.preventDefault();
-      manualSaveVersion();
-    }
     // Escape to exit presentation mode
     if (e.key === 'Escape' && isPresentationMode) {
       exitPresentationMode();
     }
+  });
+
+  // ─── 4.6. Mount Version History panel in Zone 2 sidebar (Task 3.5) ───────
+  // Create a container inside the sidebar for the history panel
+  const historyPanelContainer = document.createElement('div');
+  historyPanelContainer.className = 'history-panel-container';
+  historyPanelContainer.setAttribute('data-testid', 'history-panel-container');
+  ui.sidebar.appendChild(historyPanelContainer);
+
+  // HistoryPanel instance — lives for the lifetime of the session
+  const historyPanel = new HistoryPanel(historyPanelContainer, activeSession, versionStore);
+
+  // Initial render of the panel
+  historyPanel.render();
+
+  // Wire history-save: manual save triggered from panel button
+  historyPanelContainer.addEventListener('history-save', () => {
+    manualSaveVersion().then(() => historyPanel.render());
+  });
+
+  // Wire history-restore: Q9 default — auto-save before restore (transparent preservation)
+  historyPanelContainer.addEventListener('history-restore', async (e) => {
+    const event = e as CustomEvent<{ id: string }>;
+    const { id } = event.detail;
+    if (!activeSession) return;
+
+    // 1. Auto-save if state changed since last save (Q9)
+    if (last_command_at > last_saved_at) {
+      await manualSaveVersion();
+    }
+
+    // 2. Get version record
+    const version = await versionStore.get(id);
+    if (!version) {
+      console.error('[history-restore] Version not found:', id);
+      return;
+    }
+
+    // 3. Import snapshot
+    const importResult = activeSession.importDrawio(version.snapshot);
+    if (!importResult.ok) {
+      console.error('[history-restore] Import failed:', importResult.error);
+      showError(ui.errorBanner, ui.errorMessage, 'Restore failed: ' + importResult.error);
+      return;
+    }
+
+    // 4. Apply metadata if present
+    if (version.metadata) {
+      try {
+        const meta = JSON.parse(version.metadata);
+        activeSession.setMetadata(meta);
+      } catch (err) {
+        console.warn('[history-restore] Failed to parse metadata:', err);
+      }
+    }
+
+    // 5. Re-render scene and panel
+    const renderResult = activeSession.renderAllPages();
+    if (renderResult.ok && renderResult.value.length > 0) {
+      mountSvg(ui.viewer, renderResult.value[0]!.svg);
+    }
+    activeEditor?.refreshScene();
+    await historyPanel.render();
+  });
+
+  // Wire history-delete: remove version from store, re-render panel (Task 3.4)
+  historyPanelContainer.addEventListener('history-delete', async (e) => {
+    const event = e as CustomEvent<{ id: string }>;
+    const { id } = event.detail;
+    await versionStore.delete(id);
+    await historyPanel.render();
   });
 
   // ─── 5. Zoom/Pan on canvas container ──────────────────────────────────────
@@ -323,6 +454,9 @@ async function bootstrap(): Promise<void> {
 
   const onStateChange = () => {
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+    // Track command for auto-save suppression (Q8: timestamp comparison)
+    last_command_at = Date.now();
+    scheduleAutoSave();
   };
 
   // Selection change → inspector update + HUD update
@@ -467,6 +601,8 @@ async function bootstrap(): Promise<void> {
       // Re-render when inspector modifies state via session.executeCommand
       activeSession.setOnStateChange(() => {
         activeEditor?.triggerReplay();
+        // Also update UI buttons and schedule auto-save
+        onStateChange();
       });
     }
 
@@ -712,7 +848,7 @@ async function bootstrap(): Promise<void> {
     ui.hud.setZoom(e.detail.zoom * 100);
     // Update grid scale CSS variable for zoom-responsive grid
     ui.canvasContainer.style.setProperty('--zoom', String(e.detail.zoom));
-  }) as EventListener);
+  }) as (e: Event) => void);
 
   // ─── 14.5. Wire HUD zoom reset button ─────────────────────────────────────
   ui.hud.onZoomClick(() => {

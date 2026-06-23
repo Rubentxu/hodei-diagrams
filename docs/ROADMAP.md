@@ -117,9 +117,19 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 
 ---
 
+## ✅ Released — MVP
+
+### Version History Timeline (ADR-0064, ADR-0065, ADR-0066)
+- **PR**: feat/version-history-ui-integration (PR-3)
+- **Feature**: IndexedDB persistence, 30s auto-save idle debounce, Zone 2 sidebar panel, restore/delete actions
+- **ADRs**: 0064 (snapshot format), 0065 (Zone 2 sidebar placement), 0066 (idb runtime dep)
+- **E2E tests**: `tests/e2e/version-history.spec.ts`
+- **Unit tests**: `tests/version-store.test.ts`, `tests/auto-save.test.ts`
+
+---
+
 ## ⏸️ Deferred (no en plan activo, documentados en ADR-0048)
 
-- Version history timeline (IndexedDB)
 - Properties dialog (Metadata en DiagramModel)
 - Presentation mode advanced (F11, fullscreen)
 - Real-time collaboration (CRDT)
