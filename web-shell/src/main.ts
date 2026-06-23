@@ -19,6 +19,7 @@ import {
   showDialog,
 } from './ui.js';
 import { buildInspector } from './inspector.js';
+import { type HudControls } from './hud.js';
 import { Editor } from './editor.js';
 import type { PageToken, PageRender, SlotmapId, ScenePage } from './types.js';
 import { EMPTY_METADATA } from './types.js';
@@ -41,6 +42,8 @@ const AUTO_SAVE_IDLE_MS = 30_000;
 let last_command_at = 0;
 let last_saved_at = 0;
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let autoSavedTimer: ReturnType<typeof setTimeout> | null = null;
+let hud: HudControls | null = null;
 
 // ─── Grid overlay state ───────────────────────────────────────────────────────
 const GRID_LS_KEY = 'hodei:grid-visible';
@@ -69,7 +72,9 @@ function togglePresentationMode(): void {
   const el = document.getElementById('app');
   if (!el) return;
   if (!document.fullscreenElement) {
-    el.requestFullscreen?.().catch(() => { /* graceful fallback */ });
+    el.requestFullscreen?.().catch(() => {
+      /* graceful fallback */
+    });
   } else {
     document.exitFullscreen?.().catch(() => {});
   }
@@ -186,6 +191,13 @@ async function manualSaveVersion(): Promise<void> {
     return;
   }
 
+  // Mark as saving and cancel any pending auto-saved revert
+  hud?.setSaveStatus('saving');
+  if (autoSavedTimer !== null) {
+    clearTimeout(autoSavedTimer);
+    autoSavedTimer = null;
+  }
+
   const exportResult = activeSession.exportDrawio();
   if (!exportResult.ok) {
     console.error('[manualSaveVersion] Export failed:', exportResult.error);
@@ -211,8 +223,10 @@ async function manualSaveVersion(): Promise<void> {
     console.log(`[manualSaveVersion] Saved "${name}" with id=${id}`);
     // Suppress next auto-save (Q8: timestamp comparison)
     last_saved_at = Date.now();
+    hud?.setSaveStatus('saved');
   } catch (err) {
     console.error('[manualSaveVersion] IDB put failed:', err);
+    hud?.setSaveStatus('unsaved');
   }
 }
 
@@ -250,6 +264,7 @@ async function autoSaveTick(): Promise<void> {
   if (last_command_at <= last_saved_at) {
     return; // No state change since last save — suppress
   }
+  hud?.setSaveStatus('saving');
   const captured = await captureSnapshot();
   if (!captured) return;
 
@@ -266,8 +281,19 @@ async function autoSaveTick(): Promise<void> {
     const id = await versionStore.put(record);
     last_saved_at = Date.now();
     console.log(`[autoSaveTick] Saved auto-save with id=${id}`);
+    hud?.setSaveStatus('auto-saved');
+    // Schedule 2s revert to 'saved', cancelled on new command (see onStateChange)
+    if (autoSavedTimer !== null) clearTimeout(autoSavedTimer);
+    autoSavedTimer = setTimeout(() => {
+      // Only revert if no new command landed during the 2s window
+      if (last_command_at <= last_saved_at) {
+        hud?.setSaveStatus('saved');
+      }
+      autoSavedTimer = null;
+    }, 2000);
   } catch (err) {
     console.error('[autoSaveTick] IDB put failed:', err);
+    hud?.setSaveStatus('unsaved');
     // Best-effort: editor continues (I10)
   }
 }
@@ -294,16 +320,38 @@ function getSelectionLabel(ids: SlotmapId[], sceneData: ScenePage[]): string {
           if (bounds?.origin && bounds?.size) {
             const w = bounds.size['width'] ?? 0;
             const h = bounds.size['height'] ?? 0;
-            const shapeType = key === 'Rect' ? 'Rect' : key === 'RoundedRect' ? 'RoundedRect' : 'Ellipse';
+            const shapeType =
+              key === 'Rect' ? 'Rect' : key === 'RoundedRect' ? 'RoundedRect' : 'Ellipse';
             return `${shapeType} ${Math.round(w)}×${Math.round(h)}`;
           }
-          const shapeType = key === 'Rect' ? 'Rect' : key === 'RoundedRect' ? 'RoundedRect' : 'Ellipse';
+          const shapeType =
+            key === 'Rect' ? 'Rect' : key === 'RoundedRect' ? 'RoundedRect' : 'Ellipse';
           return shapeType;
         }
       }
     }
   }
   return 'Shape selected';
+}
+
+/** Show a loading overlay on root while WASM initializes */
+function showWasmOverlay(root: HTMLElement): void {
+  root.textContent = '';
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay';
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.setAttribute('data-testid', 'loading-overlay');
+  overlay.innerHTML = `
+    <span class="loading-overlay-spinner" aria-hidden="true"></span>
+    <span>Loading engine...</span>
+  `;
+  root.appendChild(overlay);
+}
+
+/** Remove the WASM init overlay */
+function hideWasmOverlay(root: HTMLElement): void {
+  const overlay = root.querySelector('.loading-overlay');
+  if (overlay) overlay.remove();
 }
 
 async function bootstrap(): Promise<void> {
@@ -314,11 +362,13 @@ async function bootstrap(): Promise<void> {
   }
 
   // ─── 1. WASM loading ──────────────────────────────────────────────────────
+  showWasmOverlay(root);
   const wasmResult = await loadWasm();
   if (!wasmResult.ok) {
     root.textContent = 'Failed to load diagram engine: ' + wasmResult.error;
     return;
   }
+  hideWasmOverlay(root);
 
   // ─── 2. Engine session ────────────────────────────────────────────────────
   const sessionResult = DiagramEngineSession.create(wasmResult.value);
@@ -332,7 +382,7 @@ async function bootstrap(): Promise<void> {
   // ─── 3. Load stencil libraries ─────────────────────────────────────────────
   // Load the general.xml stencil library (Rectangle, Ellipse from draw.io)
   // This makes stencil:general:Rectangle and stencil:general:Ellipse available
-  activeSession.loadStencilLibrary('general', '/fixtures/general.xml');
+  // (Moved to after buildEmptyUi to enable loading indicator via hud.setLoading)
 
   // ─── 4. Build Inspector (needed before UI for update wiring) ──────────────
   const inspector = buildInspector(activeSession);
@@ -403,11 +453,34 @@ async function bootstrap(): Promise<void> {
             ">Close</button>
           </div>
         `;
-        overlay.querySelector('#close-shortcuts')?.addEventListener('click', () => overlay.remove());
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        overlay
+          .querySelector('#close-shortcuts')
+          ?.addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) overlay.remove();
+        });
         document.body.appendChild(overlay);
       }
     },
+  });
+
+  // Make hud accessible to module-level save functions
+  hud = ui.hud;
+
+  // ─── 3b. Load stencil libraries with loading indicator ─────────────────────
+  // Debounce: only show loading indicator if load takes > 100ms
+  const stencilLoadStart = performance.now();
+  const stencilDebounceTimer = setTimeout(() => {
+    ui.hud.setLoading({ wasm: false, stencil: true });
+  }, 100);
+  activeSession.loadStencilLibrary('general', '/fixtures/general.xml').finally(() => {
+    clearTimeout(stencilDebounceTimer);
+    const elapsed = performance.now() - stencilLoadStart;
+    // Keep loading indicator visible for at least 100ms if shown
+    const minShowRemaining = Math.max(0, 100 - elapsed);
+    setTimeout(() => {
+      ui.hud.setLoading({ wasm: false, stencil: false });
+    }, minShowRemaining);
   });
 
   // ─── 4.5. Restore grid state ────────────────────────────────────────────────
@@ -531,6 +604,12 @@ async function bootstrap(): Promise<void> {
     // Track command for auto-save suppression (Q8: timestamp comparison)
     last_command_at = Date.now();
     scheduleAutoSave();
+    // Cancel any pending auto-saved → saved revert and mark as unsaved
+    if (autoSavedTimer !== null) {
+      clearTimeout(autoSavedTimer);
+      autoSavedTimer = null;
+    }
+    ui.hud.setSaveStatus('unsaved');
   };
 
   // Selection change → inspector update + HUD update
@@ -763,7 +842,28 @@ async function bootstrap(): Promise<void> {
   // All shape tool buttons share the same toggle pattern: click activates,
   // click again deactivates. The button visual class is synced to the active
   // tool so users always know which one is armed.
-  type ShapeTool = 'rectangle' | 'rounded-rect' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'cylinder' | 'cloud' | 'parallelogram' | 'trapezoid' | 'polygon' | 'rectangle-stencil' | 'ellipse-stencil' | 'diamond-stencil' | 'triangle-stencil' | 'hexagon-stencil' | 'cylinder-stencil' | 'cloud-stencil' | 'parallelogram-stencil' | 'trapezoid-stencil' | 'blockArrow-stencil';
+  type ShapeTool =
+    | 'rectangle'
+    | 'rounded-rect'
+    | 'ellipse'
+    | 'diamond'
+    | 'triangle'
+    | 'hexagon'
+    | 'cylinder'
+    | 'cloud'
+    | 'parallelogram'
+    | 'trapezoid'
+    | 'polygon'
+    | 'rectangle-stencil'
+    | 'ellipse-stencil'
+    | 'diamond-stencil'
+    | 'triangle-stencil'
+    | 'hexagon-stencil'
+    | 'cylinder-stencil'
+    | 'cloud-stencil'
+    | 'parallelogram-stencil'
+    | 'trapezoid-stencil'
+    | 'blockArrow-stencil';
   interface ToolBtn {
     btn: HTMLButtonElement;
     tool: ShapeTool;
@@ -878,7 +978,10 @@ async function bootstrap(): Promise<void> {
     const svg = activeSession.getPage(page.pageId);
     if (!svg) return;
     const pageName = page.name ?? 'page';
-    const safeName = pageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const safeName = pageName
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
     downloadSvg(svg, `diagram-${safeName}-${pageIdx + 1}.svg`);
   });
 
@@ -892,7 +995,10 @@ async function bootstrap(): Promise<void> {
     const svg = activeSession.getPage(page.pageId);
     if (!svg) return;
     const pageName = page.name ?? 'page';
-    const safeName = pageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const safeName = pageName
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
     rasterizeSvgToPng(svg, `diagram-${safeName}-${pageIdx + 1}.png`);
   });
 
@@ -912,7 +1018,10 @@ async function bootstrap(): Promise<void> {
     const svg = activeSession.getPage(page.pageId);
     if (!svg) return;
     const pageName = page.name ?? 'page';
-    const safeName = pageName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const safeName = pageName
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
     downloadHtml(svg, `diagram-${safeName}-${pageIdx + 1}.html`);
   });
 
