@@ -18,6 +18,7 @@ diagram-scene = { path = "../diagram-scene" }
 diagram-render-svg = { path = "../diagram-render-svg" }
 diagram-format-drawio = { path = "../diagram-format-drawio" }
 diagram-layout = { path = "../diagram-layout" }
+diagram-routing = { path = "../diagram-routing" }
 
 # Bridge
 wasm-bindgen = { workspace = true }

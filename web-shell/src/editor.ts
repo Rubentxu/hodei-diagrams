@@ -649,6 +649,17 @@ export class Editor {
     }
   }
 
+  /**
+   * Re-route all edges on the current page using orthogonal routing.
+   *
+   * After moving vertices, edges retain their old waypoints. This function recomputes
+   * orthogonal routes for all edges on the first page and commits the results as a
+   * single atomic transaction (one undo reverts all).
+   */
+  routeAllEdges(): void {
+    this.#session.routeAllEdges();
+  }
+
   // ─── Active Tool ──────────────────────────────────────────────────────────
 
   /** Current active tool. */

@@ -1187,6 +1187,12 @@ async function bootstrap(): Promise<void> {
     activeEditor?.applyLayout('Grid', {});
   });
 
+  // ─── 13.7.6. Wire Arrange > Re-route Edges ───────────────────────────────────
+  const menuRerouteEdges = document.querySelector('[data-testid="menu-reroute-edges"]');
+  menuRerouteEdges?.addEventListener('click', () => {
+    activeEditor?.routeAllEdges();
+  });
+
   // ─── 13.8. Wire Help > Keyboard Shortcuts ───────────────────────────────────
   const menuShortcuts = document.querySelector('[data-testid="menu-shortcuts"]');
   menuShortcuts?.addEventListener('click', () => {
