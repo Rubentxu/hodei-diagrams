@@ -2,6 +2,7 @@
 
 use diagram_core::DiagramModel;
 use diagram_format_drawio::IdMap;
+use diagram_routing::Direction;
 
 use crate::Command;
 use crate::error::{CommandError, CommandResult};
@@ -62,6 +63,29 @@ impl Editor {
         routing_kind: RoutingKind,
     ) -> CommandResult<EdgeId> {
         let mut cmd = ConnectVerticesCommand::new(from, to, routing_kind);
+        cmd.apply(&mut self.model)?;
+        let inserted_id = cmd.inserted_edge_id.ok_or(CommandError::NotApplied)?;
+        self.history.push(vec![Command::ConnectVertices(cmd)]);
+        Ok(inserted_id)
+    }
+
+    /// Connect two vertices with an edge, with optional port constraints.
+    ///
+    /// `source_port` and `target_port` specify which side of the source/target
+    /// to exit/enter from. `None` means auto-select the best port.
+    ///
+    /// On success, returns the inserted edge ID.
+    /// Pushes a `ConnectVertices` command to history for undo/redo.
+    pub fn connect_vertices_with_ports(
+        &mut self,
+        from: VertexId,
+        to: VertexId,
+        routing_kind: RoutingKind,
+        source_port: Option<Direction>,
+        target_port: Option<Direction>,
+    ) -> CommandResult<EdgeId> {
+        let mut cmd =
+            ConnectVerticesCommand::with_ports(from, to, routing_kind, source_port, target_port);
         cmd.apply(&mut self.model)?;
         let inserted_id = cmd.inserted_edge_id.ok_or(CommandError::NotApplied)?;
         self.history.push(vec![Command::ConnectVertices(cmd)]);

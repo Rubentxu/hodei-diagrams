@@ -890,6 +890,61 @@ mod tests {
     }
 
     #[test]
+    fn apply_connect_vertices_with_port_constraints() {
+        use diagram_core::CellGeometry;
+        use diagram_routing::Direction;
+
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        // Set geometry so routing can compute waypoints
+        if let Some(v) = model.store.vertex_mut(v1) {
+            v.geometry = Some(CellGeometry {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 50.0,
+                relative: false,
+                rotation: 0.0,
+                flip_h: false,
+                flip_v: false,
+            });
+        }
+        if let Some(v) = model.store.vertex_mut(v2) {
+            v.geometry = Some(CellGeometry {
+                x: 200.0,
+                y: 0.0,
+                width: 100.0,
+                height: 50.0,
+                relative: false,
+                rotation: 0.0,
+                flip_h: false,
+                flip_v: false,
+            });
+        }
+
+        // Connect with explicit port constraints (East -> West)
+        let mut cmd = Command::ConnectVertices(ConnectVerticesCommand::with_ports(
+            v1,
+            v2,
+            RoutingKind::Orthogonal,
+            Some(Direction::East),
+            Some(Direction::West),
+        ));
+        cmd.apply(&mut model).unwrap();
+
+        assert_eq!(model.store.len_edge(), 1);
+        let edge_id = eid_from_model(&model, 0);
+        let edge = model.store.edge(edge_id).unwrap();
+        assert_eq!(edge.source, v1);
+        assert_eq!(edge.target, v2);
+        // With port constraints, routing should produce waypoints
+        // (geometry is set, so waypoints should be non-empty)
+        assert!(!edge.waypoints.is_empty());
+    }
+
+    #[test]
     fn connect_vertices_invalid_source() {
         let (mut model, pid) = make_model_with_page();
         let v2 = insert_vertex(&mut model, pid, "V2");

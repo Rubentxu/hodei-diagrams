@@ -5,9 +5,10 @@
 //! functions to extract port constraints from [`StyleMap`] entries.
 
 use diagram_core::style::StyleMap;
+use serde::{Deserialize, Serialize};
 
 /// A cardinal direction indicating which side of a vertex to connect to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Direction {
     /// Top edge.
     North,

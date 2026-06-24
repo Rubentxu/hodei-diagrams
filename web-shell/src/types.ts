@@ -28,7 +28,7 @@ export type WasmModule = {
   redo(_h: number): void;
   engine_can_undo(_h: number): boolean;
   engine_can_redo(_h: number): boolean;
-  connect_vertices(_h: number, _from: number, _to: number, _routingKind: number): number;
+  connect_vertices(_h: number, _from: number, _to: number, _routingKind: number, _sourcePort: number, _targetPort: number): number;
   disconnect_edge(_h: number, _edgeId: number): void;
   parse_stencil_xml(_xml: string): string;
   parse_stencil_library_xml(_xml: string): string;

@@ -59,6 +59,10 @@ interface ConnectState {
   /** Document-space position of source center for preview line. */
   sourceX: number;
   sourceY: number;
+  /** Client-space X of the source click (for port computation). */
+  sourceClientX: number;
+  /** Client-space Y of the source click (for port computation). */
+  sourceClientY: number;
 }
 
 /** Error callback type. */
@@ -2544,6 +2548,8 @@ export class Editor {
         sourceId: hit,
         sourceX: geom.x + geom.width / 2,
         sourceY: geom.y + geom.height / 2,
+        sourceClientX: e.clientX,
+        sourceClientY: e.clientY,
       };
       this.#showPreviewLine(this.#connectState.sourceX, this.#connectState.sourceY);
       return;
@@ -2559,7 +2565,15 @@ export class Editor {
       return;
     }
 
-    const r = this.#session.connectVertices(sourceId, hit, 'orthogonal');
+    // Compute ports from click positions
+    const sourcePort = this.#computePortFromClick(
+      sourceId,
+      this.#connectState.sourceClientX,
+      this.#connectState.sourceClientY,
+    );
+    const targetPort = this.#computePortFromClick(hit, e.clientX, e.clientY);
+
+    const r = this.#session.connectVertices(sourceId, hit, 'orthogonal', sourcePort, targetPort);
     if (!r.ok) {
       this.#onError(r.error);
     } else {
@@ -2567,6 +2581,35 @@ export class Editor {
     }
 
     this.#connectState = null;
+  }
+
+  /**
+   * Determine which side of a vertex the click hit, based on click position
+   * relative to the vertex's bounding box.
+   * Returns: 0=auto, 1=N, 2=E, 3=S, 4=W
+   */
+  #computePortFromClick(vertexId: SlotmapId, clientX: number, clientY: number): number {
+    // Get vertex geometry from scene data
+    const el = this.#viewer.querySelector(
+      `[data-vertex-id="${vertexId.idx}:${vertexId.version}"]`,
+    ) as SVGGraphicsElement | null;
+    if (!el) return 0;
+
+    const bbox = el.getBBox();
+    const cx = bbox.x + bbox.width / 2;
+    const cy = bbox.y + bbox.height / 2;
+
+    // Convert click to document coordinates (same as clientToDoc)
+    const docPoint = this.#clientToDoc(clientX, clientY);
+
+    const dx = docPoint.x - cx;
+    const dy = docPoint.y - cy;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      return dx > 0 ? 2 : 4; // East or West
+    } else {
+      return dy > 0 ? 3 : 1; // South or North
+    }
   }
 
   /** Cancel connect mode and clean up preview. */
