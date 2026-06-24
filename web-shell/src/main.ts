@@ -726,6 +726,22 @@ async function bootstrap(): Promise<void> {
       );
       activeEditor.attach();
 
+      // Wire zoom keyboard shortcuts
+      activeEditor.setZoomCallbacks({
+        zoomIn: () => {
+          zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
+          ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+        },
+        zoomOut: () => {
+          zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
+          ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+        },
+        resetZoom: () => {
+          zoomPan?.resetView();
+          ui.hud.setZoom(100);
+        },
+      });
+
       // Wire cursor position to HUD (rAF-throttled)
       activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
 

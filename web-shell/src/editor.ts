@@ -107,6 +107,9 @@ export class Editor {
   #onSelectionChange: SelectionChangeCallback;
   #onToolChange: ToolChangeCallback;
   #getZoom: () => number;
+  #zoomIn: (() => void) | null = null;
+  #zoomOut: (() => void) | null = null;
+  #resetZoom: (() => void) | null = null;
   #abortController: AbortController | null = null;
 
   // ─── Stencil Drag Preview ────────────────────────────────────────────────
@@ -126,6 +129,13 @@ export class Editor {
 
   get isTextEditing(): boolean {
     return this.#textEdit !== null;
+  }
+
+  /** Set zoom control callbacks for keyboard shortcuts. */
+  setZoomCallbacks(opts: { zoomIn?: () => void; zoomOut?: () => void; resetZoom?: () => void }): void {
+    if (opts.zoomIn) this.#zoomIn = opts.zoomIn;
+    if (opts.zoomOut) this.#zoomOut = opts.zoomOut;
+    if (opts.resetZoom) this.#resetZoom = opts.resetZoom;
   }
 
   // ─── Edge / Bend Editing ───────────────────────────────────────────────────
@@ -3144,6 +3154,27 @@ export class Editor {
       e.preventDefault();
       this.copySelection();
       this.paste();
+      return;
+    }
+
+    // + / = → zoom in
+    if (!hasMod && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      this.#zoomIn?.();
+      return;
+    }
+
+    // - → zoom out
+    if (!hasMod && e.key === '-') {
+      e.preventDefault();
+      this.#zoomOut?.();
+      return;
+    }
+
+    // 0 → reset zoom
+    if (!hasMod && e.key === '0') {
+      e.preventDefault();
+      this.#resetZoom?.();
       return;
     }
 
