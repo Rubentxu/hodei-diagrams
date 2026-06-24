@@ -409,6 +409,33 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   separator.style.margin = '4px 0';
   arrangeList.appendChild(separator);
 
+  // Layout submenu
+  const layoutItem = document.createElement('button');
+  layoutItem.className = 'menu-item';
+  layoutItem.setAttribute('data-testid', 'menu-arrange-layout');
+  layoutItem.textContent = 'Layout';
+  arrangeList.appendChild(layoutItem);
+
+  const layoutList = document.createElement('div');
+  layoutList.className = 'menu-items';
+  layoutList.style.position = 'absolute';
+  layoutList.style.left = '100%';
+  layoutList.style.top = '0';
+
+  const layoutOrganicItem = document.createElement('button');
+  layoutOrganicItem.className = 'menu-item';
+  layoutOrganicItem.textContent = 'Organic';
+  layoutOrganicItem.setAttribute('data-testid', 'menu-layout-organic');
+  layoutList.appendChild(layoutOrganicItem);
+
+  layoutItem.appendChild(layoutList);
+  layoutItem.addEventListener('mouseenter', () => {
+    layoutList.style.display = 'block';
+  });
+  layoutItem.addEventListener('mouseleave', () => {
+    layoutList.style.display = 'none';
+  });
+
   // Disabled items: Group, Ungroup
   const groupItem = document.createElement('button');
   groupItem.className = 'menu-item';

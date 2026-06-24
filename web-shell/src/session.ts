@@ -466,4 +466,21 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Apply a layout algorithm to the current page.
+   * @param kind Layout kind string (e.g. "Organic", "Tree", "Hierarchical")
+   * @param config Optional layout-specific configuration
+   */
+  applyLayout(kind: string, config: object = {}): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.apply_layout(this.handle as number, JSON.stringify(kind), JSON.stringify(config));
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }
