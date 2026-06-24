@@ -3,7 +3,7 @@
 //! All registered defs are deduplicated by ID. The registry is consumed by
 //! `SvgRenderer` to emit a single `<defs>` block at render time.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// A registered SVG definition ready to be emitted inside `<defs>`.
 #[derive(Clone, PartialEq)]
@@ -27,6 +27,8 @@ pub(crate) enum SvgDef {
     },
     /// `<filter id="...">…</filter>`
     Filter { id: String, filter: FilterDef },
+    /// `<marker id="...">…</marker>`
+    Marker { id: String, svg: String },
 }
 
 /// A single gradient stop.
@@ -66,6 +68,8 @@ pub(crate) enum FilterDef {
 #[derive(Default)]
 pub(crate) struct DefsManager {
     defs: HashMap<String, SvgDef>,
+    /// Separate set for markers to allow deduplication without storing full SVG strings
+    marker_ids: HashSet<String>,
 }
 
 impl DefsManager {
@@ -144,6 +148,20 @@ impl DefsManager {
             },
         );
         id
+    }
+
+    /// Registers an SVG marker definition. Deduplicates by ID.
+    pub(crate) fn add_marker(&mut self, id: &str, svg: &str) {
+        if !self.marker_ids.contains(id) {
+            self.marker_ids.insert(id.to_owned());
+            self.defs.insert(
+                id.to_owned(),
+                SvgDef::Marker {
+                    id: id.to_owned(),
+                    svg: svg.to_owned(),
+                },
+            );
+        }
     }
 
     /// Returns the number of registered defs.
@@ -257,6 +275,9 @@ impl DefsManager {
                         }
                     }
                     out.push_str("</filter>");
+                }
+                SvgDef::Marker { id: _, svg } => {
+                    out.push_str(svg);
                 }
             }
         }

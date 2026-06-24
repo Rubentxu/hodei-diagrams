@@ -33,9 +33,7 @@ fn vid_attr(id: &VertexId) -> String {
 fn eid_attr(id: &EdgeId) -> String {
     let v = serde_json::to_value(id).expect("EdgeId should serialize");
     let idx = v["idx"].as_u64().expect("EdgeId idx should be u64");
-    let version = v["version"]
-        .as_u64()
-        .expect("EdgeId version should be u64");
+    let version = v["version"].as_u64().expect("EdgeId version should be u64");
     format!(" data-edge-id=\"{idx}:{version}\"")
 }
 
@@ -74,6 +72,57 @@ pub(crate) fn element_to_svg(
 /// Helper to produce the correct indent string.
 fn make_indent(indent: usize) -> String {
     "  ".repeat(indent)
+}
+
+/// Register an arrow marker and return the marker-end/marker-start attribute string.
+/// Returns empty string if arrow is None or "none".
+///
+/// For end arrows with None: defaults to "classic" (draw.io default).
+/// For start arrows with None: defaults to "none" (no source arrow).
+fn arrow_marker(
+    arrow: &Option<String>,
+    position: &str, // "end" or "start"
+    stroke_color: &Option<String>,
+    defs: &mut DefsManager,
+) -> String {
+    let arrow_type = match (position, arrow) {
+        (_, Some(a)) if a == "none" => return String::new(),
+        ("end", None) => "classic", // default for end arrow (draw.io default)
+        ("start", None) => return String::new(), // default: no start arrow
+        (_, Some(a)) => a.as_str(),
+        _ => return String::new(),
+    };
+
+    let color = stroke_color.as_deref().unwrap_or("#000000");
+    let marker_id = format!("arrow-{}-{}", position, arrow_type);
+
+    // Build marker SVG based on type
+    let marker_svg = match arrow_type {
+        "classic" => {
+            // Triangle arrowhead pointing right (will be auto-rotated by SVG)
+            format!(
+                r#"<marker id="{}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="{}" stroke="{}"/></marker>"#,
+                marker_id, color, color
+            )
+        }
+        "block" => {
+            format!(
+                r#"<marker id="{}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><rect x="0" y="0" width="10" height="10" fill="{}" stroke="{}"/></marker>"#,
+                marker_id, color, color
+            )
+        }
+        "open" => {
+            format!(
+                r#"<marker id="{}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10" fill="none" stroke="{}"/></marker>"#,
+                marker_id, color
+            )
+        }
+        _ => return String::new(), // Unknown arrow type — skip
+    };
+
+    defs.add_marker(&marker_id, &marker_svg);
+
+    format!(r#" marker-{}="url(#{})""#, position, marker_id)
 }
 
 /// Compute the SVG transform attribute string from rotation and flip values.
@@ -432,15 +481,27 @@ fn text_to_svg(t: &TextElement, defs: &mut DefsManager, indent: usize) -> String
 fn line_to_svg(l: &LineElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = style_to_attrs(&l.style, AttrContext::Edge, defs);
+    let marker_end = arrow_marker(&l.style.end_arrow, "end", &l.style.stroke_color, defs);
+    let marker_start = arrow_marker(&l.style.start_arrow, "start", &l.style.stroke_color, defs);
     format!(
-        "{}<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{}{}/>",
-        ind, l.from.x, l.from.y, l.to.x, l.to.y, eid_attr(&l.id), style
+        "{}<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{}{}{}{}/>",
+        ind,
+        l.from.x,
+        l.from.y,
+        l.to.x,
+        l.to.y,
+        eid_attr(&l.id),
+        marker_end,
+        marker_start,
+        style
     )
 }
 
 fn path_to_svg(p: &PathElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = style_to_attrs(&p.style, AttrContext::Edge, defs);
+    let marker_end = arrow_marker(&p.style.end_arrow, "end", &p.style.stroke_color, defs);
+    let marker_start = arrow_marker(&p.style.start_arrow, "start", &p.style.stroke_color, defs);
 
     let d = if p.points.is_empty() {
         String::new()
@@ -457,7 +518,15 @@ fn path_to_svg(p: &PathElement, defs: &mut DefsManager, indent: usize) -> String
         d
     };
 
-    format!("{}<path d=\"{}\"{}{}/>", ind, d, eid_attr(&p.id), style)
+    format!(
+        "{}<path d=\"{}\"{}{}{}{}/>",
+        ind,
+        d,
+        eid_attr(&p.id),
+        marker_end,
+        marker_start,
+        style
+    )
 }
 
 fn stencil_to_svg(s: &StencilElement, defs: &mut DefsManager, indent: usize) -> String {
@@ -754,6 +823,91 @@ mod tests {
         assert!(result.contains("y1=\"0\""));
         assert!(result.contains("x2=\"100\""));
         assert!(result.contains("y2=\"100\""));
+    }
+
+    #[test]
+    fn line_with_end_arrow_classic_emits_marker_end() {
+        let line = LineElement {
+            id: EdgeId::default(),
+            from: Point { x: 0.0, y: 0.0 },
+            to: Point { x: 100.0, y: 100.0 },
+            style: ResolvedStyle {
+                end_arrow: Some("classic".to_owned()),
+                stroke_color: Some("#000000".to_owned()),
+                ..Default::default()
+            },
+        };
+        let mut defs = DefsManager::new();
+        let result = line_to_svg(&line, &mut defs, 0);
+        assert!(result.contains(r#"marker-end="url(#arrow-end-classic)""#));
+    }
+
+    #[test]
+    fn line_with_end_arrow_none_emits_no_marker_end() {
+        let line = LineElement {
+            id: EdgeId::default(),
+            from: Point { x: 0.0, y: 0.0 },
+            to: Point { x: 100.0, y: 100.0 },
+            style: ResolvedStyle {
+                end_arrow: Some("none".to_owned()),
+                stroke_color: Some("#000000".to_owned()),
+                ..Default::default()
+            },
+        };
+        let mut defs = DefsManager::new();
+        let result = line_to_svg(&line, &mut defs, 0);
+        assert!(!result.contains("marker-end"));
+    }
+
+    #[test]
+    fn line_without_end_arrow_defaults_to_classic() {
+        // When end_arrow is None, it should default to "classic" (draw.io default)
+        let line = LineElement {
+            id: EdgeId::default(),
+            from: Point { x: 0.0, y: 0.0 },
+            to: Point { x: 100.0, y: 100.0 },
+            style: ResolvedStyle {
+                stroke_color: Some("#000000".to_owned()),
+                ..Default::default()
+            },
+        };
+        let mut defs = DefsManager::new();
+        let result = line_to_svg(&line, &mut defs, 0);
+        assert!(result.contains(r#"marker-end="url(#arrow-end-classic)""#));
+    }
+
+    #[test]
+    fn line_with_start_arrow_emits_marker_start() {
+        let line = LineElement {
+            id: EdgeId::default(),
+            from: Point { x: 0.0, y: 0.0 },
+            to: Point { x: 100.0, y: 100.0 },
+            style: ResolvedStyle {
+                start_arrow: Some("block".to_owned()),
+                stroke_color: Some("#000000".to_owned()),
+                ..Default::default()
+            },
+        };
+        let mut defs = DefsManager::new();
+        let result = line_to_svg(&line, &mut defs, 0);
+        assert!(result.contains(r#"marker-start="url(#arrow-start-block)""#));
+    }
+
+    #[test]
+    fn path_with_end_arrow_emits_marker_end() {
+        use diagram_core::geometry::Point;
+        let path = diagram_scene::PathElement {
+            id: EdgeId::default(),
+            points: vec![Point { x: 10.0, y: 10.0 }, Point { x: 50.0, y: 30.0 }],
+            style: ResolvedStyle {
+                end_arrow: Some("classic".to_owned()),
+                stroke_color: Some("#000000".to_owned()),
+                ..Default::default()
+            },
+        };
+        let mut defs = DefsManager::new();
+        let result = path_to_svg(&path, &mut defs, 0);
+        assert!(result.contains(r#"marker-end="url(#arrow-end-classic)""#));
     }
 
     #[test]
