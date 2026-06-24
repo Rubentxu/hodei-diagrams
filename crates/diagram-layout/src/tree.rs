@@ -21,7 +21,9 @@ use diagram_core::store::ModelStore;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::{CircularLayoutConfig, Direction, LayoutConfig, OrganicLayoutConfig};
+use crate::config::{
+    CircularLayoutConfig, Direction, GridLayoutConfig, LayoutConfig, OrganicLayoutConfig,
+};
 use crate::error::{LayoutError, LayoutResult};
 use crate::organic::OrganicLayout;
 
@@ -66,6 +68,8 @@ pub enum LayoutKind {
     Organic,
     /// Circular layout — places all vertices at equal angular intervals on a circle.
     Circular,
+    /// Grid layout — places vertices in a grid using cumulative-offset sizing.
+    Grid,
 }
 
 /// Tree layout engine.
@@ -174,6 +178,10 @@ pub fn apply_layout_kind(
         LayoutKind::Circular => {
             // DISPATCH ADDED IN COMMIT 2
             let layout = crate::circular::CircularLayout::new(CircularLayoutConfig::default());
+            layout.layout(store, page_id)
+        }
+        LayoutKind::Grid => {
+            let layout = crate::grid::GridLayout::new(GridLayoutConfig::default());
             layout.layout(store, page_id)
         }
     }

@@ -10,14 +10,11 @@ use diagram_core::page::Page;
 use diagram_core::store::ModelStore;
 use diagram_core::vertex::Vertex;
 
-use diagram_layout::config::{CircularLayoutConfig, LayoutConfig};
-use diagram_layout::tree::{apply_layout_kind, LayoutKind};
 use diagram_layout::CircularLayout;
+use diagram_layout::config::{CircularLayoutConfig, LayoutConfig};
+use diagram_layout::tree::{LayoutKind, apply_layout_kind};
 
-fn make_store(
-    vertices: &[(f64, f64, f64, f64)],
-    edges: &[(usize, usize)],
-) -> (ModelStore, PageId) {
+fn make_store(vertices: &[(f64, f64, f64, f64)], edges: &[(usize, usize)]) -> (ModelStore, PageId) {
     let mut store = ModelStore::new();
     let page = Page::new(PageId::default());
     let page_id = store.insert_page(page);
@@ -69,11 +66,20 @@ fn apply_layout_kind_circular_end_to_end() {
         &[(0, 1), (1, 2), (2, 3)],
     );
 
-    let result = apply_layout_kind(LayoutKind::Circular, &LayoutConfig::default(), &store, page_id);
+    let result = apply_layout_kind(
+        LayoutKind::Circular,
+        &LayoutConfig::default(),
+        &store,
+        page_id,
+    );
 
     assert!(result.is_ok(), "layout should succeed");
     let result = result.unwrap();
-    assert_eq!(result.vertices.len(), 5, "all vertices should be positioned");
+    assert_eq!(
+        result.vertices.len(),
+        5,
+        "all vertices should be positioned"
+    );
 
     // All coords should be finite
     for (_, rect) in &result.vertices {
@@ -115,8 +121,7 @@ fn circular_is_deterministic_on_identical_store() {
     {
         assert_eq!(v1, v2, "vertex {} id should match", i);
         assert!(
-            (r1.origin.x - r2.origin.x).abs() < 1e-9
-                && (r1.origin.y - r2.origin.y).abs() < 1e-9,
+            (r1.origin.x - r2.origin.x).abs() < 1e-9 && (r1.origin.y - r2.origin.y).abs() < 1e-9,
             "vertex {} position should be deterministic",
             i
         );
@@ -200,7 +205,11 @@ fn circular_with_groups_produces_group_rects() {
     let result = layout.layout(&store, page_id).unwrap();
 
     // Should have exactly 1 group rect (for group with children)
-    assert_eq!(result.group_rects.len(), 1, "group with children should produce a rect");
+    assert_eq!(
+        result.group_rects.len(),
+        1,
+        "group with children should produce a rect"
+    );
 
     let (_, group_rect) = &result.group_rects[0];
     // Group rect should have positive dimensions (encloses children + padding)
