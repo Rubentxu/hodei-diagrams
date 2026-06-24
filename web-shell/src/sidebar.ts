@@ -202,6 +202,37 @@ export function buildSidebar(): SidebarControls {
   searchWrap.appendChild(searchInput);
   container.appendChild(searchWrap);
 
+  // ─── Search filter logic ────────────────────────────────────────────────
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value.toLowerCase().trim();
+
+    // Show/hide all category headers
+    const categoryHeaders = container.querySelectorAll<HTMLElement>('.category-header');
+    categoryHeaders.forEach((el) => {
+      el.style.display = query ? 'none' : '';
+    });
+
+    // Show/hide "Coming Soon" messages
+    const comingSoonMsgs = container.querySelectorAll<HTMLElement>('.category-coming-soon');
+    comingSoonMsgs.forEach((el) => {
+      el.style.display = query ? 'none' : '';
+    });
+
+    // Show/hide "More Shapes" button
+    const moreBtn = container.querySelector<HTMLElement>('.more-shapes-btn');
+    if (moreBtn) moreBtn.style.display = query ? 'none' : '';
+
+    // Filter shape buttons
+    const allShapeBtns = container.querySelectorAll<HTMLElement>('.shape-btn');
+    allShapeBtns.forEach((btn) => {
+      const label = btn.querySelector('.shape-label');
+      const text = label?.textContent?.toLowerCase() || '';
+      const shapeAttr = btn.getAttribute('data-stencil-name')?.toLowerCase() || '';
+      const match = text.includes(query) || shapeAttr.includes(query);
+      btn.style.display = match ? '' : 'none';
+    });
+  });
+
   // ─── General category ────────────────────────────────────────────────────
   const generalCat = document.createElement('div');
   generalCat.className = 'shape-category';
