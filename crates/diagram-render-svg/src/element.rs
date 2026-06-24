@@ -1,6 +1,6 @@
 //! Visual element to SVG conversion.
 
-use diagram_core::VertexId;
+use diagram_core::{EdgeId, VertexId};
 use diagram_scene::{
     CloudElement, CylinderElement, DiamondElement, EllipseElement, GroupElement, HexagonElement,
     LineElement, ParallelogramElement, PathCommand, PathElement, PolygonElement, RectElement,
@@ -24,6 +24,19 @@ fn vid_attr(id: &VertexId) -> String {
         .as_u64()
         .expect("VertexId version should be u64");
     format!(" data-vertex-id=\"{idx}:{version}\"")
+}
+
+/// Serialize an `EdgeId` to a `data-edge-id` attribute string.
+///
+/// Format: `data-edge-id="idx:version"` — compact, no quote-escaping needed
+/// in SVG attributes. Both fields are required for slotmap lookups.
+fn eid_attr(id: &EdgeId) -> String {
+    let v = serde_json::to_value(id).expect("EdgeId should serialize");
+    let idx = v["idx"].as_u64().expect("EdgeId idx should be u64");
+    let version = v["version"]
+        .as_u64()
+        .expect("EdgeId version should be u64");
+    format!(" data-edge-id=\"{idx}:{version}\"")
 }
 
 /// Converts a `VisualElement` to an SVG string.
@@ -420,8 +433,8 @@ fn line_to_svg(l: &LineElement, defs: &mut DefsManager, indent: usize) -> String
     let ind = make_indent(indent);
     let style = style_to_attrs(&l.style, AttrContext::Edge, defs);
     format!(
-        "{}<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{}/>",
-        ind, l.from.x, l.from.y, l.to.x, l.to.y, style
+        "{}<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{}{}/>",
+        ind, l.from.x, l.from.y, l.to.x, l.to.y, eid_attr(&l.id), style
     )
 }
 
@@ -444,7 +457,7 @@ fn path_to_svg(p: &PathElement, defs: &mut DefsManager, indent: usize) -> String
         d
     };
 
-    format!("{}<path d=\"{}\"{}/>", ind, d, style)
+    format!("{}<path d=\"{}\"{}{}/>", ind, d, eid_attr(&p.id), style)
 }
 
 fn stencil_to_svg(s: &StencilElement, defs: &mut DefsManager, indent: usize) -> String {
