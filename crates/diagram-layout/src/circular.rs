@@ -153,12 +153,14 @@ impl CircularLayout {
             // intentional. The sddk-verify phase must validate against the WASM mapping
             // in crates/diagram-wasm/src/layout.rs::result_to_transaction. If applier
             // treats origin as top-left, fix the mapper to subtract (w/2, h/2) from
-            // origin.x/origin.y for organic + circular outputs. See ADR-0069 §Open
-            // Questions and design.md §Open Questions.
             vertices.push((
                 *vid,
                 Rect {
-                    origin: Point { x: cx, y: cy },
+                    // Rect.origin is top-left per geometry.rs:74.
+                    origin: Point {
+                        x: cx - w / 2.0,
+                        y: cy - h / 2.0,
+                    },
                     size: Size {
                         width: w,
                         height: h,
@@ -373,8 +375,11 @@ mod tests {
         let cy = radius;
 
         for (_, rect) in &result.vertices {
-            let dx = rect.origin.x - cx;
-            let dy = rect.origin.y - cy;
+            // Rect.origin is top-left per ADR-0071. Center = origin + size/2.
+            let center_x = rect.origin.x + rect.size.width / 2.0;
+            let center_y = rect.origin.y + rect.size.height / 2.0;
+            let dx = center_x - cx;
+            let dy = center_y - cy;
             let dist = (dx * dx + dy * dy).sqrt();
             assert!(
                 (dist - radius).abs() < 1e-6,
@@ -476,8 +481,11 @@ mod tests {
         let expected_cy = 300.0 + effective_radius; // y0 + radius
 
         for (_, rect) in &result.vertices {
-            let dx = rect.origin.x - expected_cx;
-            let dy = rect.origin.y - expected_cy;
+            // Rect.origin is top-left per ADR-0071. Center = origin + size/2.
+            let center_x = rect.origin.x + rect.size.width / 2.0;
+            let center_y = rect.origin.y + rect.size.height / 2.0;
+            let dx = center_x - expected_cx;
+            let dy = center_y - expected_cy;
             let dist = (dx * dx + dy * dy).sqrt();
             assert!(
                 (dist - effective_radius).abs() < 1e-6,

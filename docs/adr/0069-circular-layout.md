@@ -106,12 +106,9 @@ Closed-form O(n), no iteration:
    tree-layout precedent; rename to `LayoutResult` is a separate ADR-level change once
    3+ algorithms use it.
 
-4. **Rect.origin convention: center vs top-left** — `organic.rs:144` and now
-   `circular.rs` store center coords in `Rect.origin`. The WASM Transaction applier in
-   `crates/diagram-wasm/src/layout.rs` is the downstream consumer. **Verify-phase check
-   required**: if the applier treats `Rect.origin` as top-left, both organic and circular
-   have a latent offset bug. Resolution belongs to a follow-up sddk-verify action item,
-   not blocking this change.
+4. **Rect.origin convention: center vs top-left** — RESOLVED by ADR-0071.
+   `organic.rs` and `circular.rs` now write `Rect.origin = (cx - w/2, cy - h/2)` —
+   top-left coordinates. The WASM mapper consumes `origin` as top-left (unchanged).
 
 5. **Group nesting-aware sub-circle layout** — out of scope v1; v2 future change.
 

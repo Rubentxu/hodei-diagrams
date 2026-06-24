@@ -141,7 +141,12 @@ impl OrganicLayout {
             vertices.push((
                 *vid,
                 Rect {
-                    origin: Point { x: cx, y: cy },
+                    // NOTE: Rect.origin is top-left per geometry.rs:74.
+                    // FR stores (cx, cy) as center; convert to top-left.
+                    origin: Point {
+                        x: cx - w / 2.0,
+                        y: cy - h / 2.0,
+                    },
                     size: Size {
                         width: w,
                         height: h,
@@ -411,9 +416,11 @@ mod tests {
         let layout = OrganicLayout::new(OrganicLayoutConfig::default());
         let result = layout.layout(&store, page_id).unwrap();
         let (_, rect) = &result.vertices[0];
-        // Position should be the cell center (single vertex has no forces)
-        assert!((rect.origin.x - 160.0).abs() < 1e-6); // 100 + 120/2
-        assert!((rect.origin.y - 230.0).abs() < 1e-6); // 200 + 60/2
+        // Rect.origin is top-left per ADR-0071. Center = origin + size/2.
+        let cx = rect.origin.x + rect.size.width / 2.0;
+        let cy = rect.origin.y + rect.size.height / 2.0;
+        assert!((cx - 160.0).abs() < 1e-6); // 100 + 120/2
+        assert!((cy - 230.0).abs() < 1e-6); // 200 + 60/2
     }
 
     #[test]

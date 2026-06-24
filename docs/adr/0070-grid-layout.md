@@ -116,8 +116,8 @@ Two-pass cumulative-offset placement:
 1. **`compute_group_bboxes` coord semantics** — Grid passes top-left, utility expects centers,
    bbox offset by `(-w/2, -h/2)`. Deferred to follow-up affecting all 4 callers.
 
-2. **W1 latent bug** — Grid is correct (top-left origin); circular/organic store center
-   coords and trigger W1. Fix for circular/organic is a follow-up.
+2. **W1 latent bug** — RESOLVED by ADR-0071. Grid is correct (top-left origin);
+   circular and organic now write top-left after the fix.
 
 3. **`GridLayoutConfig` not embedded in `LayoutConfig`** — cross-cutting refactor deferred
    (matches organic/circular precedent).
