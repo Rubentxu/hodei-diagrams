@@ -48,11 +48,7 @@ impl CircularLayout {
     /// # Errors
     ///
     /// Returns [`LayoutError::NoVertices`] if the page has no vertices.
-    pub fn layout(
-        &self,
-        store: &ModelStore,
-        page_id: PageId,
-    ) -> LayoutResult<TreeLayoutResult> {
+    pub fn layout(&self, store: &ModelStore, page_id: PageId) -> LayoutResult<TreeLayoutResult> {
         // ── Setup pass ─────────────────────────────────────────────────────────
         let page_vertices: Vec<_> = store
             .vertices_with_ids()
@@ -163,7 +159,10 @@ impl CircularLayout {
                 *vid,
                 Rect {
                     origin: Point { x: cx, y: cy },
-                    size: Size { width: w, height: h },
+                    size: Size {
+                        width: w,
+                        height: h,
+                    },
                 },
             ));
         }
@@ -171,7 +170,10 @@ impl CircularLayout {
         // ── Write-back ──────────────────────────────────────────────────────────
         // Edge waypoints: empty (straight lines) when reset_edges = true
         let edge_waypoints: Vec<(EdgeId, Vec<Point>)> = if self.config.reset_edges {
-            page_edges.iter().map(|(eid, _)| (*eid, Vec::new())).collect()
+            page_edges
+                .iter()
+                .map(|(eid, _)| (*eid, Vec::new()))
+                .collect()
         } else {
             Vec::new()
         };
@@ -425,10 +427,7 @@ mod tests {
     fn configured_radius_wins_when_larger() {
         // 2 vertices (60x40), config.radius=500
         // auto_radius = 2 * 60 / PI = 38.2 < 500, so configured wins
-        let (store, page_id) = make_store(
-            &[(0.0, 0.0, 60.0, 40.0), (0.0, 0.0, 60.0, 40.0)],
-            &[],
-        );
+        let (store, page_id) = make_store(&[(0.0, 0.0, 60.0, 40.0), (0.0, 0.0, 60.0, 40.0)], &[]);
         let config = CircularLayoutConfig {
             radius: 500.0,
             ..CircularLayoutConfig::default()

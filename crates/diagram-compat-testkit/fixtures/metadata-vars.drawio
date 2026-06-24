@@ -1,0 +1,19 @@
+<mxfile vars='{"title":"Atlas","author":"Jane","description":"Architecture map","tags":"aws,arch"}' modified="2024-06-15T12:00:00Z" host="Electron" agent="Mozilla/5.0" version="29.0.3">
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1"/>
+        <mxCell id="2" value="Server" vertex="1">
+          <mxGeometry x="10" y="20" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="" edge="1" source="2" target="4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" value="Database" vertex="1">
+          <mxGeometry x="150" y="30" width="80" height="40" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

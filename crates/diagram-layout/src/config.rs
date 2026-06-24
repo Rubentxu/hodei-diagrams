@@ -83,6 +83,37 @@ impl Default for CircularLayoutConfig {
     }
 }
 
+/// Configuration for the grid layout algorithm.
+///
+/// This is a Hodei-original algorithm with no draw.io equivalent.
+/// The algorithm uses a cumulative-offset two-pass placement that avoids
+/// overlap even when vertices have heterogeneous widths/heights.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GridLayoutConfig {
+    /// Number of columns. None means auto-calculate as `ceil(sqrt(n))`.
+    pub num_columns: Option<usize>,
+    /// Horizontal spacing between columns.
+    pub spacing_x: f64,
+    /// Vertical spacing between rows.
+    pub spacing_y: f64,
+    /// Left margin.
+    pub margin_x: f64,
+    /// Top margin.
+    pub margin_y: f64,
+}
+
+impl Default for GridLayoutConfig {
+    fn default() -> Self {
+        Self {
+            num_columns: None,
+            spacing_x: 20.0,
+            spacing_y: 20.0,
+            margin_x: 10.0,
+            margin_y: 10.0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod organic_config_tests {
     use super::*;
@@ -113,6 +144,21 @@ mod circular_config_tests {
         assert!((cfg.y0 - 0.0).abs() < 1e-9);
         assert!(cfg.reset_edges);
         assert!(cfg.disable_edge_style);
+    }
+}
+
+#[cfg(test)]
+mod grid_config_tests {
+    use super::*;
+
+    #[test]
+    fn grid_config_defaults_are_tight() {
+        let cfg = GridLayoutConfig::default();
+        assert_eq!(cfg.num_columns, None);
+        assert!((cfg.spacing_x - 20.0).abs() < 1e-9);
+        assert!((cfg.spacing_y - 20.0).abs() < 1e-9);
+        assert!((cfg.margin_x - 10.0).abs() < 1e-9);
+        assert!((cfg.margin_y - 10.0).abs() < 1e-9);
     }
 }
 
