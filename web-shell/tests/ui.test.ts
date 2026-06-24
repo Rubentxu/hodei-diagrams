@@ -89,9 +89,13 @@ describe('ui', () => {
       { pageId: 2 as PageToken, name: 'Page B', svg: '' },
       { pageId: 3 as PageToken, name: 'Page C', svg: '' },
     ];
-    const onChange = vi.fn();
+    const callbacks = {
+      onSelect: vi.fn(),
+      onRename: vi.fn(),
+      onDelete: vi.fn(),
+    };
 
-    populatePageTabs(container, pages, 1, onChange);
+    populatePageTabs(container, pages, 1, callbacks);
 
     const tabs = container.querySelectorAll('.page-tab');
     expect(tabs.length).toBe(3);
@@ -101,20 +105,24 @@ describe('ui', () => {
     expect(tabs[1]?.classList.contains('active')).toBe(true);
   });
 
-  it('populatePageTabs click triggers onChange', () => {
+  it('populatePageTabs click triggers onSelect', () => {
     const container = document.createElement('div');
     const pages: PageRender[] = [
       { pageId: 10 as PageToken, name: 'Page A', svg: '' },
       { pageId: 20 as PageToken, name: 'Page B', svg: '' },
     ];
-    const onChange = vi.fn();
+    const callbacks = {
+      onSelect: vi.fn(),
+      onRename: vi.fn(),
+      onDelete: vi.fn(),
+    };
 
-    populatePageTabs(container, pages, 0, onChange);
+    populatePageTabs(container, pages, 0, callbacks);
 
     const secondTab = container.querySelector('[data-testid="page-tab-1"]') as HTMLElement;
     expect(secondTab).not.toBeNull();
     secondTab.click();
-    expect(onChange).toHaveBeenCalledWith(20);
+    expect(callbacks.onSelect).toHaveBeenCalledWith(20);
   });
 
   it('showError sets textContent and unhides banner', () => {

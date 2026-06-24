@@ -706,7 +706,11 @@ async function bootstrap(): Promise<void> {
     activePages = renderResult.value;
     if (activePages.length > 0) {
       mountSvg(ui.viewer, activePages[0]!.svg);
-      populatePageTabs(ui.pageTabContainer, activePages, 0, handlePageSwitch);
+      populatePageTabs(ui.pageTabContainer, activePages, 0, {
+        onSelect: handlePageSelect,
+        onRename: handlePageRename,
+        onDelete: handlePageDelete,
+      });
     }
 
     // Wire editor after successful import
@@ -832,7 +836,7 @@ async function bootstrap(): Promise<void> {
   }
 
   // ─── 7. Page switch handler ───────────────────────────────────────────────
-  function handlePageSwitch(pageIdNum: number): void {
+  function handlePageSelect(pageIdNum: number): void {
     if (!activeSession || activePages.length === 0) return;
     const token = pageIdNum as PageToken;
     const svg = activeSession.getPage(token);
@@ -840,11 +844,9 @@ async function bootstrap(): Promise<void> {
       mountSvg(ui.viewer, svg);
       const idx = activePages.findIndex((p) => p.pageId === token);
       if (idx >= 0) {
-        populatePageTabs(ui.pageTabContainer, activePages, idx, handlePageSwitch);
         activeEditorIdx = idx;
         if (activeEditor) {
           activeEditor.activePageIdx = idx;
-          // Refresh editor scene for new page
           activeEditor.refreshScene();
         }
         // Update HUD page info
@@ -856,6 +858,123 @@ async function bootstrap(): Promise<void> {
         ui.canvasContainer.style.setProperty('--zoom', '1');
       }
     }
+  }
+
+  /** Re-render page tabs after any add/rename/delete operation. */
+  function refreshPageTabs(): void {
+    if (!activeSession) return;
+    const renderResult = activeSession.renderAllPages();
+    if (!renderResult.ok) return;
+    activePages = renderResult.value;
+    const idx = Math.min(activeEditorIdx, activePages.length - 1);
+    populatePageTabs(ui.pageTabContainer, activePages, idx, {
+      onSelect: handlePageSelect,
+      onRename: handlePageRename,
+      onDelete: handlePageDelete,
+    });
+    // Update HUD page info
+    ui.hud.setPage(idx + 1, activePages.length);
+  }
+
+  /** Add a new page. */
+  function handlePageAdd(): void {
+    if (!activeSession) return;
+    const cmd = JSON.stringify({
+      AddPage: {
+        page: {
+          id: { idx: 0, version: 0 },
+          name: null,
+          size: { width: 800.0, height: 600.0 },
+        },
+      },
+    });
+    const r = activeSession.executeCommand(cmd);
+    if (!r.ok) {
+      showError(ui.errorBanner, ui.errorMessage, 'Add page failed: ' + r.error);
+      return;
+    }
+    refreshPageTabs();
+    // Switch to the new page (last one)
+    const newIdx = activePages.length - 1;
+    const newPage = activePages[newIdx];
+    if (newPage) {
+      activeEditorIdx = newIdx;
+      if (activeEditor) {
+        activeEditor.activePageIdx = newIdx;
+        activeEditor.refreshScene();
+      }
+      const svg = activeSession.getPage(newPage.pageId);
+      if (svg) {
+        mountSvg(ui.viewer, svg);
+      }
+      ui.hud.setPage(newIdx + 1, activePages.length);
+    }
+    zoomPan?.resetView();
+    ui.zoomDisplay.textContent = '100%';
+    ui.hud.setZoom(100);
+    ui.canvasContainer.style.setProperty('--zoom', '1');
+  }
+
+  /** Rename an existing page. */
+  function handlePageRename(pageIdNum: number, newName: string): void {
+    if (!activeSession) return;
+    const cmd = JSON.stringify({
+      RenamePage: {
+        id: { idx: pageIdNum, version: 0 },
+        name: { text: newName },
+      },
+    });
+    const r = activeSession.executeCommand(cmd);
+    if (!r.ok) {
+      showError(ui.errorBanner, ui.errorMessage, 'Rename page failed: ' + r.error);
+      return;
+    }
+    refreshPageTabs();
+  }
+
+  /** Delete an existing page (cannot delete the last page). */
+  function handlePageDelete(pageIdNum: number): void {
+    if (!activeSession || activePages.length <= 1) return;
+    const cmd = JSON.stringify({
+      RemovePage: {
+        id: { idx: pageIdNum, version: 0 },
+      },
+    });
+    const r = activeSession.executeCommand(cmd);
+    if (!r.ok) {
+      showError(ui.errorBanner, ui.errorMessage, 'Delete page failed: ' + r.error);
+      return;
+    }
+    // Adjust active index if needed
+    const oldIdx = activeEditorIdx;
+    const deletedIdx = activePages.findIndex((p) => p.pageId === pageIdNum);
+    refreshPageTabs();
+    // Switch to appropriate page
+    let newIdx = activeEditorIdx;
+    if (deletedIdx <= oldIdx && activeEditorIdx > 0) {
+      newIdx = activeEditorIdx - 1;
+    }
+    if (newIdx >= activePages.length) {
+      newIdx = activePages.length - 1;
+    }
+    if (newIdx < 0) newIdx = 0;
+    activeEditorIdx = newIdx;
+    if (activeEditor) {
+      activeEditor.activePageIdx = newIdx;
+      activeEditor.refreshScene();
+    }
+    const newPage = activePages[newIdx];
+    if (newPage) {
+      const svg = activeSession.getPage(newPage.pageId);
+      if (svg) {
+        mountSvg(ui.viewer, svg);
+      }
+    }
+    ui.hud.setPage(newIdx + 1, activePages.length);
+    zoomPan?.resetView();
+    ui.zoomDisplay.textContent = '100%';
+    ui.hud.setZoom(100);
+    ui.canvasContainer.style.setProperty('--zoom', '1');
   }
 
   // ─── 8. Wire file input (from navbar File > Open) ─────────────────────────
@@ -885,6 +1004,11 @@ async function bootstrap(): Promise<void> {
   ui.redoButton.addEventListener('click', () => {
     activeEditor?.redoCmd();
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+  });
+
+  // ─── 11.5. Wire Add Page button ──────────────────────────────────────────
+  ui.pageTabAdd.addEventListener('click', () => {
+    handlePageAdd();
   });
 
   // ─── 12. Wire palette tools ───────────────────────────────────────────────

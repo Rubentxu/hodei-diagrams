@@ -146,7 +146,7 @@ export function buildEmptyUi(
   addPageBtn.setAttribute('data-testid', 'page-tab-add');
   addPageBtn.textContent = '+';
   addPageBtn.title = 'Add page';
-  addPageBtn.disabled = true; // page creation not yet wired
+
   bottomBar.appendChild(addPageBtn);
 
   const bottomSpacer = document.createElement('div');
@@ -305,27 +305,95 @@ export function buildEmptyUi(
 
 // ─── Page Tab Management ──────────────────────────────────────────────────────
 
+export interface PageTabCallbacks {
+  onSelect: (pageId: number) => void;
+  onRename: (pageId: number, newName: string) => void;
+  onDelete: (pageId: number) => void;
+}
+
 /** Update page tabs in the bottom bar. */
 export function populatePageTabs(
   container: HTMLElement,
   pages: ReadonlyArray<PageRender>,
   activeIndex: number,
-  onChange: (_pageId: number) => void,
+  callbacks: PageTabCallbacks,
 ): void {
   container.innerHTML = '';
   for (const [i, page] of pages.entries()) {
-    const tab = document.createElement('button');
-    tab.className = 'page-tab';
-    tab.textContent = page.name;
+    const tab = document.createElement('div');
+    tab.className = 'page-tab' + (i === activeIndex ? ' active' : '');
     tab.setAttribute('data-testid', `page-tab-${i}`);
-    if (i === activeIndex) {
-      tab.classList.add('active');
-    }
-    tab.addEventListener('click', () => {
-      onChange(page.pageId);
+
+    // Tab name (clickable, double-click to rename)
+    const tabName = document.createElement('button');
+    tabName.className = 'page-tab-name';
+    tabName.textContent = page.name;
+    tabName.addEventListener('click', () => {
+      callbacks.onSelect(page.pageId);
     });
+    tabName.addEventListener('dblclick', () => {
+      startRename(page.pageId, page.name, tabName, (newName) => {
+        callbacks.onRename(page.pageId, newName);
+      });
+    });
+    tab.appendChild(tabName);
+
+    // Close button (not shown if only one page)
+    if (pages.length > 1) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'page-tab-close';
+      closeBtn.textContent = '×';
+      closeBtn.setAttribute('aria-label', `Close ${page.name}`);
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        callbacks.onDelete(page.pageId);
+      });
+      tab.appendChild(closeBtn);
+    }
+
     container.appendChild(tab);
   }
+}
+
+/** Start inline rename of a page tab. */
+function startRename(
+  pageId: number,
+  currentName: string,
+  tabName: HTMLButtonElement,
+  onCommit: (newName: string) => void,
+): void {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'page-tab-rename-input';
+  input.value = currentName;
+
+  // Replace tab name button with input
+  const parent = tabName.parentElement!;
+  tabName.style.display = 'none';
+  parent.insertBefore(input, tabName);
+  input.focus();
+  input.select();
+
+  const commit = () => {
+    const newName = input.value.trim();
+    if (newName && newName !== currentName) {
+      onCommit(newName);
+    }
+    input.remove();
+    tabName.style.display = '';
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    } else if (e.key === 'Escape') {
+      input.remove();
+      tabName.style.display = '';
+    }
+  });
+
+  input.addEventListener('blur', commit);
 }
 
 // ─── Error Display ────────────────────────────────────────────────────────────
