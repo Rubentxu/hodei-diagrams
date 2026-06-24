@@ -21,7 +21,7 @@ use diagram_core::store::ModelStore;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Direction, LayoutConfig, OrganicLayoutConfig};
+use crate::config::{CircularLayoutConfig, Direction, LayoutConfig, OrganicLayoutConfig};
 use crate::error::{LayoutError, LayoutResult};
 use crate::organic::OrganicLayout;
 
@@ -64,6 +64,8 @@ pub enum LayoutKind {
     Tree,
     /// Fruchterman-Reingold organic force-directed layout.
     Organic,
+    /// Circular layout — places all vertices at equal angular intervals on a circle.
+    Circular,
 }
 
 /// Tree layout engine.
@@ -167,6 +169,11 @@ pub fn apply_layout_kind(
             // Uses OrganicLayoutConfig::default() for now.
             // Callers who need custom config should use OrganicLayout directly.
             let layout = OrganicLayout::new(OrganicLayoutConfig::default());
+            layout.layout(store, page_id)
+        }
+        LayoutKind::Circular => {
+            // DISPATCH ADDED IN COMMIT 2
+            let layout = crate::circular::CircularLayout::new(CircularLayoutConfig::default());
             layout.layout(store, page_id)
         }
     }
@@ -1415,6 +1422,10 @@ mod tests {
         let kind2 = LayoutKind::Hierarchical;
         let debug_str2 = format!("{:?}", kind2);
         assert!(debug_str2.contains("Hierarchical"));
+
+        let kind3 = LayoutKind::Circular;
+        let debug_str3 = format!("{:?}", kind3);
+        assert!(debug_str3.contains("Circular"));
     }
 
     // ── Empty Page Tests ────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ pub mod hierarchy;
 pub mod layer_assignment;
 pub mod organic;
 pub mod tree;
+pub mod circular;
 
 use diagram_core::geometry::CellGeometry;
 use diagram_core::id::PageId;
@@ -48,9 +49,10 @@ use crate::cycle_removal::CycleRemover;
 use crate::hierarchy::HierarchyModel;
 use crate::layer_assignment::LayerAssignment;
 
-pub use crate::config::{Direction, LayoutConfig, OrganicLayoutConfig};
+pub use crate::config::{CircularLayoutConfig, Direction, LayoutConfig, OrganicLayoutConfig};
 pub use crate::error::{LayoutError, LayoutResult};
 pub use crate::tree::{LayoutKind, TreeLayout, TreeLayoutResult, apply_layout_kind};
+pub use crate::circular::CircularLayout;
 
 /// A stage in the layout pipeline.
 ///
