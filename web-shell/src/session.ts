@@ -307,12 +307,16 @@ export class DiagramEngineSession {
    * @param from Source vertex SlotmapId
    * @param to Target vertex SlotmapId
    * @param routingKind 'orthogonal' (default) or 'straight'
+   * @param sourcePort 0=auto, 1=N, 2=E, 3=S, 4=W (default: 0)
+   * @param targetPort 0=auto, 1=N, 2=E, 3=S, 4=W (default: 0)
    * @returns The new edge's SlotmapId, or an error
    */
   connectVertices(
     from: SlotmapId,
     to: SlotmapId,
     routingKind: 'orthogonal' | 'straight' = 'orthogonal',
+    sourcePort: number = 0,
+    targetPort: number = 0,
   ): Result<SlotmapId, EngineError> {
     const g = this.guard();
     if (!g.ok) return g;
@@ -323,6 +327,8 @@ export class DiagramEngineSession {
         from.idx,
         to.idx,
         routingKindVal,
+        sourcePort,
+        targetPort,
       );
       this.#onStateChange?.();
       return ok({ idx: rawEdgeId, version: 0 });

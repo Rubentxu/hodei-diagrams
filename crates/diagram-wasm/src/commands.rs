@@ -208,6 +208,7 @@ fn find_edge_by_idx(model: &diagram_core::DiagramModel, idx: u32) -> Option<diag
 ///
 /// `from` and `to` are the source and target vertex slotmap index values (the `idx` field from SlotmapId).
 /// `routing_kind` is 0 for orthogonal (default) or 1 for straight.
+/// `source_port` and `target_port` are 0 for auto, 1=N, 2=E, 3=S, 4=W.
 ///
 /// Returns the new edge ID on success.
 ///
@@ -221,8 +222,12 @@ pub fn connect_vertices(
     from: u32,
     to: u32,
     routing_kind: u32,
+    source_port: u32,
+    target_port: u32,
 ) -> Result<u32, JsValue> {
     let kind = routing_kind_from_u32(routing_kind);
+    let src_port = port_from_u32(source_port);
+    let tgt_port = port_from_u32(target_port);
 
     // First: validate handle (with_engine_mut returns Err on invalid handle)
     let result = with_engine_mut(handle, |e| {
@@ -239,7 +244,7 @@ pub fn connect_vertices(
             }
         };
         e.editor
-            .connect_vertices(from_id, to_id, kind)
+            .connect_vertices_with_ports(from_id, to_id, kind, src_port, tgt_port)
             .map(|edge_id| {
                 let json = match serde_json::to_value(edge_id) {
                     Ok(v) => v,
@@ -258,6 +263,18 @@ pub fn connect_vertices(
         Ok(Ok(edge_idx)) => Ok(edge_idx),
         Ok(Err(e)) => Err(JsValue::from_str(e)),
         Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Convert a u32 port value to Option<Direction>.
+/// 0 = auto (None), 1 = North, 2 = East, 3 = South, 4 = West.
+fn port_from_u32(port: u32) -> Option<diagram_routing::Direction> {
+    match port {
+        1 => Some(diagram_routing::Direction::North),
+        2 => Some(diagram_routing::Direction::East),
+        3 => Some(diagram_routing::Direction::South),
+        4 => Some(diagram_routing::Direction::West),
+        _ => None,
     }
 }
 

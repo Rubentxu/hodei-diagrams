@@ -7,7 +7,7 @@ use diagram_core::{
     CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, Point, StyleId,
     StyleMap, Vertex, VertexId,
 };
-use diagram_routing::{EdgeStyle, RoutingRequest, route};
+use diagram_routing::{Direction, EdgeStyle, RoutingRequest, route};
 
 /// Routing algorithm kind — exposed at the command layer for serialization.
 /// Maps to `diagram_routing::EdgeStyle`.
@@ -1330,6 +1330,10 @@ pub struct ConnectVerticesCommand {
     pub to: VertexId,
     /// The routing algorithm to use.
     pub routing_kind: RoutingKind,
+    /// Optional source port constraint (which side of source to exit from).
+    pub source_port: Option<Direction>,
+    /// Optional target port constraint (which side of target to enter from).
+    pub target_port: Option<Direction>,
     /// The edge ID assigned during `apply`. Used by `undo`.
     #[serde(skip)]
     pub inserted_edge_id: Option<EdgeId>,
@@ -1345,6 +1349,27 @@ impl ConnectVerticesCommand {
             from,
             to,
             routing_kind,
+            source_port: None,
+            target_port: None,
+            inserted_edge_id: None,
+            applied: false,
+        }
+    }
+
+    /// Create a new payload for connecting two vertices with port constraints.
+    pub fn with_ports(
+        from: VertexId,
+        to: VertexId,
+        routing_kind: RoutingKind,
+        source_port: Option<Direction>,
+        target_port: Option<Direction>,
+    ) -> Self {
+        Self {
+            from,
+            to,
+            routing_kind,
+            source_port,
+            target_port,
             inserted_edge_id: None,
             applied: false,
         }
@@ -1410,7 +1435,7 @@ impl ConnectVerticesCommand {
             source,
             target,
             style: self.routing_kind.into(),
-            ports: (None, None),
+            ports: (self.source_port, self.target_port),
             waypoints: &[],
         };
 
