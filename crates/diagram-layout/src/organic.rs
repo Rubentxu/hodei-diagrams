@@ -63,6 +63,9 @@ impl OrganicLayout {
             return Err(LayoutError::NoVertices);
         }
 
+        let vertex_ids: Vec<VertexId> = page_vertices.iter().map(|(id, _)| *id).collect();
+        let n = vertex_ids.len();
+
         // Build adjacency list from edges on this page
         let page_edges: Vec<_> = store
             .edges_with_ids()
@@ -71,8 +74,8 @@ impl OrganicLayout {
 
         let mut adjacency: std::collections::HashMap<VertexId, Vec<VertexId>> =
             std::collections::HashMap::new();
-        for vid in page_vertices.iter().map(|(id, _)| *id) {
-            adjacency.insert(vid, Vec::new());
+        for vid in &vertex_ids {
+            adjacency.insert(*vid, Vec::new());
         }
         for (_, edge) in &page_edges {
             adjacency.entry(edge.source).or_default().push(edge.target);
@@ -84,18 +87,48 @@ impl OrganicLayout {
             std::collections::HashMap::new();
         for (vid, vertex) in &page_vertices {
             if let Some(g) = &vertex.geometry {
-                // Store as center
                 positions.insert(*vid, (g.x + g.width / 2.0, g.y + g.height / 2.0));
             } else {
                 positions.insert(*vid, (0.0, 0.0));
             }
         }
 
-        // TODO: full FR algorithm iterations
+        // FR algorithm parameters
+        let k = self.config.force_constant;
+        let min_dist = self.config.min_distance_limit;
+        let max_dist = self.config.max_distance_limit;
+        let mut temperature = self.config.initial_temp;
+
+        // Auto-calc iterations: 20 * sqrt(n) when max_iterations == 0
+        let max_iters = if self.config.max_iterations == 0 {
+            (20.0 * (n as f64).sqrt()) as u32
+        } else {
+            self.config.max_iterations
+        };
+
+        // Main FR iteration loop
+        for _iter in 0..max_iters {
+            if temperature < 0.001 {
+                break;
+            }
+
+            // Calculate repulsive forces: O(n²)
+            let repulsion = Self::calc_repulsion(&vertex_ids, &positions, k, min_dist, max_dist);
+
+            // Calculate attractive forces along edges: O(E)
+            let attraction = Self::calc_attraction(&vertex_ids, &adjacency, &positions, k);
+
+            // Apply displacements limited by temperature
+            Self::calc_positions(&vertex_ids, &mut positions, &repulsion, &attraction, temperature);
+
+            // Reduce temperature (linear decay)
+            temperature = Self::reduce_temperature(temperature, self.config.initial_temp, max_iters);
+        }
 
         // Build result from final positions
         let mut vertices = Vec::new();
-        for (vid, &(cx, cy)) in &positions {
+        for vid in &vertex_ids {
+            let &(cx, cy) = positions.get(vid).unwrap();
             let geom = store
                 .vertex(*vid)
                 .and_then(|v| v.geometry.as_ref())
@@ -132,6 +165,155 @@ impl OrganicLayout {
             edge_waypoints,
             group_rects,
         })
+    }
+
+    /// Calculate pairwise repulsive forces between all vertices.
+    ///
+    /// O(n²) in vertex count. Force formula: `f_r = -k² / d` where `d` is
+    /// the Euclidean distance, clamped to `[min_dist, max_dist]`.
+    fn calc_repulsion(
+        vertex_ids: &[VertexId],
+        positions: &std::collections::HashMap<VertexId, (f64, f64)>,
+        k: f64,
+        min_dist: f64,
+        max_dist: f64,
+    ) -> std::collections::HashMap<VertexId, (f64, f64)> {
+        let mut displacement: std::collections::HashMap<VertexId, (f64, f64)> =
+            std::collections::HashMap::new();
+        for vid in vertex_ids {
+            displacement.insert(*vid, (0.0, 0.0));
+        }
+
+        for i in 0..vertex_ids.len() {
+            for j in (i + 1)..vertex_ids.len() {
+                let (x1, y1) = *positions.get(&vertex_ids[i]).unwrap();
+                let (x2, y2) = *positions.get(&vertex_ids[j]).unwrap();
+
+                let dx = x1 - x2;
+                let dy = y1 - y2;
+                let dist = (dx * dx + dy * dy).sqrt().max(min_dist).min(max_dist);
+
+                // Repulsive force magnitude: -k² / d
+                let force = -(k * k) / dist;
+
+                // Normalize direction
+                let norm = if dist > 1e-9 { 1.0 / dist } else { 0.0 };
+                let fx = force * dx * norm;
+                let fy = force * dy * norm;
+
+                // Apply equal and opposite forces via Entry API
+                use std::collections::hash_map::Entry;
+                if let Entry::Occupied(mut e1) = displacement.entry(vertex_ids[i]) {
+                    e1.insert((e1.get().0 + fx, e1.get().1 + fy));
+                }
+                if let Entry::Occupied(mut e2) = displacement.entry(vertex_ids[j]) {
+                    e2.insert((e2.get().0 - fx, e2.get().1 - fy));
+                }
+            }
+        }
+
+        displacement
+    }
+
+    /// Calculate attractive forces along edges.
+    ///
+    /// O(E) in edge count. Force formula: `f_a = d² / k` where `d` is
+    /// the Euclidean distance between connected vertices.
+    fn calc_attraction(
+        vertex_ids: &[VertexId],
+        adjacency: &std::collections::HashMap<VertexId, Vec<VertexId>>,
+        positions: &std::collections::HashMap<VertexId, (f64, f64)>,
+        k: f64,
+    ) -> std::collections::HashMap<VertexId, (f64, f64)> {
+        let mut displacement: std::collections::HashMap<VertexId, (f64, f64)> =
+            std::collections::HashMap::new();
+        for vid in vertex_ids {
+            displacement.insert(*vid, (0.0, 0.0));
+        }
+
+        // Track visited pairs to avoid double-counting
+        let mut visited: std::collections::HashSet<(VertexId, VertexId)> =
+            std::collections::HashSet::new();
+
+        for vid in vertex_ids {
+            if let Some(neighbors) = adjacency.get(vid) {
+                for &neighbor in neighbors {
+                    let pair: (VertexId, VertexId) = if vid < &neighbor {
+                        (*vid, neighbor)
+                    } else {
+                        (neighbor, *vid)
+                    };
+                    if visited.contains(&pair) {
+                        continue;
+                    }
+                    visited.insert(pair);
+
+                    let (x1, y1) = *positions.get(vid).unwrap();
+                    let (x2, y2) = *positions.get(&neighbor).unwrap();
+
+                    let dx = x1 - x2;
+                    let dy = y1 - y2;
+                    let dist = (dx * dx + dy * dy).sqrt();
+
+                    if dist < 1e-9 {
+                        continue;
+                    }
+
+                    // Attractive force magnitude: d² / k
+                    let force = (dist * dist) / k;
+                    let norm = 1.0 / dist;
+                    let fx = force * dx * norm;
+                    let fy = force * dy * norm;
+
+                    use std::collections::hash_map::Entry;
+                    if let Entry::Occupied(mut e1) = displacement.entry(*vid) {
+                        e1.insert((e1.get().0 - fx, e1.get().1 - fy));
+                    }
+                    if let Entry::Occupied(mut e2) = displacement.entry(neighbor) {
+                        e2.insert((e2.get().0 + fx, e2.get().1 + fy));
+                    }
+                }
+            }
+        }
+
+        displacement
+    }
+
+    /// Apply calculated displacements to vertex positions, limited by temperature.
+    fn calc_positions(
+        vertex_ids: &[VertexId],
+        positions: &mut std::collections::HashMap<VertexId, (f64, f64)>,
+        repulsion: &std::collections::HashMap<VertexId, (f64, f64)>,
+        attraction: &std::collections::HashMap<VertexId, (f64, f64)>,
+        temperature: f64,
+    ) {
+        for vid in vertex_ids {
+            let (fr_x, fr_y) = *repulsion.get(vid).unwrap();
+            let (fa_x, fa_y) = *attraction.get(vid).unwrap();
+
+            let dx = fr_x + fa_x;
+            let dy = fr_y + fa_y;
+
+            // Clamp displacement to temperature
+            let disp = (dx * dx + dy * dy).sqrt();
+            let clamped = disp.min(temperature);
+
+            let (cx, cy) = *positions.get(vid).unwrap();
+            let factor = if disp > 1e-9 { clamped / disp } else { 0.0 };
+
+            positions.insert(*vid, (cx + dx * factor, cy + dy * factor));
+        }
+    }
+
+    /// Linear temperature decay from initial_temp toward 0.
+    ///
+    /// Each call reduces temperature by `current / max_iter`, floored at 0.0.
+    fn reduce_temperature(current: f64, _initial: f64, max_iter: u32) -> f64 {
+        if max_iter == 0 {
+            return 0.0;
+        }
+        let dec = current / max_iter as f64;
+        (current - dec).max(0.0)
     }
 }
 
@@ -219,9 +401,6 @@ mod tests {
         let mut store = ModelStore::new();
         let page = Page::new(PageId::default());
         let page_id = store.insert_page(page);
-        let mut page_fixed = Page::new(page_id);
-        page_fixed.id = page_id;
-        store.replace_page(page_id, page_fixed);
         let mut page_fixed = Page::new(page_id);
         page_fixed.id = page_id;
         store.replace_page(page_id, page_fixed);
