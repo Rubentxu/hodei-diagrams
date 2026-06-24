@@ -1,12 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  buildEmptyUi,
-  populatePageTabs,
-  showError,
-  hideError,
-  wireFileInput,
-} from '../src/ui.js';
-import type { PageRender, PageToken } from '../src/types.js';
+import { buildEmptyUi, populatePageTabs, showError, hideError, wireFileInput } from '../src/ui.js';
+import type { PageRender, PageToken, Result } from '../src/types.js';
+import type { DiagramEngineSession } from '../src/session.js';
+
+// Minimal mock session for testing buildEmptyUi without engine
+const mockSession: DiagramEngineSession = {
+  executeCommand: (cmd: string): Result<void, string> => ({ ok: true, value: undefined }),
+  executeTransaction: (cmds: string[]): Result<void, string> => ({ ok: true, value: undefined }),
+  undo: (): Result<void, string> => ({ ok: true, value: undefined }),
+  redo: (): Result<void, string> => ({ ok: true, value: undefined }),
+  canUndo: (): boolean => false,
+  canRedo: (): boolean => false,
+  importDrawio: (xml: string): Result<void, string> => ({ ok: true, value: undefined }),
+  exportDrawio: (): Result<string, string> => ({ ok: true, value: '' }),
+  renderAllPages: (): Result<PageRender[], string> => ({ ok: true, value: [] }),
+  renderPage: (_pageIdx: bigint): Result<string, string> => ({ ok: true, value: '' }),
+  getScene: (): Result<import('../src/types.js').ScenePage[], string> => ({ ok: true, value: [] }),
+  loadStencilLibrary: (_name: string, _url: string): Promise<void> => Promise.resolve(),
+  executeCommands: (_cmds: string[]): Result<void, string> => ({ ok: true, value: undefined }),
+  getResolvedStyle: () => ({ ok: true, value: { remaining: {} } }),
+  getMetadata: () => ({
+    ok: true,
+    value: {
+      title: null,
+      author: null,
+      description: null,
+      tags: [],
+      created: null,
+      modified: null,
+    },
+  }),
+  setMetadata: () => ({ ok: true, value: undefined }),
+  setOnStateChange: () => {},
+  dispose: () => {},
+  isActive: true,
+} as unknown as DiagramEngineSession;
 
 function createRoot(): HTMLDivElement {
   return document.createElement('div');
@@ -19,7 +47,7 @@ describe('ui', () => {
 
   it('buildEmptyUi creates all required elements with correct types', () => {
     const root = createRoot();
-    const ui = buildEmptyUi(root);
+    const ui = buildEmptyUi(root, mockSession);
 
     // Zone 1 — Navbar
     expect(ui.fileInput).toBeInstanceOf(HTMLInputElement);

@@ -5,8 +5,9 @@
  * with E2E tests.
  */
 
-import type { PageRender } from './types.js';
-import { buildNavbar } from './navbar.js';
+import type { PageRender, SlotmapId } from './types.js';
+import type { DiagramEngineSession } from './session.js';
+import { buildNavbar, type ToolbarControls } from './navbar.js';
 import { buildSidebar } from './sidebar.js';
 import { buildRail, type RailCallbacks } from './rail.js';
 import { buildHud, type HudControls } from './hud.js';
@@ -74,6 +75,7 @@ export interface UiElements {
   // Core containers
   app: HTMLElement;
   navbar: HTMLElement;
+  toolbar: ToolbarControls;
   sidebar: HTMLElement;
 }
 
@@ -83,6 +85,7 @@ export interface UiElements {
  */
 export function buildEmptyUi(
   root: HTMLElement,
+  session: DiagramEngineSession,
   inspectorContainer?: HTMLElement,
   railCallbacks?: RailCallbacks,
 ): UiElements {
@@ -102,7 +105,7 @@ export function buildEmptyUi(
       });
 
   // ─── Zone 1: Navbar ──────────────────────────────────────────────────────
-  const navbar = buildNavbar();
+  const navbar = buildNavbar(session);
 
   // ─── Zone 2: Sidebar ─────────────────────────────────────────────────────
   const sidebar = buildSidebar();
@@ -295,6 +298,7 @@ export function buildEmptyUi(
     // Core
     app: root,
     navbar: navbar.container,
+    toolbar: navbar.toolbar,
     sidebar: sidebar.container,
   };
 }
@@ -421,7 +425,8 @@ export function buildPropertiesDialog(
   overlay.querySelector('[data-testid="dialog-save"]')?.addEventListener('click', () => {
     const title = (overlay.querySelector('#prop-title') as HTMLInputElement)?.value ?? '';
     const author = (overlay.querySelector('#prop-author') as HTMLInputElement)?.value ?? '';
-    const description = (overlay.querySelector('#prop-description') as HTMLTextAreaElement)?.value ?? '';
+    const description =
+      (overlay.querySelector('#prop-description') as HTMLTextAreaElement)?.value ?? '';
     onSave({
       title: title || null,
       author: author || null,

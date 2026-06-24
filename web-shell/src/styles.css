@@ -53,7 +53,7 @@
   --motion-slow: 280ms ease;
 
   /* Layout */
-  --navbar-h: 44px;
+  --navbar-h: 76px;
   --sidebar-w: 220px;
   --inspector-w: 260px;
   --bottom-h: 36px;
@@ -164,11 +164,9 @@ button:disabled {
 .navbar {
   grid-area: navbar;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--bg-surface);
-  padding: 0 var(--lg);
-  gap: var(--md);
   z-index: 10;
   min-height: 0;
   overflow: hidden;
@@ -182,6 +180,85 @@ button:disabled {
   padding-right: var(--md);
   border-right: 1px solid var(--bg-surface);
   margin-right: var(--xs);
+}
+
+.navbar-top-row {
+  display: flex;
+  align-items: center;
+  gap: var(--md);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 var(--lg);
+  height: 44px;
+}
+
+/* ─── Toolbar ──────────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--sm);
+  border-left: 1px solid var(--bg-surface);
+  margin-left: var(--xs);
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  transition:
+    background var(--motion-fast),
+    color var(--motion-fast);
+  flex-shrink: 0;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.toolbar-btn.--active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.toolbar-btn--color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.toolbar-btn--color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.toolbar-btn--color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--bg-surface);
+  margin: 0 var(--xs);
+  flex-shrink: 0;
 }
 
 /* ─── Zone 0: Left Rail ──────────────────────────────────────────────────── */
