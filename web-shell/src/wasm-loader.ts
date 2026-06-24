@@ -36,6 +36,9 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       set_metadata: mod.set_metadata,
       apply_layout: mod.apply_layout,
       route_all_edges: mod.route_all_edges,
+      insert_bend: mod.insert_bend,
+      move_bend: mod.move_bend,
+      remove_bend: mod.remove_bend,
     };
 
     return ok(wasm);

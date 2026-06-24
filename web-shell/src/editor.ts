@@ -660,6 +660,37 @@ export class Editor {
     this.#session.routeAllEdges();
   }
 
+  /**
+   * Insert a Z-bend into an edge at a click position on the given segment.
+   * @param edgeId The edge's SlotmapId
+   * @param segmentIndex The waypoint segment index
+   * @param x Click X coordinate in document space
+   * @param y Click Y coordinate in document space
+   */
+  insertBend(edgeId: SlotmapId, segmentIndex: number, x: number, y: number): void {
+    this.#session.insertBend(edgeId, segmentIndex, x, y);
+  }
+
+  /**
+   * Move an existing bend point to a new position.
+   * @param edgeId The edge's SlotmapId
+   * @param bendIndex The waypoint index of the bend to move
+   * @param x New X coordinate in document space
+   * @param y New Y coordinate in document space
+   */
+  moveBend(edgeId: SlotmapId, bendIndex: number, x: number, y: number): void {
+    this.#session.moveBend(edgeId, bendIndex, x, y);
+  }
+
+  /**
+   * Remove a bend point from an edge.
+   * @param edgeId The edge's SlotmapId
+   * @param bendIndex The waypoint index of the bend to remove
+   */
+  removeBend(edgeId: SlotmapId, bendIndex: number): void {
+    this.#session.removeBend(edgeId, bendIndex);
+  }
+
   // ─── Active Tool ──────────────────────────────────────────────────────────
 
   /** Current active tool. */

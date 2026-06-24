@@ -30,12 +30,16 @@
 
 #![deny(missing_docs)]
 
+mod bend;
 mod error;
 mod orth;
 mod perimeter;
 mod port;
 mod segment;
 
+pub use bend::{
+    insert_orthogonal_bend, move_orthogonal_bend, normalize_waypoints, remove_orthogonal_bend,
+};
 pub use diagram_core::geometry::Point;
 pub use error::{RoutingError, RoutingResult};
 pub use orth::route_orthogonal;

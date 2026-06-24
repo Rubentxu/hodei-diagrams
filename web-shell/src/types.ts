@@ -38,6 +38,9 @@ export type WasmModule = {
   set_metadata(_h: number, _json: string): void;
   apply_layout(_h: number, _kind_json: string, _config_json: string): void;
   route_all_edges(_h: number): void;
+  insert_bend(_h: number, _edge_idx: number, _seg: number, _x: number, _y: number): void;
+  move_bend(_h: number, _edge_idx: number, _bend: number, _x: number, _y: number): void;
+  remove_bend(_h: number, _edge_idx: number, _bend: number): void;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;

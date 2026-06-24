@@ -1,12 +1,16 @@
 //! Layout WASM bindings: dispatch layout algorithm and commit results as a transaction.
 
 use diagram_commands::Transaction;
+use diagram_core::DiagramModel;
 use diagram_core::geometry::CellGeometry;
+use diagram_core::geometry::Point;
 use diagram_core::id::{EdgeId, PageId, VertexId};
+use diagram_core::store::ModelStore;
 use diagram_layout::{
     HierarchicalLayout, LayoutConfig, LayoutKind, TreeLayoutResult, apply_layout_kind,
 };
 use diagram_routing::{EdgeStyle, RoutingRequest, route};
+use diagram_routing::{insert_orthogonal_bend, move_orthogonal_bend, remove_orthogonal_bend};
 use wasm_bindgen::prelude::*;
 
 use crate::engine::with_engine_mut;
@@ -266,6 +270,273 @@ pub fn route_all_edges(handle: u32) -> Result<(), JsValue> {
         tx.commit(&mut e.editor).map_err(|ce| {
             Box::leak(format!("RouteAllEdges: commit: {}", ce).into_boxed_str()) as &str
         })
+    })
+    .map_err(|_| JsValue::from_str("InvalidHandle"))?
+    .map_err(JsValue::from_str)
+}
+
+// ─── Bend editing helpers ─────────────────────────────────────────────────────
+
+/// Find an edge ID by its raw slotmap index.
+fn find_edge_by_idx(model: &DiagramModel, idx: u32) -> Option<EdgeId> {
+    model
+        .store
+        .edges_with_ids()
+        .find(|(eid, _)| {
+            let json = match serde_json::to_value(eid) {
+                Ok(v) => v,
+                Err(_) => return false,
+            };
+            let json_idx = match json.get("idx") {
+                Some(v) => match v.as_u64() {
+                    Some(n) => n as u32,
+                    None => return false,
+                },
+                None => return false,
+            };
+            json_idx == idx
+        })
+        .map(|(eid, _)| eid)
+}
+
+/// Compute the center point of a vertex.
+fn vertex_center(store: &ModelStore, vid: VertexId) -> Option<Point> {
+    let v = store.vertex(vid)?;
+    let g = v.geometry?;
+    Some(Point {
+        x: g.x + g.width / 2.0,
+        y: g.y + g.height / 2.0,
+    })
+}
+
+/// Insert a Z-bend into an edge at a click position on the given segment.
+///
+/// `handle` is the engine handle.
+/// `edge_idx` is the slotmap index of the edge.
+/// `segment_index` is the waypoint segment to bend (0 = between waypoint 0 and 1).
+/// `x` and `y` are the click coordinates in document space.
+///
+/// On success the edge waypoints are updated and one history entry is pushed
+/// (one undo reverts the change). On failure the store is unchanged.
+///
+/// # Errors
+///
+/// - `"InvalidHandle"` if the engine handle is not valid
+/// - `"InsertBend: edge not found"` if no edge matches `edge_idx`
+/// - `"InsertBend: missing geometry"` if source or target vertex lacks geometry
+/// - `"InsertBend: commit: <error>"` if the transaction commit fails
+#[wasm_bindgen]
+pub fn insert_bend(
+    handle: u32,
+    edge_idx: u32,
+    segment_index: u32,
+    x: f64,
+    y: f64,
+) -> Result<(), JsValue> {
+    let click = Point { x, y };
+
+    with_engine_mut(handle, |e| {
+        let store = &e.editor.model().store;
+
+        // Find the edge
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("InsertBend: edge not found");
+            }
+        };
+
+        let edge = match store.edge(eid) {
+            Some(ed) => ed,
+            None => {
+                return Err("InsertBend: edge not found");
+            }
+        };
+
+        // Get source and target centers
+        let src_center = match vertex_center(store, edge.source) {
+            Some(c) => c,
+            None => return Err("InsertBend: source vertex has no geometry"),
+        };
+        let tgt_center = match vertex_center(store, edge.target) {
+            Some(c) => c,
+            None => return Err("InsertBend: target vertex has no geometry"),
+        };
+
+        // Build full path: [source_center, ...waypoints, target_center]
+        let mut full_path = vec![src_center];
+        full_path.extend_from_slice(&edge.waypoints);
+        full_path.push(tgt_center);
+
+        // Insert bend
+        let new_path = insert_orthogonal_bend(&full_path, segment_index as usize, click);
+
+        // Extract new waypoints (exclude source and target centers)
+        let new_waypoints = if new_path.len() > 2 {
+            new_path[1..new_path.len() - 1].to_vec()
+        } else {
+            vec![]
+        };
+
+        // Commit transaction
+        let tx = Transaction::new().set_edge_waypoints(eid, new_waypoints);
+        tx.commit(&mut e.editor)
+            .map_err(|ce| Box::leak(format!("InsertBend: commit: {}", ce).into_boxed_str()) as &str)
+    })
+    .map_err(|_| JsValue::from_str("InvalidHandle"))?
+    .map_err(JsValue::from_str)
+}
+
+/// Move an existing bend point to a new position.
+///
+/// `handle` is the engine handle.
+/// `edge_idx` is the slotmap index of the edge.
+/// `bend_index` is the waypoint index of the bend to move (relative to waypoints,
+/// not the full path — so waypoints[0] is bend_index 0).
+/// `x` and `y` are the new position in document space.
+///
+/// On success the edge waypoints are updated and one history entry is pushed.
+/// On failure the store is unchanged.
+///
+/// # Errors
+///
+/// - `"InvalidHandle"` if the engine handle is not valid
+/// - `"MoveBend: edge not found"` if no edge matches `edge_idx`
+/// - `"MoveBend: missing geometry"` if source or target vertex lacks geometry
+/// - `"MoveBend: commit: <error>"` if the transaction commit fails
+#[wasm_bindgen]
+pub fn move_bend(
+    handle: u32,
+    edge_idx: u32,
+    bend_index: u32,
+    x: f64,
+    y: f64,
+) -> Result<(), JsValue> {
+    let new_point = Point { x, y };
+
+    with_engine_mut(handle, |e| {
+        let store = &e.editor.model().store;
+
+        // Find the edge
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("MoveBend: edge not found");
+            }
+        };
+
+        let edge = match store.edge(eid) {
+            Some(ed) => ed,
+            None => {
+                return Err("MoveBend: edge not found");
+            }
+        };
+
+        // Get source and target centers
+        let src_center = match vertex_center(store, edge.source) {
+            Some(c) => c,
+            None => return Err("MoveBend: source vertex has no geometry"),
+        };
+        let tgt_center = match vertex_center(store, edge.target) {
+            Some(c) => c,
+            None => return Err("MoveBend: target vertex has no geometry"),
+        };
+
+        // Build full path: [source_center, ...waypoints, target_center]
+        let mut full_path = vec![src_center];
+        full_path.extend_from_slice(&edge.waypoints);
+        full_path.push(tgt_center);
+
+        // bend_index in waypoints corresponds to full_path[bend_index + 1]
+        let full_bend_index = (bend_index as usize) + 1;
+
+        // Move the bend
+        let new_path = move_orthogonal_bend(&full_path, full_bend_index, new_point);
+
+        // Extract new waypoints
+        let new_waypoints = if new_path.len() > 2 {
+            new_path[1..new_path.len() - 1].to_vec()
+        } else {
+            vec![]
+        };
+
+        // Commit transaction
+        let tx = Transaction::new().set_edge_waypoints(eid, new_waypoints);
+        tx.commit(&mut e.editor)
+            .map_err(|ce| Box::leak(format!("MoveBend: commit: {}", ce).into_boxed_str()) as &str)
+    })
+    .map_err(|_| JsValue::from_str("InvalidHandle"))?
+    .map_err(JsValue::from_str)
+}
+
+/// Remove a bend point from an edge.
+///
+/// `handle` is the engine handle.
+/// `edge_idx` is the slotmap index of the edge.
+/// `bend_index` is the waypoint index of the bend to remove (relative to waypoints,
+/// not the full path).
+///
+/// On success the edge waypoints are updated and one history entry is pushed.
+/// On failure the store is unchanged.
+///
+/// # Errors
+///
+/// - `"InvalidHandle"` if the engine handle is not valid
+/// - `"RemoveBend: edge not found"` if no edge matches `edge_idx`
+/// - `"RemoveBend: missing geometry"` if source or target vertex lacks geometry
+/// - `"RemoveBend: commit: <error>"` if the transaction commit fails
+#[wasm_bindgen]
+pub fn remove_bend(handle: u32, edge_idx: u32, bend_index: u32) -> Result<(), JsValue> {
+    with_engine_mut(handle, |e| {
+        let store = &e.editor.model().store;
+
+        // Find the edge
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("RemoveBend: edge not found");
+            }
+        };
+
+        let edge = match store.edge(eid) {
+            Some(ed) => ed,
+            None => {
+                return Err("RemoveBend: edge not found");
+            }
+        };
+
+        // Get source and target centers
+        let src_center = match vertex_center(store, edge.source) {
+            Some(c) => c,
+            None => return Err("RemoveBend: source vertex has no geometry"),
+        };
+        let tgt_center = match vertex_center(store, edge.target) {
+            Some(c) => c,
+            None => return Err("RemoveBend: target vertex has no geometry"),
+        };
+
+        // Build full path: [source_center, ...waypoints, target_center]
+        let mut full_path = vec![src_center];
+        full_path.extend_from_slice(&edge.waypoints);
+        full_path.push(tgt_center);
+
+        // bend_index in waypoints corresponds to full_path[bend_index + 1]
+        let full_bend_index = (bend_index as usize) + 1;
+
+        // Remove the bend
+        let new_path = remove_orthogonal_bend(&full_path, full_bend_index);
+
+        // Extract new waypoints
+        let new_waypoints = if new_path.len() > 2 {
+            new_path[1..new_path.len() - 1].to_vec()
+        } else {
+            vec![]
+        };
+
+        // Commit transaction
+        let tx = Transaction::new().set_edge_waypoints(eid, new_waypoints);
+        tx.commit(&mut e.editor)
+            .map_err(|ce| Box::leak(format!("RemoveBend: commit: {}", ce).into_boxed_str()) as &str)
     })
     .map_err(|_| JsValue::from_str("InvalidHandle"))?
     .map_err(JsValue::from_str)

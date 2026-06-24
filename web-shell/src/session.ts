@@ -522,4 +522,59 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Insert a Z-bend into an edge at a click position on the given segment.
+   * @param edgeId The edge's SlotmapId
+   * @param segmentIndex The waypoint segment index (0 = between waypoint 0 and 1)
+   * @param x Click X coordinate in document space
+   * @param y Click Y coordinate in document space
+   */
+  insertBend(edgeId: SlotmapId, segmentIndex: number, x: number, y: number): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.insert_bend(this.handle as number, edgeId.idx, segmentIndex, x, y);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Move an existing bend point to a new position.
+   * @param edgeId The edge's SlotmapId
+   * @param bendIndex The waypoint index of the bend to move
+   * @param x New X coordinate in document space
+   * @param y New Y coordinate in document space
+   */
+  moveBend(edgeId: SlotmapId, bendIndex: number, x: number, y: number): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.move_bend(this.handle as number, edgeId.idx, bendIndex, x, y);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Remove a bend point from an edge.
+   * @param edgeId The edge's SlotmapId
+   * @param bendIndex The waypoint index of the bend to remove
+   */
+  removeBend(edgeId: SlotmapId, bendIndex: number): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.remove_bend(this.handle as number, edgeId.idx, bendIndex);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }
