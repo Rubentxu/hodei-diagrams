@@ -467,21 +467,19 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   rerouteEdgesItem.setAttribute('data-testid', 'menu-reroute-edges');
   arrangeList.appendChild(rerouteEdgesItem);
 
-  // Disabled items: Group, Ungroup
+  // Group, Ungroup items (enabled/disabled dynamically based on selection via ToolbarControls.update)
   const groupItem = document.createElement('button');
   groupItem.className = 'menu-item';
   groupItem.textContent = 'Group';
   groupItem.setAttribute('data-testid', 'menu-group');
-  groupItem.disabled = true;
-  groupItem.title = 'Grouping requires a group to be selected';
+  groupItem.title = 'Group selected shapes (requires 2+ shapes)';
   arrangeList.appendChild(groupItem);
 
   const ungroupItem = document.createElement('button');
   ungroupItem.className = 'menu-item';
   ungroupItem.textContent = 'Ungroup';
   ungroupItem.setAttribute('data-testid', 'menu-ungroup');
-  ungroupItem.disabled = true;
-  ungroupItem.title = 'Ungrouping requires a group to be selected';
+  ungroupItem.title = 'Ungroup selected shape (requires exactly 1 grouped shape)';
   arrangeList.appendChild(ungroupItem);
 
   arrangeMenu.appendChild(arrangeList);

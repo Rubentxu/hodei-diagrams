@@ -41,6 +41,8 @@ export type WasmModule = {
   insert_bend(_h: number, _edge_idx: number, _seg: number, _x: number, _y: number): void;
   move_bend(_h: number, _edge_idx: number, _bend: number, _x: number, _y: number): void;
   remove_bend(_h: number, _edge_idx: number, _bend: number): void;
+  group_vertices(_h: number, _vertex_indices_json: string): void;
+  ungroup_vertices(_h: number, _vertex_idx: number): void;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;

@@ -39,6 +39,8 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       insert_bend: mod.insert_bend,
       move_bend: mod.move_bend,
       remove_bend: mod.remove_bend,
+      group_vertices: mod.group_vertices,
+      ungroup_vertices: mod.ungroup_vertices,
     };
 
     return ok(wasm);

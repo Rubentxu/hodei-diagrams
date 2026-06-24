@@ -11,6 +11,7 @@ use crate::payload::{
     ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, MoveGroupPayload,
     MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
     RemoveVertexPayload, RenamePagePayload, RoutingKind, SetEdgeWaypointsPayload,
+    SetVertexParentPayload,
 };
 use diagram_core::{
     CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, Point, StyleMap,
@@ -277,6 +278,15 @@ impl Transaction {
     pub fn remove_group(mut self, id: GroupId) -> Self {
         self.commands
             .push(Command::RemoveGroup(RemoveGroupPayload::new(id)));
+        self
+    }
+
+    /// Set a vertex's parent group in the transaction.
+    pub fn set_vertex_parent(mut self, vertex_id: VertexId, parent: Option<GroupId>) -> Self {
+        self.commands
+            .push(Command::SetVertexParent(SetVertexParentPayload::new(
+                vertex_id, parent,
+            )));
         self
     }
 

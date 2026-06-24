@@ -647,6 +647,38 @@ export class Editor {
   }
 
   /**
+   * Group selected vertices into a new container group.
+   * Requires at least 2 selected vertices.
+   * Uses the session's groupVertices method.
+   */
+  groupSelection(): void {
+    if (this.#selection.size < 2) return;
+    const ids = Array.from(this.#selection);
+    const result = this.#session.groupVertices(ids);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    this.#replay();
+  }
+
+  /**
+   * Ungroup the selected vertex by removing it from its parent group.
+   * Requires exactly 1 selected vertex that has a parent group.
+   * Uses the session's ungroupVertices method.
+   */
+  ungroupSelection(): void {
+    if (this.#selection.size !== 1) return;
+    const id = Array.from(this.#selection)[0]!;
+    const result = this.#session.ungroupVertices(id);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    this.#replay();
+  }
+
+  /**
    * Apply a layout algorithm to the current page.
    * @param kind Layout kind: "Organic", "Tree", "Hierarchical", "Circular", "Grid"
    * @param config Optional layout-specific configuration

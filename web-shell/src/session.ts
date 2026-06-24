@@ -577,4 +577,40 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Group selected vertices into a new container group.
+   * @param ids Array of vertex SlotmapIds to group
+   * @returns Error if grouping fails
+   */
+  groupVertices(ids: SlotmapId[]): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const indices = ids.map((id) => id.idx);
+      const json = JSON.stringify(indices);
+      this.wasm.group_vertices(this.handle as number, json);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Ungroup a vertex by removing it from its parent group.
+   * @param id The vertex SlotmapId to ungroup
+   * @returns Error if ungrouping fails
+   */
+  ungroupVertices(id: SlotmapId): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.ungroup_vertices(this.handle as number, id.idx);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }

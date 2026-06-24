@@ -1634,6 +1634,59 @@ impl MoveGroupPayload {
     }
 }
 
+/// Payload for setting a vertex's parent group.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetVertexParentPayload {
+    /// The vertex to modify.
+    pub vertex_id: VertexId,
+    /// The new parent group, or None to remove from any group.
+    pub parent: Option<GroupId>,
+    /// Previous parent (populated by apply).
+    #[serde(skip)]
+    pub prev_parent: Option<GroupId>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetVertexParentPayload {
+    /// Create a new payload for setting a vertex's parent.
+    pub fn new(vertex_id: VertexId, parent: Option<GroupId>) -> Self {
+        Self {
+            vertex_id,
+            parent,
+            prev_parent: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-parent operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let vertex = model
+            .store
+            .vertex_mut(self.vertex_id)
+            .ok_or(CommandError::VertexNotFound(self.vertex_id))?;
+        self.prev_parent = vertex.parent;
+        vertex.parent = self.parent;
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the set-parent operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let vertex = model
+            .store
+            .vertex_mut(self.vertex_id)
+            .ok_or(CommandError::VertexNotFound(self.vertex_id))?;
+        vertex.parent = self.prev_parent;
+        self.applied = false;
+        Ok(())
+    }
+}
+
 /// Payload for setting edge waypoints.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SetEdgeWaypointsPayload {
