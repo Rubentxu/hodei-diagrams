@@ -2141,3 +2141,13 @@ svg [data-editing='true'] text.vertex-label,
     color: black !important;
   }
 }
+
+/* ─── Bend Handle Styling ─────────────────────────────────────────────────────── */
+.bend-handle {
+  cursor: move;
+  pointer-events: all;
+}
+
+.bend-handle:hover {
+  fill: #2563eb;
+}

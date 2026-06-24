@@ -122,6 +122,13 @@ export class Editor {
     return this.#textEdit !== null;
   }
 
+  // ─── Edge / Bend Editing ───────────────────────────────────────────────────
+  #selectedEdgeId: SlotmapId | null = null;
+  #selectedBendIndex: number | null = null;
+  #bendDrag: { edgeId: SlotmapId; bendIndex: number } | null = null;
+  #onBendDragMoveBound: (e: PointerEvent) => void;
+  #onBendDragUpBound: (e: PointerEvent) => void;
+
   // Internal clipboard for copy/paste
   #clipboard: { vertices: Vertex[]; offset: number } | null = null;
 
@@ -141,6 +148,10 @@ export class Editor {
     this.#onSelectionChange = onSelectionChange ?? (() => {});
     this.#onToolChange = onToolChange ?? (() => {});
     this.#getZoom = getZoom ?? (() => 1);
+
+    // Initialize bound event handlers for bend dragging
+    this.#onBendDragMoveBound = (e: PointerEvent) => this.#onBendDragMove(e);
+    this.#onBendDragUpBound = () => this.#onBendDragUp();
   }
 
   // ─── Public Selection API ──────────────────────────────────────────────────
@@ -1035,9 +1046,15 @@ export class Editor {
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
+    // Clean up bend drag listeners
+    this.#viewer.removeEventListener('pointermove', this.#onBendDragMoveBound);
+    this.#viewer.removeEventListener('pointerup', this.#onBendDragUpBound);
+    this.#viewer.removeEventListener('pointercancel', this.#onBendDragUpBound);
     this.#dragState = null;
+    this.#bendDrag = null;
     this.#cancelMarquee();
     this.#cancelConnect();
+    this.#clearEdgeSelection();
   }
 
   /** Execute undo and replay. For toolbar button binding. */
@@ -1591,6 +1608,11 @@ export class Editor {
 
     // Re-apply selection if still valid
     this.#reapplySelection();
+
+    // Re-render bend handles if an edge is selected
+    if (this.#selectedEdgeId) {
+      this.#renderBendHandles();
+    }
   }
 
   // ─── Selection ────────────────────────────────────────────────────────────
@@ -1676,6 +1698,33 @@ export class Editor {
     const value = attrEl.getAttribute('data-vertex-id');
     if (!value) return null;
     return parseSlotmapAttr(value);
+  }
+
+  /** Hit-test a pointer event against edges. Returns SlotmapId or null. */
+  #hitTestEdge(e: PointerEvent): SlotmapId | null {
+    const target = e.target as Element | null;
+    if (!target) return null;
+    const attrEl = target.closest('[data-edge-id]');
+    if (!attrEl) return null;
+    const value = attrEl.getAttribute('data-edge-id');
+    if (!value) return null;
+    return parseSlotmapAttr(value);
+  }
+
+  /** Select an edge and show its bend handles. */
+  #selectEdge(edgeId: SlotmapId): void {
+    this.#selectedEdgeId = edgeId;
+    // Clear vertex selection
+    this.#selection.clear();
+    this.#renderBendHandles();
+    this.#notifySelectionChange();
+  }
+
+  /** Clear edge selection and remove bend handles. */
+  #clearEdgeSelection(): void {
+    this.#selectedEdgeId = null;
+    this.#selectedBendIndex = null;
+    this.#viewer.querySelectorAll('.bend-handle').forEach((el) => el.remove());
   }
 
   // ─── Marquee Selection ────────────────────────────────────────────────────
@@ -1793,6 +1842,14 @@ export class Editor {
     // Ignore non-primary button
     if (e.button !== 0) return;
 
+    // Check if clicking on a bend handle FIRST (before any other hit testing)
+    const bendHandle = (e.target as Element)?.closest('.bend-handle');
+    if (bendHandle && this.#selectedEdgeId) {
+      const bendIndex = parseInt(bendHandle.getAttribute('data-bend-index') || '0');
+      this.#startBendDrag(this.#selectedEdgeId, bendIndex, e);
+      return;
+    }
+
     // Label placement mode: create a label shape and immediately open text editor
     if (this.#labelPlacementActive) {
       this.#labelPlacementActive = false;
@@ -1846,6 +1903,18 @@ export class Editor {
 
     if (!hit) {
       // Click on empty area
+      // Try edge hit testing as fallback
+      const edgeHit = this.#hitTestEdge(e);
+      if (edgeHit) {
+        this.#selectEdge(edgeHit);
+        return;
+      }
+
+      // Clear edge selection when clicking empty space
+      if (this.#selectedEdgeId) {
+        this.#clearEdgeSelection();
+      }
+
       if (e.shiftKey) {
         // Shift+click on empty: start marquee
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
@@ -2474,12 +2543,167 @@ export class Editor {
     this.setActiveTool(null);
   }
 
+  // ─── Bend Handle Rendering ───────────────────────────────────────────────
+
+  /** Render bend handles for the currently selected edge. */
+  #renderBendHandles(): void {
+    // Remove old handles
+    this.#viewer.querySelectorAll('.bend-handle').forEach((el) => el.remove());
+
+    if (!this.#selectedEdgeId) return;
+
+    // Find the edge's path element in the SVG
+    const edgeSelector = `[data-edge-id="${this.#selectedEdgeId.idx}:${this.#selectedEdgeId.version}"]`;
+    const pathEl = this.#viewer.querySelector(edgeSelector);
+    if (!pathEl) return;
+
+    // Get the edge's waypoints from the scene
+    const pts = this.#getEdgeWaypoints(this.#selectedEdgeId);
+    // For each intermediate waypoint (not first/last which are source/target centers),
+    // create a circle handle
+    for (let i = 1; i < pts.length - 1; i++) {
+      const pt = pts[i]!;
+      const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      handle.setAttribute('cx', String(pt.x));
+      handle.setAttribute('cy', String(pt.y));
+      handle.setAttribute('r', '5');
+      handle.setAttribute('class', 'bend-handle');
+      handle.setAttribute('data-bend-index', String(i));
+      handle.setAttribute('fill', '#4a9eff');
+      handle.setAttribute('stroke', '#fff');
+      handle.setAttribute('stroke-width', '1.5');
+      handle.style.cursor = 'move';
+      this.#viewer.appendChild(handle);
+    }
+  }
+
+  /** Get waypoints for an edge from the scene cache. */
+  #getEdgeWaypoints(edgeId: SlotmapId): Array<{ x: number; y: number }> {
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        // Check for LineElement
+        const line = e['Line'] as Record<string, unknown> | undefined;
+        if (line) {
+          const idField = line['id'] as { idx?: number; version?: number } | undefined;
+          if (idField?.idx === edgeId.idx && idField?.version === edgeId.version) {
+            const from = line['from'] as { x?: number; y?: number } | undefined;
+            const to = line['to'] as { x?: number; y?: number } | undefined;
+            if (from && to) {
+              return [
+                { x: from.x ?? 0, y: from.y ?? 0 },
+                { x: to.x ?? 0, y: to.y ?? 0 },
+              ];
+            }
+          }
+        }
+        // Check for PathElement
+        const path = e['Path'] as Record<string, unknown> | undefined;
+        if (path) {
+          const idField = path['id'] as { idx?: number; version?: number } | undefined;
+          if (idField?.idx === edgeId.idx && idField?.version === edgeId.version) {
+            const points = path['points'] as Array<{ x?: number; y?: number }> | undefined;
+            if (points && points.length > 0) {
+              return points.map((p) => ({ x: p.x ?? 0, y: p.y ?? 0 }));
+            }
+          }
+        }
+      }
+    }
+    return [];
+  }
+
+  /** Compute perpendicular distance from a point to a line segment. */
+  #pointToSegmentDist(
+    pt: { x: number; y: number },
+    segA: { x: number; y: number },
+    segB: { x: number; y: number },
+  ): number {
+    const dx = segB.x - segA.x;
+    const dy = segB.y - segA.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) {
+      // Segment is a point
+      return Math.hypot(pt.x - segA.x, pt.y - segA.y);
+    }
+    // Project point onto line, clamped to segment
+    let t = ((pt.x - segA.x) * dx + (pt.y - segA.y) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = segA.x + t * dx;
+    const projY = segA.y + t * dy;
+    return Math.hypot(pt.x - projX, pt.y - projY);
+  }
+
+  /** Find the nearest segment index for a point on an edge. */
+  #findNearestSegment(
+    pts: Array<{ x: number; y: number }>,
+    point: { x: number; y: number },
+  ): number {
+    let minDist = Infinity;
+    let nearest = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const d = this.#pointToSegmentDist(point, pts[i]!, pts[i + 1]!);
+      if (d < minDist) {
+        minDist = d;
+        nearest = i;
+      }
+    }
+    return nearest;
+  }
+
+  // ─── Bend Drag FSM ───────────────────────────────────────────────────────
+
+  /** Start dragging a bend handle. */
+  #startBendDrag(edgeId: SlotmapId, bendIndex: number, e: PointerEvent): void {
+    this.#bendDrag = { edgeId, bendIndex };
+    this.#selectedBendIndex = bendIndex;
+    this.#viewer.addEventListener('pointermove', this.#onBendDragMoveBound);
+    this.#viewer.addEventListener('pointerup', this.#onBendDragUpBound);
+    this.#viewer.addEventListener('pointercancel', this.#onBendDragUpBound);
+  }
+
+  /** Handle pointer move during bend drag. */
+  #onBendDragMove(e: PointerEvent): void {
+    if (!this.#bendDrag) return;
+    const docPoint = this.#clientToDoc(e.clientX, e.clientY);
+    const snapped = this.#snapToGrid(docPoint.x, docPoint.y);
+    this.moveBend(this.#bendDrag.edgeId, this.#bendDrag.bendIndex, snapped.x, snapped.y);
+  }
+
+  /** Handle pointer up to end bend drag. */
+  #onBendDragUp(): void {
+    this.#bendDrag = null;
+    this.#viewer.removeEventListener('pointermove', this.#onBendDragMoveBound);
+    this.#viewer.removeEventListener('pointerup', this.#onBendDragUpBound);
+    this.#viewer.removeEventListener('pointercancel', this.#onBendDragUpBound);
+  }
+
   // ─── Double-Click Text Edit ───────────────────────────────────────────────
 
   /** Handle dblclick on the viewer: start text edit on the hit shape. */
   #onDblClick(e: MouseEvent): void {
     const target = e.target as Element | null;
     if (!target) return;
+
+    // Check if double-clicking on an edge to insert a bend
+    const edgeEl = target.closest('[data-edge-id]');
+    if (edgeEl) {
+      const edgeAttr = edgeEl.getAttribute('data-edge-id');
+      if (edgeAttr) {
+        const edgeId = parseSlotmapAttr(edgeAttr);
+        if (edgeId) {
+          e.preventDefault();
+          e.stopPropagation();
+          const docPoint = this.#clientToDoc(e.clientX, e.clientY);
+          const pts = this.#getEdgeWaypoints(edgeId);
+          const segIdx = this.#findNearestSegment(pts, docPoint);
+          const snapped = this.#snapToGrid(docPoint.x, docPoint.y);
+          this.insertBend(edgeId, segIdx, snapped.x, snapped.y);
+          return;
+        }
+      }
+    }
+
     const shapeEl = target.closest('[data-vertex-id]');
     if (!shapeEl) return;
 
@@ -2519,8 +2743,15 @@ export class Editor {
       return;
     }
 
-    // Delete / Backspace → delete selection
+    // Delete / Backspace → delete selection or bend
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Delete selected bend first
+      if (this.#selectedBendIndex !== null && this.#selectedEdgeId) {
+        this.removeBend(this.#selectedEdgeId, this.#selectedBendIndex);
+        this.#selectedBendIndex = null;
+        e.preventDefault();
+        return;
+      }
       if (this.#selection.size > 0) {
         this.deleteSelection();
       } else if (this.#connectState) {
