@@ -40,6 +40,10 @@ pub enum LayoutError {
     #[error("no root found")]
     NoRoot,
 
+    /// No vertices found on the page (used by organic layout).
+    #[error("no vertices on page")]
+    NoVertices,
+
     /// Tree validation: unknown layout kind encountered.
     #[error("unknown layout kind: {0}")]
     UnknownKind(String),

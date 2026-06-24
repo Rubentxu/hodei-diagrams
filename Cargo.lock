@@ -567,6 +567,7 @@ version = "0.18.0"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
+ "diagram-layout",
  "diagram-routing",
  "ignore",
  "serde",
