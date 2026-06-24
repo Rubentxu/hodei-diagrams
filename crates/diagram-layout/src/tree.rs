@@ -21,8 +21,9 @@ use diagram_core::store::ModelStore;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Direction, LayoutConfig};
+use crate::config::{Direction, LayoutConfig, OrganicLayoutConfig};
 use crate::error::{LayoutError, LayoutResult};
+use crate::organic::OrganicLayout;
 
 /// Minimum jetty length for edge routing (draw.io default).
 #[allow(dead_code)]
@@ -61,6 +62,8 @@ pub enum LayoutKind {
     Hierarchical,
     /// The Moen compact tree layout.
     Tree,
+    /// Fruchterman-Reingold organic force-directed layout.
+    Organic,
 }
 
 /// Tree layout engine.
@@ -158,6 +161,12 @@ pub fn apply_layout_kind(
         }
         LayoutKind::Tree => {
             let layout = TreeLayout::new(config.clone());
+            layout.layout(store, page_id)
+        }
+        LayoutKind::Organic => {
+            // Uses OrganicLayoutConfig::default() for now.
+            // Callers who need custom config should use OrganicLayout directly.
+            let layout = OrganicLayout::new(OrganicLayoutConfig::default());
             layout.layout(store, page_id)
         }
     }
@@ -931,80 +940,92 @@ fn compute_jetty_waypoints(
 
 // ─── Group Bounding Box Adjustment ────────────────────────────────────────────
 
+/// Compute group bounding boxes from vertex positions.
+///
+/// Groups are processed after vertices have been repositioned so that the
+/// bounding box accurately encloses the new vertex positions.
+pub(crate) fn compute_group_bboxes(
+    store: &ModelStore,
+    page_id: PageId,
+    positions: &std::collections::HashMap<VertexId, (f64, f64)>,
+    group_padding: f64,
+) -> Vec<(GroupId, Rect)> {
+    let page_groups: Vec<_> = store
+        .groups_with_ids()
+        .filter(|(_, g)| g.page_id == Some(page_id))
+        .collect();
+
+    let mut result = Vec::new();
+
+    for (gid, _) in &page_groups {
+        // Find all vertices that belong to this group
+        let mut min_x = f64::MAX;
+        let mut min_y = f64::MAX;
+        let mut max_x = f64::MIN;
+        let mut max_y = f64::MIN;
+        let mut has_children = false;
+
+        for (vid, vertex) in store.vertices_with_ids() {
+            if vertex.page_id != Some(page_id) {
+                continue;
+            }
+            if vertex.parent == Some(*gid) {
+                has_children = true;
+                if let Some(&(cx, cy)) = positions.get(&vid) {
+                    let (w, h) = vertex
+                        .geometry
+                        .as_ref()
+                        .map(|g| (g.width, g.height))
+                        .unwrap_or((120.0, 60.0));
+                    min_x = min_x.min(cx - w / 2.0);
+                    min_y = min_y.min(cy - h / 2.0);
+                    max_x = max_x.max(cx + w / 2.0);
+                    max_y = max_y.max(cy + h / 2.0);
+                }
+            }
+        }
+
+        if !has_children {
+            continue;
+        }
+
+        result.push((
+            *gid,
+            Rect {
+                origin: Point {
+                    x: min_x - group_padding,
+                    y: min_y - group_padding,
+                },
+                size: Size {
+                    width: (max_x - min_x) + 2.0 * group_padding,
+                    height: (max_y - min_y) + 2.0 * group_padding,
+                },
+            },
+        ));
+    }
+
+    result
+}
+
 /// Recompute group bounding boxes based on post-layout vertex positions.
 ///
-/// Groups are processed deepest-first so that inner groups are sized before
-/// their containers. Groups with no children on the page are skipped.
+/// Groups with no children on the page are skipped.
 fn adjust_parents(
     arena: &TreeArena,
     store: &ModelStore,
     page_id: PageId,
     result: &mut Vec<(GroupId, Rect)>,
 ) {
-    // Collect all groups on this page
-    let page_groups: Vec<_> = store
-        .groups_with_ids()
-        .filter(|(_, g)| g.page_id == Some(page_id))
+    // Build positions map from arena nodes
+    let positions: std::collections::HashMap<VertexId, (f64, f64)> = arena
+        .nodes
+        .iter()
+        .map(|node| (node.id, (node.x, node.y)))
         .collect();
 
-    // For each group, find all child vertices (direct and transitive via tree)
-    // and compute the bounding box
-    for (gid, _group) in &page_groups {
-        // Find all tree vertices that belong to this group
-        let mut child_vertices: Vec<usize> = Vec::new();
-
-        for node_idx in 0..arena.nodes.len() {
-            let vid = arena.nodes[node_idx].id;
-
-            // Look up this vertex in the store to check its parent group
-            if let Some(vertex) = store.vertex(vid) {
-                if vertex.page_id == Some(page_id) {
-                    if let Some(vertex_parent) = vertex.parent {
-                        if vertex_parent == *gid {
-                            child_vertices.push(node_idx);
-                        }
-                    }
-                }
-            }
-        }
-
-        if child_vertices.is_empty() {
-            continue; // Skip groups with no children
-        }
-
-        // Compute bounding box of all child vertices
-        let mut min_x = f64::MAX;
-        let mut min_y = f64::MAX;
-        let mut max_x = f64::MIN;
-        let mut max_y = f64::MIN;
-
-        for &node_idx in &child_vertices {
-            let node = &arena.nodes[node_idx];
-            let x = node.x;
-            let y = node.y;
-            let w = node.w;
-            let h = node.h;
-
-            min_x = min_x.min(x);
-            min_y = min_y.min(y);
-            max_x = max_x.max(x + w);
-            max_y = max_y.max(y + h);
-        }
-
-        // Apply GROUP_PADDING on all sides
-        let rect = Rect {
-            origin: Point {
-                x: min_x - GROUP_PADDING,
-                y: min_y - GROUP_PADDING,
-            },
-            size: Size {
-                width: (max_x - min_x) + 2.0 * GROUP_PADDING,
-                height: (max_y - min_y) + 2.0 * GROUP_PADDING,
-            },
-        };
-
-        result.push((*gid, rect));
-    }
+    // Delegate to shared compute_group_bboxes
+    let group_rects = compute_group_bboxes(store, page_id, &positions, GROUP_PADDING);
+    result.extend(group_rects);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
