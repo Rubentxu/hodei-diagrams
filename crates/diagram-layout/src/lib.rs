@@ -35,6 +35,7 @@ pub mod cycle_removal;
 pub mod error;
 pub mod hierarchy;
 pub mod layer_assignment;
+pub mod organic;
 pub mod tree;
 
 use diagram_core::geometry::CellGeometry;
@@ -47,7 +48,7 @@ use crate::cycle_removal::CycleRemover;
 use crate::hierarchy::HierarchyModel;
 use crate::layer_assignment::LayerAssignment;
 
-pub use crate::config::{Direction, LayoutConfig};
+pub use crate::config::{Direction, LayoutConfig, OrganicLayoutConfig};
 pub use crate::error::{LayoutError, LayoutResult};
 pub use crate::tree::{LayoutKind, TreeLayout, TreeLayoutResult, apply_layout_kind};
 

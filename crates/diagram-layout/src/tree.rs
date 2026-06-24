@@ -61,6 +61,8 @@ pub enum LayoutKind {
     Hierarchical,
     /// The Moen compact tree layout.
     Tree,
+    /// Fruchterman-Reingold organic force-directed layout.
+    Organic,
 }
 
 /// Tree layout engine.
@@ -159,6 +161,13 @@ pub fn apply_layout_kind(
         LayoutKind::Tree => {
             let layout = TreeLayout::new(config.clone());
             layout.layout(store, page_id)
+        }
+        LayoutKind::Organic => {
+            // Full dispatch wired in commit 5; for now return a clear error so
+            // callers know this variant needs OrganicLayoutConfig.
+            Err(LayoutError::LayoutFailed(
+                "Organic layout requires OrganicLayoutConfig; use OrganicLayout directly".into(),
+            ))
         }
     }
 }

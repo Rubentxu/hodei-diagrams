@@ -5,10 +5,10 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.28.0 — Fase 6 completada + 4 features shipped (Tree Layout, PNG, PDF, HTML Export, Presentation Mode).**
+**v0.31.0 — Fase 9 completada (Toolbar/Status bar + Layout parity next).**
 Motor Rust sólido con round-trip `.drawio` en archivo real de 4MB (21 celdas,
-AWS-Admisión). 12 crates, ~460+ tests Rust, ~260+ tests E2E.
-68 ADRs (0001-0068). UI con paridad ~55% vs draw.io. Próximo: Fase 9 — Toolbar/Status bar.
+AWS-Admisión). 12 crates, ~500+ tests Rust, ~280+ tests E2E.
+68 ADRs (0001-0068). UI con paridad ~65% vs draw.io. Próximo: Layout engines (Organic/Circular/Grid).
 
 | Crate | Capa | Status |
 |-------|------|--------|
@@ -33,9 +33,8 @@ AWS-Admisión). 12 crates, ~460+ tests Rust, ~260+ tests E2E.
 
 ## 🎯 Active Track: Paridad Funcional con draw.io
 
-**Plan documentado en ADRs 0050-0062.** Fases 0-6 completadas. La UI tiene
-**~45% de paridad** con draw.io. El plan cubre 8 fases secuenciales.
-Fase 9 (Toolbar/Status bar) pendiente de priorizar.
+**Plan documentado en ADRs 0050-0062.** Fases 0-9 completadas. La UI tiene
+**~65% de paridad** con draw.io. Layout engines (Organic/Circular/Grid) son el siguiente hito.
 
 | Fase | Tag | Foco | ADRs | Estado |
 |------|-----|------|------|--------|
@@ -49,7 +48,7 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 | 7. Snap/align | v0.16.0 | Snap to grid, guides, alignment, distribute | 0060 | ✅ Completada (PR #41, #42) |
 | 8. Effects | v0.17.0 | Shadow, glass, gradient (SVG-native) | 0061 | ✅ Completada (PR #43) |
 | **v1.0.0** | **NO automático** | Decisión del usuario | — | — |
-| 9. Toolbar/Status bar | PENDIENTE | Toolbar, status bar, progress indicators | — | ⏸️ Priorizar |
+| 9. Toolbar/Status bar | v0.31.0 | Toolbar, status bar, progress indicators | 0047, 0048, 0049 | ✅ Completada (PR #57, #58, #59) |
 
 ### Fase 0 — Edges interactivos (PR-E1)
 - **Rust**: `ConnectVerticesCommand`, `DisconnectEdgeCommand`, edge.style routing
@@ -169,6 +168,42 @@ Fase 9 (Toolbar/Status bar) pendiente de priorizar.
 - **ADRs**: 0064 (snapshot format), 0065 (Zone 2 sidebar placement), 0066 (idb runtime dep)
 - **E2E tests**: `tests/e2e/version-history.spec.ts`
 - **Unit tests**: `tests/version-store.test.ts`, `tests/auto-save.test.ts`
+
+### Fase 9 Slice 1 (B+C) — Save-Status + Progress/Loading Feedback
+- **PR**: feat/fase-9-status-progress (PR #57), v0.29.0
+- **Feature**: Save-status indicator in HUD Zone 3.5 (Saved / Unsaved changes / Saving... / Auto-saved), wired to existing `last_command_at`/`last_saved_at` trackers + 30s auto-save. WASM-init loading overlay on `#app` (pre-mount). Stencil library loading feedback in HUD (debounced >100ms).
+- **Scope**: web-shell TS only — `hud.ts`, `main.ts`, `styles.css`, `tests/e2e/save-status.spec.ts`
+- **Tests**: 12 E2E tests, cargo test/clippy/fmt all clean
+- **ADRs**: ADR-0047 (Zone 3.5 HUD), ADR-0048 (auto-save deferred innovation)
+- **Invariant**: Zero Rust/WASM changes, zero new npm deps
+
+### Fase 9 Slice 2D (D) — Arrange + Extras + Help Menus
+- **PR**: feat/fase-9-slice2-menus (PR #58), v0.30.0
+- **Feature**: Arrange menu (z-order To Front/Back/Forward/Backward, Align×6, Distribute×H/V, Rotate CW/CCW, Flip H/V, Group/Ungroup disabled), Extras menu (Edit XML, Copy as SVG, Preferences disabled), Help menu (Keyboard Shortcuts, About). 4 z-order TS wrappers in editor.ts.
+- **Scope**: web-shell TS only — `navbar.ts`, `editor.ts`, `main.ts`, `styles.css`, `tests/e2e/menus.spec.ts`
+- **Tests**: E2E tests, cargo test/clippy/fmt all clean
+- **Escalations**: Group/Ungroup kept disabled (TS wrapper follow-up); About dialog uses showDialog (not lightweight overlay)
+
+### Fase 9 Slice 3A (A) — Context-Sensitive Toolbar
+- **PR**: feat/fase-9-slice3-toolbar-a0 (PR #59), v0.31.0
+- **Feature**: Toolbar nested inside navbar (Option A0 — no grid change, reversible). 7 buttons: Fill Color, Line Color, Bold, Italic, Delete, To Front, To Back. Context-sensitive enable/disable based on selection. Navbar grows 44px→76px.
+- **Scope**: web-shell TS only — `navbar.ts`, `styles.css`, `main.ts`, `ui.ts`, `tests/e2e/toolbar.spec.ts`
+- **Key decision**: Option A0 (toolbar inside navbar) chosen over A1 (new grid row) — avoids hard-to-reverse grid change
+- **Invariant**: Zero Rust/WASM changes, zero new npm deps, grid-template-areas unchanged
+
+---
+
+## 🎯 Next Track: Layout Engines + Routing UI
+
+| Engine | Status | draw.io equivalent | Next |
+|--------|--------|---------------------|------|
+| Tree Layout (Moen) | ✅ v0.28.0 | Compact Tree Layout | — |
+| Organic / Force-directed | ⏸️ Pending | mxGraph layout mDIFR | `/sddk-new organic-layout` |
+| Circular Layout | ⏸️ Pending | Arrange > Cicle | — |
+| Grid / Table Layout | ⏸️ Pending | Arrange > Grid | — |
+| Edge Routing UI | ⏸️ Pending | Waypoints, Connection | — |
+
+> Layout engine wiring: `apply_layout(Organic)` / `apply_layout(Circular)` / `apply_layout(Grid)` via WASM export, same pattern as Tree Layout (ADR-0067).
 
 ---
 

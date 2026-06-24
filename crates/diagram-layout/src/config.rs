@@ -2,6 +2,65 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Configuration for the Fruchterman-Reingold organic layout algorithm.
+///
+/// Draw.io defaults are used when no explicit value is provided.
+/// The algorithm is deterministic — no random seed required.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OrganicLayoutConfig {
+    /// Ideal distance between all vertex pairs. Higher values spread vertices apart.
+    /// Draw.io default: 50.0.
+    pub force_constant: f64,
+    /// Minimum distance below which repulsion force is clamped (prevents singularities).
+    /// Draw.io default: 2.0.
+    pub min_distance_limit: f64,
+    /// Maximum distance beyond which forces are ignored (performance cutoff).
+    /// Draw.io default: 500.0.
+    pub max_distance_limit: f64,
+    /// Initial temperature controlling maximum displacement per iteration.
+    /// Draw.io default: 200.0.
+    pub initial_temp: f64,
+    /// Maximum iterations. 0 means auto-calc as 20 * sqrt(vertex_count).
+    pub max_iterations: u32,
+    /// Reset all edge waypoints to straight lines after layout.
+    /// Draw.io default: true.
+    pub reset_edges: bool,
+    /// Disable per-edge style evaluation (treat all edges uniformly).
+    /// Draw.io default: true.
+    pub disable_edge_style: bool,
+}
+
+impl Default for OrganicLayoutConfig {
+    fn default() -> Self {
+        Self {
+            force_constant: 50.0,
+            min_distance_limit: 2.0,
+            max_distance_limit: 500.0,
+            initial_temp: 200.0,
+            max_iterations: 0,
+            reset_edges: true,
+            disable_edge_style: true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod organic_config_tests {
+    use super::*;
+
+    #[test]
+    fn organic_defaults_match_drawio() {
+        let cfg = OrganicLayoutConfig::default();
+        assert!((cfg.force_constant - 50.0).abs() < 1e-9);
+        assert!((cfg.min_distance_limit - 2.0).abs() < 1e-9);
+        assert!((cfg.max_distance_limit - 500.0).abs() < 1e-9);
+        assert!((cfg.initial_temp - 200.0).abs() < 1e-9);
+        assert_eq!(cfg.max_iterations, 0);
+        assert!(cfg.reset_edges);
+        assert!(cfg.disable_edge_style);
+    }
+}
+
 /// The direction in which the layout flows.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Direction {
