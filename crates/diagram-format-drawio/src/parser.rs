@@ -50,6 +50,7 @@ impl DrawioParser {
         let mut in_mxgraph_model = false;
         let mut in_root = false;
         let mut saw_mxgraph_model = false;
+        let mut collecting_points: Option<Vec<(f64, f64)>> = None;
 
         loop {
             buf.clear();
@@ -112,6 +113,24 @@ impl DrawioParser {
                                 }
                             }
                         }
+                        b"Array" => {
+                            // Check if this is a points array: <Array as="points">
+                            let mut is_points = false;
+                            for attr_result in e.attributes().with_checks(false) {
+                                if let Ok(attr) = attr_result {
+                                    if attr.key.as_ref() == b"as" {
+                                        if let Ok(val) = std::str::from_utf8(&attr.value) {
+                                            if val == "points" {
+                                                is_points = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if is_points {
+                                collecting_points = Some(Vec::new());
+                            }
+                        }
                         _ => {
                             let name_bytes = e.name().as_ref().to_vec();
                             let name_str = String::from_utf8_lossy(&name_bytes);
@@ -145,6 +164,24 @@ impl DrawioParser {
                                 }
                             }
                         }
+                    } else if e.name().as_ref() == b"mxPoint" {
+                        // Extract x,y from mxPoint while collecting points
+                        if let Some(ref mut points) = collecting_points {
+                            let mut x = 0.0;
+                            let mut y = 0.0;
+                            for attr_result in e.attributes().with_checks(false) {
+                                if let Ok(attr) = attr_result {
+                                    if let Ok(val) = std::str::from_utf8(&attr.value) {
+                                        match attr.key.as_ref() {
+                                            b"x" => x = val.parse().unwrap_or(0.0),
+                                            b"y" => y = val.parse().unwrap_or(0.0),
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                            points.push((x, y));
+                        }
                     }
                 }
                 Ok(Event::End(e)) => match e.name().as_ref() {
@@ -166,6 +203,18 @@ impl DrawioParser {
                     }
                     b"root" => {
                         in_root = false;
+                    }
+                    b"Array" => {
+                        // End of points array — assign collected points to last cell's geometry
+                        if let Some(points) = collecting_points.take() {
+                            if let Some(ref mut diagram) = current_diagram {
+                                if let Some(cell) = diagram.cells.last_mut() {
+                                    if let Some(ref mut geo) = cell.geometry {
+                                        geo.points = points;
+                                    }
+                                }
+                            }
+                        }
                     }
                     _ => {}
                 },
@@ -302,6 +351,7 @@ impl DrawioParser {
             rotation,
             flip_h,
             flip_v,
+            points: Vec::new(),
         })
     }
 }
@@ -440,6 +490,87 @@ mod tests {
         assert!(
             cell.geometry.is_none(),
             "Page-level as=\"graph\" geometry should NOT be attached to a cell"
+        );
+    }
+
+    const EDGE_WITH_WAYPOINTS: &str = r#"<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1"/>
+        <mxCell id="2" value="A" vertex="1">
+          <mxGeometry x="10" y="10" width="80" height="40"/>
+        </mxCell>
+        <mxCell id="3" value="B" vertex="1">
+          <mxGeometry x="300" y="10" width="80" height="40"/>
+        </mxCell>
+        <mxCell id="4" edge="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="100" y="50"/>
+              <mxPoint x="200" y="80"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"#;
+
+    #[test]
+    fn test_edge_with_waypoints_parses_points() {
+        let parser = DrawioParser::new();
+        let doc = parser.parse_str(EDGE_WITH_WAYPOINTS).unwrap();
+        // Find the edge cell (id="4")
+        let edge_cell = doc.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "4")
+            .expect("edge cell should exist");
+        assert!(
+            edge_cell.edge,
+            "cell should be an edge"
+        );
+        let geo = edge_cell.geometry.as_ref().expect("edge should have geometry");
+        assert_eq!(
+            geo.points.len(),
+            2,
+            "edge should have 2 waypoints"
+        );
+        assert_eq!(geo.points[0], (100.0, 50.0));
+        assert_eq!(geo.points[1], (200.0, 80.0));
+    }
+
+    #[test]
+    fn test_edge_without_waypoints_has_empty_points() {
+        // An edge without Array/points should have empty points vector
+        let xml = r#"<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1"/>
+        <mxCell id="2" vertex="1"/>
+        <mxCell id="3" vertex="1"/>
+        <mxCell id="4" edge="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"#;
+        let parser = DrawioParser::new();
+        let doc = parser.parse_str(xml).unwrap();
+        let edge_cell = doc.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.id == "4")
+            .expect("edge cell should exist");
+        let geo = edge_cell.geometry.as_ref().expect("edge should have geometry");
+        assert!(
+            geo.points.is_empty(),
+            "edge without waypoints should have empty points"
         );
     }
 }

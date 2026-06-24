@@ -1,0 +1,22 @@
+<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="A" value="Vertex A" vertex="1">
+          <mxGeometry x="10" y="20" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="B" value="Vertex B" vertex="1">
+          <mxGeometry x="300" y="20" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="connects" edge="1" source="A" target="B">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="100" y="50"/>
+              <mxPoint x="200" y="80"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

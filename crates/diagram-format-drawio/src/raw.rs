@@ -41,6 +41,10 @@ pub struct RawDrawioGeometry {
     /// Vertical flip flag.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flip_v: Option<bool>,
+    /// Waypoints parsed from `<Array as="points"><mxPoint .../></Array>`.
+    /// Empty for vertices; populated for edges with custom routing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub points: Vec<(f64, f64)>,
 }
 
 /// Root document of a `.drawio` file: `<mxfile>` containing one or more
