@@ -5,7 +5,10 @@
  * All state is in the engine; this is pure UI building and event wiring.
  */
 
-import { ICONS } from './icon';
+import { ICONS } from './icon.js';
+import type { DiagramEngineSession } from './session.js';
+import type { Editor } from './editor.js';
+import type { SlotmapId } from './types.js';
 
 export interface NavbarControls {
   container: HTMLElement;
@@ -14,9 +17,17 @@ export interface NavbarControls {
   redoBtn: HTMLButtonElement;
   saveBtn: HTMLButtonElement;
   zoomDisplay: HTMLSpanElement;
+  toolbar: ToolbarControls;
 }
 
-export function buildNavbar(): NavbarControls {
+/** Toolbar controls exposed for wiring in main.ts */
+export interface ToolbarControls {
+  container: HTMLElement;
+  setEditor(editor: Editor): void;
+  update(selection: readonly SlotmapId[]): void;
+}
+
+export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   const container = document.createElement('div');
   container.className = 'navbar';
   container.setAttribute('data-testid', 'navbar');
@@ -480,7 +491,12 @@ export function buildNavbar(): NavbarControls {
   helpMenu.appendChild(helpList);
   menuBar.appendChild(helpMenu);
 
-  container.appendChild(menuBar);
+  // Wrap menu bar and quick controls in the top row
+  const navbarTopRow = document.createElement('div');
+  navbarTopRow.className = 'navbar-top-row';
+
+  navbarTopRow.appendChild(menuBar);
+  container.appendChild(navbarTopRow);
 
   // ─── Quick controls ───────────────────────────────────────────────────────
   const quickControls = document.createElement('div');
@@ -539,7 +555,202 @@ export function buildNavbar(): NavbarControls {
   saveBtn.setAttribute('data-testid', 'save-btn');
   quickControls.appendChild(saveBtn);
 
-  container.appendChild(quickControls);
+  navbarTopRow.appendChild(quickControls);
+
+  // ─── Toolbar (Zone 1.5) ───────────────────────────────────────────────────
+  const toolbarContainer = document.createElement('div');
+  toolbarContainer.className = 'toolbar';
+  toolbarContainer.setAttribute('data-testid', 'toolbar');
+
+  let activeEditor: Editor | null = null;
+
+  // Helper: create a toolbar button
+  function makeToolbarBtn(testId: string, label: string, onClick: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'toolbar-btn';
+    btn.setAttribute('data-testid', testId);
+    btn.title = label;
+    btn.disabled = true;
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      if (!btn.disabled && activeEditor) {
+        onClick();
+      }
+    });
+    return btn;
+  }
+
+  // Helper: create a toolbar separator
+  function makeToolbarSep(): HTMLElement {
+    const sep = document.createElement('div');
+    sep.className = 'toolbar-sep';
+    return sep;
+  }
+
+  // Fill color button (input type=color styled as swatch)
+  const fillInput = document.createElement('input');
+  fillInput.type = 'color';
+  fillInput.value = '#ffffff';
+  fillInput.className = 'toolbar-btn toolbar-btn--color-swatch';
+  fillInput.setAttribute('data-testid', 'toolbar-fill');
+  fillInput.title = 'Fill color';
+  fillInput.disabled = true;
+  fillInput.addEventListener('input', () => {
+    if (activeEditor && activeEditor.selection.length > 0) {
+      const id = activeEditor.selection[0]!;
+      const cmd = JSON.stringify({
+        ChangeStyle: {
+          id: { idx: id.idx, version: id.version },
+          style: { fillColor: fillInput.value },
+        },
+      });
+      const r = session.executeCommand(cmd);
+      if (!r.ok) console.warn('[toolbar] Fill color failed:', r.error);
+    }
+  });
+
+  // Stroke color button (input type=color styled as swatch)
+  const strokeInput = document.createElement('input');
+  strokeInput.type = 'color';
+  strokeInput.value = '#000000';
+  strokeInput.className = 'toolbar-btn toolbar-btn--color-swatch';
+  strokeInput.setAttribute('data-testid', 'toolbar-stroke');
+  strokeInput.title = 'Stroke color';
+  strokeInput.disabled = true;
+  strokeInput.addEventListener('input', () => {
+    if (activeEditor && activeEditor.selection.length > 0) {
+      const id = activeEditor.selection[0]!;
+      const cmd = JSON.stringify({
+        ChangeStyle: {
+          id: { idx: id.idx, version: id.version },
+          style: { strokeColor: strokeInput.value },
+        },
+      });
+      const r = session.executeCommand(cmd);
+      if (!r.ok) console.warn('[toolbar] Stroke color failed:', r.error);
+    }
+  });
+
+  // Bold button
+  const boldBtn = makeToolbarBtn('toolbar-bold', 'Bold', () => {
+    if (!activeEditor || activeEditor.selection.length === 0) return;
+    const id = activeEditor.selection[0]!;
+    const style = activeEditor.getResolvedStyle(id);
+    const currentBold = style?.remaining['bold'] === '1';
+    const newBold = !currentBold;
+    const cmd = JSON.stringify({
+      ChangeStyle: {
+        id: { idx: id.idx, version: id.version },
+        style: { bold: newBold ? '1' : '0' },
+      },
+    });
+    const r = session.executeCommand(cmd);
+    if (!r.ok) console.warn('[toolbar] Bold toggle failed:', r.error);
+  });
+
+  // Italic button
+  const italicBtn = makeToolbarBtn('toolbar-italic', 'Italic', () => {
+    if (!activeEditor || activeEditor.selection.length === 0) return;
+    const id = activeEditor.selection[0]!;
+    const style = activeEditor.getResolvedStyle(id);
+    const currentItalic = style?.remaining['italic'] === '1';
+    const newItalic = !currentItalic;
+    const cmd = JSON.stringify({
+      ChangeStyle: {
+        id: { idx: id.idx, version: id.version },
+        style: { italic: newItalic ? '1' : '0' },
+      },
+    });
+    const r = session.executeCommand(cmd);
+    if (!r.ok) console.warn('[toolbar] Italic toggle failed:', r.error);
+  });
+
+  // Delete button
+  const deleteBtn = makeToolbarBtn('toolbar-delete', 'Delete', () => {
+    if (!activeEditor) return;
+    const ids = activeEditor.selection;
+    if (ids.length === 0) return;
+    const commands: string[] = [];
+    for (const id of ids) {
+      commands.push(
+        JSON.stringify({
+          RemoveVertex: { id: { idx: id.idx, version: id.version } },
+        }),
+      );
+    }
+    if (commands.length > 0) {
+      const r = session.executeTransaction(commands);
+      if (!r.ok) console.warn('[toolbar] Delete failed:', r.error);
+    }
+  });
+
+  // To Front button
+  const frontBtn = makeToolbarBtn('toolbar-front', 'To Front', () => {
+    if (!activeEditor) return;
+    activeEditor.bringToFront();
+  });
+
+  // To Back button
+  const backBtn = makeToolbarBtn('toolbar-back', 'To Back', () => {
+    if (!activeEditor) return;
+    activeEditor.sendToBack();
+  });
+
+  // Assemble toolbar in order: fill, stroke, sep, bold, italic, sep, delete, front, back
+  toolbarContainer.appendChild(fillInput);
+  toolbarContainer.appendChild(strokeInput);
+  toolbarContainer.appendChild(makeToolbarSep());
+  toolbarContainer.appendChild(boldBtn);
+  toolbarContainer.appendChild(italicBtn);
+  toolbarContainer.appendChild(makeToolbarSep());
+  toolbarContainer.appendChild(deleteBtn);
+  toolbarContainer.appendChild(frontBtn);
+  toolbarContainer.appendChild(backBtn);
+
+  container.appendChild(toolbarContainer);
+
+  // Toolbar controls object
+  const toolbarControls: ToolbarControls = {
+    container: toolbarContainer,
+    setEditor(editor: Editor): void {
+      activeEditor = editor;
+      // Enable all buttons now that we have an editor
+      fillInput.disabled = false;
+      strokeInput.disabled = false;
+      boldBtn.disabled = false;
+      italicBtn.disabled = false;
+      deleteBtn.disabled = false;
+      frontBtn.disabled = false;
+      backBtn.disabled = false;
+    },
+    update(selection: readonly SlotmapId[]): void {
+      const hasSelection = selection.length > 0;
+      const hasMultiSelection = selection.length > 1;
+
+      // Delete, front, back require at least one selection
+      deleteBtn.disabled = !hasSelection || !activeEditor;
+      frontBtn.disabled = !hasSelection || !activeEditor;
+      backBtn.disabled = !hasSelection || !activeEditor;
+
+      // Color and style buttons require exactly one selection
+      const singleSelect = selection.length === 1;
+      fillInput.disabled = !singleSelect || !activeEditor;
+      strokeInput.disabled = !singleSelect || !activeEditor;
+      boldBtn.disabled = !singleSelect || !activeEditor;
+      italicBtn.disabled = !singleSelect || !activeEditor;
+
+      // Update Bold/Italic active state from resolved style
+      if (singleSelect && activeEditor) {
+        const id = selection[0]!;
+        const style = activeEditor.getResolvedStyle(id);
+        boldBtn.classList.toggle('--active', style?.remaining['bold'] === '1');
+        italicBtn.classList.toggle('--active', style?.remaining['italic'] === '1');
+      } else {
+        boldBtn.classList.remove('--active');
+        italicBtn.classList.remove('--active');
+      }
+    },
+  };
 
   return {
     container,
@@ -548,5 +759,6 @@ export function buildNavbar(): NavbarControls {
     redoBtn,
     saveBtn,
     zoomDisplay,
+    toolbar: toolbarControls,
   };
 }
