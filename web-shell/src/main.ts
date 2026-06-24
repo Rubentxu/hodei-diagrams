@@ -1161,12 +1161,6 @@ async function bootstrap(): Promise<void> {
 
   // Note: Arrange > Group and Ungroup are disabled — no wiring (per spec)
 
-  // ─── 13.7.5. Wire Arrange > Layout ───────────────────────────────────────
-  const menuLayoutOrganic = document.querySelector('[data-testid="menu-layout-organic"]');
-  menuLayoutOrganic?.addEventListener('click', () => {
-    activeEditor?.applyLayout('Organic', {});
-  });
-
   // ─── 13.8. Wire Help > Keyboard Shortcuts ───────────────────────────────────
   const menuShortcuts = document.querySelector('[data-testid="menu-shortcuts"]');
   menuShortcuts?.addEventListener('click', () => {

@@ -36,7 +36,6 @@ export type WasmModule = {
   get_resolved_style(_h: number, _vertexId: number): string;
   get_metadata(_h: number): string;
   set_metadata(_h: number, _json: string): void;
-  apply_layout(_h: number, _kind_json: string, _config_json: string): void;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;

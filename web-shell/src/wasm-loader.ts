@@ -34,7 +34,6 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       get_resolved_style: mod.get_resolved_style,
       get_metadata: mod.get_metadata,
       set_metadata: mod.set_metadata,
-      apply_layout: mod.apply_layout,
     };
 
     return ok(wasm);
