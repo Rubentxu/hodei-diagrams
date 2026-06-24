@@ -17,12 +17,12 @@
 #![forbid(unsafe_code)]
 
 use diagram_core::geometry::{Point, Rect, Size};
-use diagram_core::id::{EdgeId, GroupId, PageId, VertexId};
+use diagram_core::id::{EdgeId, PageId, VertexId};
 use diagram_core::store::ModelStore;
 
 use crate::config::OrganicLayoutConfig;
 use crate::error::{LayoutError, LayoutResult};
-use crate::tree::TreeLayoutResult;
+use crate::tree::{compute_group_bboxes, TreeLayoutResult};
 
 /// Fruchterman-Reingold organic layout engine.
 ///
@@ -158,7 +158,7 @@ impl OrganicLayout {
         };
 
         // Group bounding boxes (deferred — computed after vertex positions settle)
-        let group_rects = compute_group_bboxes(store, page_id, &positions);
+        let group_rects = compute_group_bboxes(store, page_id, &positions, 10.0);
 
         Ok(TreeLayoutResult {
             vertices,
@@ -317,75 +317,6 @@ impl OrganicLayout {
     }
 }
 
-/// Compute updated bounding boxes for groups containing vertices on the page.
-///
-/// Groups are processed after vertices have been repositioned so that the
-/// bounding box accurately encloses the new vertex positions.
-fn compute_group_bboxes(
-    store: &ModelStore,
-    page_id: PageId,
-    positions: &std::collections::HashMap<VertexId, (f64, f64)>,
-) -> Vec<(GroupId, Rect)> {
-    use diagram_core::geometry::Point;
-
-    let page_groups: Vec<_> = store
-        .groups_with_ids()
-        .filter(|(_, g)| g.page_id == Some(page_id))
-        .collect();
-
-    let mut result = Vec::new();
-    let padding = 10.0; // GROUP_PADDING
-
-    for (gid, _) in &page_groups {
-        // Find all vertices that belong to this group
-        let mut min_x = f64::MAX;
-        let mut min_y = f64::MAX;
-        let mut max_x = f64::MIN;
-        let mut max_y = f64::MIN;
-        let mut has_children = false;
-
-        for (vid, vertex) in store.vertices_with_ids() {
-            if vertex.page_id != Some(page_id) {
-                continue;
-            }
-            if vertex.parent == Some(*gid) {
-                has_children = true;
-                if let Some(&(cx, cy)) = positions.get(&vid) {
-                    let (w, h) = vertex
-                        .geometry
-                        .as_ref()
-                        .map(|g| (g.width, g.height))
-                        .unwrap_or((120.0, 60.0));
-                    min_x = min_x.min(cx - w / 2.0);
-                    min_y = min_y.min(cy - h / 2.0);
-                    max_x = max_x.max(cx + w / 2.0);
-                    max_y = max_y.max(cy + h / 2.0);
-                }
-            }
-        }
-
-        if !has_children {
-            continue;
-        }
-
-        result.push((
-            *gid,
-            Rect {
-                origin: Point {
-                    x: min_x - padding,
-                    y: min_y - padding,
-                },
-                size: Size {
-                    width: (max_x - min_x) + 2.0 * padding,
-                    height: (max_y - min_y) + 2.0 * padding,
-                },
-            },
-        ));
-    }
-
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -480,8 +411,53 @@ mod tests {
         let layout = OrganicLayout::new(OrganicLayoutConfig::default());
         let result = layout.layout(&store, page_id).unwrap();
         let (_, rect) = &result.vertices[0];
-        // Position should be the cell center
+        // Position should be the cell center (single vertex has no forces)
         assert!((rect.origin.x - 160.0).abs() < 1e-6); // 100 + 120/2
         assert!((rect.origin.y - 230.0).abs() < 1e-6); // 200 + 60/2
+    }
+
+    #[test]
+    fn two_connected_vertices_spread_out() {
+        // Two vertices at DIFFERENT initial positions should spread apart under FR
+        // (vertices at EXACT same position cause FR singularity: zero forces)
+        let (store, page_id) = make_store(
+            &[(0.0, 0.0, 120.0, 60.0), (130.0, 0.0, 120.0, 60.0)],
+            &[(0, 1)],
+        );
+        let layout = OrganicLayout::new(OrganicLayoutConfig::default());
+        let result = layout.layout(&store, page_id).unwrap();
+        assert_eq!(result.vertices.len(), 2);
+
+        // Extract positions
+        let mut positions: Vec<(f64, f64)> = result
+            .vertices
+            .iter()
+            .map(|(_, r)| (r.origin.x, r.origin.y))
+            .collect();
+        positions.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+        // Vertices should be separated after layout
+        let dx = (positions[0].0 - positions[1].0).abs();
+        let dy = (positions[0].1 - positions[1].1).abs();
+        let distance = (dx * dx + dy * dy).sqrt();
+        // With default force_constant=50, two vertices should spread to ~50 apart
+        assert!(
+            distance > 10.0,
+            "vertices should spread apart, distance={distance}"
+        );
+    }
+
+    #[test]
+    fn waypoints_empty_when_reset_edges_true() {
+        let (store, page_id) = make_store(
+            &[(0.0, 0.0, 120.0, 60.0), (0.0, 0.0, 120.0, 60.0)],
+            &[(0, 1)],
+        );
+        let layout = OrganicLayout::new(OrganicLayoutConfig::default());
+        let result = layout.layout(&store, page_id).unwrap();
+        // With reset_edges=true, all waypoints should be empty
+        for (_, waypoints) in &result.edge_waypoints {
+            assert!(waypoints.is_empty(), "waypoints should be empty with reset_edges=true");
+        }
     }
 }
