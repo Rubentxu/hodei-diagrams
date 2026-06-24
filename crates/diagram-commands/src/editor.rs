@@ -8,8 +8,8 @@ use crate::error::{CommandError, CommandResult};
 use crate::history::History;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
-    ConnectVerticesCommand, DisconnectEdgeCommand, EditLabelPayload, MoveGroupPayload,
-    MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
+    ConnectVerticesCommand, DisconnectEdgeCommand, EditEdgeLabelPayload, EditLabelPayload,
+    MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
     RemoveVertexPayload, RenamePagePayload, RoutingKind, SetEdgeWaypointsPayload,
     SetVertexParentPayload,
 };
@@ -235,6 +235,16 @@ impl Transaction {
     /// Edit a vertex label (allowing None to clear) in the transaction.
     pub fn edit_vertex_label_opt(self, id: VertexId, label: Option<Label>) -> Self {
         self.edit_vertex_label_impl(id, label)
+    }
+
+    /// Edit an edge label in the transaction.
+    pub fn edit_edge_label(mut self, id: EdgeId, label: Label) -> Self {
+        self.commands
+            .push(Command::EditEdgeLabel(EditEdgeLabelPayload::new(
+                id,
+                Some(label),
+            )));
+        self
     }
 
     /// Add an edge to the transaction.

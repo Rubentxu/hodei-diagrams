@@ -743,6 +743,65 @@ impl EditLabelPayload {
     }
 }
 
+/// Payload for editing an edge label.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditEdgeLabelPayload {
+    /// The ID of the edge whose label to edit.
+    pub id: EdgeId,
+    /// The new label.
+    pub label: Option<Label>,
+    /// The previous label. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_label: Option<Label>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl EditEdgeLabelPayload {
+    /// Create a new payload for editing an edge label.
+    pub fn new(id: EdgeId, label: Option<Label>) -> Self {
+        Self {
+            id,
+            label,
+            prev_label: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the edit-edge-label operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+
+        // Capture previous label
+        self.prev_label = edge.label.clone();
+
+        // Apply new label
+        edge.label = self.label.clone();
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the edit-edge-label operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_label.take().ok_or(CommandError::NotApplied)?;
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+        edge.label = Some(prev);
+        self.applied = false;
+        Ok(())
+    }
+}
+
 /// Payload for adding an edge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddEdgePayload {

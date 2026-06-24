@@ -72,6 +72,7 @@ type ToolChangeCallback = (_tool: ToolKind) => void;
 /** Inline text edit state — null when not editing. */
 type TextEditState = {
   vertexId: SlotmapId;
+  isEdge: boolean;
   input: HTMLInputElement;
   originalLabel: string;
 } | null;
@@ -1342,7 +1343,7 @@ export class Editor {
     // Mark shape as being edited (hides its SVG text label)
     shapeEl.setAttribute('data-editing', 'true');
 
-    this.#textEdit = { vertexId, input, originalLabel };
+    this.#textEdit = { vertexId, isEdge: false, input, originalLabel };
 
     // Debounced label dispatch on input
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1371,8 +1372,12 @@ export class Editor {
   /** Commit the current text edit and close the overlay. */
   #commitTextEdit(): void {
     if (!this.#textEdit) return;
-    const { vertexId, input } = this.#textEdit;
-    this.#dispatchLabelEdit(vertexId, input.value);
+    const { vertexId, input, isEdge } = this.#textEdit;
+    if (isEdge) {
+      this.#dispatchEdgeLabelEdit(vertexId, input.value);
+    } else {
+      this.#dispatchLabelEdit(vertexId, input.value);
+    }
     this.#cleanupTextEdit();
   }
 
@@ -1401,14 +1406,24 @@ export class Editor {
   /** Clean up the text edit overlay and reset state. */
   #cleanupTextEdit(): void {
     if (!this.#textEdit) return;
-    const { input } = this.#textEdit;
+    const { input, isEdge } = this.#textEdit;
 
-    // Remove editing attribute from shape
-    const shapeEl = this.#viewer.querySelector(
-      `[data-vertex-id="${this.#textEdit.vertexId.idx}:${this.#textEdit.vertexId.version}"]`,
-    );
-    if (shapeEl) {
-      shapeEl.removeAttribute('data-editing');
+    if (isEdge) {
+      // Remove editing attribute from edge element
+      const edgeEl = this.#viewer.querySelector(
+        `[data-edge-id="${this.#textEdit.vertexId.idx}:${this.#textEdit.vertexId.version}"]`,
+      );
+      if (edgeEl) {
+        edgeEl.removeAttribute('data-editing');
+      }
+    } else {
+      // Remove editing attribute from shape
+      const shapeEl = this.#viewer.querySelector(
+        `[data-vertex-id="${this.#textEdit.vertexId.idx}:${this.#textEdit.vertexId.version}"]`,
+      );
+      if (shapeEl) {
+        shapeEl.removeAttribute('data-editing');
+      }
     }
 
     input.remove();
@@ -1432,6 +1447,107 @@ export class Editor {
       }
     }
     return null;
+  }
+
+  /** Get the label text for an edge from the scene cache. */
+  #getEdgeLabel(edgeId: SlotmapId): string | null {
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        // TextElement in display_list has `text: string` field
+        const text = e['text'] as string | undefined;
+        if (text !== undefined) {
+          const owner = e['owner'] as Record<string, unknown> | undefined;
+          const ownerEdge = owner?.['Edge'] as { idx?: number; version?: number } | undefined;
+          if (ownerEdge?.idx === edgeId.idx && ownerEdge?.version === edgeId.version) {
+            return text;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Dispatch an EditEdgeLabel command to the engine. */
+  #dispatchEdgeLabelEdit(edgeId: SlotmapId, newLabel: string): void {
+    if (!newLabel.trim()) return; // Don't dispatch empty labels
+    const cmd = JSON.stringify({
+      EditEdgeLabel: {
+        id: slotmapIdToField(edgeId),
+        label: { text: newLabel },
+      },
+    });
+    const result = this.#session.executeCommand(cmd);
+    if (!result.ok) {
+      this.#onError(result.error);
+    } else {
+      this.#replay();
+    }
+  }
+
+  /** Start inline text editing for an edge label. */
+  #startEdgeTextEdit(edgeId: SlotmapId, _e: MouseEvent): void {
+    // If already editing, do nothing
+    if (this.#textEdit) return;
+
+    // Get current edge label from scene cache
+    const currentLabel = this.#getEdgeLabel(edgeId) ?? '';
+
+    // Find the edge's element by data-edge-id
+    const edgeEl = this.#viewer.querySelector(
+      `[data-edge-id="${edgeId.idx}:${edgeId.version}"]`,
+    );
+    if (!edgeEl) return;
+
+    const rect = edgeEl.getBoundingClientRect();
+
+    // Create input overlay
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'label-editor';
+    input.value = currentLabel;
+    input.style.position = 'fixed';
+    input.style.left = `${rect.left}px`;
+    input.style.top = `${rect.top}px`;
+    input.style.width = `${rect.width}px`;
+    input.style.height = `${rect.height}px`;
+    input.style.font = '12px Inter, sans-serif';
+    input.style.textAlign = 'center';
+    input.style.background = 'rgba(255,255,255,0.95)';
+    input.style.border = '2px solid #3B82F6';
+    input.style.zIndex = '1000';
+    document.body.appendChild(input);
+
+    input.focus();
+    input.select();
+
+    // Mark edge as being edited
+    edgeEl.setAttribute('data-editing', 'true');
+
+    this.#textEdit = { vertexId: edgeId, isEdge: true, input, originalLabel: currentLabel };
+
+    // Debounced label dispatch on input
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    input.addEventListener('input', () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        this.#dispatchEdgeLabelEdit(edgeId, input.value);
+      }, 200);
+    });
+
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        this.#commitTextEdit();
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        this.#cancelTextEdit();
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      this.#commitTextEdit();
+    });
   }
 
   // ─── Coordinate Conversion ────────────────────────────────────────────────
@@ -2712,12 +2828,21 @@ export class Editor {
 
   // ─── Double-Click Text Edit ───────────────────────────────────────────────
 
-  /** Handle dblclick on the viewer: start text edit on the hit shape. */
+  /** Handle dblclick on the viewer: start text edit on the hit shape or edge label. */
   #onDblClick(e: MouseEvent): void {
     const target = e.target as Element | null;
     if (!target) return;
 
-    // Check if double-clicking on an edge to insert a bend
+    // Check if double-clicking on an edge label (TextElement owned by an edge)
+    const edgeLabelHit = this.#hitTestEdgeLabel(e);
+    if (edgeLabelHit) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.#startEdgeTextEdit(edgeLabelHit, e);
+      return;
+    }
+
+    // Check if double-clicking on an edge line to insert a bend
     const edgeEl = target.closest('[data-edge-id]');
     if (edgeEl) {
       const edgeAttr = edgeEl.getAttribute('data-edge-id');
@@ -2747,6 +2872,32 @@ export class Editor {
     e.preventDefault();
     e.stopPropagation();
     this.#startTextEdit(id, e);
+  }
+
+  /** Hit-test a mouse event against edge labels in the scene cache. Returns SlotmapId or null. */
+  #hitTestEdgeLabel(e: MouseEvent): SlotmapId | null {
+    const target = e.target as Element | null;
+    if (!target) return null;
+
+    // Only process text elements
+    if (target.tagName !== 'text'.toUpperCase() && target.tagName !== 'text') return null;
+
+    // Check if this text element is an edge label by looking through scene cache
+    const textContent = target.textContent ?? '';
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const elemRecord = elem as Record<string, unknown>;
+        const text = elemRecord['text'] as string | undefined;
+        if (text !== undefined && text === textContent) {
+          const owner = elemRecord['owner'] as Record<string, unknown> | undefined;
+          const ownerEdge = owner?.['Edge'] as { idx?: number; version?: number } | undefined;
+          if (ownerEdge) {
+            return { idx: ownerEdge.idx!, version: ownerEdge.version! };
+          }
+        }
+      }
+    }
+    return null;
   }
 
   // ─── Keyboard ─────────────────────────────────────────────────────────────

@@ -68,6 +68,13 @@ pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsVal
                     tx
                 }
             }
+            Command::EditEdgeLabel(p) => {
+                if let Some(label) = p.label {
+                    tx.edit_edge_label(p.id, label)
+                } else {
+                    tx
+                }
+            }
             Command::AddEdge(p) => tx.add_edge(p.edge),
             Command::RemoveEdge(p) => tx.remove_edge(p.id),
             Command::ChangeStyle(p) => tx.change_style(p.id, p.style),
