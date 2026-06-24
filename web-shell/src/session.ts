@@ -503,4 +503,23 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Re-route all edges on the current page using orthogonal routing.
+   *
+   * After moving vertices, edges retain their old waypoints. This function recomputes
+   * orthogonal routes for all edges on the first page and commits the results as a
+   * single atomic transaction (one undo reverts all).
+   */
+  routeAllEdges(): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.route_all_edges(this.handle as number);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }

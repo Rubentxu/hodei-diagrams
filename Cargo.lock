@@ -678,6 +678,7 @@ dependencies = [
  "diagram-format-drawio",
  "diagram-layout",
  "diagram-render-svg",
+ "diagram-routing",
  "diagram-scene",
  "diagram-stencils",
  "parking_lot",

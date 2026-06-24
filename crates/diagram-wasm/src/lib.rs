@@ -45,7 +45,7 @@ pub use commands::{
 pub use engine::{create_engine, dispose_engine};
 pub use export::{export_drawio, export_drawio_fresh_engine};
 pub use import::import_drawio;
-pub use layout::apply_layout;
+pub use layout::{apply_layout, route_all_edges};
 pub use metadata::{get_metadata, set_metadata};
 pub use render::{render_pages, render_svg};
 pub use scene::get_scene;

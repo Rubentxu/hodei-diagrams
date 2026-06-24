@@ -460,6 +460,13 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     layoutList.style.display = 'none';
   });
 
+  // Re-route Edges item
+  const rerouteEdgesItem = document.createElement('button');
+  rerouteEdgesItem.className = 'menu-item';
+  rerouteEdgesItem.textContent = 'Re-route Edges';
+  rerouteEdgesItem.setAttribute('data-testid', 'menu-reroute-edges');
+  arrangeList.appendChild(rerouteEdgesItem);
+
   // Disabled items: Group, Ungroup
   const groupItem = document.createElement('button');
   groupItem.className = 'menu-item';

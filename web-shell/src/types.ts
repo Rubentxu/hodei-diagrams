@@ -37,6 +37,7 @@ export type WasmModule = {
   get_metadata(_h: number): string;
   set_metadata(_h: number, _json: string): void;
   apply_layout(_h: number, _kind_json: string, _config_json: string): void;
+  route_all_edges(_h: number): void;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
