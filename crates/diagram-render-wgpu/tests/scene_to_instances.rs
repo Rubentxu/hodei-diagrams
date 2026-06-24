@@ -50,6 +50,7 @@ fn make_page(display_list: Vec<VisualElement>) -> PageScene {
         width: 800.0,
         height: 600.0,
         display_list,
+        background: None,
     }
 }
 

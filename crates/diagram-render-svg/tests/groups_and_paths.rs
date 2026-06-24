@@ -45,6 +45,7 @@ fn group_with_clip_emits_defs_and_clip_path() {
         width: 300.0,
         height: 300.0,
         display_list: vec![group],
+        background: None,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -94,6 +95,7 @@ fn group_without_clip_no_defs() {
         width: 300.0,
         height: 300.0,
         display_list: vec![group],
+        background: None,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -127,6 +129,7 @@ fn path_element_emits_m_l_format() {
         width: 100.0,
         height: 100.0,
         display_list: vec![path],
+        background: None,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -166,15 +169,16 @@ fn two_clip_groups_get_incrementing_ids() {
         width: 300.0,
         height: 300.0,
         display_list: vec![group1, group2],
+        background: None,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render_pages(&scene).unwrap();
 
     // Both clip_0 and clip_1 should be present
-    assert!(result.contains("clip_0"), "Expected clip_0");
-    assert!(result.contains("clip_1"), "Expected clip_1");
-    assert!(!result.contains("clip_2"), "Should not have clip_2");
+    assert!(result[0].1.contains("clip_0"), "Expected clip_0");
+    assert!(result[0].1.contains("clip_1"), "Expected clip_1");
+    assert!(!result[0].1.contains("clip_2"), "Should not have clip_2");
 }
 
 #[test]
@@ -192,6 +196,7 @@ fn edge_connect_line_between_vertices() {
         width: 100.0,
         height: 100.0,
         display_list: vec![line],
+        background: None,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -223,6 +228,7 @@ fn empty_defs_when_no_clipping() {
         width: 100.0,
         height: 100.0,
         display_list: vec![rect],
+        background: None,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -259,6 +265,7 @@ fn nested_group_with_child_vertex() {
         width: 200.0,
         height: 200.0,
         display_list: vec![group],
+        background: None,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();

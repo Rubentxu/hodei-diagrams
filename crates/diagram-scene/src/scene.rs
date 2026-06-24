@@ -25,4 +25,7 @@ pub struct PageScene {
     pub height: f64,
     /// The display list — back-to-front ordered VisualElements.
     pub display_list: Vec<super::VisualElement>,
+    /// The page background color. `None` means white.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
 }

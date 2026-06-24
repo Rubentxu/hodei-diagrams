@@ -182,9 +182,10 @@ impl DrawioMapping {
             model.store.insert_page(Page::new(Default::default()));
         }
 
-        // Set page names from diagram names (pages_mut() returns pages in insertion order)
+        // Set page names and backgrounds from diagram names (pages_mut() returns pages in insertion order)
         for (page, diagram) in model.store.pages_mut().zip(raw.diagrams.iter()) {
             page.name = diagram.name.as_ref().map(|n| Label::new(n.as_str()));
+            page.background = diagram.background.clone();
         }
 
         // PASS 1 — Forward sweep: allocate placeholder entries, record raw→engine ID
@@ -407,9 +408,12 @@ impl DrawioMapping {
         let mut diagrams = Vec::new();
 
         for (page_id, _page) in model.store.pages_with_ids() {
-            let diagram_name = {
+            let (diagram_name, diagram_background) = {
                 let page = model.store.page(page_id).expect("page must exist");
-                page.name.as_ref().map(|l| l.text.as_str().to_owned())
+                (
+                    page.name.as_ref().map(|l| l.text.as_str().to_owned()),
+                    page.background.clone(),
+                )
             };
 
             let mut cells = Vec::new();
@@ -641,6 +645,7 @@ impl DrawioMapping {
 
             diagrams.push(RawDrawioDiagram {
                 name: diagram_name,
+                background: diagram_background,
                 cells,
             });
         }
@@ -731,6 +736,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Empty Page".to_owned()),
+                background: None,
                 cells: vec![],
             }],
         };
@@ -744,6 +750,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![RawDrawioCell {
                     id: "v1".to_owned(),
                     value: Some("Hi".to_owned()),
@@ -786,6 +793,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![
                     RawDrawioCell {
                         id: "v1".to_owned(),
@@ -829,6 +837,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![RawDrawioCell {
                     id: "v1".to_owned(),
                     value: Some("Orphan".to_owned()),
@@ -868,6 +877,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![RawDrawioCell {
                     id: "e1".to_owned(),
                     value: None,
@@ -970,6 +980,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![RawDrawioCell {
                     id: "v1".to_owned(),
                     value: Some("Test".to_owned()),
@@ -1008,6 +1019,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![
                     RawDrawioCell {
                         id: "v1".to_owned(),
@@ -1069,6 +1081,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![RawDrawioCell {
                     id: "g1".to_owned(),
                     value: Some("Group".to_owned()),
@@ -1103,6 +1116,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Empty Page".to_owned()),
+                background: None,
                 cells: vec![],
             }],
         };
@@ -1123,6 +1137,7 @@ mod tests {
             diagrams: vec![
                 RawDrawioDiagram {
                     name: Some("Page-1".to_owned()),
+                    background: None,
                     cells: vec![RawDrawioCell {
                         id: "v1".to_owned(),
                         value: Some("First".to_owned()),
@@ -1138,6 +1153,7 @@ mod tests {
                 },
                 RawDrawioDiagram {
                     name: Some("Page-2".to_owned()),
+                    background: None,
                     cells: vec![RawDrawioCell {
                         id: "v2".to_owned(),
                         value: Some("Second".to_owned()),
@@ -1182,6 +1198,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![RawDrawioCell {
                     id: "v-original".to_owned(),
                     value: Some("Test".to_owned()),
@@ -1213,6 +1230,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![
                     RawDrawioCell {
                         id: "first".to_owned(),
@@ -1278,6 +1296,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![
                     RawDrawioCell {
                         id: "v1".to_owned(),

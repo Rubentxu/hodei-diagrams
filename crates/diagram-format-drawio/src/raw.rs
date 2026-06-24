@@ -61,6 +61,9 @@ pub struct RawDrawioDocument {
 pub struct RawDrawioDiagram {
     /// Optional diagram name (matches the `name` attribute on `<diagram>`).
     pub name: Option<String>,
+    /// Optional background color (matches the `background` attribute on `<diagram>`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
     /// Cells (vertices, edges, groups) belonging to this diagram.
     pub cells: Vec<RawDrawioCell>,
 }
