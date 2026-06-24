@@ -12,7 +12,7 @@ use crate::payload::{
     BringToFrontPayload, ChangeStylePayload, ConnectVerticesCommand, DisconnectEdgeCommand,
     EditLabelPayload, FlipCommand, MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload,
     RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload, RenamePagePayload, RotateCommand,
-    SendBackwardPayload, SendToBackPayload, SetEdgeWaypointsPayload,
+    SendBackwardPayload, SendToBackPayload, SetEdgeWaypointsPayload, SetVertexParentPayload,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -66,6 +66,8 @@ pub enum Command {
     BringForward(BringForwardPayload),
     /// Send a cell backward (swap with next lower).
     SendBackward(SendBackwardPayload),
+    /// Set a vertex's parent group.
+    SetVertexParent(SetVertexParentPayload),
 }
 
 impl Command {
@@ -96,6 +98,7 @@ impl Command {
             Command::SendToBack(p) => p.apply(model),
             Command::BringForward(p) => p.apply(model),
             Command::SendBackward(p) => p.apply(model),
+            Command::SetVertexParent(p) => p.apply(model),
         }
     }
 
@@ -126,6 +129,7 @@ impl Command {
             Command::SendToBack(p) => p.undo(model),
             Command::BringForward(p) => p.undo(model),
             Command::SendBackward(p) => p.undo(model),
+            Command::SetVertexParent(p) => p.undo(model),
         }
     }
 }

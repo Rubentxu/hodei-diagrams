@@ -2,6 +2,8 @@
 
 use crate::engine::{with_engine, with_engine_mut};
 use diagram_commands::{Command, RoutingKind, Transaction};
+use diagram_core::geometry::CellGeometry;
+use diagram_core::{Group, VertexId};
 use diagram_scene::resolver::StyleResolver;
 use wasm_bindgen::prelude::*;
 
@@ -471,6 +473,164 @@ pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValu
     // Flatten the nested Result: Result<Result<String, &str>, &'static str>
     match result {
         Ok(Ok(json)) => Ok(JsValue::from_str(&json)),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Group selected vertices into a new container group.
+///
+/// `vertex_indices_json` is a JSON array of vertex slotmap index values (the `idx` field from SlotmapId).
+///
+/// Computes the bounding box of all vertices, creates a group with that geometry,
+/// and sets each vertex's parent to the new group.
+///
+/// Two undo steps: first undo clears parent links, second undo removes the group.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `GroupVertices: <reason>` on other errors
+#[wasm_bindgen]
+pub fn group_vertices(handle: u32, vertex_indices_json: &str) -> Result<(), JsValue> {
+    let result = with_engine_mut(handle, |e| {
+        // Parse vertex indices
+        let indices: Vec<u32> = serde_json::from_str(vertex_indices_json)
+            .map_err(|_| "GroupVertices: invalid indices JSON")?;
+
+        if indices.len() < 2 {
+            return Err("GroupVertices: need at least 2 vertices");
+        }
+
+        // Find VertexIds from indices
+        let vids: Vec<VertexId> = indices
+            .iter()
+            .filter_map(|&idx| find_vertex_by_idx(e.editor.model(), idx))
+            .collect();
+
+        if vids.len() < 2 {
+            return Err("GroupVertices: not enough valid vertices found");
+        }
+
+        let store = &e.editor.model().store;
+
+        // Compute bounding box from all vertices' geometry
+        let (min_x, min_y, max_x, max_y) = vids
+            .iter()
+            .filter_map(|vid| store.vertex(*vid).and_then(|v| v.geometry))
+            .fold(
+                (f64::MAX, f64::MAX, f64::MIN, f64::MIN),
+                |(minx, miny, maxx, maxy), g| {
+                    (
+                        minx.min(g.x),
+                        miny.min(g.y),
+                        maxx.max(g.x + g.width),
+                        maxy.max(g.y + g.height),
+                    )
+                },
+            );
+
+        let page_id = store.vertex(vids[0]).and_then(|v| v.page_id);
+        let z_order = store.max_z_order(page_id.unwrap_or_default()) + 1;
+
+        // Create group with bounding box geometry
+        let group = Group {
+            label: None,
+            style_id: None,
+            page_id,
+            geometry: Some(CellGeometry {
+                x: min_x,
+                y: min_y,
+                width: (max_x - min_x).max(1.0),
+                height: (max_y - min_y).max(1.0),
+                relative: false,
+                ..Default::default()
+            }),
+            z_order,
+            locked: false,
+            visible: true,
+        };
+
+        // Step 1: Insert group imperatively to get the GroupId
+        let gid = e.editor.model_mut().store.insert_group(group.clone());
+
+        // Step 2: Build transaction with SetVertexParent for each vertex
+        let mut tx = Transaction::new();
+        for vid in &vids {
+            tx = tx.set_vertex_parent(*vid, Some(gid));
+        }
+
+        tx.commit(&mut e.editor)
+            .map_err(|err| Box::leak(format!("GroupVertices: {}", err).into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Ungroup a vertex by removing it from its parent group.
+///
+/// `vertex_idx` is the vertex's slotmap index value (the `idx` field from SlotmapId).
+///
+/// Finds the parent group of the vertex, clears the parent link for all vertices
+/// in that group, and removes the group itself.
+///
+/// Single undo step removes the group and restores parent links.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `UngroupVertices: <reason>` on other errors
+#[wasm_bindgen]
+pub fn ungroup_vertices(handle: u32, vertex_idx: u32) -> Result<(), JsValue> {
+    let result = with_engine_mut(handle, |e| {
+        // Find the vertex
+        let vid = find_vertex_by_idx(e.editor.model(), vertex_idx)
+            .ok_or("UngroupVertices: vertex not found")?;
+
+        // Get its parent group
+        let parent_gid = {
+            let vertex = e
+                .editor
+                .model()
+                .store
+                .vertex(vid)
+                .ok_or("UngroupVertices: vertex not found")?;
+            vertex
+                .parent
+                .ok_or("UngroupVertices: vertex has no parent group")?
+        };
+
+        // Find all vertices with that parent
+        let siblings: Vec<VertexId> = e
+            .editor
+            .model()
+            .store
+            .vertices_with_ids()
+            .filter(|(_, v)| v.parent == Some(parent_gid))
+            .map(|(vid, _)| vid)
+            .collect();
+
+        if siblings.is_empty() {
+            return Err("UngroupVertices: no siblings found in group");
+        }
+
+        // Build transaction: clear parent for all siblings, then remove group
+        let mut tx = Transaction::new();
+        for sibling_vid in &siblings {
+            tx = tx.set_vertex_parent(*sibling_vid, None);
+        }
+        tx = tx.remove_group(parent_gid);
+
+        tx.commit(&mut e.editor)
+            .map_err(|err| Box::leak(format!("UngroupVertices: {}", err).into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(())) => Ok(()),
         Ok(Err(e)) => Err(JsValue::from_str(e)),
         Err(e) => Err(JsValue::from_str(e)),
     }

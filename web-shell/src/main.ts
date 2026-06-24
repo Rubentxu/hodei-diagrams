@@ -1159,7 +1159,16 @@ async function bootstrap(): Promise<void> {
     activeEditor?.flipSelection('vertical');
   });
 
-  // Note: Arrange > Group and Ungroup are disabled — no wiring (per spec)
+  // ─── 13.7.5. Wire Arrange > Group / Ungroup ─────────────────────────────────
+  const menuGroup = document.querySelector('[data-testid="menu-group"]');
+  menuGroup?.addEventListener('click', () => {
+    activeEditor?.groupSelection();
+  });
+
+  const menuUngroup = document.querySelector('[data-testid="menu-ungroup"]');
+  menuUngroup?.addEventListener('click', () => {
+    activeEditor?.ungroupSelection();
+  });
 
   // ─── 13.7.5. Wire Arrange > Layout ───────────────────────────────────────
   const menuLayoutTree = document.querySelector('[data-testid="menu-layout-tree"]');
