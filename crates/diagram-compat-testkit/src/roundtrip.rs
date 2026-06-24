@@ -1078,4 +1078,109 @@ mod tests {
             assert_eq!(b.1, a.1, "z_order must be preserved for {}", b.0);
         }
     }
+
+    #[test]
+    fn roundtrip_edge_with_waypoints() {
+        let xml = include_str!("../fixtures/edge-with-waypoints.drawio");
+
+        let first = parse_drawio_with_diagnostics(xml, &mut Vec::new())
+            .expect("edge-with-waypoints.drawio should parse");
+
+        // Find the edge cell
+        let edge_cell = first.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .expect("should have an edge cell");
+
+        // Verify waypoints were parsed
+        let geo = edge_cell.geometry.as_ref().expect("edge should have geometry");
+        assert_eq!(
+            geo.points.len(),
+            2,
+            "edge should have 2 waypoints"
+        );
+        assert_eq!(geo.points[0], (100.0, 50.0));
+        assert_eq!(geo.points[1], (200.0, 80.0));
+
+        // Round-trip: write back to XML
+        let written = write_drawio(&first).expect("write_drawio should succeed");
+
+        // Verify Array/points is present in output
+        assert!(
+            written.contains("Array"),
+            "written XML should contain Array element"
+        );
+        assert!(
+            written.contains("mxPoint"),
+            "written XML should contain mxPoint elements"
+        );
+        assert!(
+            written.contains(r#"as="points""#),
+            "written XML should contain as=\"points\""
+        );
+
+        // Re-parse and verify waypoints survive round-trip
+        let second = parse_drawio_with_diagnostics(&written, &mut Vec::new())
+            .expect("written XML should parse");
+
+        let reparsed_edge = second.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .expect("reparsed should still have an edge");
+
+        let reparsed_geo = reparsed_edge.geometry.as_ref().expect("edge should have geometry");
+        assert_eq!(
+            reparsed_geo.points.len(),
+            2,
+            "waypoints should survive round-trip"
+        );
+        assert_eq!(reparsed_geo.points[0], (100.0, 50.0));
+        assert_eq!(reparsed_geo.points[1], (200.0, 80.0));
+    }
+
+    #[test]
+    fn roundtrip_edge_without_waypoints_backward_compat() {
+        // An edge without waypoints should still work correctly
+        let xml = include_str!("../fixtures/edge-connect.drawio");
+
+        let first = parse_drawio_with_diagnostics(xml, &mut Vec::new())
+            .expect("edge-connect.drawio should parse");
+
+        // Find the edge cell
+        let edge_cell = first.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .expect("should have an edge cell");
+
+        // Verify no waypoints
+        let geo = edge_cell.geometry.as_ref();
+        assert!(
+            geo.map(|g| g.points.is_empty()).unwrap_or(true),
+            "edge without waypoints should have empty or no points"
+        );
+
+        // Round-trip
+        let written = write_drawio(&first).expect("write_drawio should succeed");
+        let second = parse_drawio_with_diagnostics(&written, &mut Vec::new())
+            .expect("written XML should parse");
+
+        let reparsed_edge = second.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .expect("reparsed should still have an edge");
+
+        // Should not have Array/points in output for empty waypoints
+        assert!(
+            !written.contains("Array"),
+            "edge without waypoints should not emit Array element"
+        );
+
+        // Edge should still be valid
+        assert_eq!(reparsed_edge.source.as_deref(), Some("A"));
+        assert_eq!(reparsed_edge.target.as_deref(), Some("B"));
+    }
 }

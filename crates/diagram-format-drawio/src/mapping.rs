@@ -338,7 +338,19 @@ impl DrawioMapping {
                                     style_id,
                                     source,
                                     target,
-                                    waypoints: Vec::new(),
+                                    waypoints: cell
+                                        .geometry
+                                        .as_ref()
+                                        .map(|g| {
+                                            g.points
+                                                .iter()
+                                                .map(|(x, y)| diagram_core::geometry::Point {
+                                                    x: *x,
+                                                    y: *y,
+                                                })
+                                                .collect()
+                                        })
+                                        .unwrap_or_default(),
                                     page_id,
                                     z_order,
                                     locked,
@@ -443,6 +455,7 @@ impl DrawioMapping {
                         rotation: rotation_deg,
                         flip_h: if geo.flip_h { Some(true) } else { None },
                         flip_v: if geo.flip_v { Some(true) } else { None },
+                        points: Vec::new(),
                     }
                 });
 
@@ -533,7 +546,21 @@ impl DrawioMapping {
                     parent: None,
                     source: Some(source_raw),
                     target: Some(target_raw),
-                    geometry: None,
+                    geometry: if edge.waypoints.is_empty() {
+                        None
+                    } else {
+                        Some(crate::raw::RawDrawioGeometry {
+                            x: 0.0,
+                            y: 0.0,
+                            width: 0.0,
+                            height: 0.0,
+                            r#as: "geometry".to_owned(),
+                            rotation: None,
+                            flip_h: None,
+                            flip_v: None,
+                            points: edge.waypoints.iter().map(|p| (p.x, p.y)).collect(),
+                        })
+                    },
                     extra,
                 };
                 cells.push((edge.z_order, cell));
@@ -580,6 +607,7 @@ impl DrawioMapping {
                         rotation: rotation_deg,
                         flip_h: if geo.flip_h { Some(true) } else { None },
                         flip_v: if geo.flip_v { Some(true) } else { None },
+                        points: Vec::new(),
                     }
                 });
 

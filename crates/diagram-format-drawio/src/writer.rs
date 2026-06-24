@@ -101,7 +101,32 @@ fn write_geometry(writer: &mut Writer<&mut Vec<u8>>, geo: &RawDrawioGeometry) ->
     if geo.flip_v == Some(true) {
         geo_start.push_attribute(("flipV", "1"));
     }
-    writer.write_event(Event::Empty(geo_start))
+
+    if geo.points.is_empty() {
+        writer.write_event(Event::Empty(geo_start))
+    } else {
+        // Emit geometry with nested Array/points for edges with waypoints
+        writer.write_event(Event::Start(geo_start))?;
+        write_points_array(writer, &geo.points)?;
+        writer.write_event(Event::End(BytesEnd::new("mxGeometry")))?;
+        Ok(())
+    }
+}
+
+fn write_points_array(writer: &mut Writer<&mut Vec<u8>>, points: &[(f64, f64)]) -> io::Result<()> {
+    let mut array_start = BytesStart::new("Array");
+    array_start.push_attribute(("as", "points"));
+    writer.write_event(Event::Start(array_start))?;
+
+    for &(x, y) in points {
+        let mut pt_start = BytesStart::new("mxPoint");
+        pt_start.push_attribute(("x", format!("{}", x).as_str()));
+        pt_start.push_attribute(("y", format!("{}", y).as_str()));
+        writer.write_event(Event::Empty(pt_start))?;
+    }
+
+    writer.write_event(Event::End(BytesEnd::new("Array")))?;
+    Ok(())
 }
 
 fn write_cell(
@@ -199,6 +224,7 @@ mod tests {
                 flip_h: None,
                 flip_v: None,
                 r#as: "geometry".to_owned(),
+                points: Vec::new(),
             }),
             extra: Default::default(),
         };
