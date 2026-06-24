@@ -3138,5 +3138,67 @@ export class Editor {
       }
       return;
     }
+
+    // Ctrl+D → duplicate selection (copy + paste)
+    if (hasMod && e.key === 'd') {
+      e.preventDefault();
+      this.copySelection();
+      this.paste();
+      return;
+    }
+
+    // Arrow keys → nudge selected shapes (1px, Shift = 10px)
+    if (this.#selection.size > 0 && !hasMod) {
+      const step = e.shiftKey ? 10 : 1;
+      let dx = 0;
+      let dy = 0;
+      switch (e.key) {
+        case 'ArrowLeft': dx = -step; break;
+        case 'ArrowRight': dx = step; break;
+        case 'ArrowUp': dy = -step; break;
+        case 'ArrowDown': dy = step; break;
+        default: return;
+      }
+      e.preventDefault();
+      this.#nudgeSelection(dx, dy);
+      return;
+    }
+  }
+
+  /** Move all selected shapes by (dx, dy) via a single atomic transaction. */
+  #nudgeSelection(dx: number, dy: number): void {
+    if (this.#selection.size === 0) return;
+    const cmds: string[] = [];
+    for (const id of this.#selection) {
+      const el = this.#viewer.querySelector(
+        `[data-vertex-id="${id.idx}:${id.version}"]`,
+      ) as SVGGraphicsElement | null;
+      if (!el) continue;
+      const bbox = el.getBBox();
+      const newGeom = {
+        x: bbox.x + dx,
+        y: bbox.y + dy,
+        width: bbox.width,
+        height: bbox.height,
+        relative: false,
+      };
+      cmds.push(
+        JSON.stringify({
+          MoveVertex: {
+            id: slotmapIdToField(id),
+            geometry: newGeom,
+          },
+        }),
+      );
+    }
+    if (cmds.length === 0) return;
+    const result = this.#session.executeTransaction(
+      JSON.stringify(cmds),
+    );
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    this.#replay();
   }
 }
