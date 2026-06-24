@@ -474,7 +474,7 @@ async function bootstrap(): Promise<void> {
   zoomPan = setupZoomPan(zoomPanPlaceholder, viewerPlaceholder);
 
   // ─── 5. Build 5-zone UI with inspector ────────────────────────────────────
-  const ui = buildEmptyUi(root, inspector.container, {
+  const ui = buildEmptyUi(root, activeSession, inspector.container, {
     onSelectTool: () => {
       activeEditor?.setActiveTool(null);
       ui.rectToolButton.classList.remove('active-tool');
@@ -666,6 +666,8 @@ async function bootstrap(): Promise<void> {
       ui.hud.setSelection(getSelectionLabel(ids, sceneData));
       // Update HUD selection count
       ui.hud.setSelectionCount(ids.length);
+      // Update toolbar buttons
+      ui.toolbar.update(ids);
     }
     // Update zoom display
     ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
@@ -739,6 +741,9 @@ async function bootstrap(): Promise<void> {
 
       // Wire inspector to editor for arrange operations
       inspector.setEditor(activeEditor);
+
+      // Wire toolbar to editor for context-sensitive controls
+      ui.toolbar.setEditor(activeEditor);
 
       // ── Stencil drag-and-drop ─────────────────────────────────────────────
       // Wire dragstart on all stencil sidebar buttons
