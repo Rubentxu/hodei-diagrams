@@ -198,9 +198,9 @@ AWS-Admisión). 12 crates, ~500+ tests Rust, ~280+ tests E2E.
 | Engine | Status | draw.io equivalent | Next |
 |--------|--------|---------------------|------|
 | Tree Layout (Moen) | ✅ v0.28.0 | Compact Tree Layout | — |
-| Organic / Force-directed | 🚀 READY FOR APPLY (PR: feat/organic-layout) | mxGraph layout mDIFR | Merge + tag v0.32.0 |
+| Organic / Force-directed | ✅ v0.32.0 | mxGraph layout mDIFR | — |
 | Circular Layout | ✅ Done (PR: feat/circular-layout) | Arrange > Circle | — |
-| Grid / Table Layout | ⏸️ Pending | Hodei-original (no draw.io equivalent) | — |
+| Grid / Table Layout | ✅ Done (PR: feat/grid-layout) | Hodei-original (no draw.io equivalent) | — |
 | Edge Routing UI | ⏸️ Pending | Waypoints, Connection | — |
 
 > Layout engine wiring: `apply_layout(Organic)` / `apply_layout(Circular)` / `apply_layout(Grid)` via WASM export, same pattern as Tree Layout (ADR-0067).
