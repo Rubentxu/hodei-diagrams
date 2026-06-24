@@ -455,13 +455,12 @@ impl SceneBuilder {
                 style: resolved_style,
             }))
         } else {
-            let mut points = Vec::with_capacity(edge.waypoints.len() + 2);
-            points.push(from);
-            points.extend(edge.waypoints.iter().cloned());
-            points.push(to);
+            // Waypoints from the routing engine already start at the source
+            // perimeter and end at the target perimeter. Do NOT prepend/append
+            // vertex centers — that would place the arrowhead inside the shape.
             Ok(VisualElement::Path(PathElement {
                 id: eid,
-                points,
+                points: edge.waypoints.iter().cloned().collect(),
                 style: resolved_style,
             }))
         }
@@ -879,23 +878,17 @@ mod tests {
             })
             .expect("Expected Path element");
 
-        // Center of v1 = (40 + 80/2, 20 + 40/2) = (80, 40)
-        assert_eq!(path_elem.points[0].x, 80.0);
-        assert_eq!(path_elem.points[0].y, 40.0);
+        // Waypoints are stored as-is (no center prepend/append).
+        // The routing engine already provides perimeter points.
+        assert_eq!(path_elem.points.len(), 2); // just the 2 waypoints
 
         // Waypoint 1
-        assert_eq!(path_elem.points[1].x, 100.0);
-        assert_eq!(path_elem.points[1].y, 50.0);
+        assert_eq!(path_elem.points[0].x, 100.0);
+        assert_eq!(path_elem.points[0].y, 50.0);
 
         // Waypoint 2
-        assert_eq!(path_elem.points[2].x, 100.0);
-        assert_eq!(path_elem.points[2].y, 70.0);
-
-        // Center of v2 = (120 + 80/2, 80 + 40/2) = (160, 100)
-        assert_eq!(path_elem.points[3].x, 160.0);
-        assert_eq!(path_elem.points[3].y, 100.0);
-
-        assert_eq!(path_elem.points.len(), 4); // from + 2 waypoints + to
+        assert_eq!(path_elem.points[1].x, 100.0);
+        assert_eq!(path_elem.points[1].y, 70.0);
     }
 
     #[test]
