@@ -98,6 +98,8 @@ pub struct ResolvedStyle {
     pub end_arrow: Option<String>,
     /// Arrow style at the start (source) of an edge. Default: "none".
     pub start_arrow: Option<String>,
+    /// Whether the edge should render as a smooth curve through waypoints.
+    pub curved: Option<bool>,
     /// Unknown keys preserved from the original `StyleMap`.
     pub remaining: StyleMap,
 }
@@ -119,6 +121,7 @@ impl ResolvedStyle {
             && self.gradient.is_none()
             && self.end_arrow.is_none()
             && self.start_arrow.is_none()
+            && self.curved.is_none()
             && self.remaining.is_empty()
     }
 }
@@ -196,6 +199,7 @@ impl StyleResolver {
             "gradientColor5",
             "endArrow",
             "startArrow",
+            "edgeStyle",
         ]
     }
 
@@ -217,6 +221,7 @@ impl StyleResolver {
         let mut opacity = None;
         let mut end_arrow = None;
         let mut start_arrow = None;
+        let mut curved = None;
 
         // Effect fields collected in first pass
         let mut shadow_enabled = false;
@@ -341,6 +346,9 @@ impl StyleResolver {
                 }
                 "endArrow" => end_arrow = Some(value.as_str().to_owned()),
                 "startArrow" => start_arrow = Some(value.as_str().to_owned()),
+                "edgeStyle" => {
+                    curved = Some(value.as_str() == "curvedEdgeStyle");
+                }
                 _ => {
                     remaining.insert(key, value.as_str());
                 }
@@ -412,6 +420,7 @@ impl StyleResolver {
             gradient,
             end_arrow,
             start_arrow,
+            curved,
             remaining,
         }
     }
@@ -684,6 +693,24 @@ mod tests {
         assert!(resolved.end_arrow.is_none());
     }
 
+    #[test]
+    fn resolve_edge_style_curved() {
+        let mut map = StyleMap::new();
+        map.insert("edgeStyle", "curvedEdgeStyle");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(resolved.curved, Some(true));
+        assert!(resolved.remaining.is_empty());
+    }
+
+    #[test]
+    fn resolve_edge_style_orthogonal() {
+        let mut map = StyleMap::new();
+        map.insert("edgeStyle", "orthogonalEdgeStyle");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(resolved.curved, Some(false));
+        assert!(resolved.remaining.is_empty());
+    }
+
     // ─── classify tests ───────────────────────────────────────────────────────
 
     #[test]
@@ -862,6 +889,7 @@ mod tests {
             "gradientColor5",
             "endArrow",
             "startArrow",
+            "edgeStyle",
         ];
         assert_eq!(keys.len(), expected.len());
         for k in expected {
