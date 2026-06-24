@@ -745,6 +745,9 @@ async function bootstrap(): Promise<void> {
       // Wire toolbar to editor for context-sensitive controls
       ui.toolbar.setEditor(activeEditor);
 
+      // Initialize toolbar disabled state (no selection yet)
+      ui.toolbar.update([]);
+
       // ── Stencil drag-and-drop ─────────────────────────────────────────────
       // Wire dragstart on all stencil sidebar buttons
       const stencilBtns = [

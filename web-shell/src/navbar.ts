@@ -646,6 +646,8 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     });
     const r = session.executeCommand(cmd);
     if (!r.ok) console.warn('[toolbar] Bold toggle failed:', r.error);
+    // Update active class immediately since we know the new state
+    boldBtn.classList.toggle('--active', newBold);
   });
 
   // Italic button
@@ -663,6 +665,8 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     });
     const r = session.executeCommand(cmd);
     if (!r.ok) console.warn('[toolbar] Italic toggle failed:', r.error);
+    // Update active class immediately since we know the new state
+    italicBtn.classList.toggle('--active', newItalic);
   });
 
   // Delete button
@@ -679,7 +683,7 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
       );
     }
     if (commands.length > 0) {
-      const r = session.executeTransaction(commands);
+      const r = session.executeCommands(commands);
       if (!r.ok) console.warn('[toolbar] Delete failed:', r.error);
     }
   });
