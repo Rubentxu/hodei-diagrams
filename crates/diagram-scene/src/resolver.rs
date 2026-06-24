@@ -94,6 +94,10 @@ pub struct ResolvedStyle {
     pub glass: Option<GlassConfig>,
     /// Gradient fill configuration.
     pub gradient: Option<GradientConfig>,
+    /// Arrow style at the end (target) of an edge. Default: "classic".
+    pub end_arrow: Option<String>,
+    /// Arrow style at the start (source) of an edge. Default: "none".
+    pub start_arrow: Option<String>,
     /// Unknown keys preserved from the original `StyleMap`.
     pub remaining: StyleMap,
 }
@@ -113,6 +117,8 @@ impl ResolvedStyle {
             && self.shadow.is_none()
             && self.glass.is_none()
             && self.gradient.is_none()
+            && self.end_arrow.is_none()
+            && self.start_arrow.is_none()
             && self.remaining.is_empty()
     }
 }
@@ -188,6 +194,8 @@ impl StyleResolver {
             "gradientColor3",
             "gradientColor4",
             "gradientColor5",
+            "endArrow",
+            "startArrow",
         ]
     }
 
@@ -207,6 +215,8 @@ impl StyleResolver {
         let mut font_size = None;
         let mut font_family = None;
         let mut opacity = None;
+        let mut end_arrow = None;
+        let mut start_arrow = None;
 
         // Effect fields collected in first pass
         let mut shadow_enabled = false;
@@ -329,6 +339,8 @@ impl StyleResolver {
                         }
                     }
                 }
+                "endArrow" => end_arrow = Some(value.as_str().to_owned()),
+                "startArrow" => start_arrow = Some(value.as_str().to_owned()),
                 _ => {
                     remaining.insert(key, value.as_str());
                 }
@@ -398,6 +410,8 @@ impl StyleResolver {
             shadow,
             glass,
             gradient,
+            end_arrow,
+            start_arrow,
             remaining,
         }
     }
@@ -635,8 +649,39 @@ mod tests {
 
         let mut map2 = StyleMap::new();
         map2.insert("opacity", "-0.5");
-        let resolved = StyleResolver::new().resolve(&map2);
-        assert_eq!(resolved.opacity, Some(0.0));
+        let resolved2 = StyleResolver::new().resolve(&map2);
+        assert_eq!(resolved2.opacity, Some(0.0));
+    }
+
+    #[test]
+    fn resolve_end_arrow_classic() {
+        let mut map = StyleMap::new();
+        map.insert("endArrow", "classic");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(resolved.end_arrow, Some("classic".to_owned()));
+    }
+
+    #[test]
+    fn resolve_end_arrow_none() {
+        let mut map = StyleMap::new();
+        map.insert("endArrow", "none");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(resolved.end_arrow, Some("none".to_owned()));
+    }
+
+    #[test]
+    fn resolve_start_arrow_block() {
+        let mut map = StyleMap::new();
+        map.insert("startArrow", "block");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(resolved.start_arrow, Some("block".to_owned()));
+    }
+
+    #[test]
+    fn resolve_no_end_arrow_yields_none() {
+        let map = StyleMap::new();
+        let resolved = StyleResolver::new().resolve(&map);
+        assert!(resolved.end_arrow.is_none());
     }
 
     // ─── classify tests ───────────────────────────────────────────────────────
@@ -815,6 +860,8 @@ mod tests {
             "gradientColor3",
             "gradientColor4",
             "gradientColor5",
+            "endArrow",
+            "startArrow",
         ];
         assert_eq!(keys.len(), expected.len());
         for k in expected {
