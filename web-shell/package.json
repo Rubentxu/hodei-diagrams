@@ -16,6 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:regressions": "bash ../scripts/check-regressions.sh",
+    "test:regressions:e2e": "bash ../scripts/check-regressions.sh --e2e",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build:wasm && npm run build"
   },
   "devDependencies": {
