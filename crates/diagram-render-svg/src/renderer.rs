@@ -64,10 +64,11 @@ impl SvgRenderer {
         // Title
         output.push_str(&format!("<title>{}</title>\n", escape_text(&page.name)));
 
-        // White background rect as first drawn child
+        // Background rect — page background color or white default
+        let bg_color = page.background.as_deref().unwrap_or("white");
         output.push_str(&format!(
-            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\"/>\n",
-            view_x, view_y, view_w, view_h
+            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/>\n",
+            view_x, view_y, view_w, view_h, bg_color
         ));
 
         // Walk display list — pass defs manager so elements can register gradients/filters
@@ -217,6 +218,7 @@ mod tests {
             width: 100.0,
             height: 100.0,
             display_list: vec![],
+            background: None,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -236,6 +238,7 @@ mod tests {
             width: 200.0,
             height: 300.0,
             display_list: vec![],
+            background: None,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -251,6 +254,7 @@ mod tests {
             width: 800.0,
             height: 600.0,
             display_list: vec![],
+            background: None,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -286,6 +290,7 @@ mod tests {
             width: 100.0,
             height: 100.0,
             display_list: vec![rect],
+            background: None,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -317,6 +322,7 @@ mod tests {
             width: 100.0,
             height: 100.0,
             display_list: vec![rect],
+            background: None,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();

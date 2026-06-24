@@ -195,6 +195,7 @@ impl SceneBuilder {
             width: page.size.width,
             height: page.size.height,
             display_list,
+            background: page.background.clone(),
         })
     }
 

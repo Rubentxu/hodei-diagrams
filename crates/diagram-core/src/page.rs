@@ -19,6 +19,9 @@ pub struct Page {
     pub name: Option<Label>,
     /// Canvas / page size in user-space units.
     pub size: Size,
+    /// Optional page background color. `None` means white (the default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
 }
 
 impl Page {
@@ -31,6 +34,7 @@ impl Page {
                 width: 1.0,
                 height: 1.0,
             },
+            background: None,
         }
     }
 }

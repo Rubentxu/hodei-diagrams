@@ -87,6 +87,7 @@ fn four_shape_fixture() -> PageScene {
         width: 300.0,
         height: 200.0,
         display_list: vec![rect, rounded, ellipse, line],
+        background: None,
     }
 }
 
@@ -148,6 +149,7 @@ fn group_clipping_visual_regression() {
         width: 200.0,
         height: 200.0,
         display_list: vec![group],
+        background: None,
     };
 
     let _instances = collect_instances_for_page(&page);

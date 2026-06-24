@@ -72,8 +72,20 @@ impl DrawioParser {
                                 .and_then(|attr| {
                                     std::str::from_utf8(&attr.value).ok().map(|s| s.to_owned())
                                 });
+                            let diagram_background = e
+                                .attributes()
+                                .find(|a| {
+                                    a.as_ref()
+                                        .map(|attr| attr.key.as_ref() == b"background")
+                                        .unwrap_or(false)
+                                })
+                                .and_then(|r| r.ok())
+                                .and_then(|attr| {
+                                    std::str::from_utf8(&attr.value).ok().map(|s| s.to_owned())
+                                });
                             current_diagram = Some(RawDrawioDiagram {
                                 name: diagram_name,
+                                background: diagram_background,
                                 cells: Vec::new(),
                             });
                         }

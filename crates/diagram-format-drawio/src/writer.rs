@@ -232,6 +232,7 @@ mod tests {
         let doc = RawDrawioDocument {
             diagrams: vec![RawDrawioDiagram {
                 name: Some("Page-1".to_owned()),
+                background: None,
                 cells: vec![cell],
             }],
         };

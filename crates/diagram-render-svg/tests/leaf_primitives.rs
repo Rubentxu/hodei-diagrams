@@ -33,6 +33,7 @@ fn simple_rect_renders_correctly() {
         width: 827.0,
         height: 1169.0,
         display_list: vec![rect],
+        background: None,
     };
 
     let scene = Scene { pages: vec![page] };
@@ -97,6 +98,7 @@ fn rect_with_no_style_renders() {
         width: 100.0,
         height: 100.0,
         display_list: vec![rect],
+        background: None,
     };
 
     let scene = Scene { pages: vec![page] };
@@ -155,6 +157,7 @@ fn multiple_rects_render_in_order() {
         width: 100.0,
         height: 100.0,
         display_list: vec![rect1, rect2],
+        background: None,
     };
 
     let scene = Scene { pages: vec![page] };
