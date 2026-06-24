@@ -22,7 +22,7 @@ use diagram_core::store::ModelStore;
 
 use crate::config::OrganicLayoutConfig;
 use crate::error::{LayoutError, LayoutResult};
-use crate::tree::{compute_group_bboxes, TreeLayoutResult};
+use crate::tree::{TreeLayoutResult, compute_group_bboxes};
 
 /// Fruchterman-Reingold organic layout engine.
 ///
@@ -48,11 +48,7 @@ impl OrganicLayout {
     /// # Errors
     ///
     /// Returns [`LayoutError::NoVertices`] if the page has no vertices.
-    pub fn layout(
-        &self,
-        store: &ModelStore,
-        page_id: PageId,
-    ) -> LayoutResult<TreeLayoutResult> {
+    pub fn layout(&self, store: &ModelStore, page_id: PageId) -> LayoutResult<TreeLayoutResult> {
         // Collect vertices on this page
         let page_vertices: Vec<_> = store
             .vertices_with_ids()
@@ -119,10 +115,17 @@ impl OrganicLayout {
             let attraction = Self::calc_attraction(&vertex_ids, &adjacency, &positions, k);
 
             // Apply displacements limited by temperature
-            Self::calc_positions(&vertex_ids, &mut positions, &repulsion, &attraction, temperature);
+            Self::calc_positions(
+                &vertex_ids,
+                &mut positions,
+                &repulsion,
+                &attraction,
+                temperature,
+            );
 
             // Reduce temperature (linear decay)
-            temperature = Self::reduce_temperature(temperature, self.config.initial_temp, max_iters);
+            temperature =
+                Self::reduce_temperature(temperature, self.config.initial_temp, max_iters);
         }
 
         // Build result from final positions
@@ -404,10 +407,7 @@ mod tests {
 
     #[test]
     fn positions_preserved_as_cell_centers() {
-        let (store, page_id) = make_store(
-            &[(100.0, 200.0, 120.0, 60.0)],
-            &[],
-        );
+        let (store, page_id) = make_store(&[(100.0, 200.0, 120.0, 60.0)], &[]);
         let layout = OrganicLayout::new(OrganicLayoutConfig::default());
         let result = layout.layout(&store, page_id).unwrap();
         let (_, rect) = &result.vertices[0];
@@ -457,7 +457,10 @@ mod tests {
         let result = layout.layout(&store, page_id).unwrap();
         // With reset_edges=true, all waypoints should be empty
         for (_, waypoints) in &result.edge_waypoints {
-            assert!(waypoints.is_empty(), "waypoints should be empty with reset_edges=true");
+            assert!(
+                waypoints.is_empty(),
+                "waypoints should be empty with reset_edges=true"
+            );
         }
     }
 }

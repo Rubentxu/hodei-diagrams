@@ -198,7 +198,7 @@ AWS-Admisión). 12 crates, ~500+ tests Rust, ~280+ tests E2E.
 | Engine | Status | draw.io equivalent | Next |
 |--------|--------|---------------------|------|
 | Tree Layout (Moen) | ✅ v0.28.0 | Compact Tree Layout | — |
-| Organic / Force-directed | ⏸️ Pending | mxGraph layout mDIFR | `/sddk-new organic-layout` |
+| Organic / Force-directed | 🚀 READY FOR APPLY (PR: feat/organic-layout) | mxGraph layout mDIFR | Merge + tag v0.32.0 |
 | Circular Layout | ⏸️ Pending | Arrange > Cicle | — |
 | Grid / Table Layout | ⏸️ Pending | Arrange > Grid | — |
 | Edge Routing UI | ⏸️ Pending | Waypoints, Connection | — |
