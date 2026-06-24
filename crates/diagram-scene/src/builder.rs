@@ -143,6 +143,14 @@ impl SceneBuilder {
                                 x: (from_to.0.x + from_to.1.x) / 2.0,
                                 y: (from_to.0.y + from_to.1.y) / 2.0,
                             };
+                            // Apply label offset if set
+                            let anchor = match edge.label_offset {
+                                Some((dx, dy)) => CorePoint {
+                                    x: anchor.x + dx,
+                                    y: anchor.y + dy,
+                                },
+                                None => anchor,
+                            };
                             let text_elem = VisualElement::Text(TextElement {
                                 owner: EntityId::Edge(eid),
                                 anchor,

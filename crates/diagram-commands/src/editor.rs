@@ -11,8 +11,8 @@ use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
     ConnectVerticesCommand, DisconnectEdgeCommand, EditEdgeLabelPayload, EditLabelPayload,
     MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
-    RemoveVertexPayload, RenamePagePayload, RoutingKind, SetEdgeWaypointsPayload,
-    SetVertexParentPayload,
+    RemoveVertexPayload, RenamePagePayload, RoutingKind, SetEdgeLabelOffsetPayload,
+    SetEdgeWaypointsPayload, SetVertexParentPayload,
 };
 use diagram_core::{
     CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, Point, StyleMap,
@@ -290,6 +290,15 @@ impl Transaction {
         self.commands
             .push(Command::SetEdgeWaypoints(SetEdgeWaypointsPayload::new(
                 id, waypoints,
+            )));
+        self
+    }
+
+    /// Set an edge's label offset in the transaction.
+    pub fn set_edge_label_offset(mut self, id: EdgeId, offset: Option<(f64, f64)>) -> Self {
+        self.commands
+            .push(Command::SetEdgeLabelOffset(SetEdgeLabelOffsetPayload::new(
+                id, offset,
             )));
         self
     }

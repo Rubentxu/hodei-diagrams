@@ -1829,3 +1829,61 @@ impl SetEdgeWaypointsPayload {
         Ok(())
     }
 }
+
+/// Payload for setting an edge's label offset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetEdgeLabelOffsetPayload {
+    /// The ID of the edge whose label offset to set.
+    pub id: EdgeId,
+    /// The new offset (dx, dy) from the edge midpoint.
+    pub offset: Option<(f64, f64)>,
+    /// The previous offset. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_offset: Option<(f64, f64)>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetEdgeLabelOffsetPayload {
+    /// Create a new payload for setting an edge's label offset.
+    pub fn new(id: EdgeId, offset: Option<(f64, f64)>) -> Self {
+        Self {
+            id,
+            offset,
+            prev_offset: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-edge-label-offset operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+
+        // Capture previous offset
+        self.prev_offset = edge.label_offset;
+
+        // Apply new offset
+        edge.label_offset = self.offset;
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the set-edge-label-offset operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+        edge.label_offset = self.prev_offset;
+        self.applied = false;
+        Ok(())
+    }
+}
