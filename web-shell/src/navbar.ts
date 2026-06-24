@@ -428,6 +428,18 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   layoutOrganicItem.setAttribute('data-testid', 'menu-layout-organic');
   layoutList.appendChild(layoutOrganicItem);
 
+  const layoutCircularItem = document.createElement('button');
+  layoutCircularItem.className = 'menu-item';
+  layoutCircularItem.textContent = 'Circular';
+  layoutCircularItem.setAttribute('data-testid', 'menu-layout-circular');
+  layoutList.appendChild(layoutCircularItem);
+
+  const layoutGridItem = document.createElement('button');
+  layoutGridItem.className = 'menu-item';
+  layoutGridItem.textContent = 'Grid';
+  layoutGridItem.setAttribute('data-testid', 'menu-layout-grid');
+  layoutList.appendChild(layoutGridItem);
+
   layoutItem.appendChild(layoutList);
   layoutItem.addEventListener('mouseenter', () => {
     layoutList.style.display = 'block';
