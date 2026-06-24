@@ -505,15 +505,14 @@ fn path_to_svg(p: &PathElement, defs: &mut DefsManager, indent: usize) -> String
 
     let d = if p.points.is_empty() {
         String::new()
+    } else if p.style.curved == Some(true) && p.points.len() >= 3 {
+        // Smooth curve through points using Catmull-Rom → Bezier
+        catmull_rom_to_bezier(&p.points)
     } else {
-        let mut d = String::from("M ");
-        for (i, pt) in p.points.iter().enumerate() {
-            if i > 0 {
-                d.push_str(" L ");
-            }
-            d.push_str(&pt.x.to_string());
-            d.push(' ');
-            d.push_str(&pt.y.to_string());
+        // Straight line segments (existing behavior)
+        let mut d = format!("M {} {}", p.points[0].x, p.points[0].y);
+        for pt in &p.points[1..] {
+            d.push_str(&format!(" L {} {}", pt.x, pt.y));
         }
         d
     };
@@ -527,6 +526,49 @@ fn path_to_svg(p: &PathElement, defs: &mut DefsManager, indent: usize) -> String
         marker_start,
         style
     )
+}
+
+/// Convert a list of points to a smooth SVG path using Catmull-Rom spline.
+/// Produces cubic Bezier segments that pass through all control points smoothly.
+fn catmull_rom_to_bezier(points: &[diagram_core::geometry::Point]) -> String {
+    if points.len() < 2 {
+        return String::new();
+    }
+    if points.len() == 2 {
+        return format!(
+            "M {} {} L {} {}",
+            points[0].x, points[0].y, points[1].x, points[1].y
+        );
+    }
+
+    let mut d = format!("M {} {}", points[0].x, points[0].y);
+
+    // Tension factor (0.5 = standard Catmull-Rom)
+    let tension = 0.5;
+
+    for i in 0..points.len() - 1 {
+        let p0 = if i > 0 { &points[i - 1] } else { &points[0] };
+        let p1 = &points[i];
+        let p2 = &points[i + 1];
+        let p3 = if i + 2 < points.len() {
+            &points[i + 2]
+        } else {
+            p2
+        };
+
+        // Catmull-Rom → Cubic Bezier control points
+        let c1x = p1.x + (p2.x - p0.x) / 6.0 * tension * 2.0;
+        let c1y = p1.y + (p2.y - p0.y) / 6.0 * tension * 2.0;
+        let c2x = p2.x - (p3.x - p1.x) / 6.0 * tension * 2.0;
+        let c2y = p2.y - (p3.y - p1.y) / 6.0 * tension * 2.0;
+
+        d.push_str(&format!(
+            " C {} {} {} {} {} {}",
+            c1x, c1y, c2x, c2y, p2.x, p2.y
+        ));
+    }
+
+    d
 }
 
 fn stencil_to_svg(s: &StencilElement, defs: &mut DefsManager, indent: usize) -> String {
@@ -1313,5 +1355,96 @@ mod tests {
         // Should have default fill #dae8fc and stroke #6c8ebf
         assert!(result.contains("fill=\"#dae8fc\""));
         assert!(result.contains("stroke=\"#6c8ebf\""));
+    }
+
+    // ─── curved edge tests ───────────────────────────────────────────────────
+
+    #[test]
+    fn path_curved_with_3_plus_points_emits_c_commands() {
+        use diagram_core::geometry::Point;
+        let path = VisualElement::Path(diagram_scene::PathElement {
+            id: EdgeId::default(),
+            points: vec![
+                Point { x: 10.0, y: 10.0 },
+                Point { x: 50.0, y: 30.0 },
+                Point { x: 90.0, y: 10.0 },
+            ],
+            style: ResolvedStyle {
+                curved: Some(true),
+                ..Default::default()
+            },
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        // Should contain C (cubic Bezier) commands
+        assert!(
+            result.contains('C'),
+            "curved path with 3+ points should contain C commands"
+        );
+        assert!(result.contains("M 10 10"));
+    }
+
+    #[test]
+    fn path_not_curved_emits_l_commands() {
+        use diagram_core::geometry::Point;
+        let path = VisualElement::Path(diagram_scene::PathElement {
+            id: EdgeId::default(),
+            points: vec![
+                Point { x: 10.0, y: 10.0 },
+                Point { x: 50.0, y: 30.0 },
+                Point { x: 90.0, y: 10.0 },
+            ],
+            style: ResolvedStyle {
+                curved: Some(false),
+                ..Default::default()
+            },
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        // Should contain L commands, not C commands
+        assert!(result.contains(" L "));
+        assert!(!result.contains(" C "));
+    }
+
+    #[test]
+    fn path_curved_with_2_points_emits_l_commands() {
+        // A path with 2 points can't be curved - should fall back to L
+        use diagram_core::geometry::Point;
+        let path = VisualElement::Path(diagram_scene::PathElement {
+            id: EdgeId::default(),
+            points: vec![Point { x: 10.0, y: 10.0 }, Point { x: 50.0, y: 30.0 }],
+            style: ResolvedStyle {
+                curved: Some(true),
+                ..Default::default()
+            },
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        // Should use L commands since only 2 points
+        assert!(result.contains(" L "));
+        assert!(!result.contains(" C "));
+    }
+
+    #[test]
+    fn path_curved_with_default_curved_emits_l_commands() {
+        // When curved is None (default), should use L commands
+        use diagram_core::geometry::Point;
+        let path = VisualElement::Path(diagram_scene::PathElement {
+            id: EdgeId::default(),
+            points: vec![
+                Point { x: 10.0, y: 10.0 },
+                Point { x: 50.0, y: 30.0 },
+                Point { x: 90.0, y: 10.0 },
+            ],
+            style: empty_style(), // curved is None by default
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        assert!(result.contains(" L "));
+        assert!(!result.contains(" C "));
     }
 }
