@@ -37,6 +37,7 @@ pub mod hierarchy;
 pub mod layer_assignment;
 pub mod organic;
 pub mod tree;
+pub mod circular;
 
 use diagram_core::geometry::CellGeometry;
 use diagram_core::id::PageId;

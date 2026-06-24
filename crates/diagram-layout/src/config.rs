@@ -44,6 +44,45 @@ impl Default for OrganicLayoutConfig {
     }
 }
 
+/// Configuration for the circular layout algorithm.
+///
+/// Draw.io defaults are used when no explicit value is provided.
+/// The algorithm is deterministic and closed-form — no iteration required.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CircularLayoutConfig {
+    /// Circle radius in user-space units.
+    /// Draw.io default: 100.0.
+    pub radius: f64,
+    /// Move the entire circle so that (x0, y0) becomes the top-left corner.
+    /// Draw.io default: false.
+    pub move_circle: bool,
+    /// X coordinate of the top-left corner when `move_circle` is true.
+    /// Draw.io default: 0.0.
+    pub x0: f64,
+    /// Y coordinate of the top-left corner when `move_circle` is true.
+    /// Draw.io default: 0.0.
+    pub y0: f64,
+    /// Reset all edge waypoints to straight lines after layout.
+    /// Draw.io default: true.
+    pub reset_edges: bool,
+    /// Disable per-edge style evaluation (treat all edges uniformly).
+    /// Draw.io default: true.  v1 no-op — deferred to routing layer (ADR-0044).
+    pub disable_edge_style: bool,
+}
+
+impl Default for CircularLayoutConfig {
+    fn default() -> Self {
+        Self {
+            radius: 100.0,
+            move_circle: false,
+            x0: 0.0,
+            y0: 0.0,
+            reset_edges: true,
+            disable_edge_style: true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod organic_config_tests {
     use super::*;
@@ -56,6 +95,22 @@ mod organic_config_tests {
         assert!((cfg.max_distance_limit - 500.0).abs() < 1e-9);
         assert!((cfg.initial_temp - 200.0).abs() < 1e-9);
         assert_eq!(cfg.max_iterations, 0);
+        assert!(cfg.reset_edges);
+        assert!(cfg.disable_edge_style);
+    }
+}
+
+#[cfg(test)]
+mod circular_config_tests {
+    use super::*;
+
+    #[test]
+    fn circular_defaults_match_drawio() {
+        let cfg = CircularLayoutConfig::default();
+        assert!((cfg.radius - 100.0).abs() < 1e-9);
+        assert!(!cfg.move_circle);
+        assert!((cfg.x0 - 0.0).abs() < 1e-9);
+        assert!((cfg.y0 - 0.0).abs() < 1e-9);
         assert!(cfg.reset_edges);
         assert!(cfg.disable_edge_style);
     }
