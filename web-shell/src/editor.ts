@@ -8,6 +8,7 @@ import type {
   GradientConfig,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
+import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -1045,6 +1046,8 @@ export class Editor {
     this.#viewer.addEventListener('pointerdown', (e) => this.#onPointerDown(e), opts);
     // Double-click on a shape enters inline text edit mode
     this.#viewer.addEventListener('dblclick', (e) => this.#onDblClick(e), opts);
+    // Right-click context menu
+    this.#viewer.addEventListener('contextmenu', (e) => this.#onContextMenu(e), opts);
     // keydown on the document to catch keyboard shortcuts
     document.addEventListener('keydown', (e) => this.#onKeyDown(e), opts);
 
@@ -2898,6 +2901,60 @@ export class Editor {
       }
     }
     return null;
+  }
+
+  // ─── Context Menu ────────────────────────────────────────────────────────
+
+  #onContextMenu(e: MouseEvent): void {
+    // Check what was clicked
+    const vertexHit = this.#hitTest(e as PointerEvent);
+    const edgeHit = this.#hitTestEdge(e as PointerEvent);
+
+    if (vertexHit) {
+      // Select the vertex first if not already selected
+      if (!this.#selection.has(vertexHit)) {
+        this.#selection.clear();
+        this.#selection.add(vertexHit);
+        this.#replay();
+      }
+
+      const items: ContextMenuItem[] = [
+        { label: 'Edit Label', action: () => this.#startTextEdit(vertexHit, e) },
+        { label: 'Copy', action: () => this.copySelection() },
+        { separator: true, label: '', action: () => {} },
+        { label: 'Bring to Front', action: () => this.bringToFront() },
+        { label: 'Send to Back', action: () => this.sendToBack() },
+        { separator: true, label: '', action: () => {} },
+        { label: 'Rotate CW', action: () => this.rotateSelection(Math.PI / 2) },
+        { label: 'Rotate CCW', action: () => this.rotateSelection(-Math.PI / 2) },
+        { label: 'Flip H', action: () => this.flipSelection('horizontal') },
+        { label: 'Flip V', action: () => this.flipSelection('vertical') },
+        { separator: true, label: '', action: () => {} },
+        { label: 'Delete', action: () => this.deleteSelection() },
+      ];
+
+      showContextMenu(e.clientX, e.clientY, items);
+    } else if (edgeHit) {
+      const items: ContextMenuItem[] = [
+        { label: 'Edit Label', action: () => this.#startEdgeTextEdit(edgeHit, e) },
+        { separator: true, label: '', action: () => {} },
+        { label: 'Delete Edge', action: () => {
+          this.#session.disconnectEdge(edgeHit);
+          this.#replay();
+        }},
+      ];
+
+      showContextMenu(e.clientX, e.clientY, items);
+    } else {
+      // Empty space context menu
+      const items: ContextMenuItem[] = [
+        { label: 'Paste', action: () => this.paste(), disabled: this.#clipboard === null },
+        { separator: true, label: '', action: () => {} },
+        { label: 'Select All', action: () => this.selectAll() },
+      ];
+
+      showContextMenu(e.clientX, e.clientY, items);
+    }
   }
 
   // ─── Keyboard ─────────────────────────────────────────────────────────────
