@@ -10,9 +10,10 @@ use crate::error::CommandResult;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, BringForwardPayload,
     BringToFrontPayload, ChangeStylePayload, ConnectVerticesCommand, DisconnectEdgeCommand,
-    EditLabelPayload, FlipCommand, MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload,
-    RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload, RenamePagePayload, RotateCommand,
-    SendBackwardPayload, SendToBackPayload, SetEdgeWaypointsPayload, SetVertexParentPayload,
+    EditEdgeLabelPayload, EditLabelPayload, FlipCommand, MoveGroupPayload, MoveVertexPayload,
+    RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload,
+    RenamePagePayload, RotateCommand, SendBackwardPayload, SendToBackPayload,
+    SetEdgeWaypointsPayload, SetVertexParentPayload,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -32,6 +33,8 @@ pub enum Command {
     MoveGroup(MoveGroupPayload),
     /// Edit a vertex's label.
     EditVertexLabel(EditLabelPayload),
+    /// Edit an edge's label.
+    EditEdgeLabel(EditEdgeLabelPayload),
     /// Add an edge between two vertices.
     AddEdge(AddEdgePayload),
     /// Remove an edge from the diagram.
@@ -81,6 +84,7 @@ impl Command {
             Command::MoveVertex(p) => p.apply(model),
             Command::MoveGroup(p) => p.apply(model),
             Command::EditVertexLabel(p) => p.apply(model),
+            Command::EditEdgeLabel(p) => p.apply(model),
             Command::AddEdge(p) => p.apply(model),
             Command::RemoveEdge(p) => p.apply(model),
             Command::ConnectVertices(p) => p.apply(model),
@@ -112,6 +116,7 @@ impl Command {
             Command::MoveVertex(p) => p.undo(model),
             Command::MoveGroup(p) => p.undo(model),
             Command::EditVertexLabel(p) => p.undo(model),
+            Command::EditEdgeLabel(p) => p.undo(model),
             Command::AddEdge(p) => p.undo(model),
             Command::RemoveEdge(p) => p.undo(model),
             Command::ConnectVertices(p) => p.undo(model),
@@ -166,7 +171,7 @@ mod tests {
 
     use super::*;
     use crate::RoutingKind;
-    use crate::payload::CellTarget;
+    use crate::payload::{CellTarget, EditEdgeLabelPayload};
 
     fn make_model_with_page() -> (DiagramModel, PageId) {
         let mut model = DiagramModel::new();
@@ -657,6 +662,66 @@ mod tests {
 
         let v = model.store.vertex(vid).unwrap();
         assert_eq!(v.label.as_ref().unwrap().as_str(), "Original");
+    }
+
+    // ─── EditEdgeLabel ───────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_edit_edge_label_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            label: Some(Label::new("Original")),
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+
+        let mut cmd =
+            Command::EditEdgeLabel(EditEdgeLabelPayload::new(eid, Some(Label::new("New"))));
+        cmd.apply(&mut model).unwrap();
+
+        let e = model.store.edge(eid).unwrap();
+        assert_eq!(e.label.as_ref().unwrap().as_str(), "New");
+    }
+
+    #[test]
+    fn undo_edit_edge_label_restores_original() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            label: Some(Label::new("Original")),
+            ..Default::default()
+        };
+        let eid = model.store.insert_edge(edge);
+
+        let mut cmd =
+            Command::EditEdgeLabel(EditEdgeLabelPayload::new(eid, Some(Label::new("New"))));
+        cmd.apply(&mut model).unwrap();
+        cmd.undo(&mut model).unwrap();
+
+        let e = model.store.edge(eid).unwrap();
+        assert_eq!(e.label.as_ref().unwrap().as_str(), "Original");
+    }
+
+    #[test]
+    fn apply_edit_edge_label_not_found_error() {
+        let (mut model, _pid) = make_model_with_page();
+        let bogus = diagram_core::EdgeId::default();
+
+        let mut cmd =
+            Command::EditEdgeLabel(EditEdgeLabelPayload::new(bogus, Some(Label::new("New"))));
+        let err = cmd.apply(&mut model).unwrap_err();
+        assert!(matches!(err, crate::error::CommandError::EdgeNotFound(_)));
     }
 
     // ─── AddEdge ───────────────────────────────────────────────────────────────
