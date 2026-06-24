@@ -48,6 +48,40 @@ _Avoid_: Raw number, parsing PageId shape in the shell
 The result of injecting an SVG string from the engine into the DOM via `innerHTML`. The engine is the trust boundary — SVG strings are treated as trusted content since the engine owns all rendering logic.
 _Avoid_: User-supplied innerHTML, client-side SVG parsing, DOM manipulation of engine output
 
+## Layout Engines
+
+**TreeLayout**:
+The Moen compact tree layout algorithm (ADR-0067), ported from `mxCompactTreeLayout.js`. Produces hierarchical tree layouts with jetty routing and automatic group bounding-box resizing.
+_Avoid_: Sugiyama layout (that is the HierarchicalLayout variant)
+
+**OrganicLayout**:
+The Fruchterman-Reingold force-directed layout algorithm (ADR-0068), ported from `mxGraphLayout.js`. Produces force-directed graph layouts where connected vertices attract and all vertex pairs repel. Deterministic (no Math.random()).
+_Avoid_: Random layout, iterative without convergence guarantee
+
+**CircularLayout**:
+The circular layout algorithm (ADR-0069), ported from `mxCircleLayout.js`. Places all page vertices at equal angular intervals on a computed circle. O(n), deterministic, closed-form — no iteration.
+_Avoid_: Organic-style force-directed (that uses OrganicLayout)
+
+**mxCircleLayout**:
+The upstream draw.io JavaScript layout algorithm that CircularLayout ports. Used as the behavioral reference for the O(n) closed-form circular arrangement.
+_Avoid_: Internal implementation detail as specification
+
+**move_circle**:
+A `CircularLayoutConfig` field. When `true`, the circle center is pinned to `(x0 + radius, y0 + radius)`. When `false` (default), the center is computed as `(min_x + radius, min_y + radius)` where min_x/min_y are the top-left corners of the bounding box of all vertex positions.
+_Avoid_: Confusing with geometry origin — this is a layout parameter, not a vertex coordinate
+
+**CircularLayoutConfig**:
+Configuration struct for CircularLayout. Fields: `radius` (default 100.0), `move_circle` (default false), `x0` (default 0.0), `y0` (default 0.0), `reset_edges` (default true), `disable_edge_style` (default true, v1 no-op).
+_Avoid_: Embedding this in LayoutConfig (that is a follow-up cross-cutting refactor)
+
+**TreeLayoutResult**:
+Shared output type for all non-hierarchical layout algorithms (Tree, Organic, Circular). Contains `vertices: Vec<(VertexId, Rect)>`, `edge_waypoints: Vec<(EdgeId, Vec<Point>)>`, and `group_rects: Vec<(GroupId, Rect)>`.
+_Avoid_: Creating a separate CircularLayoutResult (that would add connascence with no benefit)
+
+**compute_group_bboxes**:
+Shared utility that computes group bounding boxes from vertex center positions. Called by tree (adjust_parents), organic, and circular layouts. Takes `(store, page_id, positions: &HashMap<VertexId, (f64, f64)>, group_padding)`.
+_Avoid_: Implementing group bbox logic inside each layout algorithm
+
 ## Flagged Ambiguities
 
 - **Editor vs Engine**: In this project, the editor is not the product core. The canonical term for the core product is **Diagram Engine**.
