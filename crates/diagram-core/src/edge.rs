@@ -47,6 +47,9 @@ pub struct Edge {
     /// scene display list but remain addressable in the model. Default is true.
     /// See ADR-0058 §Lock and visibility.
     pub visible: bool,
+    /// Label position offset from the edge midpoint. (0,0) = centered (default).
+    /// Positive dx moves label toward target, negative toward source.
+    pub label_offset: Option<(f64, f64)>,
 }
 
 impl Default for Edge {
@@ -61,6 +64,7 @@ impl Default for Edge {
             z_order: 0,
             locked: false,
             visible: true, // Visible by default per ADR-0058
+            label_offset: None,
         }
     }
 }

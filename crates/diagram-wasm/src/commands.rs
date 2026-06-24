@@ -95,6 +95,8 @@ pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsVal
             // ConnectVertices and DisconnectEdge have their own dedicated WASM functions
             Command::ConnectVertices(_) => tx,
             Command::DisconnectEdge(_) => tx,
+            // SetEdgeLabelOffset has a dedicated WASM function, but also handle via transaction
+            Command::SetEdgeLabelOffset(p) => tx.set_edge_label_offset(p.id, p.offset),
             // Handle any future variants gracefully (non_exhaustive)
             _ => tx,
         }
@@ -651,6 +653,67 @@ pub fn ungroup_vertices(handle: u32, vertex_idx: u32) -> Result<(), JsValue> {
 
         tx.commit(&mut e.editor)
             .map_err(|err| Box::leak(format!("UngroupVertices: {}", err).into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Set an edge's label offset, allowing labels to be repositioned along the edge.
+///
+/// `handle` is the engine handle (u32).
+/// `edge_idx` is the edge's slotmap index (the `idx` field from SlotmapId).
+/// `dx` and `dy` are the offset from the edge midpoint.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `SetEdgeLabelOffset: edge not found` if the edge ID does not exist
+#[wasm_bindgen]
+pub fn set_edge_label_offset(handle: u32, edge_idx: u32, dx: f64, dy: f64) -> Result<(), JsValue> {
+    let result = with_engine_mut(handle, |e| {
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("SetEdgeLabelOffset: edge not found");
+            }
+        };
+        let tx = Transaction::new().set_edge_label_offset(eid, Some((dx, dy)));
+        tx.commit(&mut e.editor)
+            .map_err(|err| Box::leak(format!("{err}").into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Clear an edge's label offset, resetting the label to the edge midpoint.
+///
+/// `handle` is the engine handle (u32).
+/// `edge_idx` is the edge's slotmap index (the `idx` field from SlotmapId).
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `ClearEdgeLabelOffset: edge not found` if the edge ID does not exist
+#[wasm_bindgen]
+pub fn clear_edge_label_offset(handle: u32, edge_idx: u32) -> Result<(), JsValue> {
+    let result = with_engine_mut(handle, |e| {
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("ClearEdgeLabelOffset: edge not found");
+            }
+        };
+        let tx = Transaction::new().set_edge_label_offset(eid, None);
+        tx.commit(&mut e.editor)
+            .map_err(|err| Box::leak(format!("{err}").into_boxed_str()) as &str)
     });
 
     match result {

@@ -356,6 +356,7 @@ impl DrawioMapping {
                                     z_order,
                                     locked,
                                     visible,
+                                    label_offset: None,
                                 };
                                 model.store.replace_edge(eid, edge);
                             }

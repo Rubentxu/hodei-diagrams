@@ -2,10 +2,10 @@
 
 use diagram_core::{EdgeId, VertexId};
 use diagram_scene::{
-    CloudElement, CylinderElement, DiamondElement, EllipseElement, GroupElement, HexagonElement,
-    LineElement, ParallelogramElement, PathCommand, PathElement, PolygonElement, RectElement,
-    RoundedRectElement, StencilElement, TextElement, TrapezoidElement, TriangleElement,
-    VisualElement,
+    CloudElement, CylinderElement, DiamondElement, EllipseElement, EntityId, GroupElement,
+    HexagonElement, LineElement, ParallelogramElement, PathCommand, PathElement, PolygonElement,
+    RectElement, RoundedRectElement, StencilElement, TextElement, TrapezoidElement,
+    TriangleElement, VisualElement,
 };
 
 use crate::clip::ClipPathManager;
@@ -472,9 +472,14 @@ fn text_to_svg(t: &TextElement, defs: &mut DefsManager, indent: usize) -> String
     let ind = make_indent(indent);
     let style = style_to_attrs(&t.style, AttrContext::Text, defs);
     let escaped = escape_text(&t.text);
+    // Add data-edge-label attribute for edge labels to enable drag interaction
+    let edge_label_attr = match &t.owner {
+        EntityId::Edge(eid) => format!(" data-edge-label=\"{}\"", eid_attr(eid).trim()),
+        _ => String::new(),
+    };
     format!(
-        "{}<text x=\"{}\" y=\"{}\"{}>{}</text>",
-        ind, t.anchor.x, t.anchor.y, style, escaped
+        "{}<text x=\"{}\" y=\"{}\"{}{}>{}</text>",
+        ind, t.anchor.x, t.anchor.y, edge_label_attr, style, escaped
     )
 }
 

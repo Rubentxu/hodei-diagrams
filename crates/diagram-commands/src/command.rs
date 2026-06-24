@@ -13,7 +13,7 @@ use crate::payload::{
     EditEdgeLabelPayload, EditLabelPayload, FlipCommand, MoveGroupPayload, MoveVertexPayload,
     RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload,
     RenamePagePayload, RotateCommand, SendBackwardPayload, SendToBackPayload,
-    SetEdgeWaypointsPayload, SetVertexParentPayload,
+    SetEdgeLabelOffsetPayload, SetEdgeWaypointsPayload, SetVertexParentPayload,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -71,6 +71,8 @@ pub enum Command {
     SendBackward(SendBackwardPayload),
     /// Set a vertex's parent group.
     SetVertexParent(SetVertexParentPayload),
+    /// Set an edge's label offset.
+    SetEdgeLabelOffset(SetEdgeLabelOffsetPayload),
 }
 
 impl Command {
@@ -103,6 +105,7 @@ impl Command {
             Command::BringForward(p) => p.apply(model),
             Command::SendBackward(p) => p.apply(model),
             Command::SetVertexParent(p) => p.apply(model),
+            Command::SetEdgeLabelOffset(p) => p.apply(model),
         }
     }
 
@@ -135,6 +138,7 @@ impl Command {
             Command::BringForward(p) => p.undo(model),
             Command::SendBackward(p) => p.undo(model),
             Command::SetVertexParent(p) => p.undo(model),
+            Command::SetEdgeLabelOffset(p) => p.undo(model),
         }
     }
 }
