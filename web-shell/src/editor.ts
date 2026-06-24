@@ -637,11 +637,16 @@ export class Editor {
 
   /**
    * Apply a layout algorithm to the current page.
-   * @param kind Layout kind: "Organic", "Tree", "Hierarchical"
+   * @param kind Layout kind: "Organic", "Tree", "Hierarchical", "Circular", "Grid"
    * @param config Optional layout-specific configuration
    */
   applyLayout(kind: string, config: object = {}): void {
-    this.#session.applyLayout(kind, config);
+    // HierarchicalLayout uses a separate WASM export because it mutates the store in-place
+    if (kind === 'Hierarchical') {
+      this.#session.applyHierarchicalLayout(config);
+    } else {
+      this.#session.applyLayout(kind, config);
+    }
   }
 
   // ─── Active Tool ──────────────────────────────────────────────────────────

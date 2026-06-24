@@ -1162,6 +1162,16 @@ async function bootstrap(): Promise<void> {
   // Note: Arrange > Group and Ungroup are disabled — no wiring (per spec)
 
   // ─── 13.7.5. Wire Arrange > Layout ───────────────────────────────────────
+  const menuLayoutTree = document.querySelector('[data-testid="menu-layout-tree"]');
+  menuLayoutTree?.addEventListener('click', () => {
+    activeEditor?.applyLayout('Tree', {});
+  });
+
+  const menuLayoutHierarchical = document.querySelector('[data-testid="menu-layout-hierarchical"]');
+  menuLayoutHierarchical?.addEventListener('click', () => {
+    activeEditor?.applyLayout('Hierarchical', {});
+  });
+
   const menuLayoutOrganic = document.querySelector('[data-testid="menu-layout-organic"]');
   menuLayoutOrganic?.addEventListener('click', () => {
     activeEditor?.applyLayout('Organic', {});

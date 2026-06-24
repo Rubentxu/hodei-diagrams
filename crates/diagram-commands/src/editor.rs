@@ -121,6 +121,11 @@ impl Editor {
         &self.model
     }
 
+    /// Mutably borrow the model.
+    pub fn model_mut(&mut self) -> &mut DiagramModel {
+        &mut self.model
+    }
+
     /// Consume and return the model.
     pub fn into_model(self) -> DiagramModel {
         self.model

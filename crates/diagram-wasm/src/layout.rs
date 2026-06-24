@@ -3,7 +3,9 @@
 use diagram_commands::Transaction;
 use diagram_core::geometry::CellGeometry;
 use diagram_core::id::PageId;
-use diagram_layout::{LayoutConfig, LayoutKind, TreeLayoutResult, apply_layout_kind};
+use diagram_layout::{
+    HierarchicalLayout, LayoutConfig, LayoutKind, TreeLayoutResult, apply_layout_kind,
+};
 use wasm_bindgen::prelude::*;
 
 use crate::engine::with_engine_mut;
@@ -122,6 +124,67 @@ pub fn apply_layout(handle: u32, kind_json: &str, config_json: &str) -> Result<(
         let tx = result_to_transaction(page_id, &result);
         tx.commit(&mut e.editor).map_err(|ce| {
             Box::leak(format!("ApplyLayout: commit: {}", ce).into_boxed_str()) as &str
+        })
+    })
+    .map_err(|_| JsValue::from_str("InvalidHandle"))?
+    .map_err(JsValue::from_str)
+}
+
+/// Apply the Hierarchical layout algorithm to the current page.
+///
+/// `handle` is the engine handle returned by [`create_engine`](crate::create_engine).
+/// `config_json` is a JSON string encoding the [`LayoutConfig`].
+///
+/// This function is separate from [`apply_layout`] because `HierarchicalLayout`
+/// mutates the store in-place (unlike Tree/Organic/Circular/Grid which return
+/// `TreeLayoutResult`). On success the affected vertices are updated and one
+/// history entry is pushed (one undo reverts all). On failure the store is unchanged.
+///
+/// # Errors
+///
+/// - `"InvalidHandle"` if the engine handle is not valid
+/// - `"ApplyHierarchical: invalid config: <json_error>"` if `config_json` is malformed
+/// - `"ApplyHierarchical: <LayoutError>"` if the layout algorithm fails
+#[wasm_bindgen]
+pub fn apply_hierarchical_layout(handle: u32, config_json: &str) -> Result<(), JsValue> {
+    // Parse layout config
+    let config: LayoutConfig = match serde_json::from_str(config_json) {
+        Ok(c) => c,
+        Err(e) => {
+            return Err(JsValue::from_str(&format!(
+                "ApplyHierarchical: invalid config: {e}"
+            )));
+        }
+    };
+
+    // Look up engine and get current page
+    with_engine_mut(handle, |e| {
+        // Use the first page as the layout target.
+        // Multi-page diagrams require the caller to iterate explicitly.
+        let page_id = e
+            .editor
+            .model()
+            .store
+            .pages_with_ids()
+            .next()
+            .map(|(pid, _)| pid)
+            .ok_or_else(|| {
+                let msg = "ApplyHierarchical: no pages in diagram".to_string();
+                Box::leak(msg.into_boxed_str()) as &str
+            })?;
+
+        // HierarchicalLayout mutates the store in-place
+        let layout = HierarchicalLayout::new(config);
+        layout
+            .layout(&mut e.editor.model_mut().store, page_id)
+            .map_err(|le| {
+                Box::leak(format!("ApplyHierarchical: {}", le).into_boxed_str()) as &str
+            })?;
+
+        // Commit an empty transaction to push a history entry (one undo reverts all)
+        let tx = Transaction::new();
+        tx.commit(&mut e.editor).map_err(|ce| {
+            Box::leak(format!("ApplyHierarchical: commit: {}", ce).into_boxed_str()) as &str
         })
     })
     .map_err(|_| JsValue::from_str("InvalidHandle"))?

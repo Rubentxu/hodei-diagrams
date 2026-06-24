@@ -422,6 +422,18 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   layoutList.style.left = '100%';
   layoutList.style.top = '0';
 
+  const layoutTreeItem = document.createElement('button');
+  layoutTreeItem.className = 'menu-item';
+  layoutTreeItem.textContent = 'Tree';
+  layoutTreeItem.setAttribute('data-testid', 'menu-layout-tree');
+  layoutList.appendChild(layoutTreeItem);
+
+  const layoutHierarchicalItem = document.createElement('button');
+  layoutHierarchicalItem.className = 'menu-item';
+  layoutHierarchicalItem.textContent = 'Hierarchical';
+  layoutHierarchicalItem.setAttribute('data-testid', 'menu-layout-hierarchical');
+  layoutList.appendChild(layoutHierarchicalItem);
+
   const layoutOrganicItem = document.createElement('button');
   layoutOrganicItem.className = 'menu-item';
   layoutOrganicItem.textContent = 'Organic';

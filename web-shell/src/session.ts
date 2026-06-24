@@ -483,4 +483,24 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Apply the Hierarchical layout algorithm to the current page.
+   *
+   * This is separate from `applyLayout` because `HierarchicalLayout` mutates
+   * the store in-place, unlike other layouts that return a `TreeLayoutResult`.
+   *
+   * @param config Optional layout-specific configuration
+   */
+  applyHierarchicalLayout(config: object = {}): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.apply_hierarchical_layout(this.handle as number, JSON.stringify(config));
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }
