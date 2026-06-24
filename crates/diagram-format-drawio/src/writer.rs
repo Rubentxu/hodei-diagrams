@@ -61,6 +61,9 @@ fn write_diagram(
     if let Some(ref name) = diagram.name {
         diagram_start.push_attribute(("name", name.as_str()));
     }
+    if let Some(ref background) = diagram.background {
+        diagram_start.push_attribute(("background", background.as_str()));
+    }
     writer.write_event(Event::Start(diagram_start))?;
 
     writer.write_event(Event::Start(BytesStart::new("mxGraphModel")))?;
