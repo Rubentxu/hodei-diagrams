@@ -1167,6 +1167,16 @@ async function bootstrap(): Promise<void> {
     activeEditor?.applyLayout('Organic', {});
   });
 
+  const menuLayoutCircular = document.querySelector('[data-testid="menu-layout-circular"]');
+  menuLayoutCircular?.addEventListener('click', () => {
+    activeEditor?.applyLayout('Circular', {});
+  });
+
+  const menuLayoutGrid = document.querySelector('[data-testid="menu-layout-grid"]');
+  menuLayoutGrid?.addEventListener('click', () => {
+    activeEditor?.applyLayout('Grid', {});
+  });
+
   // ─── 13.8. Wire Help > Keyboard Shortcuts ───────────────────────────────────
   const menuShortcuts = document.querySelector('[data-testid="menu-shortcuts"]');
   menuShortcuts?.addEventListener('click', () => {
