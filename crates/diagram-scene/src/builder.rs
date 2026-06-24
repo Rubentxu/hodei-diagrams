@@ -11,9 +11,9 @@ use diagram_core::{
 
 use crate::element::{
     CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
-    EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PolygonElement,
-    RectElement, RoundedRectElement, StencilAspect, StencilElement, TextElement, TrapezoidElement,
-    TriangleElement, VisualElement,
+    EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PathElement,
+    PolygonElement, RectElement, RoundedRectElement, StencilAspect, StencilElement, TextElement,
+    TrapezoidElement, TriangleElement, VisualElement,
 };
 use crate::error::{SceneError, SceneResult};
 use crate::resolver::StyleResolver;
@@ -446,12 +446,24 @@ impl SceneBuilder {
         let style_map = style_for(store, edge.style_id);
         let resolved_style = self.resolver.resolve(&style_map);
 
-        Ok(VisualElement::Line(LineElement {
-            id: eid,
-            from,
-            to,
-            style: resolved_style,
-        }))
+        if edge.waypoints.is_empty() {
+            Ok(VisualElement::Line(LineElement {
+                id: eid,
+                from,
+                to,
+                style: resolved_style,
+            }))
+        } else {
+            let mut points = Vec::with_capacity(edge.waypoints.len() + 2);
+            points.push(from);
+            points.extend(edge.waypoints.iter().cloned());
+            points.push(to);
+            Ok(VisualElement::Path(PathElement {
+                id: eid,
+                points,
+                style: resolved_style,
+            }))
+        }
     }
 
     /// Project a group to a GroupElement with nested children.
@@ -793,6 +805,139 @@ mod tests {
         assert_eq!(page_scene.display_list.len(), 3); // v1, v2, edge
 
         // Find the Line element
+        let line_elem = page_scene
+            .display_list
+            .iter()
+            .find_map(|e| match e {
+                VisualElement::Line(le) => Some(le),
+                _ => None,
+            })
+            .expect("Expected Line element");
+
+        // Center of v1 = (40 + 80/2, 20 + 40/2) = (80, 40)
+        assert_eq!(line_elem.from.x, 80.0);
+        assert_eq!(line_elem.from.y, 40.0);
+
+        // Center of v2 = (120 + 80/2, 80 + 40/2) = (160, 100)
+        assert_eq!(line_elem.to.x, 160.0);
+        assert_eq!(line_elem.to.y, 100.0);
+    }
+
+    #[test]
+    fn build_edge_with_waypoints_produces_path_element() {
+        let mut model = DiagramModel::new();
+
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Vertex 1 at (40, 20) with size 80x40
+        let geom1 = make_geom(40.0, 20.0, 80.0, 40.0, false);
+        let v1 = Vertex {
+            geometry: Some(geom1),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let vid1 = model.store.insert_vertex(v1);
+
+        // Vertex 2 at (120, 80) with size 80x40
+        let geom2 = make_geom(120.0, 80.0, 80.0, 40.0, false);
+        let v2 = Vertex {
+            geometry: Some(geom2),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let vid2 = model.store.insert_vertex(v2);
+
+        // Edge with waypoints
+        let waypoints = vec![
+            diagram_core::geometry::Point { x: 100.0, y: 50.0 },
+            diagram_core::geometry::Point { x: 100.0, y: 70.0 },
+        ];
+        let edge = Edge {
+            source: vid1,
+            target: vid2,
+            page_id: Some(pid),
+            waypoints,
+            ..Default::default()
+        };
+        model.store.insert_edge(edge);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        assert_eq!(page_scene.display_list.len(), 3); // v1, v2, edge
+
+        // Find the Path element
+        let path_elem = page_scene
+            .display_list
+            .iter()
+            .find_map(|e| match e {
+                VisualElement::Path(pe) => Some(pe),
+                _ => None,
+            })
+            .expect("Expected Path element");
+
+        // Center of v1 = (40 + 80/2, 20 + 40/2) = (80, 40)
+        assert_eq!(path_elem.points[0].x, 80.0);
+        assert_eq!(path_elem.points[0].y, 40.0);
+
+        // Waypoint 1
+        assert_eq!(path_elem.points[1].x, 100.0);
+        assert_eq!(path_elem.points[1].y, 50.0);
+
+        // Waypoint 2
+        assert_eq!(path_elem.points[2].x, 100.0);
+        assert_eq!(path_elem.points[2].y, 70.0);
+
+        // Center of v2 = (120 + 80/2, 80 + 40/2) = (160, 100)
+        assert_eq!(path_elem.points[3].x, 160.0);
+        assert_eq!(path_elem.points[3].y, 100.0);
+
+        assert_eq!(path_elem.points.len(), 4); // from + 2 waypoints + to
+    }
+
+    #[test]
+    fn build_edge_with_empty_waypoints_produces_line_element() {
+        let mut model = DiagramModel::new();
+
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Vertex 1 at (40, 20) with size 80x40
+        let geom1 = make_geom(40.0, 20.0, 80.0, 40.0, false);
+        let v1 = Vertex {
+            geometry: Some(geom1),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let vid1 = model.store.insert_vertex(v1);
+
+        // Vertex 2 at (120, 80) with size 80x40
+        let geom2 = make_geom(120.0, 80.0, 80.0, 40.0, false);
+        let v2 = Vertex {
+            geometry: Some(geom2),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let vid2 = model.store.insert_vertex(v2);
+
+        // Edge with empty waypoints (backward compat)
+        let edge = Edge {
+            source: vid1,
+            target: vid2,
+            page_id: Some(pid),
+            waypoints: vec![],
+            ..Default::default()
+        };
+        model.store.insert_edge(edge);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+
+        // Should produce LineElement, not PathElement
         let line_elem = page_scene
             .display_list
             .iter()
