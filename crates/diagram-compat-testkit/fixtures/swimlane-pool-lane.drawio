@@ -1,0 +1,23 @@
+<mxfile>
+  <diagram name="Pool and Lane">
+    <mxGraphModel>
+      <root>
+        <mxCell id="pool" value="Pipeline" style="swimlane" vertex="1">
+          <mxGeometry x="10" y="10" width="700" height="400" as="geometry"/>
+        </mxCell>
+        <mxCell id="lane1" value="Design" style="swimlane" vertex="1" parent="pool">
+          <mxGeometry x="0" y="0" width="700" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="lane2" value="Build" style="swimlane" vertex="1" parent="pool">
+          <mxGeometry x="0" y="120" width="700" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="s1" value="Architecture" vertex="1" parent="lane1">
+          <mxGeometry x="20" y="40" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="s2" value="Coding" vertex="1" parent="lane2">
+          <mxGeometry x="20" y="40" width="120" height="60" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

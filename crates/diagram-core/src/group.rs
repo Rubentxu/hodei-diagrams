@@ -1,11 +1,12 @@
 //! Group payload for the diagram engine.
 //!
-//! A group is a container cell that may hold child vertices and edges.
-//! Children reference the group via their own `parent: Option<GroupId>` field,
-//! matching draw.io's `parent` semantics.
+//! A group is a container cell that may hold child vertices, edges, and
+//! nested groups. Children reference the group via their own `parent:
+//! Option<GroupId>` field. Groups can also be nested: a swimlane lane's
+//! `parent` field references its parent pool.
 
 use crate::geometry::CellGeometry;
-use crate::id::{PageId, StyleId};
+use crate::id::{GroupId, PageId, StyleId};
 use crate::label::Label;
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +14,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Groups are non-vertex, non-edge cells that serve as layout containers.
 /// Children reference a group via their own `parent` field, not by storing
-/// child IDs within the group itself.
+/// child IDs within the group itself. Groups can also be nested (e.g. a
+/// swimlane lane inside a pool) via the `parent` field on the group itself.
 ///
 /// See ADR-0058 §Decision (data shape).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -24,6 +26,8 @@ pub struct Group {
     pub label: Option<Label>,
     /// The style ID referencing shared style metadata.
     pub style_id: Option<StyleId>,
+    /// The parent group this group belongs to, if any (supports swimlane nesting).
+    pub parent: Option<GroupId>,
     /// The page this group belongs to, if any.
     pub page_id: Option<PageId>,
     /// Z-order for layering: higher values render on top. Ties are broken
@@ -47,6 +51,7 @@ impl Default for Group {
             geometry: None,
             label: None,
             style_id: None,
+            parent: None,
             page_id: None,
             z_order: 0,
             locked: false,

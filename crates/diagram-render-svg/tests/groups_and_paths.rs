@@ -38,6 +38,7 @@ fn group_with_clip_emits_defs_and_clip_path() {
         style: empty_style(),
         children: vec![child_rect],
         clip: true,
+        header: None,
     });
     let page = PageScene {
         page_id: PageId::default(),
@@ -88,6 +89,7 @@ fn group_without_clip_no_defs() {
         style: empty_style(),
         children: vec![child_rect],
         clip: false,
+        header: None,
     });
     let page = PageScene {
         page_id: PageId::default(),
@@ -155,13 +157,15 @@ fn two_clip_groups_get_incrementing_ids() {
         style: empty_style(),
         children: vec![],
         clip: true,
+        header: None,
     });
     let group2 = VisualElement::Group(GroupElement {
         id: GroupId::default(),
-        bounds: make_rect(100.0, 100.0, 100.0, 100.0),
+        bounds: make_rect(0.0, 0.0, 200.0, 200.0),
         style: empty_style(),
         children: vec![],
         clip: true,
+        header: None,
     });
     let page = PageScene {
         page_id: PageId::default(),
@@ -258,6 +262,7 @@ fn nested_group_with_child_vertex() {
         style: empty_style(),
         children: vec![child_rect],
         clip: false,
+        header: None,
     });
     let page = PageScene {
         page_id: PageId::default(),

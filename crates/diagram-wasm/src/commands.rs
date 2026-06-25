@@ -575,6 +575,7 @@ pub fn group_vertices(handle: u32, vertex_indices_json: &str) -> Result<(), JsVa
             z_order,
             locked: false,
             visible: true,
+            parent: None,
         };
 
         // Step 1: Insert group imperatively to get the GroupId

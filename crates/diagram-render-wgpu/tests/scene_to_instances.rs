@@ -139,6 +139,7 @@ fn nested_groups_flatten_children() {
         style: ResolvedStyle::default(),
         children: vec![inner_rect],
         clip: false,
+        header: None,
     });
     let outer_group = VisualElement::Group(GroupElement {
         id: GroupId::default(),
@@ -152,6 +153,7 @@ fn nested_groups_flatten_children() {
         style: ResolvedStyle::default(),
         children: vec![inner_group],
         clip: true,
+        header: None,
     });
     let page = make_page(vec![outer_group]);
     let instances = collect_instances_for_page(&page);
@@ -184,6 +186,7 @@ fn scissor_group_with_child_rect() {
         style: ResolvedStyle::default(),
         children: vec![child_rect],
         clip: true,
+        header: None,
     });
     let page = make_page(vec![group]);
     let instances = collect_instances_for_page(&page);

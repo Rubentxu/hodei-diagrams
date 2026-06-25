@@ -12,8 +12,8 @@ use diagram_core::{
 use crate::element::{
     CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
     EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PathElement,
-    PolygonElement, RectElement, RoundedRectElement, StencilAspect, StencilElement, TextElement,
-    TrapezoidElement, TriangleElement, VisualElement,
+    PolygonElement, RectElement, RoundedRectElement, StencilAspect, StencilElement,
+    SwimlaneHeader, TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
 use crate::error::{SceneError, SceneResult};
 use crate::resolver::StyleResolver;
@@ -99,7 +99,7 @@ impl SceneBuilder {
                 continue; // Hidden
             }
 
-            let elem = self.project_vertex(store, vid, vertex, None)?;
+            let elem = self.project_vertex(store, vid, vertex, CorePoint { x: 0.0, y: 0.0 })?;
             entries.push((vertex.z_order, 0, index, elem));
             index += 1;
 
@@ -107,7 +107,7 @@ impl SceneBuilder {
             if let Some(ref label) = vertex.label {
                 let style_map = style_for(store, vertex.style_id);
                 let style = self.resolver.resolve(&style_map);
-                let anchor = self.vertex_top_left(store, vid)?;
+                let anchor = self.vertex_top_left(store, vid, CorePoint { x: 0.0, y: 0.0 })?;
                 let text_elem = VisualElement::Text(TextElement {
                     owner: EntityId::Vertex(vid),
                     anchor,
@@ -166,16 +166,21 @@ impl SceneBuilder {
             }
         }
 
-        // Top-level groups: page_id matches (groups don't have parent in v1) AND visible
+        // Top-level groups: page_id matches AND parent.is_none() AND visible
+        // Nested groups (e.g. swimlane lanes inside a pool) are projected as
+        // children of their parent group, not as top-level entries.
         for (gid, group) in store.groups_with_ids() {
             if group.page_id != Some(page_id) {
                 continue;
+            }
+            if group.parent.is_some() {
+                continue; // Nested group — rendered inside its parent
             }
             if !group.visible {
                 continue; // Hidden group skips its entire subtree
             }
 
-            let elem = self.project_group(store, gid, group, page_id)?;
+            let elem = self.project_group(store, gid, group, page_id, CorePoint { x: 0.0, y: 0.0 })?;
             entries.push((group.z_order, 4, index, elem));
             index += 1;
         }
@@ -208,12 +213,15 @@ impl SceneBuilder {
     }
 
     /// Project a vertex to a VisualElement.
+    ///
+    /// `parent_offset` is the accumulated page origin of the vertex's enclosing
+    /// group chain (for top-level vertices it is `(0, 0)`).
     fn project_vertex(
         &self,
         store: &ModelStore,
         vid: VertexId,
         vertex: &Vertex,
-        parent_geom: Option<&CellGeometry>,
+        parent_offset: CorePoint,
     ) -> SceneResult<VisualElement> {
         let geometry = vertex.geometry.ok_or(SceneError::MissingGeometry(vid))?;
 
@@ -221,7 +229,7 @@ impl SceneBuilder {
         let kind = self.resolver.classify(&style_map);
         let resolved_style = self.resolver.resolve(&style_map);
 
-        let bounds = page_coords(&geometry, parent_geom);
+        let bounds = page_coords(&geometry, parent_offset);
 
         match kind {
             crate::resolver::ShapeKind::Rect => Ok(VisualElement::Rect(RectElement {
@@ -475,12 +483,16 @@ impl SceneBuilder {
     }
 
     /// Project a group to a GroupElement with nested children.
+    ///
+    /// `parent_offset` is the accumulated page origin of any enclosing group.
+    /// For top-level groups (pools) this is `(0, 0)`.
     fn project_group(
         &self,
         store: &ModelStore,
         gid: GroupId,
         group: &Group,
         page_id: diagram_core::PageId,
+        parent_offset: CorePoint,
     ) -> SceneResult<VisualElement> {
         let geometry = group
             .geometry
@@ -489,9 +501,32 @@ impl SceneBuilder {
         let style_map = style_for(store, group.style_id);
         let resolved_style = self.resolver.resolve(&style_map);
 
-        let bounds = page_coords(&geometry, None);
+        // Compute group bounds in page coordinates
+        let group_offset = if geometry.relative {
+            CorePoint {
+                x: parent_offset.x + geometry.x,
+                y: parent_offset.y + geometry.y,
+            }
+        } else {
+            CorePoint { x: geometry.x, y: geometry.y }
+        };
+        let bounds = CoreRect {
+            origin: group_offset,
+            size: Size {
+                width: geometry.width,
+                height: geometry.height,
+            },
+        };
 
-        // Collect children: vertices with parent == gid
+        // Compute swimlane header only for top-level swimlane groups (pools).
+        // Nested swimlane groups (lanes inside pools, parent=Some) do NOT get a header.
+        let header = if group.parent.is_none() {
+            self.compute_swimlane_header(&style_map, &bounds)
+        } else {
+            None
+        };
+
+        // Collect child vertices
         let mut children: Vec<VisualElement> = Vec::new();
 
         for (vid, vertex) in store.vertices_with_ids() {
@@ -502,14 +537,14 @@ impl SceneBuilder {
                 continue;
             }
 
-            let elem = self.project_vertex(store, vid, vertex, Some(&geometry))?;
+            let elem = self.project_vertex(store, vid, vertex, group_offset)?;
             children.push(elem);
 
             // Label projection for child vertex
             if let Some(ref label) = vertex.label {
                 let child_style_map = style_for(store, vertex.style_id);
                 let child_style = self.resolver.resolve(&child_style_map);
-                let anchor = self.vertex_top_left(store, vid)?;
+                let anchor = self.vertex_top_left(store, vid, group_offset)?;
                 let text_elem = VisualElement::Text(TextElement {
                     owner: EntityId::Vertex(vid),
                     anchor,
@@ -520,9 +555,33 @@ impl SceneBuilder {
             }
         }
 
-        // Note: nested groups (groups inside groups) are not yet exercisable
-        // because Group has no parent field in v1. This loop is here for
-        // forward-compatibility when Group::parent is added.
+        // Recurse into nested child groups (e.g. swimlane lanes inside a pool)
+        for (child_gid, child_group) in store.groups_with_ids() {
+            if child_group.page_id != Some(page_id) {
+                continue;
+            }
+            if child_group.parent != Some(gid) {
+                continue;
+            }
+            if !child_group.visible {
+                continue;
+            }
+            // Accumulate offset: child's relative offset within this group
+            let child_geom = match child_group.geometry {
+                Some(g) => g,
+                None => continue,
+            };
+            let child_offset = if child_geom.relative {
+                CorePoint {
+                    x: group_offset.x + child_geom.x,
+                    y: group_offset.y + child_geom.y,
+                }
+            } else {
+                CorePoint { x: child_geom.x, y: child_geom.y }
+            };
+            let child_elem = self.project_group(store, child_gid, child_group, page_id, child_offset)?;
+            children.push(child_elem);
+        }
 
         Ok(VisualElement::Group(GroupElement {
             id: gid,
@@ -530,10 +589,67 @@ impl SceneBuilder {
             style: resolved_style,
             children,
             clip: true, // draw.io clips group children by default
+            header,
         }))
     }
 
+    /// Compute the swimlane header from `startSize` and `horizontal` style keys.
+    ///
+    /// Returns `None` if the group is not a swimlane (style does not contain
+    /// the substring `"swimlane"`).
+    fn compute_swimlane_header(
+        &self,
+        style_map: &StyleMap,
+        group_bounds: &CoreRect,
+    ) -> Option<SwimlaneHeader> {
+        // Only groups with "swimlane" in the style are swimlanes
+        if !style_map
+            .iter()
+            .any(|(k, _)| k == "swimlane")
+        {
+            return None;
+        }
+
+        let horizontal = style_map
+            .get("horizontal")
+            .map(|v| v.as_str() == "1" || v.as_str().to_lowercase() == "true")
+            .unwrap_or(false);
+
+        let start_size = style_map
+            .get("startSize")
+            .and_then(|v| v.as_str().parse::<f64>().ok())
+            .unwrap_or(40.0);
+
+        let header_bounds = if horizontal {
+            // Vertical strip on the left edge
+            CoreRect {
+                origin: group_bounds.origin,
+                size: Size {
+                    width: start_size,
+                    height: group_bounds.size.height,
+                },
+            }
+        } else {
+            // Horizontal band at the top edge
+            CoreRect {
+                origin: group_bounds.origin,
+                size: Size {
+                    width: group_bounds.size.width,
+                    height: start_size,
+                },
+            }
+        };
+
+        Some(SwimlaneHeader {
+            bounds: header_bounds,
+            horizontal,
+        })
+    }
+
     /// Get the center point of a vertex in page coordinates.
+    ///
+    /// Used for edge endpoints — always computes the absolute page position
+    /// by walking the full parent group chain.
     fn vertex_center(&self, store: &ModelStore, vid: VertexId) -> SceneResult<Option<CorePoint>> {
         let vertex = store.vertex(vid).ok_or(SceneError::MissingGeometry(vid))?;
         let geometry = match vertex.geometry {
@@ -541,11 +657,9 @@ impl SceneBuilder {
             None => return Ok(None),
         };
 
-        // For grouped vertices, we need to walk the parent chain
-        let parent_geom = vertex
-            .parent
-            .and_then(|gid| store.group(gid).and_then(|g| g.geometry));
-        let bounds = page_coords(&geometry, parent_geom.as_ref());
+        // Walk the full parent group chain to compute accumulated offset
+        let parent_offset = compute_parent_offset(store, vertex.parent)?;
+        let bounds = page_coords(&geometry, parent_offset);
 
         Ok(Some(CorePoint {
             x: bounds.origin.x + bounds.size.width / 2.0,
@@ -554,17 +668,18 @@ impl SceneBuilder {
     }
 
     /// Get the top-left point of a vertex in page coordinates.
-    fn vertex_top_left(&self, store: &ModelStore, vid: VertexId) -> SceneResult<CorePoint> {
+    ///
+    /// When `parent_offset` is provided (from `project_group`), it is used
+    /// directly. When called from `build_page` for top-level vertices, pass
+    /// `(0, 0)`.
+    fn vertex_top_left(&self, store: &ModelStore, vid: VertexId, parent_offset: CorePoint) -> SceneResult<CorePoint> {
         let vertex = store.vertex(vid).ok_or(SceneError::MissingGeometry(vid))?;
         let geometry = match vertex.geometry {
             Some(g) => g,
             None => return Err(SceneError::MissingGeometry(vid)),
         };
 
-        let parent_geom = vertex
-            .parent
-            .and_then(|gid| store.group(gid).and_then(|g| g.geometry));
-        let bounds = page_coords(&geometry, parent_geom.as_ref());
+        let bounds = page_coords(&geometry, parent_offset);
 
         Ok(bounds.origin)
     }
@@ -587,15 +702,18 @@ impl SceneBuilder {
 
 // ─── Geometry flattening helpers ─────────────────────────────────────────────
 
-/// Compute page coordinates from a cell geometry and optional parent geometry.
+/// Compute page coordinates from a cell geometry and an accumulated parent offset.
 ///
-/// If `geom.relative == true` AND `parent_geom.is_some()`, the returned
-/// origin is the parent origin plus the geometry offset. Otherwise the
-/// returned origin is the geometry's own x/y (absolute or orphan relative).
-fn page_coords(geom: &CellGeometry, parent_geom: Option<&CellGeometry>) -> CoreRect {
-    let (x, y) = match (geom.relative, parent_geom) {
-        (true, Some(p)) => (geom.x + p.x, geom.y + p.y),
-        _ => (geom.x, geom.y), // absolute or orphan relative
+/// If `geom.relative == true`, the returned origin is `parent_offset + geom.x/y`.
+/// Otherwise it is just `geom.x/y` (absolute geometry).
+///
+/// `parent_offset` is the accumulated page origin of the enclosing group chain.
+/// For top-level vertices it is `(0, 0)`.
+fn page_coords(geom: &CellGeometry, parent_offset: CorePoint) -> CoreRect {
+    let (x, y) = if geom.relative {
+        (geom.x + parent_offset.x, geom.y + parent_offset.y)
+    } else {
+        (geom.x, geom.y)
     };
 
     CoreRect {
@@ -613,6 +731,25 @@ fn style_for(store: &ModelStore, style_id: Option<diagram_core::StyleId>) -> Sty
         Some(sid) => store.style(sid).cloned().unwrap_or_default(),
         None => StyleMap::new(),
     }
+}
+
+/// Compute the accumulated page offset by walking the full parent group chain.
+///
+/// For a vertex nested N levels deep (group → group → ... → vertex), this
+/// sums the x/y offsets of all enclosing groups that have `relative=true`.
+fn compute_parent_offset(store: &ModelStore, mut parent: Option<diagram_core::GroupId>) -> SceneResult<CorePoint> {
+    let mut offset = CorePoint { x: 0.0, y: 0.0 };
+    while let Some(gid) = parent {
+        let group = store.group(gid).ok_or(SceneError::MissingGroupGeometry(gid))?;
+        if let Some(ref geom) = group.geometry {
+            if geom.relative {
+                offset.x += geom.x;
+                offset.y += geom.y;
+            }
+        }
+        parent = group.parent;
+    }
+    Ok(offset)
 }
 
 #[cfg(test)]
@@ -722,6 +859,122 @@ mod tests {
             }
             _ => panic!("Expected Group element"),
         }
+    }
+
+    // =============================================================================
+    // Task 2.3 — Swimlane nested projection: pool → lane → shape
+    // =============================================================================
+
+    #[test]
+    fn build_swimlane_nested_pool_lane_shape() {
+        // Simulates the swimlane-pool-lane.drawio fixture:
+        //   pool  at (10, 10, 700, 400)  — top-level group, parent=None
+        //   lane  at (0, 0, 700, 120)     — child group of pool, relative=true
+        //   shape at (20, 40, 120, 60)   — child vertex of lane, relative=true
+        //
+        // Accumulated page coords for shape: pool_origin + lane_origin + shape_origin
+        // = (10+0+20, 10+0+40) = (30, 50)
+        let mut model = DiagramModel::new();
+
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Pool (top-level group, parent=None)
+        let mut pool_style = StyleMap::new();
+        pool_style.insert("swimlane".to_owned(), diagram_core::StyleValue(String::new()));
+        let pool_style_id = model.store.insert_style(pool_style);
+        let pool_geom = make_geom(10.0, 10.0, 700.0, 400.0, false);
+        let pool = Group {
+            geometry: Some(pool_geom),
+            style_id: Some(pool_style_id),
+            page_id: Some(pid),
+            parent: None,
+            ..Default::default()
+        };
+        let pool_gid = model.store.insert_group(pool);
+
+        // Lane (nested group, parent=pool_gid, relative within pool)
+        let lane_geom = make_geom(0.0, 0.0, 700.0, 120.0, true);
+        let lane = Group {
+            geometry: Some(lane_geom),
+            style_id: Some(pool_style_id),
+            page_id: Some(pid),
+            parent: Some(pool_gid),
+            ..Default::default()
+        };
+        let lane_gid = model.store.insert_group(lane);
+
+        // Shape (child vertex of lane)
+        let shape_geom = make_geom(20.0, 40.0, 120.0, 60.0, true);
+        let shape = Vertex {
+            geometry: Some(shape_geom),
+            style_id: None,
+            page_id: Some(pid),
+            parent: Some(lane_gid),
+            ..Default::default()
+        };
+        let _shape_vid = model.store.insert_vertex(shape);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+
+        // Only pool appears in display list (lane is nested inside it, shape is nested inside lane)
+        assert_eq!(page_scene.display_list.len(), 1, "only pool is top-level");
+
+        let pool_elem = match &page_scene.display_list[0] {
+            VisualElement::Group(g) => g,
+            other => panic!("Expected top-level Group (pool), got {:?}", other),
+        };
+
+        // Pool has swimlane header
+        assert!(
+            pool_elem.header.is_some(),
+            "pool must have a SwimlaneHeader"
+        );
+        let pool_header = pool_elem.header.as_ref().unwrap();
+        // Default startSize=40, horizontal=false → header is top band (700×40)
+        assert_eq!(pool_header.bounds.size.width, 700.0);
+        assert_eq!(pool_header.bounds.size.height, 40.0);
+        assert!(!pool_header.horizontal, "pool should be vertical (horizontal=false)");
+
+        // Pool has one child: the lane (nested group)
+        assert_eq!(
+            pool_elem.children.len(),
+            1,
+            "pool must have exactly one child (the lane)"
+        );
+
+        let lane_elem = match &pool_elem.children[0] {
+            VisualElement::Group(g) => g,
+            other => panic!("Expected nested Group (lane), got {:?}", other),
+        };
+
+        // Lane has no header (it's not a swimlane itself — only pools are)
+        assert!(
+            lane_elem.header.is_none(),
+            "lane should not have a SwimlaneHeader"
+        );
+
+        // Lane has one child: the shape
+        assert_eq!(
+            lane_elem.children.len(),
+            1,
+            "lane must have exactly one child (the shape)"
+        );
+
+        let shape_elem = match &lane_elem.children[0] {
+            VisualElement::Rect(r) => r,
+            other => panic!("Expected Rect (shape), got {:?}", other),
+        };
+
+        // Shape accumulated coords: pool(10,10) + lane(0,0) + shape(20,40) = (30, 50)
+        assert_eq!(shape_elem.bounds.origin.x, 30.0);
+        assert_eq!(shape_elem.bounds.origin.y, 50.0);
+        assert_eq!(shape_elem.bounds.size.width, 120.0);
+        assert_eq!(shape_elem.bounds.size.height, 60.0);
     }
 
     #[test]
@@ -1647,7 +1900,8 @@ mod tests {
     #[test]
     fn page_coords_absolute() {
         let geom = make_geom(10.0, 20.0, 100.0, 50.0, false);
-        let result = page_coords(&geom, None);
+        let parent_offset = CorePoint { x: 0.0, y: 0.0 };
+        let result = page_coords(&geom, parent_offset);
 
         assert_eq!(result.origin.x, 10.0);
         assert_eq!(result.origin.y, 20.0);
@@ -1657,9 +1911,9 @@ mod tests {
 
     #[test]
     fn page_coords_relative_with_parent() {
-        let parent = make_geom(100.0, 200.0, 500.0, 400.0, false);
+        let parent_offset = CorePoint { x: 100.0, y: 200.0 };
         let child = make_geom(10.0, 30.0, 50.0, 25.0, true);
-        let result = page_coords(&child, Some(&parent));
+        let result = page_coords(&child, parent_offset);
 
         assert_eq!(result.origin.x, 110.0); // 100 + 10
         assert_eq!(result.origin.y, 230.0); // 200 + 30
@@ -1669,10 +1923,11 @@ mod tests {
 
     #[test]
     fn page_coords_relative_without_parent_is_absolute() {
+        let parent_offset = CorePoint { x: 0.0, y: 0.0 };
         let child = make_geom(10.0, 30.0, 50.0, 25.0, true);
-        let result = page_coords(&child, None);
+        let result = page_coords(&child, parent_offset);
 
-        // Relative but no parent: behaves as absolute
+        // Relative but zero parent offset: behaves as absolute
         assert_eq!(result.origin.x, 10.0);
         assert_eq!(result.origin.y, 30.0);
     }

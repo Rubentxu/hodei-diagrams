@@ -372,6 +372,7 @@ mod tests {
             style: ResolvedStyle::default(),
             children,
             clip: _clip,
+            header: None,
         })
     }
 

@@ -1003,6 +1003,7 @@ mod tests {
             style: empty_style(),
             children: vec![],
             clip: false,
+            header: None,
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
@@ -1027,6 +1028,7 @@ mod tests {
             style: empty_style(),
             children: vec![],
             clip: true,
+            header: None,
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
@@ -1063,6 +1065,7 @@ mod tests {
             style: empty_style(),
             children: vec![child_rect],
             clip: false,
+            header: None,
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();

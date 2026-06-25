@@ -357,6 +357,22 @@ pub struct PathElement {
     pub style: super::ResolvedStyle,
 }
 
+/// Swimlane header descriptor — present when a group represents a swimlane
+/// (pool or lane). The header is the resize band at the top or left edge,
+/// controlled by `startSize` and `horizontal` style keys in draw.io.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwimlaneHeader {
+    /// The header band bounds in page coordinates.
+    pub bounds: Rect,
+    /// Whether the swimlane is horizontal (`true`) or vertical (`false`).
+    ///
+    /// - `horizontal = true`: header is a vertical strip on the left
+    ///   (x=group.x, y=group.y, w=startSize, h=group.h)
+    /// - `horizontal = false`: header is a horizontal band at the top
+    ///   (x=group.x, y=group.y, w=group.w, h=startSize)
+    pub horizontal: bool,
+}
+
 /// A group element containing nested children.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupElement {
@@ -370,6 +386,9 @@ pub struct GroupElement {
     pub children: Vec<VisualElement>,
     /// Whether children are clipped to the group bounds.
     pub clip: bool,
+    /// Swimlane header, if this group represents a swimlane.
+    #[serde(default)]
+    pub header: Option<SwimlaneHeader>,
 }
 
 #[cfg(test)]
@@ -501,6 +520,7 @@ mod tests {
             style,
             children: vec![child1, child2],
             clip: true,
+            header: None,
         };
 
         assert_eq!(group.children.len(), 2);
