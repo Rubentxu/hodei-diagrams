@@ -40,7 +40,7 @@ pub use element::{
     CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
     EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PathCommand,
     PathElement, PolygonElement, RectElement, RoundedRectElement, StencilAspect, StencilElement,
-    TextElement, TrapezoidElement, TriangleElement, VisualElement,
+    SwimlaneHeader, TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
 pub use error::{SceneError, SceneResult};
 pub use resolver::{ResolvedStyle, ShapeKind, StyleResolver};
