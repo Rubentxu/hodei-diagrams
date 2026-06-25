@@ -22,6 +22,25 @@ pub struct Page {
     /// Optional page background color. `None` means white (the default).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
+    /// Whether math typesetting is enabled for this page.
+    /// When `true`, the renderer processes math expressions in labels.
+    #[serde(default)]
+    pub math_enabled: bool,
+}
+
+impl Default for Page {
+    fn default() -> Self {
+        Self {
+            id: Default::default(),
+            name: None,
+            size: Size {
+                width: 1.0,
+                height: 1.0,
+            },
+            background: None,
+            math_enabled: false,
+        }
+    }
 }
 
 impl Page {
@@ -35,6 +54,7 @@ impl Page {
                 height: 1.0,
             },
             background: None,
+            math_enabled: false,
         }
     }
 }
