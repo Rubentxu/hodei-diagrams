@@ -6,6 +6,8 @@
  * Collapse state persisted in localStorage.
  */
 
+import type { StencilLibraryManager } from './stencil-library-manager.js';
+
 export interface SidebarControls {
   container: HTMLElement;
   rectToolBtn: HTMLButtonElement;
@@ -148,7 +150,7 @@ const LOCK_ICON = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" s
   <path d="M3 4.5V3a2 2 0 0 1 4 0v1.5"/>
 </svg>`;
 
-export function buildSidebar(): SidebarControls {
+export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarControls {
   const container = document.createElement('div');
   container.className = 'sidebar';
   container.setAttribute('data-testid', 'sidebar');
@@ -329,149 +331,113 @@ export function buildSidebar(): SidebarControls {
   }
 
   generalCat.appendChild(shapeGrid);
+  container.appendChild(generalCat);
 
-  // ─── Stencils category ──────────────────────────────────────────────────
-  const stencilCat = document.createElement('div');
-  stencilCat.className = 'shape-category';
+  // ─── Dynamic stencil categories ─────────────────────────────────────────
+  // Container for dynamically rendered library categories (replaced on manager changes)
+  const dynamicStencilContainer = document.createElement('div');
+  dynamicStencilContainer.setAttribute('data-testid', 'dynamic-stencil-categories');
+  container.appendChild(dynamicStencilContainer);
 
-  const stencilHeader = document.createElement('div');
-  stencilHeader.className = 'category-header';
+  // Hidden file input for loading additional stencil libraries
+  const hiddenFileInput = document.createElement('input');
+  hiddenFileInput.type = 'file';
+  hiddenFileInput.accept = '.xml';
+  hiddenFileInput.style.display = 'none';
+  hiddenFileInput.setAttribute('data-testid', 'stencil-file-input');
+  container.appendChild(hiddenFileInput);
 
-  const stencilIcon = document.createElement('span');
-  stencilIcon.className = 'category-icon';
-  stencilIcon.innerHTML = categoryIcon('Stencils');
-  stencilHeader.appendChild(stencilIcon);
+  /**
+   * Render all stencil library categories from the manager's current state.
+   * Replaces all content in dynamicStencilContainer.
+   */
+  function renderDynamicStencilCategories(): void {
+    dynamicStencilContainer.innerHTML = '';
 
-  const stencilTitle = document.createElement('span');
-  stencilTitle.className = 'category-title';
-  stencilTitle.textContent = 'Stencils';
-  stencilHeader.appendChild(stencilTitle);
+    if (!stencilManager) return;
 
-  const stencilCount = document.createElement('span');
-  stencilCount.className = 'category-count';
-  stencilCount.setAttribute('data-testid', 'category-count-stencils');
-  stencilCount.textContent = '10';
-  stencilHeader.appendChild(stencilCount);
+    const libraries = stencilManager.getLibraries();
 
-  stencilCat.appendChild(stencilHeader);
+    // Render each library as a collapsible category
+    for (const [libName, shapes] of libraries) {
+      const cat = document.createElement('div');
+      cat.className = 'shape-category';
 
-  const stencilGrid = document.createElement('div');
-  stencilGrid.className = 'shape-grid';
+      // Category header
+      const catHeader = document.createElement('div');
+      catHeader.className = 'category-header';
 
-  const STENCIL_SHAPES: ShapeEntry[] = [
-    {
-      id: 'rectangle',
-      label: 'Rect',
-      tooltip: 'Rectangle stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><rect x="2" y="2" width="28" height="20" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'rectangle-stencil-btn',
-    },
-    {
-      id: 'ellipse',
-      label: 'Ellipse',
-      tooltip: 'Ellipse stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><ellipse cx="16" cy="12" rx="14" ry="10" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'ellipse-stencil-btn',
-    },
-    {
-      id: 'diamond',
-      label: 'Diamond',
-      tooltip: 'Diamond stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="16,2 30,12 16,22 2,12" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'diamond-stencil-btn',
-    },
-    {
-      id: 'triangle',
-      label: 'Triangle',
-      tooltip: 'Triangle stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="16,2 30,22 2,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'triangle-stencil-btn',
-    },
-    {
-      id: 'hexagon',
-      label: 'Hexagon',
-      tooltip: 'Hexagon stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="16,2 28,7 28,17 16,22 4,17 4,7" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'hexagon-stencil-btn',
-    },
-    {
-      id: 'cylinder',
-      label: 'Cylinder',
-      tooltip: 'Cylinder stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><path d="M6,6 C6,3 10,2 16,2 C22,2 26,3 26,6 L26,18 C26,21 22,22 16,22 C10,22 6,21 6,18 Z" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'cylinder-stencil-btn',
-    },
-    {
-      id: 'cloud',
-      label: 'Cloud',
-      tooltip: 'Cloud stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><path d="M8,18 C4,18 2,14 4,10 C4,6 8,4 12,6 C14,4 18,4 20,6 C24,6 28,10 26,14 C30,14 30,18 26,18 Z" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'cloud-stencil-btn',
-    },
-    {
-      id: 'parallelogram',
-      label: 'Parallelogram',
-      tooltip: 'Parallelogram stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="8,2 30,2 24,22 2,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'parallelogram-stencil-btn',
-    },
-    {
-      id: 'trapezoid',
-      label: 'Trapezoid',
-      tooltip: 'Trapezoid stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="6,2 26,2 30,22 2,22" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'trapezoid-stencil-btn',
-    },
-    {
-      id: 'blockArrow',
-      label: 'BlockArrow',
-      tooltip: 'Block arrow stencil',
-      icon: '<svg width="32" height="24" viewBox="0 0 32 24"><polygon points="4,8 18,8 18,2 28,12 18,22 18,16 4,16" fill="none" stroke="#F8FAFC" stroke-width="1.5"/></svg>',
-      dataTestId: 'blockarrow-stencil-btn',
-    },
-  ];
+      const catIcon = document.createElement('span');
+      catIcon.className = 'category-icon';
+      catIcon.innerHTML = categoryIcon(libName);
+      catHeader.appendChild(catIcon);
 
-  for (const shape of STENCIL_SHAPES) {
-    const btn = document.createElement('button');
-    btn.className = 'shape-btn';
-    btn.title = shape.tooltip;
-    btn.setAttribute('data-testid', shape.dataTestId);
-    btn.setAttribute('draggable', 'true');
-    btn.setAttribute('data-stencil-name', shape.id);
-    btn.innerHTML = shape.icon;
-    const label = document.createElement('span');
-    label.className = 'shape-label';
-    label.textContent = shape.label;
-    btn.appendChild(label);
+      const catTitle = document.createElement('span');
+      catTitle.className = 'category-title';
+      catTitle.textContent = libName.charAt(0).toUpperCase() + libName.slice(1);
+      catHeader.appendChild(catTitle);
 
-    if (shape.id === 'rectangle') {
-      controls.rectangleStencilBtn = btn;
-    } else if (shape.id === 'ellipse') {
-      controls.ellipseStencilBtn = btn;
-    } else if (shape.id === 'diamond') {
-      controls.diamondStencilBtn = btn;
-    } else if (shape.id === 'triangle') {
-      controls.triangleStencilBtn = btn;
-    } else if (shape.id === 'hexagon') {
-      controls.hexagonStencilBtn = btn;
-    } else if (shape.id === 'cylinder') {
-      controls.cylinderStencilBtn = btn;
-    } else if (shape.id === 'cloud') {
-      controls.cloudStencilBtn = btn;
-    } else if (shape.id === 'parallelogram') {
-      controls.parallelogramStencilBtn = btn;
-    } else if (shape.id === 'trapezoid') {
-      controls.trapezoidStencilBtn = btn;
-    } else if (shape.id === 'blockArrow') {
-      controls.blockArrowStencilBtn = btn;
+      const catCount = document.createElement('span');
+      catCount.className = 'category-count';
+      catCount.setAttribute('data-testid', `category-count-${libName}`);
+      catCount.textContent = String(shapes.length);
+      catHeader.appendChild(catCount);
+
+      cat.appendChild(catHeader);
+
+      // Shape grid
+      const grid = document.createElement('div');
+      grid.className = 'shape-grid';
+
+      if (shapes.length === 0) {
+        const emptyMsg = document.createElement('span');
+        emptyMsg.className = 'category-coming-soon';
+        emptyMsg.textContent = 'No shapes in this library';
+        grid.appendChild(emptyMsg);
+      } else {
+        for (const shape of shapes) {
+          const btn = document.createElement('button');
+          btn.className = 'shape-btn';
+          btn.title = shape.name;
+          btn.setAttribute('data-testid', `shape-${libName}-${shape.name}`);
+          // Placeholder icon: square with shape initial inside
+          const initial = shape.name.charAt(0).toUpperCase();
+          btn.innerHTML = `<svg width="32" height="24" viewBox="0 0 32 24">
+            <rect x="2" y="2" width="28" height="20" rx="2"
+              fill="none" stroke="#F8FAFC" stroke-width="1.5"/>
+            <text x="16" y="16" text-anchor="middle" dominant-baseline="middle"
+              font-size="10" fill="#F8FAFC" font-family="monospace">${initial}</text>
+          </svg>`;
+          const label = document.createElement('span');
+          label.className = 'shape-label';
+          label.textContent = shape.name;
+          btn.appendChild(label);
+
+          // Click to add shape at canvas center (future: drag-and-drop)
+          btn.addEventListener('click', () => {
+            // Dispatch a custom event that main.ts can listen to for adding the shape
+            const event = new CustomEvent('stencil-shape-activate', {
+              bubbles: true,
+              detail: { library: libName, name: shape.name },
+            });
+            container.dispatchEvent(event);
+          });
+
+          grid.appendChild(btn);
+        }
+      }
+
+      cat.appendChild(grid);
+      dynamicStencilContainer.appendChild(cat);
     }
-
-    stencilGrid.appendChild(btn);
   }
 
-  stencilCat.appendChild(stencilGrid);
-  container.appendChild(stencilCat);
-  container.appendChild(generalCat);
+  // Initial render and subscribe to manager changes
+  if (stencilManager) {
+    renderDynamicStencilCategories();
+    const unsubscribe = stencilManager.subscribe(renderDynamicStencilCategories);
+    // Note: unsubscribe is intentionally not called — manager lives for the session lifetime
+  }
 
   // ─── Future categories (grayed out with lock) ───────────────────────────
   // Warn once if duplicate keys exist (Databases and Database map to same icon)
@@ -526,9 +492,26 @@ export function buildSidebar(): SidebarControls {
   const moreBtn = document.createElement('button');
   moreBtn.className = 'more-shapes-btn';
   moreBtn.textContent = '+ More Shapes';
-  moreBtn.disabled = true;
-  moreBtn.title = 'Disponible en v1.1';
   container.appendChild(moreBtn);
+
+  // Wire "+ More Shapes" to hidden file input
+  moreBtn.addEventListener('click', () => {
+    hiddenFileInput.value = '';
+    hiddenFileInput.click();
+  });
+
+  hiddenFileInput.addEventListener('change', async () => {
+    if (!stencilManager) return;
+    const files = hiddenFileInput.files;
+    if (!files || files.length === 0) return;
+    const file = files[0]!;
+    const name = file.name.replace(/\.xml$/i, '');
+    try {
+      await stencilManager.loadFromFile(name, file);
+    } catch (e) {
+      window.alert(`Failed to load stencil library: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
 
   return {
     container,

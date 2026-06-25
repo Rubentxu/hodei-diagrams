@@ -822,6 +822,16 @@ async function bootstrap(): Promise<void> {
       });
       // ─────────────────────────────────────────────────────────────────────
 
+      // ── Dynamic stencil library shape activation (click-to-add) ───────────
+      ui.sidebar.addEventListener('stencil-shape-activate', (e) => {
+        if (!activeSession) return;
+        const event = e as CustomEvent<{ library: string; name: string }>;
+        const { library, name } = event.detail;
+        // Add at canvas center (400, 300) as default activation position
+        activeSession.addStencilVertex(library, name, 400, 300);
+      });
+      // ─────────────────────────────────────────────────────────────────────
+
       // Re-render when inspector modifies state via session.executeCommand
       activeSession.setOnStateChange(() => {
         activeEditor?.triggerReplay();
