@@ -10,8 +10,8 @@
 //!   cargo test -p diagram-routing --test integration_bend
 
 use diagram_routing::{
-    insert_orthogonal_bend, move_orthogonal_bend, normalize_waypoints, remove_orthogonal_bend,
-    Point,
+    Point, insert_orthogonal_bend, move_orthogonal_bend, normalize_waypoints,
+    remove_orthogonal_bend,
 };
 
 // ─── Normalization edge cases ────────────────────────────────────────────────
@@ -79,8 +79,8 @@ fn normalize_handles_single_point() {
 fn insert_bend_on_long_horizontal_segment_creates_minimal_z() {
     // Long horizontal segment: source at left, target at right
     let path = vec![
-        Point { x: 50.0, y: 100.0 },   // source east perimeter
-        Point { x: 350.0, y: 100.0 },  // target west perimeter
+        Point { x: 50.0, y: 100.0 },  // source east perimeter
+        Point { x: 350.0, y: 100.0 }, // target west perimeter
     ];
     // Click at (200, 50) — above the segment
     let result = insert_orthogonal_bend(&path, 0, Point { x: 200.0, y: 50.0 });
@@ -95,19 +95,14 @@ fn insert_bend_on_long_horizontal_segment_creates_minimal_z() {
         assert!(
             is_orthogonal,
             "Non-orthogonal segment at index {}: {:?} → {:?}",
-            i,
-            a,
-            b
+            i, a, b
         );
     }
 }
 
 #[test]
 fn insert_bend_on_click_on_segment_is_noop() {
-    let path = vec![
-        Point { x: 0.0, y: 100.0 },
-        Point { x: 100.0, y: 100.0 },
-    ];
+    let path = vec![Point { x: 0.0, y: 100.0 }, Point { x: 100.0, y: 100.0 }];
     // Click exactly on the segment
     let result = insert_orthogonal_bend(&path, 0, Point { x: 50.0, y: 100.0 });
     // Should not add colinear points (normalization removes them)
@@ -242,10 +237,7 @@ fn remove_middle_bend_simplifies_path() {
 
 #[test]
 fn remove_first_or_last_bend_noop() {
-    let path = vec![
-        Point { x: 0.0, y: 0.0 },
-        Point { x: 100.0, y: 100.0 },
-    ];
+    let path = vec![Point { x: 0.0, y: 0.0 }, Point { x: 100.0, y: 100.0 }];
     // Try to remove index 0 (first point) — should panic (endpoint cannot be removed)
     let result = std::panic::catch_unwind(|| remove_orthogonal_bend(&path, 0));
     assert!(result.is_err(), "Removing first point should panic");
@@ -253,10 +245,7 @@ fn remove_first_or_last_bend_noop() {
 
 #[test]
 fn remove_last_bend_panics() {
-    let path = vec![
-        Point { x: 0.0, y: 0.0 },
-        Point { x: 100.0, y: 100.0 },
-    ];
+    let path = vec![Point { x: 0.0, y: 0.0 }, Point { x: 100.0, y: 100.0 }];
     // Try to remove last index — should panic (endpoint cannot be removed)
     let result = std::panic::catch_unwind(|| remove_orthogonal_bend(&path, 1));
     assert!(result.is_err(), "Removing last point should panic");
@@ -304,10 +293,7 @@ fn remove_bend_normalizes_result() {
 
 #[test]
 fn insert_then_remove_bend_roundtrip() {
-    let path = vec![
-        Point { x: 0.0, y: 0.0 },
-        Point { x: 100.0, y: 0.0 },
-    ];
+    let path = vec![Point { x: 0.0, y: 0.0 }, Point { x: 100.0, y: 0.0 }];
     // Insert a bend
     let with_bend = insert_orthogonal_bend(&path, 0, Point { x: 50.0, y: 50.0 });
     assert_eq!(with_bend.len(), 5);

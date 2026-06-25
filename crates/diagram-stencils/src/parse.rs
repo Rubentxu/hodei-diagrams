@@ -267,6 +267,44 @@ pub fn parse_stencil_library(xml: &str) -> Result<Vec<Stencil>, StencilError> {
                             format!("unsupported element '{}' in {} - skipped", name, location),
                         ));
                     }
+                    "fillstroke" if in_background || in_foreground => {
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
+                        target.push(PathCommand::FillStroke);
+                    }
+                    "fill" if in_background || in_foreground => {
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
+                        target.push(PathCommand::Fill);
+                    }
+                    "stroke" if in_background || in_foreground => {
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
+                        target.push(PathCommand::Stroke);
+                    }
+                    _ if in_background && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in background - skipped", name),
+                        ));
+                    }
+                    _ if in_foreground && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in foreground - skipped", name),
+                        ));
+                    }
                     _ => {}
                 }
             }
@@ -453,6 +491,44 @@ pub fn parse_stencil(xml: &str) -> Result<Stencil, StencilError> {
                         diagnostics.push(Diagnostic::new(
                             format!("<{}>", name),
                             format!("unsupported element '{}' in {} - skipped", name, location),
+                        ));
+                    }
+                    "fillstroke" if in_background || in_foreground => {
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
+                        target.push(PathCommand::FillStroke);
+                    }
+                    "fill" if in_background || in_foreground => {
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
+                        target.push(PathCommand::Fill);
+                    }
+                    "stroke" if in_background || in_foreground => {
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
+                        target.push(PathCommand::Stroke);
+                    }
+                    _ if in_background && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in background - skipped", name),
+                        ));
+                    }
+                    _ if in_foreground && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in foreground - skipped", name),
                         ));
                     }
                     _ => {}
@@ -789,5 +865,143 @@ mod tests {
         let stencils = parse_stencil_library(xml).unwrap();
         assert_eq!(stencils.len(), 1, "Expected 1 shape, got {:?}", stencils);
         assert_eq!(stencils[0].name, "Tail");
+    }
+
+    // ─── fillstroke/fill/stroke element tests ─────────────────────────────────
+
+    #[test]
+    fn parse_fillstroke_element_yields_fillstroke_command() {
+        let xml = r#"<shapes name="test">
+            <shape name="Box" w="80" h="40">
+                <foreground><fillstroke/></foreground>
+            </shape>
+        </shapes>"#;
+        let stencil = parse_stencil(xml).unwrap();
+        assert_eq!(stencil.foreground.len(), 1);
+        assert!(matches!(stencil.foreground[0], PathCommand::FillStroke));
+    }
+
+    #[test]
+    fn parse_fill_element_yields_fill_command() {
+        let xml = r#"<shapes name="test">
+            <shape name="Box" w="80" h="40">
+                <foreground><fill/></foreground>
+            </shape>
+        </shapes>"#;
+        let stencil = parse_stencil(xml).unwrap();
+        assert_eq!(stencil.foreground.len(), 1);
+        assert!(matches!(stencil.foreground[0], PathCommand::Fill));
+    }
+
+    #[test]
+    fn parse_stroke_element_yields_stroke_command() {
+        let xml = r#"<shapes name="test">
+            <shape name="Box" w="80" h="40">
+                <foreground><stroke/></foreground>
+            </shape>
+        </shapes>"#;
+        let stencil = parse_stencil(xml).unwrap();
+        assert_eq!(stencil.foreground.len(), 1);
+        assert!(matches!(stencil.foreground[0], PathCommand::Stroke));
+    }
+
+    #[test]
+    fn parse_strokewidth_element_emits_diagnostic() {
+        let xml = r#"<shapes name="test">
+            <shape name="Box" w="80" h="40">
+                <foreground><strokewidth/></foreground>
+            </shape>
+        </shapes>"#;
+        let stencil = parse_stencil(xml).unwrap();
+        assert!(
+            !stencil.diagnostics.is_empty(),
+            "expected diagnostic for strokewidth"
+        );
+        assert!(
+            stencil
+                .diagnostics
+                .iter()
+                .any(|d| d.message.contains("strokewidth")),
+            "expected strokewidth in diagnostic message"
+        );
+    }
+
+    #[test]
+    fn parse_library_fillstroke_element_yields_fillstroke_command() {
+        let xml = r#"<shapes name="test">
+            <shape name="Box" w="80" h="40">
+                <foreground><fillstroke/></foreground>
+            </shape>
+        </shapes>"#;
+        let stencils = parse_stencil_library(xml).unwrap();
+        assert_eq!(stencils.len(), 1);
+        assert_eq!(stencils[0].foreground.len(), 1);
+        assert!(matches!(stencils[0].foreground[0], PathCommand::FillStroke));
+    }
+
+    #[test]
+    fn parse_library_fill_and_stroke_elements() {
+        let xml = r#"<shapes name="test">
+            <shape name="Box" w="80" h="40">
+                <foreground><fill/><stroke/></foreground>
+            </shape>
+        </shapes>"#;
+        let stencils = parse_stencil_library(xml).unwrap();
+        assert_eq!(stencils.len(), 1);
+        assert_eq!(stencils[0].foreground.len(), 2);
+        assert!(matches!(stencils[0].foreground[0], PathCommand::Fill));
+        assert!(matches!(stencils[0].foreground[1], PathCommand::Stroke));
+    }
+
+    #[test]
+    fn parse_library_strokewidth_emits_diagnostic() {
+        let xml = r#"<shapes name="test">
+            <shape name="Box" w="80" h="40">
+                <foreground><strokewidth/></foreground>
+            </shape>
+        </shapes>"#;
+        let stencils = parse_stencil_library(xml).unwrap();
+        assert_eq!(stencils.len(), 1);
+        assert!(
+            !stencils[0].diagnostics.is_empty(),
+            "expected diagnostic for strokewidth"
+        );
+    }
+
+    #[test]
+    fn parse_general_xml_fixture_foreground_fillstroke() {
+        // The general.xml fixture has <fillstroke/> in foreground of each shape.
+        // After the fix, foreground should be [FillStroke], not [].
+        let xml = include_str!("../fixtures/general.xml");
+        let stencils = parse_stencil_library(xml).unwrap();
+        assert_eq!(stencils.len(), 2);
+
+        let rect = &stencils[0];
+        assert_eq!(rect.name, "Rectangle");
+        assert_eq!(
+            rect.foreground.len(),
+            1,
+            "expected [FillStroke], got {:?}",
+            rect.foreground
+        );
+        assert!(matches!(rect.foreground[0], PathCommand::FillStroke));
+        assert!(
+            rect.diagnostics.is_empty(),
+            "expected no diagnostics for general.xml Rectangle"
+        );
+
+        let ellipse = &stencils[1];
+        assert_eq!(ellipse.name, "Ellipse");
+        assert_eq!(
+            ellipse.foreground.len(),
+            1,
+            "expected [FillStroke], got {:?}",
+            ellipse.foreground
+        );
+        assert!(matches!(ellipse.foreground[0], PathCommand::FillStroke));
+        assert!(
+            ellipse.diagnostics.is_empty(),
+            "expected no diagnostics for general.xml Ellipse"
+        );
     }
 }

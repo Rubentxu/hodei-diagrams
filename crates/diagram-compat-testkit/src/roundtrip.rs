@@ -1094,12 +1094,11 @@ mod tests {
             .expect("should have an edge cell");
 
         // Verify waypoints were parsed
-        let geo = edge_cell.geometry.as_ref().expect("edge should have geometry");
-        assert_eq!(
-            geo.points.len(),
-            2,
-            "edge should have 2 waypoints"
-        );
+        let geo = edge_cell
+            .geometry
+            .as_ref()
+            .expect("edge should have geometry");
+        assert_eq!(geo.points.len(), 2, "edge should have 2 waypoints");
         assert_eq!(geo.points[0], (100.0, 50.0));
         assert_eq!(geo.points[1], (200.0, 80.0));
 
@@ -1130,7 +1129,10 @@ mod tests {
             .find(|c| c.edge)
             .expect("reparsed should still have an edge");
 
-        let reparsed_geo = reparsed_edge.geometry.as_ref().expect("edge should have geometry");
+        let reparsed_geo = reparsed_edge
+            .geometry
+            .as_ref()
+            .expect("edge should have geometry");
         assert_eq!(
             reparsed_geo.points.len(),
             2,

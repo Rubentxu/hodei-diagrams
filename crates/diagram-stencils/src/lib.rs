@@ -100,6 +100,10 @@ pub enum PathCommand {
     Close,
     /// Fill and stroke the current path.
     FillStroke,
+    /// Fill the current path (no stroke).
+    Fill,
+    /// Stroke the current path (no fill).
+    Stroke,
 }
 
 /// SPDX license identifier for open-source stencils.
@@ -222,6 +226,8 @@ fn normalize_commands(
             }
             PathCommand::Close => PathCommand::Close,
             PathCommand::FillStroke => PathCommand::FillStroke,
+            PathCommand::Fill => PathCommand::Fill,
+            PathCommand::Stroke => PathCommand::Stroke,
         })
         .collect()
 }

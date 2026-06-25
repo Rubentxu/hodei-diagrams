@@ -540,16 +540,12 @@ mod tests {
             .iter()
             .find(|c| c.id == "4")
             .expect("edge cell should exist");
-        assert!(
-            edge_cell.edge,
-            "cell should be an edge"
-        );
-        let geo = edge_cell.geometry.as_ref().expect("edge should have geometry");
-        assert_eq!(
-            geo.points.len(),
-            2,
-            "edge should have 2 waypoints"
-        );
+        assert!(edge_cell.edge, "cell should be an edge");
+        let geo = edge_cell
+            .geometry
+            .as_ref()
+            .expect("edge should have geometry");
+        assert_eq!(geo.points.len(), 2, "edge should have 2 waypoints");
         assert_eq!(geo.points[0], (100.0, 50.0));
         assert_eq!(geo.points[1], (200.0, 80.0));
     }
@@ -579,7 +575,10 @@ mod tests {
             .iter()
             .find(|c| c.id == "4")
             .expect("edge cell should exist");
-        let geo = edge_cell.geometry.as_ref().expect("edge should have geometry");
+        let geo = edge_cell
+            .geometry
+            .as_ref()
+            .expect("edge should have geometry");
         assert!(
             geo.points.is_empty(),
             "edge without waypoints should have empty points"

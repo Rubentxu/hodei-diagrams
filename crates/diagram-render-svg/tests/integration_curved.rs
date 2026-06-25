@@ -6,11 +6,11 @@
 //! Run with:
 //!   cargo test -p diagram-render-svg --test integration_curved
 
-use diagram_core::geometry::Point;
 use diagram_core::EdgeId;
-use diagram_scene::{PathElement, ResolvedStyle, VisualElement};
+use diagram_core::geometry::Point;
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::{PageId, PageScene, Scene};
+use diagram_scene::{PathElement, ResolvedStyle, VisualElement};
 
 /// Helper to build a page with a single display element.
 fn page_with_element(elem: VisualElement) -> Scene {
@@ -97,10 +97,7 @@ fn curved_with_two_points_falls_back_to_line() {
     // Need 3+ points for curve. With 2 points, should fall back to straight line.
     let path = VisualElement::Path(PathElement {
         id: EdgeId::default(),
-        points: vec![
-            Point { x: 10.0, y: 50.0 },
-            Point { x: 190.0, y: 150.0 },
-        ],
+        points: vec![Point { x: 10.0, y: 50.0 }, Point { x: 190.0, y: 150.0 }],
         style: ResolvedStyle {
             curved: Some(true),
             ..Default::default()
