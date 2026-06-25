@@ -510,6 +510,7 @@ mod tests {
             anchor: Point { x: 0.0, y: 0.0 },
             text: "hello".to_owned(),
             style: ResolvedStyle::default(),
+            is_math: false,
         });
         let path = VisualElement::Path(PathElement {
             id: EdgeId::default(),
