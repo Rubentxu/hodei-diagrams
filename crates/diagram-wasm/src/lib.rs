@@ -40,13 +40,8 @@ mod types;
 
 pub use commands::{
     ROUTING_KIND_ORTHOGONAL, ROUTING_KIND_STRAIGHT, clear_edge_anchor, connect_vertices,
-    connect_vertices_anchored, disconnect_edge, engine_can_redo, engine_can_undo,
-    execute_command, execute_transaction, get_edge_anchors, get_resolved_style, redo, set_edge_anchor,
-    undo,
-};
-pub use types::{
-    anchor_dto_auto, anchor_dto_cardinal, anchor_dto_normalized, AnchorDto, AnchorEnd,
-    AnchorNormalizedDto, EdgeAnchorsDto,
+    connect_vertices_anchored, disconnect_edge, engine_can_redo, engine_can_undo, execute_command,
+    execute_transaction, get_edge_anchors, get_resolved_style, redo, set_edge_anchor, undo,
 };
 pub use engine::{create_engine, dispose_engine};
 pub use export::{export_drawio, export_drawio_fresh_engine};
@@ -56,3 +51,7 @@ pub use metadata::{get_metadata, set_metadata};
 pub use render::{render_pages, render_svg};
 pub use scene::get_scene;
 pub use stencil::{PathCommandDto, parse_stencil_library_xml, parse_stencil_xml};
+pub use types::{
+    AnchorDto, AnchorEnd, AnchorNormalizedDto, EdgeAnchorsDto, anchor_dto_auto,
+    anchor_dto_cardinal, anchor_dto_normalized,
+};

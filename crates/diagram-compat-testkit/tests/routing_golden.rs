@@ -7,7 +7,7 @@
 use diagram_core::geometry::Point;
 use diagram_core::vertex::Vertex;
 use diagram_format_drawio::{DrawioMapping, parse_drawio};
-use diagram_routing::{route_orthogonal, Anchor};
+use diagram_routing::{Anchor, route_orthogonal};
 
 /// Tolerance for floating-point waypoint comparison.
 const TOLERANCE: f64 = f64::EPSILON * 100.0;

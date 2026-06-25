@@ -12,8 +12,8 @@ use diagram_core::{
 use crate::element::{
     CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
     EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PathElement,
-    PolygonElement, RectElement, RoundedRectElement, StencilAspect, StencilElement,
-    SwimlaneHeader, TextElement, TrapezoidElement, TriangleElement, VisualElement,
+    PolygonElement, RectElement, RoundedRectElement, StencilAspect, StencilElement, SwimlaneHeader,
+    TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
 use crate::error::{SceneError, SceneResult};
 use crate::resolver::StyleResolver;
@@ -180,7 +180,8 @@ impl SceneBuilder {
                 continue; // Hidden group skips its entire subtree
             }
 
-            let elem = self.project_group(store, gid, group, page_id, CorePoint { x: 0.0, y: 0.0 })?;
+            let elem =
+                self.project_group(store, gid, group, page_id, CorePoint { x: 0.0, y: 0.0 })?;
             entries.push((group.z_order, 4, index, elem));
             index += 1;
         }
@@ -520,7 +521,10 @@ impl SceneBuilder {
                 y: parent_offset.y + geometry.y,
             }
         } else {
-            CorePoint { x: geometry.x, y: geometry.y }
+            CorePoint {
+                x: geometry.x,
+                y: geometry.y,
+            }
         };
         let bounds = CoreRect {
             origin: group_offset,
@@ -582,7 +586,8 @@ impl SceneBuilder {
             // children we are about to recurse into). Pass it as
             // `parent_offset` so the recursive `project_group` call adds the
             // child's geometry to it correctly.
-            let child_elem = self.project_group(store, child_gid, child_group, page_id, group_offset)?;
+            let child_elem =
+                self.project_group(store, child_gid, child_group, page_id, group_offset)?;
             children.push(child_elem);
         }
 
@@ -606,10 +611,7 @@ impl SceneBuilder {
         group_bounds: &CoreRect,
     ) -> Option<SwimlaneHeader> {
         // Only groups with "swimlane" in the style are swimlanes
-        if !style_map
-            .iter()
-            .any(|(k, _)| k == "swimlane")
-        {
+        if !style_map.iter().any(|(k, _)| k == "swimlane") {
             return None;
         }
 
@@ -675,7 +677,12 @@ impl SceneBuilder {
     /// When `parent_offset` is provided (from `project_group`), it is used
     /// directly. When called from `build_page` for top-level vertices, pass
     /// `(0, 0)`.
-    fn vertex_top_left(&self, store: &ModelStore, vid: VertexId, parent_offset: CorePoint) -> SceneResult<CorePoint> {
+    fn vertex_top_left(
+        &self,
+        store: &ModelStore,
+        vid: VertexId,
+        parent_offset: CorePoint,
+    ) -> SceneResult<CorePoint> {
         let vertex = store.vertex(vid).ok_or(SceneError::MissingGeometry(vid))?;
         let geometry = match vertex.geometry {
             Some(g) => g,
@@ -740,10 +747,15 @@ fn style_for(store: &ModelStore, style_id: Option<diagram_core::StyleId>) -> Sty
 ///
 /// For a vertex nested N levels deep (group → group → ... → vertex), this
 /// sums the x/y offsets of all enclosing groups that have `relative=true`.
-fn compute_parent_offset(store: &ModelStore, mut parent: Option<diagram_core::GroupId>) -> SceneResult<CorePoint> {
+fn compute_parent_offset(
+    store: &ModelStore,
+    mut parent: Option<diagram_core::GroupId>,
+) -> SceneResult<CorePoint> {
     let mut offset = CorePoint { x: 0.0, y: 0.0 };
     while let Some(gid) = parent {
-        let group = store.group(gid).ok_or(SceneError::MissingGroupGeometry(gid))?;
+        let group = store
+            .group(gid)
+            .ok_or(SceneError::MissingGroupGeometry(gid))?;
         if let Some(ref geom) = group.geometry {
             if geom.relative {
                 offset.x += geom.x;
@@ -884,7 +896,10 @@ mod tests {
 
         // Pool (top-level group, parent=None)
         let mut pool_style = StyleMap::new();
-        pool_style.insert("swimlane".to_owned(), diagram_core::StyleValue(String::new()));
+        pool_style.insert(
+            "swimlane".to_owned(),
+            diagram_core::StyleValue(String::new()),
+        );
         let pool_style_id = model.store.insert_style(pool_style);
         let pool_geom = make_geom(10.0, 10.0, 700.0, 400.0, false);
         let pool = Group {
@@ -941,7 +956,10 @@ mod tests {
         // Default startSize=40, horizontal=false → header is top band (700×40)
         assert_eq!(pool_header.bounds.size.width, 700.0);
         assert_eq!(pool_header.bounds.size.height, 40.0);
-        assert!(!pool_header.horizontal, "pool should be vertical (horizontal=false)");
+        assert!(
+            !pool_header.horizontal,
+            "pool should be vertical (horizontal=false)"
+        );
 
         // Pool has one child: the lane (nested group)
         assert_eq!(

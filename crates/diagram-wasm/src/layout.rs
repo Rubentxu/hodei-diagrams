@@ -9,7 +9,7 @@ use diagram_core::store::ModelStore;
 use diagram_layout::{
     HierarchicalLayout, LayoutConfig, LayoutKind, TreeLayoutResult, apply_layout_kind,
 };
-use diagram_routing::{resolve_anchor, EdgeStyle, RoutingRequest, route};
+use diagram_routing::{EdgeStyle, RoutingRequest, resolve_anchor, route};
 use diagram_routing::{insert_orthogonal_bend, move_orthogonal_bend, remove_orthogonal_bend};
 use wasm_bindgen::prelude::*;
 

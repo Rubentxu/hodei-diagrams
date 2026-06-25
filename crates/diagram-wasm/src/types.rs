@@ -84,16 +84,4 @@ impl AnchorDto {
             AnchorDto::West => "west",
         }
     }
-
-    /// Parse from a string, returning None for unrecognized values.
-    pub fn from_str(s: &str) -> Option<AnchorDto> {
-        match s.trim().to_lowercase().as_str() {
-            "auto" => Some(AnchorDto::Auto),
-            "north" => Some(AnchorDto::North),
-            "south" => Some(AnchorDto::South),
-            "east" => Some(AnchorDto::East),
-            "west" => Some(AnchorDto::West),
-            _ => None,
-        }
-    }
 }

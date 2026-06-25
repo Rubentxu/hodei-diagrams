@@ -3,9 +3,7 @@
 use diagram_core::VertexId;
 use diagram_core::geometry::{Point, Rect, Size};
 use diagram_render_svg::{RenderError, SvgRenderer};
-use diagram_scene::{
-    PageId, RectElement, ResolvedStyle, Scene, VisualElement,
-};
+use diagram_scene::{PageId, RectElement, ResolvedStyle, Scene, VisualElement};
 
 #[test]
 fn simple_rect_renders_correctly() {

@@ -7,7 +7,7 @@ use diagram_core::{
     CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, Point, StyleId,
     StyleMap, Vertex, VertexId,
 };
-use diagram_routing::{resolve_anchor, Direction, EdgeStyle, RoutingRequest, route};
+use diagram_routing::{Direction, EdgeStyle, RoutingRequest, resolve_anchor, route};
 
 /// Routing algorithm kind — exposed at the command layer for serialization.
 /// Maps to `diagram_routing::EdgeStyle`.
