@@ -4,8 +4,8 @@ use diagram_core::{EdgeId, VertexId};
 use diagram_scene::{
     CloudElement, CylinderElement, DiamondElement, EllipseElement, EntityId, GroupElement,
     HexagonElement, ImageAspect, ImageElement, LineElement, ParallelogramElement, PathCommand,
-    PathElement, PolygonElement, RectElement, RoundedRectElement, StencilElement,
-    SwimlaneHeader, TextElement, TrapezoidElement, TriangleElement, VisualElement,
+    PathElement, PolygonElement, RectElement, RoundedRectElement, StencilElement, SwimlaneHeader,
+    TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
 
 use crate::clip::ClipPathManager;
@@ -779,10 +779,7 @@ fn group_to_svg(
 
     // Render swimlane header (if any) as the first element inside the group,
     // so it sits behind any nested lanes/shapes but in front of the pool background.
-    let header_svg = g
-        .header
-        .as_ref()
-        .map(|h| header_to_svg(h, &g.style, defs));
+    let header_svg = g.header.as_ref().map(|h| header_to_svg(h, &g.style, defs));
 
     let (open_tag, close_tag) = if g.clip {
         let clip_id = clip.register(

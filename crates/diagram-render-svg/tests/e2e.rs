@@ -304,7 +304,9 @@ fn swimlane_golden_snapshots_are_well_formed() {
 
     // viewBox captures the pool bounds
     assert!(
-        pool_lane_pages_1[0].1.contains(r#"viewBox="10 10 700 400""#),
+        pool_lane_pages_1[0]
+            .1
+            .contains(r#"viewBox="10 10 700 400""#),
         "swimlane-pool-lane viewBox should be 10 10 700 400, got:\n{}",
         pool_lane_pages_1[0].1
     );

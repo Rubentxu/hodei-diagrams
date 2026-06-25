@@ -730,7 +730,7 @@ pub fn clear_edge_label_offset(handle: u32, edge_idx: u32) -> Result<(), JsValue
 
 use crate::types::EdgeAnchorsDto;
 use diagram_core::style::{StyleMap, StyleValue};
-use diagram_routing::{anchor_to_style_keys, style_keys_to_anchor, Anchor, AnchorEnd, Direction};
+use diagram_routing::{Anchor, AnchorEnd, Direction, anchor_to_style_keys, style_keys_to_anchor};
 
 /// Connect two vertices with an edge, using the specified anchors for source and target.
 ///
@@ -778,13 +778,21 @@ pub fn connect_vertices_anchored(
         let edge_id = e
             .editor
             .connect_vertices(from_id, to_id, diagram_commands::RoutingKind::Orthogonal)
-            .map_err(|err| {
-                Box::leak(format!("ConnectError: {}", err).into_boxed_str()) as &str
-            })?;
+            .map_err(|err| Box::leak(format!("ConnectError: {}", err).into_boxed_str()) as &str)?;
 
         // Now set the anchor style on the edge
-        set_edge_anchor_style(e.editor.model_mut(), edge_id, AnchorEnd::Source, &source_anchor)?;
-        set_edge_anchor_style(e.editor.model_mut(), edge_id, AnchorEnd::Target, &target_anchor)?;
+        set_edge_anchor_style(
+            e.editor.model_mut(),
+            edge_id,
+            AnchorEnd::Source,
+            &source_anchor,
+        )?;
+        set_edge_anchor_style(
+            e.editor.model_mut(),
+            edge_id,
+            AnchorEnd::Target,
+            &target_anchor,
+        )?;
 
         // Return the edge index
         let json = match serde_json::to_value(edge_id) {
@@ -890,7 +898,11 @@ pub fn set_edge_anchor(
     let anchor_end = match end {
         0 => AnchorEnd::Source,
         1 => AnchorEnd::Target,
-        _ => return Err(JsValue::from_str("set_edge_anchor: end must be 0 (source) or 1 (target)")),
+        _ => {
+            return Err(JsValue::from_str(
+                "set_edge_anchor: end must be 0 (source) or 1 (target)",
+            ));
+        }
     };
 
     let result = with_engine_mut(handle, |e| {
@@ -930,7 +942,7 @@ pub fn clear_edge_anchor(handle: u32, edge_idx: u32, end: u32) -> Result<(), JsV
         _ => {
             return Err(JsValue::from_str(
                 "clear_edge_anchor: end must be 0 (source) or 1 (target)",
-            ))
+            ));
         }
     };
 
@@ -974,16 +986,17 @@ pub fn get_edge_anchors(handle: u32, edge_idx: u32) -> Result<JsValue, JsValue> 
             }
         };
 
-        let edge = e
-            .editor
-            .model()
-            .store
-            .edge(eid)
-            .ok_or("EdgeNotFound")?;
+        let edge = e.editor.model().store.edge(eid).ok_or("EdgeNotFound")?;
 
         // Get or create style
         let style = match edge.style_id {
-            Some(sid) => e.editor.model().store.style(sid).cloned().unwrap_or_default(),
+            Some(sid) => e
+                .editor
+                .model()
+                .store
+                .style(sid)
+                .cloned()
+                .unwrap_or_default(),
             None => StyleMap::new(),
         };
 

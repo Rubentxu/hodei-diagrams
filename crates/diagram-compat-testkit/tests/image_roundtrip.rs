@@ -42,7 +42,10 @@ fn image_datauri_roundtrip_preserves_style() {
         .find(|c| c.vertex && c.geometry.is_some())
         .expect("reparsed should have image vertex");
 
-    let reparsed_style = reparsed_cell.style.as_ref().expect("reparsed cell should have style");
+    let reparsed_style = reparsed_cell
+        .style
+        .as_ref()
+        .expect("reparsed cell should have style");
     assert!(
         reparsed_style.contains("shape=image"),
         "reparsed style should contain 'shape=image', got: {}",
@@ -85,7 +88,10 @@ fn image_url_roundtrip_preserves_style() {
         .find(|c| c.vertex && c.geometry.is_some())
         .expect("reparsed should have image vertex");
 
-    let reparsed_style = reparsed_cell.style.as_ref().expect("reparsed cell should have style");
+    let reparsed_style = reparsed_cell
+        .style
+        .as_ref()
+        .expect("reparsed cell should have style");
     assert!(
         reparsed_style.contains("shape=image"),
         "reparsed style should contain 'shape=image', got: {}",

@@ -30,7 +30,11 @@ use crate::port::Anchor;
 /// 3. Resolves port constraints (if any) or auto-selects perimeter sides.
 /// 4. Computes perimeter points for source and target.
 /// 5. Delegates to straight → single-bend → multi-bend tiers.
-pub fn route_orthogonal(source: &Vertex, target: &Vertex, ports: (Anchor, Anchor)) -> RoutingResult<Path> {
+pub fn route_orthogonal(
+    source: &Vertex,
+    target: &Vertex,
+    ports: (Anchor, Anchor),
+) -> RoutingResult<Path> {
     // ── Validate geometry ──────────────────────────────────────────────
     let src_geom = source
         .geometry
@@ -318,8 +322,15 @@ mod tests {
         // Source east = (75, 125), target west = (375, 125)
         let src = vertex(50.0, 100.0, 50.0, 50.0);
         let tgt = vertex(350.0, 50.0, 50.0, 100.0);
-        let path =
-            route_orthogonal(&src, &tgt, (Anchor::Cardinal(Direction::East), Anchor::Cardinal(Direction::West))).unwrap();
+        let path = route_orthogonal(
+            &src,
+            &tgt,
+            (
+                Anchor::Cardinal(Direction::East),
+                Anchor::Cardinal(Direction::West),
+            ),
+        )
+        .unwrap();
         assert_eq!(path.0[0], Point { x: 100.0, y: 125.0 }); // source east
         assert_eq!(path.0.last().unwrap(), &Point { x: 350.0, y: 100.0 }); // target west
     }
