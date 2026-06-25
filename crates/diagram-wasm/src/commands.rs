@@ -732,6 +732,7 @@ use crate::types::EdgeAnchorsDto;
 use diagram_core::style::{StyleMap, StyleValue};
 use diagram_routing::{Anchor, AnchorEnd, Direction, anchor_to_style_keys, style_keys_to_anchor};
 
+#[allow(clippy::too_many_arguments)]
 /// Connect two vertices with an edge, using the specified anchors for source and target.
 ///
 /// `from` and `to` are the source and target vertex slotmap index values (the `idx` field from SlotmapId).
