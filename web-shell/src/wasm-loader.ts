@@ -35,12 +35,17 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       get_metadata: mod.get_metadata,
       set_metadata: mod.set_metadata,
       apply_layout: mod.apply_layout,
+      apply_hierarchical_layout: mod.apply_hierarchical_layout,
       route_all_edges: mod.route_all_edges,
       insert_bend: mod.insert_bend,
       move_bend: mod.move_bend,
       remove_bend: mod.remove_bend,
       group_vertices: mod.group_vertices,
       ungroup_vertices: mod.ungroup_vertices,
+      connect_vertices_anchored: mod.connect_vertices_anchored,
+      set_edge_anchor: mod.set_edge_anchor,
+      clear_edge_anchor: mod.clear_edge_anchor,
+      get_edge_anchors: mod.get_edge_anchors,
     };
 
     return ok(wasm);

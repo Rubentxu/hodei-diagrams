@@ -2195,6 +2195,20 @@ svg [data-editing='true'] text.vertex-label,
   fill: #2563eb;
 }
 
+/* ─── Port Handle Styling ──────────────────────────────────────────────────── */
+.port-handle {
+  cursor: grab;
+  pointer-events: all;
+}
+
+.port-handle:hover {
+  fill: #2563eb;
+}
+
+.port-handle:active {
+  cursor: grabbing;
+}
+
 /* ─── Context Menu ─────────────────────────────────────────────────────────── */
 .context-menu {
   position: fixed;

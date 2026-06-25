@@ -37,12 +37,17 @@ export type WasmModule = {
   get_metadata(_h: number): string;
   set_metadata(_h: number, _json: string): void;
   apply_layout(_h: number, _kind_json: string, _config_json: string): void;
+  apply_hierarchical_layout(_h: number, _config_json: string): void;
   route_all_edges(_h: number): void;
   insert_bend(_h: number, _edge_idx: number, _seg: number, _x: number, _y: number): void;
   move_bend(_h: number, _edge_idx: number, _bend: number, _x: number, _y: number): void;
   remove_bend(_h: number, _edge_idx: number, _bend: number): void;
   group_vertices(_h: number, _vertex_indices_json: string): void;
   ungroup_vertices(_h: number, _vertex_idx: number): void;
+  connect_vertices_anchored(_h: number, _from: number, _to: number, _source_kind: string, _source_nx: number, _source_ny: number, _target_kind: string, _target_nx: number, _target_ny: number): number;
+  set_edge_anchor(_h: number, _edge_idx: number, _end: number, _anchor_kind: string, _nx: number, _ny: number): void;
+  clear_edge_anchor(_h: number, _edge_idx: number, _end: number): void;
+  get_edge_anchors(_h: number, _edge_idx: number): string;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;

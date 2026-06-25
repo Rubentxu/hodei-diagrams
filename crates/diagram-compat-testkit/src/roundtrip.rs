@@ -1185,4 +1185,130 @@ mod tests {
         assert_eq!(reparsed_edge.source.as_deref(), Some("A"));
         assert_eq!(reparsed_edge.target.as_deref(), Some("B"));
     }
+
+    // =============================================================================
+    // Connection Points Phase B — Anchor round-trip test
+    // =============================================================================
+
+    #[test]
+    fn roundtrip_edge_with_normalized_source_anchor() {
+        use diagram_core::style::{StyleMap, StyleValue};
+        use diagram_format_drawio::DrawioMapping;
+        use diagram_routing::Anchor;
+
+        // Build a model with two vertices and one edge that has a Normalized source anchor
+        let mut model = diagram_core::DiagramModel::new();
+        let page_id = model
+            .store
+            .insert_page(diagram_core::Page::new(Default::default()));
+
+        let v0 = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            geometry: Some(diagram_core::geometry::CellGeometry {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 100.0,
+                relative: false,
+                rotation: 0.0,
+                flip_h: false,
+                flip_v: false,
+            }),
+            ..Default::default()
+        });
+
+        let v1 = model.store.insert_vertex(diagram_core::Vertex {
+            page_id: Some(page_id),
+            geometry: Some(diagram_core::geometry::CellGeometry {
+                x: 200.0,
+                y: 0.0,
+                width: 100.0,
+                height: 100.0,
+                relative: false,
+                rotation: 0.0,
+                flip_h: false,
+                flip_v: false,
+            }),
+            ..Default::default()
+        });
+
+        // Create a StyleMap with normalized anchor keys (source anchor = Normalized(0.5, 0.3))
+        let mut anchor_style = StyleMap::new();
+        anchor_style.insert("exitX", StyleValue("50".to_owned()));
+        anchor_style.insert("exitY", StyleValue("30".to_owned()));
+        anchor_style.insert("exitPerimeter", StyleValue("1".to_owned()));
+        let anchor_style_id = model.store.insert_style(anchor_style);
+
+        let edge = diagram_core::Edge {
+            page_id: Some(page_id),
+            source: v0,
+            target: v1,
+            style_id: Some(anchor_style_id),
+            ..Default::default()
+        };
+        let _eid = model.store.insert_edge(edge);
+
+        // Create id_map for the model
+        let mut id_map = diagram_format_drawio::mapping::IdMap::new();
+        id_map.vertices.insert("v0".to_owned(), v0);
+        id_map.vertices.insert("v1".to_owned(), v1);
+        id_map.edges.insert(
+            "e0".to_owned(),
+            model.store.edges_with_ids().next().unwrap().0,
+        );
+
+        // Export to raw
+        let mapper = DrawioMapping::new();
+        let mut diags = Vec::new();
+        let raw = mapper
+            .to_raw(&model, &id_map, &mut diags)
+            .expect("to_raw should succeed");
+
+        // Verify the style contains anchor keys
+        let edge_cell = raw.diagrams[0]
+            .cells
+            .iter()
+            .find(|c| c.edge)
+            .expect("should have an edge cell");
+        let style_str = edge_cell.style.as_deref().unwrap_or("");
+        assert!(
+            style_str.contains("exitX=50"),
+            "style should contain exitX=50, got: {style_str}"
+        );
+        assert!(
+            style_str.contains("exitY=30"),
+            "style should contain exitY=30, got: {style_str}"
+        );
+
+        // Write to XML and re-parse
+        let written =
+            diagram_format_drawio::write_drawio(&raw).expect("write_drawio should succeed");
+
+        let reparsed =
+            diagram_format_drawio::parse_drawio(&written).expect("reparsing should succeed");
+
+        // Map back to domain
+        let mapper2 = DrawioMapping::new();
+        let (model2, _id_map2) = mapper2
+            .to_domain(&reparsed)
+            .expect("re-parsed domain mapping should succeed");
+
+        // Find the edge and verify anchor was preserved
+        let edge2 = model2
+            .store
+            .edges_with_ids()
+            .next()
+            .expect("should have one edge")
+            .1;
+
+        // Resolve the anchor using the style
+        let style2 = model2.store.style(edge2.style_id.unwrap()).unwrap();
+        let resolved = diagram_routing::resolve_anchor(Some(style2), None, "exit");
+
+        assert_eq!(
+            resolved,
+            Anchor::Normalized { nx: 0.5, ny: 0.3 },
+            "source anchor Normalized(0.5, 0.3) should be preserved through round-trip"
+        );
+    }
 }
