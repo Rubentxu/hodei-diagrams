@@ -74,7 +74,9 @@ fn apply_hierarchical_layout_end_to_end() {
     // All vertices should have finite positions after layout
     for vid in store.vertices_with_ids().map(|(id, _)| id) {
         let v = store.vertex(vid).unwrap();
-        let g = v.geometry.expect("vertex should have geometry after layout");
+        let g = v
+            .geometry
+            .expect("vertex should have geometry after layout");
         assert!(g.x.is_finite(), "x must be finite");
         assert!(g.y.is_finite(), "y must be finite");
     }

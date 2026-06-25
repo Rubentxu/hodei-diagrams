@@ -93,7 +93,11 @@ fn connect_with_source_port_creates_edge_with_perimeter_exit() {
         .expect("should have one edge")
         .0;
 
-    let edge = editor.model().store.edge(edge_id).expect("edge should exist");
+    let edge = editor
+        .model()
+        .store
+        .edge(edge_id)
+        .expect("edge should exist");
     assert_eq!(edge.source, source_id);
     assert_eq!(edge.target, target_id);
 
@@ -163,7 +167,11 @@ fn connect_without_ports_uses_auto_perimeter() {
         .expect("should have one edge")
         .0;
 
-    let edge = editor.model().store.edge(edge_id).expect("edge should exist");
+    let edge = editor
+        .model()
+        .store
+        .edge(edge_id)
+        .expect("edge should exist");
     assert_eq!(edge.source, source_id);
     assert_eq!(edge.target, target_id);
 
@@ -241,15 +249,17 @@ fn set_edge_label_offset_persists_to_edge_struct() {
     let mut editor = Editor::new(model);
 
     // Set label offset
-    let cmd = Command::SetEdgeLabelOffset(SetEdgeLabelOffsetPayload::new(
-        edge_id,
-        Some((10.0, 20.0)),
-    ));
+    let cmd =
+        Command::SetEdgeLabelOffset(SetEdgeLabelOffsetPayload::new(edge_id, Some((10.0, 20.0))));
 
     editor.execute(cmd).unwrap();
 
     // Verify offset was set
-    let edge = editor.model().store.edge(edge_id).expect("edge should exist");
+    let edge = editor
+        .model()
+        .store
+        .edge(edge_id)
+        .expect("edge should exist");
     assert_eq!(
         edge.label_offset,
         Some((10.0, 20.0)),
@@ -419,10 +429,8 @@ fn connect_with_ports_and_set_label_offset() {
         .0;
 
     // Set label offset
-    let offset_cmd = Command::SetEdgeLabelOffset(SetEdgeLabelOffsetPayload::new(
-        edge_id,
-        Some((30.0, 40.0)),
-    ));
+    let offset_cmd =
+        Command::SetEdgeLabelOffset(SetEdgeLabelOffsetPayload::new(edge_id, Some((30.0, 40.0))));
     editor.execute(offset_cmd).unwrap();
 
     // Verify both port-based routing and label offset

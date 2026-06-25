@@ -9,8 +9,8 @@
 //! Run with:
 //!   cargo test -p diagram-format-drawio --test integration_background
 
-use diagram_format_drawio::{DrawioMapping, DrawioParser, DrawioWriter};
 use diagram_format_drawio::raw::{RawDrawioCell, RawDrawioDiagram, RawDrawioDocument};
+use diagram_format_drawio::{DrawioMapping, DrawioParser, DrawioWriter};
 
 const XML_WITH_BACKGROUND: &str = "<mxfile>\
   <diagram name=\"Page-1\" background=\"#ff0000\">\
@@ -84,10 +84,7 @@ fn roundtrip_preserves_background_color() {
     let doc = parser.parse_str(XML_WITH_BACKGROUND).unwrap();
 
     // Verify raw model has background
-    assert_eq!(
-        doc.diagrams[0].background,
-        Some("#ff0000".to_owned())
-    );
+    assert_eq!(doc.diagrams[0].background, Some("#ff0000".to_owned()));
 
     // Map to domain
     let mapper = DrawioMapping::new();

@@ -268,26 +268,42 @@ pub fn parse_stencil_library(xml: &str) -> Result<Vec<Stencil>, StencilError> {
                         ));
                     }
                     "fillstroke" if in_background || in_foreground => {
-                        let target = if in_background { &mut background } else { &mut foreground };
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
                         target.push(PathCommand::FillStroke);
                     }
                     "fill" if in_background || in_foreground => {
-                        let target = if in_background { &mut background } else { &mut foreground };
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
                         target.push(PathCommand::Fill);
                     }
                     "stroke" if in_background || in_foreground => {
-                        let target = if in_background { &mut background } else { &mut foreground };
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
                         target.push(PathCommand::Stroke);
                     }
-                    _ if in_background || in_foreground => {
-                        if !encountered_unsupported.contains(&name) {
-                            encountered_unsupported.insert(name.clone());
-                            let location = if in_background { "background" } else { "foreground" };
-                            diagnostics.push(Diagnostic::new(
-                                format!("<{}>", name),
-                                format!("unsupported element '{}' in {} - skipped", name, location),
-                            ));
-                        }
+                    _ if in_background && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in background - skipped", name),
+                        ));
+                    }
+                    _ if in_foreground && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in foreground - skipped", name),
+                        ));
                     }
                     _ => {}
                 }
@@ -478,26 +494,42 @@ pub fn parse_stencil(xml: &str) -> Result<Stencil, StencilError> {
                         ));
                     }
                     "fillstroke" if in_background || in_foreground => {
-                        let target = if in_background { &mut background } else { &mut foreground };
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
                         target.push(PathCommand::FillStroke);
                     }
                     "fill" if in_background || in_foreground => {
-                        let target = if in_background { &mut background } else { &mut foreground };
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
                         target.push(PathCommand::Fill);
                     }
                     "stroke" if in_background || in_foreground => {
-                        let target = if in_background { &mut background } else { &mut foreground };
+                        let target = if in_background {
+                            &mut background
+                        } else {
+                            &mut foreground
+                        };
                         target.push(PathCommand::Stroke);
                     }
-                    _ if in_background || in_foreground => {
-                        if !encountered_unsupported.contains(&name) {
-                            encountered_unsupported.insert(name.clone());
-                            let location = if in_background { "background" } else { "foreground" };
-                            diagnostics.push(Diagnostic::new(
-                                format!("<{}>", name),
-                                format!("unsupported element '{}' in {} - skipped", name, location),
-                            ));
-                        }
+                    _ if in_background && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in background - skipped", name),
+                        ));
+                    }
+                    _ if in_foreground && !encountered_unsupported.contains(&name) => {
+                        encountered_unsupported.insert(name.clone());
+                        diagnostics.push(Diagnostic::new(
+                            format!("<{}>", name),
+                            format!("unsupported element '{}' in foreground - skipped", name),
+                        ));
                     }
                     _ => {}
                 }
@@ -881,7 +913,10 @@ mod tests {
             </shape>
         </shapes>"#;
         let stencil = parse_stencil(xml).unwrap();
-        assert!(!stencil.diagnostics.is_empty(), "expected diagnostic for strokewidth");
+        assert!(
+            !stencil.diagnostics.is_empty(),
+            "expected diagnostic for strokewidth"
+        );
         assert!(
             stencil
                 .diagnostics
@@ -943,7 +978,12 @@ mod tests {
 
         let rect = &stencils[0];
         assert_eq!(rect.name, "Rectangle");
-        assert_eq!(rect.foreground.len(), 1, "expected [FillStroke], got {:?}", rect.foreground);
+        assert_eq!(
+            rect.foreground.len(),
+            1,
+            "expected [FillStroke], got {:?}",
+            rect.foreground
+        );
         assert!(matches!(rect.foreground[0], PathCommand::FillStroke));
         assert!(
             rect.diagnostics.is_empty(),
@@ -953,8 +993,10 @@ mod tests {
         let ellipse = &stencils[1];
         assert_eq!(ellipse.name, "Ellipse");
         assert_eq!(
-            ellipse.foreground.len(), 1,
-            "expected [FillStroke], got {:?}", ellipse.foreground
+            ellipse.foreground.len(),
+            1,
+            "expected [FillStroke], got {:?}",
+            ellipse.foreground
         );
         assert!(matches!(ellipse.foreground[0], PathCommand::FillStroke));
         assert!(
