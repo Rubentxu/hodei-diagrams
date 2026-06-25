@@ -3,14 +3,14 @@
 use diagram_core::{EdgeId, VertexId};
 use diagram_scene::{
     CloudElement, CylinderElement, DiamondElement, EllipseElement, EntityId, GroupElement,
-    HexagonElement, LineElement, ParallelogramElement, PathCommand, PathElement, PolygonElement,
-    RectElement, RoundedRectElement, StencilElement, TextElement, TrapezoidElement,
-    TriangleElement, VisualElement,
+    HexagonElement, ImageAspect, ImageElement, LineElement, ParallelogramElement, PathCommand,
+    PathElement, PolygonElement, RectElement, RoundedRectElement, StencilElement, TextElement,
+    TrapezoidElement, TriangleElement, VisualElement,
 };
 
 use crate::clip::ClipPathManager;
 use crate::defs::DefsManager;
-use crate::escape::escape_text;
+use crate::escape::{escape_attr, escape_text};
 use crate::style::{AttrContext, style_to_attrs};
 
 /// Serialize a `VertexId` to a `data-vertex-id` attribute string.
@@ -65,6 +65,7 @@ pub(crate) fn element_to_svg(
         VisualElement::Path(p) => path_to_svg(p, defs, indent),
         VisualElement::Group(g) => group_to_svg(g, clip, defs, indent),
         VisualElement::Stencil(s) => stencil_to_svg(s, defs, indent),
+        VisualElement::Image(i) => image_to_svg(i, defs, indent),
         _ => String::new(),
     }
 }
@@ -614,7 +615,69 @@ fn stencil_to_svg(s: &StencilElement, defs: &mut DefsManager, indent: usize) -> 
     }
 }
 
-/// Build an SVG path `d` attribute string from a list of PathCommands.
+fn image_to_svg(img: &ImageElement, defs: &mut DefsManager, indent: usize) -> String {
+    let ind = make_indent(indent);
+    let vid = vid_attr(&img.id);
+    let xform = compute_transform(&img.bounds, img.rotation, img.flip_h, img.flip_v);
+    let x = img.bounds.origin.x;
+    let y = img.bounds.origin.y;
+    let w = img.bounds.size.width;
+    let h = img.bounds.size.height;
+
+    let (href, aspect_ratio) = match &img.image_src {
+        Some(src) => {
+            let escaped = escape_attr(src);
+            let par = match img.aspect {
+                ImageAspect::Contain => "xMidYMid meet",
+                ImageAspect::Cover => "xMidYMid slice",
+                ImageAspect::Stretch => "none",
+                _ => "xMidYMid meet",
+            };
+            (escaped, par)
+        }
+        None => {
+            // Placeholder rect when no image source
+            let style = shape_style_defaults(&img.style, AttrContext::Shape, defs);
+            return format!(
+                "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}{} fill=\"none\" stroke=\"#ccc\" stroke-dasharray=\"4 2\"/>",
+                ind, x, y, w, h, vid, style, xform
+            );
+        }
+    };
+
+    if xform.is_empty() {
+        format!(
+            "{}<image href=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}/>",
+            ind,
+            href,
+            x,
+            y,
+            w,
+            h,
+            vid,
+            aspect_ratio_attr(aspect_ratio)
+        )
+    } else {
+        format!(
+            "{}<g{}>\n{}<image href=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}/>\n{}</g>",
+            ind,
+            xform,
+            ind,
+            href,
+            x,
+            y,
+            w,
+            h,
+            vid,
+            aspect_ratio_attr(aspect_ratio),
+            ind
+        )
+    }
+}
+
+fn aspect_ratio_attr(par: &str) -> String {
+    format!(" preserveAspectRatio=\"{}\"", par)
+}
 ///
 /// Scales coordinates from the stencil's native [0, w] × [0, h] space to the
 /// element's bounding box.
