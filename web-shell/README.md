@@ -70,7 +70,6 @@ web-shell/
 │   ├── history-panel.ts # Version history timeline
 │   ├── version-store.ts # IndexedDB persistence layer
 │   ├── export-raster.ts # PNG/PDF/HTML export
-│   ├── stencil-loader.ts # Stencil library loading and caching
 │   ├── style-keys.ts  # Style key constants
 │   └── icon.ts        # SVG icon helper
 ├── tests/
