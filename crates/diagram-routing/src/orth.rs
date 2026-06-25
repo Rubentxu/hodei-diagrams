@@ -16,10 +16,9 @@ use diagram_core::id::VertexId;
 use diagram_core::vertex::Vertex;
 
 use crate::Path;
-use crate::PortPair;
 use crate::error::{RoutingError, RoutingResult};
-use crate::perimeter::{auto_perimeter_points, perimeter_point};
-use crate::port::Direction;
+use crate::perimeter::{auto_perimeter_points, perimeter_point, perimeter_point_normalized};
+use crate::port::Anchor;
 
 /// Route an orthogonal edge between two vertices.
 ///
@@ -31,7 +30,7 @@ use crate::port::Direction;
 /// 3. Resolves port constraints (if any) or auto-selects perimeter sides.
 /// 4. Computes perimeter points for source and target.
 /// 5. Delegates to straight → single-bend → multi-bend tiers.
-pub fn route_orthogonal(source: &Vertex, target: &Vertex, ports: PortPair) -> RoutingResult<Path> {
+pub fn route_orthogonal(source: &Vertex, target: &Vertex, ports: (Anchor, Anchor)) -> RoutingResult<Path> {
     // ── Validate geometry ──────────────────────────────────────────────
     let src_geom = source
         .geometry
@@ -60,31 +59,24 @@ pub fn route_orthogonal(source: &Vertex, target: &Vertex, ports: PortPair) -> Ro
     route_between_points(&src_geom, &tgt_geom, src_pt, tgt_pt)
 }
 
-/// Resolve source and target perimeter points, respecting port constraints.
+/// Resolve source and target perimeter points, respecting anchors.
 fn resolve_perimeter_points(
     src_geom: &CellGeometry,
     tgt_geom: &CellGeometry,
-    ports: PortPair,
+    ports: (Anchor, Anchor),
 ) -> (Point, Point) {
-    let (src_dir, tgt_dir) = ports;
+    let (src_anchor, tgt_anchor) = ports;
 
-    let src_pt = match src_dir {
-        Some(d) => perimeter_point(src_geom, d),
-        None => {
-            // Check style map for port constraint
-            // For v1, port constraint from style is resolved at the call site.
-            // Here we fall through to auto-selection.
-            // In future, we could check source.style_id against a resolved store.
-            match None::<Direction> {
-                Some(d) => perimeter_point(src_geom, d),
-                None => auto_perimeter_points(src_geom, tgt_geom).0,
-            }
-        }
+    let src_pt = match src_anchor {
+        Anchor::Normalized { nx, ny } => perimeter_point_normalized(src_geom, nx, ny),
+        Anchor::Cardinal(d) => perimeter_point(src_geom, d),
+        Anchor::Auto => auto_perimeter_points(src_geom, tgt_geom).0,
     };
 
-    let tgt_pt = match tgt_dir {
-        Some(d) => perimeter_point(tgt_geom, d),
-        None => auto_perimeter_points(src_geom, tgt_geom).1,
+    let tgt_pt = match tgt_anchor {
+        Anchor::Normalized { nx, ny } => perimeter_point_normalized(tgt_geom, nx, ny),
+        Anchor::Cardinal(d) => perimeter_point(tgt_geom, d),
+        Anchor::Auto => auto_perimeter_points(src_geom, tgt_geom).1,
     };
 
     (src_pt, tgt_pt)
@@ -168,6 +160,7 @@ fn manhattan_dist(a: &Point, b: &Point) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::port::Direction;
 
     fn vertex(x: f64, y: f64, w: f64, h: f64) -> Vertex {
         Vertex {
@@ -204,7 +197,7 @@ mod tests {
         // west edge is x=300, mid-y = 125. Yes: (300, 125).
         let src = vertex(100.0, 100.0, 50.0, 50.0);
         let tgt = vertex(300.0, 100.0, 50.0, 50.0);
-        let path = route_orthogonal(&src, &tgt, (None, None)).unwrap();
+        let path = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto)).unwrap();
         assert_eq!(path.0.len(), 2);
         assert_eq!(path.0[0], Point { x: 150.0, y: 125.0 });
         assert_eq!(path.0[1], Point { x: 300.0, y: 125.0 });
@@ -214,7 +207,7 @@ mod tests {
     fn vertical_straight() {
         let src = vertex(100.0, 100.0, 50.0, 50.0);
         let tgt = vertex(100.0, 300.0, 50.0, 50.0);
-        let path = route_orthogonal(&src, &tgt, (None, None)).unwrap();
+        let path = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto)).unwrap();
         assert_eq!(path.0.len(), 2);
         assert_eq!(path.0[0], Point { x: 125.0, y: 150.0 }); // source south
         assert_eq!(path.0[1], Point { x: 125.0, y: 300.0 }); // target north
@@ -228,7 +221,7 @@ mod tests {
         // Source is left-and-above → auto selects source east, target west
         let src = vertex(50.0, 100.0, 50.0, 50.0);
         let tgt = vertex(200.0, 300.0, 50.0, 50.0);
-        let path = route_orthogonal(&src, &tgt, (None, None)).unwrap();
+        let path = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto)).unwrap();
         assert_eq!(path.0.len(), 3);
         // Points form a valid 90° elbow
         let (a, b, c) = (path.0[0], path.0[1], path.0[2]);
@@ -244,7 +237,7 @@ mod tests {
         let tgt = vertex(200.0, 50.0, 100.0, 100.0);
         let src_geom = src.geometry.unwrap();
         let tgt_geom = tgt.geometry.unwrap();
-        let path = route_orthogonal(&src, &tgt, (None, None)).unwrap();
+        let path = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto)).unwrap();
         // Intermediate waypoints (indices 1..n-1) must be strictly outside
         // both bounding rects. The first and last waypoints are connector
         // anchor points on the boundary, which is expected.
@@ -266,7 +259,7 @@ mod tests {
     fn missing_source_geometry() {
         let src = vertex_no_geom();
         let tgt = vertex(100.0, 100.0, 50.0, 50.0);
-        let result = route_orthogonal(&src, &tgt, (None, None));
+        let result = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto));
         assert!(matches!(result, Err(RoutingError::MissingGeometry(_))));
     }
 
@@ -274,7 +267,7 @@ mod tests {
     fn missing_target_geometry() {
         let src = vertex(100.0, 100.0, 50.0, 50.0);
         let tgt = vertex_no_geom();
-        let result = route_orthogonal(&src, &tgt, (None, None));
+        let result = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto));
         assert!(matches!(result, Err(RoutingError::MissingGeometry(_))));
     }
 
@@ -282,7 +275,7 @@ mod tests {
     fn overlapping_vertices_error() {
         let src = vertex(100.0, 100.0, 30.0, 30.0);
         let tgt = vertex(100.0, 100.0, 30.0, 30.0);
-        let result = route_orthogonal(&src, &tgt, (None, None));
+        let result = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto));
         assert!(matches!(
             result,
             Err(RoutingError::OverlappingVertices(_, _))
@@ -293,7 +286,7 @@ mod tests {
     fn zero_area_source_no_panic() {
         let src = vertex(0.0, 0.0, 0.0, 0.0);
         let tgt = vertex(100.0, 100.0, 50.0, 50.0);
-        let path = route_orthogonal(&src, &tgt, (None, None)).unwrap();
+        let path = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto)).unwrap();
         assert!(!path.0.is_empty());
     }
 
@@ -301,7 +294,7 @@ mod tests {
     fn zero_area_target_no_panic() {
         let src = vertex(100.0, 100.0, 50.0, 50.0);
         let tgt = vertex(200.0, 200.0, 0.0, 0.0);
-        let path = route_orthogonal(&src, &tgt, (None, None)).unwrap();
+        let path = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto)).unwrap();
         assert!(!path.0.is_empty());
     }
 
@@ -310,7 +303,7 @@ mod tests {
         // Two vertices at (0, 0, 20×20) with different IDs (via memory address)
         let src = vertex(0.0, 0.0, 20.0, 20.0);
         let tgt = vertex(0.0, 0.0, 20.0, 20.0);
-        let result = route_orthogonal(&src, &tgt, (None, None));
+        let result = route_orthogonal(&src, &tgt, (Anchor::Auto, Anchor::Auto));
         // These overlap (same center) → error
         assert!(matches!(
             result,
@@ -326,7 +319,7 @@ mod tests {
         let src = vertex(50.0, 100.0, 50.0, 50.0);
         let tgt = vertex(350.0, 50.0, 50.0, 100.0);
         let path =
-            route_orthogonal(&src, &tgt, (Some(Direction::East), Some(Direction::West))).unwrap();
+            route_orthogonal(&src, &tgt, (Anchor::Cardinal(Direction::East), Anchor::Cardinal(Direction::West))).unwrap();
         assert_eq!(path.0[0], Point { x: 100.0, y: 125.0 }); // source east
         assert_eq!(path.0.last().unwrap(), &Point { x: 350.0, y: 100.0 }); // target west
     }

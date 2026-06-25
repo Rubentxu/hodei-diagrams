@@ -4,12 +4,12 @@ use diagram_commands::Transaction;
 use diagram_core::DiagramModel;
 use diagram_core::geometry::CellGeometry;
 use diagram_core::geometry::Point;
-use diagram_core::id::{EdgeId, PageId, VertexId};
+use diagram_core::id::{EdgeId, PageId, StyleId, VertexId};
 use diagram_core::store::ModelStore;
 use diagram_layout::{
     HierarchicalLayout, LayoutConfig, LayoutKind, TreeLayoutResult, apply_layout_kind,
 };
-use diagram_routing::{EdgeStyle, RoutingRequest, route};
+use diagram_routing::{resolve_anchor, EdgeStyle, RoutingRequest, route};
 use diagram_routing::{insert_orthogonal_bend, move_orthogonal_bend, remove_orthogonal_bend};
 use wasm_bindgen::prelude::*;
 
@@ -228,18 +228,18 @@ pub fn route_all_edges(handle: u32) -> Result<(), JsValue> {
 
         let store = &e.editor.model().store;
 
-        // Collect all edges on this page with their source/target vertex IDs
-        let edge_data: Vec<(EdgeId, VertexId, VertexId)> = store
+        // Collect all edges on this page with their source/target vertex IDs and style_id
+        let edge_data: Vec<(EdgeId, VertexId, VertexId, Option<StyleId>)> = store
             .edges_with_ids()
             .filter(|(_, edge)| edge.page_id == Some(page_id))
-            .map(|(eid, edge)| (eid, edge.source, edge.target))
+            .map(|(eid, edge)| (eid, edge.source, edge.target, edge.style_id))
             .collect();
 
         // For each edge, compute routing and accumulate SetEdgeWaypoints commands
         let mut tx = Transaction::new();
         let mut any_routed = false;
 
-        for (eid, src_id, tgt_id) in edge_data {
+        for (eid, src_id, tgt_id, style_id) in edge_data {
             let Some(source) = store.vertex(src_id) else {
                 continue;
             };
@@ -247,11 +247,16 @@ pub fn route_all_edges(handle: u32) -> Result<(), JsValue> {
                 continue;
             };
 
+            // Resolve anchors from edge style (primary leak fix per design §Data Flow)
+            let style_map = style_id.and_then(|sid| store.style(sid));
+            let src_anchor = resolve_anchor(style_map, None, "exit");
+            let tgt_anchor = resolve_anchor(style_map, None, "entry");
+
             let req = RoutingRequest {
                 source,
                 target,
                 style: EdgeStyle::Orthogonal,
-                ports: (None, None),
+                ports: (src_anchor, tgt_anchor),
                 waypoints: &[],
             };
 

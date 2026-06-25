@@ -7,7 +7,7 @@ use diagram_core::{
     CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, Point, StyleId,
     StyleMap, Vertex, VertexId,
 };
-use diagram_routing::{Direction, EdgeStyle, RoutingRequest, route};
+use diagram_routing::{resolve_anchor, Direction, EdgeStyle, RoutingRequest, route};
 
 /// Routing algorithm kind — exposed at the command layer for serialization.
 /// Maps to `diagram_routing::EdgeStyle`.
@@ -1413,13 +1413,13 @@ impl ConnectVerticesCommand {
 
     /// Route a specific edge and store its computed waypoints.
     fn route_edge(&self, edge_id: EdgeId, model: &mut DiagramModel) -> CommandResult<()> {
-        // Get source/target IDs first (can't borrow store mutably and immutably at same time)
-        let (src_id, tgt_id) = {
+        // Get source/target IDs and style_id first (can't borrow store mutably and immutably at same time)
+        let (src_id, tgt_id, style_id) = {
             let edge = model
                 .store
                 .edge(edge_id)
                 .ok_or(CommandError::EdgeNotFound(edge_id))?;
-            (edge.source, edge.target)
+            (edge.source, edge.target, edge.style_id)
         };
 
         let source = model
@@ -1431,11 +1431,16 @@ impl ConnectVerticesCommand {
             .vertex(tgt_id)
             .ok_or(CommandError::VertexNotFound(tgt_id))?;
 
+        // Resolve anchors from edge style (style wins over explicit port)
+        let style_map = style_id.and_then(|sid| model.store.style(sid));
+        let src_anchor = resolve_anchor(style_map, self.source_port, "exit");
+        let tgt_anchor = resolve_anchor(style_map, self.target_port, "entry");
+
         let req = RoutingRequest {
             source,
             target,
             style: self.routing_kind.into(),
-            ports: (self.source_port, self.target_port),
+            ports: (src_anchor, tgt_anchor),
             waypoints: &[],
         };
 

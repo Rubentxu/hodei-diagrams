@@ -43,6 +43,25 @@ pub fn perimeter_point(geom: &CellGeometry, direction: Direction) -> Point {
     }
 }
 
+/// Compute the perimeter point for normalised coordinates `(nx, ny)`.
+///
+/// The point is computed as `geom.x + nx * geom.width` and
+/// `geom.y + ny * geom.height`. **No clamping** is applied — values
+/// outside `[0, 1]` produce points outside the bounding box, which matches
+/// real-world draw.io fixtures that carry out-of-range values.
+pub fn perimeter_point_normalized(geom: &CellGeometry, nx: f64, ny: f64) -> Point {
+    if geom.width <= 0.0 || geom.height <= 0.0 {
+        return Point {
+            x: geom.x,
+            y: geom.y,
+        };
+    }
+    Point {
+        x: geom.x + nx * geom.width,
+        y: geom.y + ny * geom.height,
+    }
+}
+
 /// Auto-select best perimeter sides and compute both connector points.
 ///
 /// The selection heuristic:
@@ -207,5 +226,56 @@ mod tests {
         // Source north = (35, 200), target south = (25, 50)
         assert_eq!(sp, Point { x: 35.0, y: 200.0 });
         assert_eq!(tp, Point { x: 25.0, y: 50.0 });
+    }
+
+    // ── perimeter_point_normalized ─────────────────────────────────────
+
+    #[test]
+    fn normalized_top_mid() {
+        // (50, 50, 100×100) → (0.5, 0.0) → (100, 50)
+        let g = geom(50.0, 50.0, 100.0, 100.0);
+        assert_eq!(
+            perimeter_point_normalized(&g, 0.5, 0.0),
+            Point { x: 100.0, y: 50.0 }
+        );
+    }
+
+    #[test]
+    fn normalized_east_mid() {
+        // (10, 10, 80×60) → (1.0, 0.5) → (90, 40)
+        let g = geom(10.0, 10.0, 80.0, 60.0);
+        assert_eq!(
+            perimeter_point_normalized(&g, 1.0, 0.5),
+            Point { x: 90.0, y: 40.0 }
+        );
+    }
+
+    #[test]
+    fn normalized_arbitrary_25_percent() {
+        // (0, 0, 100×80) → (0.25, 0.0) → (25, 0)
+        let g = geom(0.0, 0.0, 100.0, 80.0);
+        assert_eq!(
+            perimeter_point_normalized(&g, 0.25, 0.0),
+            Point { x: 25.0, y: 0.0 }
+        );
+    }
+
+    #[test]
+    fn normalized_out_of_range_passthrough() {
+        // Out-of-range values pass through verbatim (no clamp)
+        let g = geom(0.0, 0.0, 100.0, 100.0);
+        assert_eq!(
+            perimeter_point_normalized(&g, -0.003, 1.001),
+            Point { x: -0.3, y: 100.1 }
+        );
+    }
+
+    #[test]
+    fn normalized_zero_area_returns_origin() {
+        let g = geom(10.0, 20.0, 0.0, 0.0);
+        assert_eq!(
+            perimeter_point_normalized(&g, 0.5, 0.5),
+            Point { x: 10.0, y: 20.0 }
+        );
     }
 }

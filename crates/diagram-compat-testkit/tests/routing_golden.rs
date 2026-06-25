@@ -7,7 +7,7 @@
 use diagram_core::geometry::Point;
 use diagram_core::vertex::Vertex;
 use diagram_format_drawio::{DrawioMapping, parse_drawio};
-use diagram_routing::route_orthogonal;
+use diagram_routing::{route_orthogonal, Anchor};
 
 /// Tolerance for floating-point waypoint comparison.
 const TOLERANCE: f64 = f64::EPSILON * 100.0;
@@ -56,7 +56,7 @@ fn golden_routing_straight() {
 
     // Source: (100, 100, 50×50)  → east perimeter: (150, 125)
     // Target: (300, 100, 50×50)  → west perimeter: (300, 125)
-    let path = route_orthogonal(&va, &vb, (None, None)).unwrap();
+    let path = route_orthogonal(&va, &vb, (Anchor::Auto, Anchor::Auto)).unwrap();
 
     assert_eq!(path.0.len(), 2, "straight edge should have 2 waypoints");
     assert!(
@@ -83,7 +83,7 @@ fn golden_routing_single_bend() {
     // dy (200) > dx (150) → vertical dominance, target below:
     //   source South = (75, 150), target North = (225, 300)
     // L-shape elbow: horizontal-first at (225, 150)
-    let path = route_orthogonal(&va, &vb, (None, None)).unwrap();
+    let path = route_orthogonal(&va, &vb, (Anchor::Auto, Anchor::Auto)).unwrap();
 
     assert_eq!(path.0.len(), 3, "single-bend should have 3 waypoints");
 
@@ -129,7 +129,7 @@ fn golden_routing_multi_bend() {
     let va = model.store.vertex(vid_a).cloned().unwrap();
     let vb = model.store.vertex(vid_b).cloned().unwrap();
 
-    let path = route_orthogonal(&va, &vb, (None, None)).unwrap();
+    let path = route_orthogonal(&va, &vb, (Anchor::Auto, Anchor::Auto)).unwrap();
 
     // Must have at least 2 waypoints and form a valid orthogonal path
     assert!(

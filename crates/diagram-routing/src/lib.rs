@@ -43,8 +43,8 @@ pub use bend::{
 pub use diagram_core::geometry::Point;
 pub use error::{RoutingError, RoutingResult};
 pub use orth::route_orthogonal;
-pub use perimeter::{auto_perimeter_points, perimeter_point};
-pub use port::{Direction, parse_port_constraint, port_constraint_from_style};
+pub use perimeter::{auto_perimeter_points, perimeter_point, perimeter_point_normalized};
+pub use port::{Anchor, Direction, parse_port_constraint, port_constraint_from_style, resolve_anchor};
 pub use segment::route_segment;
 
 use diagram_core::style::StyleMap;
@@ -71,8 +71,8 @@ pub struct RoutingRequest<'a> {
     pub target: &'a Vertex,
     /// The edge style (algorithm selector).
     pub style: EdgeStyle,
-    /// Port constraints for source and target (optional).
-    pub ports: PortPair,
+    /// Anchors for source and target (source anchor, target anchor).
+    pub ports: (Anchor, Anchor),
     /// Pre-existing waypoints (used by Segment passthrough).
     pub waypoints: &'a [Point],
 }
@@ -88,7 +88,7 @@ pub struct Path(pub Vec<Point>);
 /// - [`EdgeStyle::Segment`] → [`route_segment`]
 pub fn route(req: &RoutingRequest<'_>) -> RoutingResult<Path> {
     match req.style {
-        EdgeStyle::Orthogonal => route_orthogonal(req.source, req.target, req.ports),
+        EdgeStyle::Orthogonal => route_orthogonal(req.source, req.target, req.ports.clone()),
         EdgeStyle::Segment => route_segment(req.waypoints),
     }
 }
@@ -135,7 +135,7 @@ mod tests {
             source: &src,
             target: &tgt,
             style: EdgeStyle::Orthogonal,
-            ports: (None, None),
+            ports: (Anchor::Auto, Anchor::Auto),
             waypoints: &[],
         };
         let path = route(&req).unwrap();
@@ -150,7 +150,7 @@ mod tests {
             source: &Vertex::default(),
             target: &Vertex::default(),
             style: EdgeStyle::Segment,
-            ports: (None, None),
+            ports: (Anchor::Auto, Anchor::Auto),
             waypoints: &pts,
         };
         let path = route(&req).unwrap();
