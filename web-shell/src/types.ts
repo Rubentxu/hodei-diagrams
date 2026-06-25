@@ -101,6 +101,8 @@ export interface ScenePage {
   width: number;
   height: number;
   display_list: Record<string, unknown>[];
+  /** Whether math rendering is enabled for this page (from Rust PageScene.math_enabled). */
+  math_enabled?: boolean;
 }
 
 // ─── Style Types ──────────────────────────────────────────────────────────────
