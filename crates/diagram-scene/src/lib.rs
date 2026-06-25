@@ -38,9 +38,10 @@ pub use builder::SceneBuilder;
 pub use diagram_core::id::PageId;
 pub use element::{
     CloudElement, CylinderElement, DEFAULT_ROUNDED_RADIUS, DiamondElement, EllipseElement,
-    EntityId, GroupElement, HexagonElement, LineElement, ParallelogramElement, PathCommand,
-    PathElement, PolygonElement, RectElement, RoundedRectElement, StencilAspect, StencilElement,
-    SwimlaneHeader, TextElement, TrapezoidElement, TriangleElement, VisualElement,
+    EntityId, GroupElement, HexagonElement, ImageAspect, ImageElement, LineElement,
+    ParallelogramElement, PathCommand, PathElement, PolygonElement, RectElement,
+    RoundedRectElement, StencilAspect, StencilElement, SwimlaneHeader, TextElement,
+    TrapezoidElement, TriangleElement, VisualElement,
 };
 pub use error::{SceneError, SceneResult};
 pub use resolver::{ResolvedStyle, ShapeKind, StyleResolver};

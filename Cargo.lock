@@ -645,6 +645,7 @@ dependencies = [
  "diagram-core",
  "pathfinding",
  "rstar",
+ "serde",
  "smallvec",
  "thiserror 2.0.18",
 ]

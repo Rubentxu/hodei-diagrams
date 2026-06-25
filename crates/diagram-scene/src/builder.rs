@@ -435,6 +435,18 @@ impl SceneBuilder {
                     style: resolved_style,
                 }))
             }
+            crate::resolver::ShapeKind::Image => {
+                Ok(VisualElement::Image(crate::element::ImageElement {
+                    id: vid,
+                    bounds,
+                    image_src: resolved_style.image_src.clone(),
+                    aspect: crate::element::ImageAspect::Contain,
+                    rotation: geometry.rotation,
+                    flip_h: geometry.flip_h,
+                    flip_v: geometry.flip_v,
+                    style: resolved_style,
+                }))
+            }
         }
     }
 
@@ -476,7 +488,7 @@ impl SceneBuilder {
             // vertex centers — that would place the arrowhead inside the shape.
             Ok(VisualElement::Path(PathElement {
                 id: eid,
-                points: edge.waypoints.iter().cloned().collect(),
+                points: edge.waypoints.to_vec(),
                 style: resolved_style,
             }))
         }
@@ -1784,6 +1796,76 @@ mod tests {
                 assert_eq!(p.points.len(), 4);
             }
             other => panic!("Expected Polygon, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_image_style_produces_image_element() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "image");
+        style_map.insert("image", "https://example.com/logo.png");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(10.0, 20.0, 80.0, 60.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Image(img) => {
+                assert_eq!(
+                    img.image_src,
+                    Some("https://example.com/logo.png".to_owned())
+                );
+                assert_eq!(img.bounds.origin.x, 10.0);
+                assert_eq!(img.bounds.origin.y, 20.0);
+                assert_eq!(img.bounds.size.width, 80.0);
+                assert_eq!(img.bounds.size.height, 60.0);
+            }
+            other => panic!("Expected Image, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_image_missing_src_uses_placeholder() {
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        let mut style_map = StyleMap::new();
+        style_map.insert("shape", "image");
+        let style_id = model.store.insert_style(style_map);
+
+        let geom = make_geom(0.0, 0.0, 50.0, 50.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            style_id: Some(style_id),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        let page_scene = &scene.pages[0];
+        match &page_scene.display_list[0] {
+            VisualElement::Image(img) => {
+                assert_eq!(img.image_src, None);
+            }
+            other => panic!("Expected Image, got {:?}", other),
         }
     }
 

@@ -64,6 +64,8 @@ pub enum VisualElement {
     Group(GroupElement),
     /// A draw.io stencil reference, resolved at scene-build time.
     Stencil(StencilElement),
+    /// An image element — rendered as `<image href=.../>` in SVG.
+    Image(ImageElement),
 }
 
 /// A draw.io stencil element — resolved path commands embedded at scene build.
@@ -102,6 +104,18 @@ pub enum StencilAspect {
     Variable,
 }
 
+/// Image fit mode — how the image fills the element bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum ImageAspect {
+    /// Fit within bounds, preserving aspect ratio (SVG `xMidYMid meet`).
+    Contain,
+    /// Fill bounds, preserving aspect ratio, may crop (SVG `xMidYMid slice`).
+    Cover,
+    /// Stretch to fill bounds, ignoring aspect ratio (SVG `none`).
+    Stretch,
+}
+
 /// Static definition of a built-in stencil shape.
 /// Used by the registry to look up normalised [0,1] path data.
 #[derive(Debug, Clone, Copy)]
@@ -125,6 +139,27 @@ impl From<diagram_stencils::Aspect> for StencilAspect {
             diagram_stencils::Aspect::Variable => StencilAspect::Variable,
         }
     }
+}
+
+/// An image element — rendered as an `<image>` tag in SVG.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageElement {
+    /// The vertex ID.
+    pub id: VertexId,
+    /// The bounds in page coordinates.
+    pub bounds: Rect,
+    /// Image source URL or data-URI.
+    pub image_src: Option<String>,
+    /// How the image fits within the bounds.
+    pub aspect: ImageAspect,
+    /// The rotation angle in radians (clockwise positive).
+    pub rotation: f64,
+    /// Horizontal flip flag.
+    pub flip_h: bool,
+    /// Vertical flip flag.
+    pub flip_v: bool,
+    /// The resolved style.
+    pub style: super::ResolvedStyle,
 }
 
 /// A rectangle element.
@@ -785,6 +820,7 @@ mod tests {
                 VisualElement::Path(_) => {}
                 VisualElement::Group(_) => {}
                 VisualElement::Stencil(_) => {}
+                VisualElement::Image(_) => {}
             }
         }
 
