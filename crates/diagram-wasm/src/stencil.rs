@@ -75,6 +75,10 @@ pub enum PathCommandDto {
     Close,
     /// Fill and stroke the current path.
     FillStroke,
+    /// Fill the current path (no stroke).
+    Fill,
+    /// Stroke the current path (no fill).
+    Stroke,
 }
 
 impl From<&diagram_stencils::PathCommand> for PathCommandDto {
@@ -122,6 +126,8 @@ impl From<&diagram_stencils::PathCommand> for PathCommandDto {
             },
             diagram_stencils::PathCommand::Close => PathCommandDto::Close,
             diagram_stencils::PathCommand::FillStroke => PathCommandDto::FillStroke,
+            diagram_stencils::PathCommand::Fill => PathCommandDto::Fill,
+            diagram_stencils::PathCommand::Stroke => PathCommandDto::Stroke,
         }
     }
 }

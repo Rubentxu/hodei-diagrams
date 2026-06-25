@@ -687,6 +687,12 @@ fn build_path_d(commands: &[PathCommand], width: f64, height: f64) -> String {
                 // in SVG this is controlled by presentation attributes on the path element.
                 // No path data emitted.
             }
+            PathCommand::Fill => {
+                // Fill is a draw.io marker — no SVG path data needed.
+            }
+            PathCommand::Stroke => {
+                // Stroke is a draw.io marker — no SVG path data needed.
+            }
         }
     }
     d.trim_end().to_owned()
