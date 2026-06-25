@@ -100,6 +100,8 @@ pub struct ResolvedStyle {
     pub start_arrow: Option<String>,
     /// Whether the edge should render as a smooth curve through waypoints.
     pub curved: Option<bool>,
+    /// Image source URL or data-URI for `shape=image` vertices.
+    pub image_src: Option<String>,
     /// Unknown keys preserved from the original `StyleMap`.
     pub remaining: StyleMap,
 }
@@ -122,6 +124,7 @@ impl ResolvedStyle {
             && self.end_arrow.is_none()
             && self.start_arrow.is_none()
             && self.curved.is_none()
+            && self.image_src.is_none()
             && self.remaining.is_empty()
     }
 }
@@ -155,6 +158,8 @@ pub enum ShapeKind {
     Polygon,
     /// A draw.io stencil — resolved from `shape=stencil:<name>`.
     Stencil,
+    /// An image element — resolved from `shape=image`.
+    Image,
 }
 
 /// The stateless style resolver.
@@ -200,6 +205,7 @@ impl StyleResolver {
             "endArrow",
             "startArrow",
             "edgeStyle",
+            "image",
         ]
     }
 
@@ -222,6 +228,7 @@ impl StyleResolver {
         let mut end_arrow = None;
         let mut start_arrow = None;
         let mut curved = None;
+        let mut image_src = None;
 
         // Effect fields collected in first pass
         let mut shadow_enabled = false;
@@ -346,6 +353,7 @@ impl StyleResolver {
                 }
                 "endArrow" => end_arrow = Some(value.as_str().to_owned()),
                 "startArrow" => start_arrow = Some(value.as_str().to_owned()),
+                "image" => image_src = Some(value.as_str().to_owned()),
                 "edgeStyle" => {
                     curved = Some(value.as_str() == "curvedEdgeStyle");
                 }
@@ -421,6 +429,7 @@ impl StyleResolver {
             end_arrow,
             start_arrow,
             curved,
+            image_src,
             remaining,
         }
     }
@@ -472,6 +481,9 @@ impl StyleResolver {
             // stencil:<name> — a draw.io stencil reference
             if s.starts_with("stencil:") {
                 return ShapeKind::Stencil;
+            }
+            if s.eq_ignore_ascii_case("image") {
+                return ShapeKind::Image;
             }
         }
 
@@ -845,6 +857,56 @@ mod tests {
         assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Cloud);
     }
 
+    #[test]
+    fn classify_shape_image() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "image");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Image);
+    }
+
+    #[test]
+    fn classify_shape_image_case_insensitive() {
+        let mut map = StyleMap::new();
+        map.insert("shape", "IMAGE");
+        assert_eq!(StyleResolver::new().classify(&map), ShapeKind::Image);
+    }
+
+    #[test]
+    fn resolve_image_url() {
+        let mut map = StyleMap::new();
+        map.insert("image", "https://example.com/logo.png");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(
+            resolved.image_src,
+            Some("https://example.com/logo.png".to_owned())
+        );
+    }
+
+    #[test]
+    fn resolve_image_data_uri() {
+        let mut map = StyleMap::new();
+        map.insert("image", "data:image/png;base64,iVBORw0KGgo=");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert_eq!(
+            resolved.image_src,
+            Some("data:image/png;base64,iVBORw0KGgo=".to_owned())
+        );
+    }
+
+    #[test]
+    fn resolve_image_not_in_remaining() {
+        let mut map = StyleMap::new();
+        map.insert("image", "https://example.com/logo.png");
+        let resolved = StyleResolver::new().resolve(&map);
+        assert!(resolved.remaining.get("image").is_none());
+    }
+
+    #[test]
+    fn known_keys_contains_image() {
+        let keys = StyleResolver::known_keys();
+        assert!(keys.contains(&"image"));
+    }
+
     // ─── helper tests ─────────────────────────────────────────────────────────
 
     #[test]
@@ -890,6 +952,7 @@ mod tests {
             "endArrow",
             "startArrow",
             "edgeStyle",
+            "image",
         ];
         assert_eq!(keys.len(), expected.len());
         for k in expected {
