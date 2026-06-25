@@ -723,3 +723,311 @@ pub fn clear_edge_label_offset(handle: u32, edge_idx: u32) -> Result<(), JsValue
         Err(e) => Err(JsValue::from_str(e)),
     }
 }
+
+// =============================================================================
+// Connection Points — Anchor WASM Commands
+// =============================================================================
+
+use crate::types::EdgeAnchorsDto;
+use diagram_core::style::{StyleMap, StyleValue};
+use diagram_routing::{anchor_to_style_keys, style_keys_to_anchor, Anchor, AnchorEnd, Direction};
+
+/// Connect two vertices with an edge, using the specified anchors for source and target.
+///
+/// `from` and `to` are the source and target vertex slotmap index values (the `idx` field from SlotmapId).
+/// `source_kind` and `target_kind` are anchor kind strings: "auto", "north", "south", "east", "west", or "normalized".
+/// For "normalized" kind, provide the nx/ny coordinates; for other kinds, nx/ny are ignored.
+///
+/// Returns the new edge ID on success.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `ConnectError: <reason>` if the connection could not be made
+#[wasm_bindgen]
+pub fn connect_vertices_anchored(
+    handle: u32,
+    from: u32,
+    to: u32,
+    source_kind: String,
+    source_nx: f64,
+    source_ny: f64,
+    target_kind: String,
+    target_nx: f64,
+    target_ny: f64,
+) -> Result<u32, JsValue> {
+    let result = with_engine_mut(handle, |e| {
+        let from_id = match find_vertex_by_idx(e.editor.model(), from) {
+            Some(id) => id,
+            None => {
+                return Err("ConnectError: source vertex not found");
+            }
+        };
+        let to_id = match find_vertex_by_idx(e.editor.model(), to) {
+            Some(id) => id,
+            None => {
+                return Err("ConnectError: target vertex not found");
+            }
+        };
+
+        // Parse source anchor
+        let source_anchor = parse_anchor_from_strings(&source_kind, source_nx, source_ny)?;
+        let target_anchor = parse_anchor_from_strings(&target_kind, target_nx, target_ny)?;
+
+        // Create the edge first using the editor's connect_vertices
+        let edge_id = e
+            .editor
+            .connect_vertices(from_id, to_id, diagram_commands::RoutingKind::Orthogonal)
+            .map_err(|err| {
+                Box::leak(format!("ConnectError: {}", err).into_boxed_str()) as &str
+            })?;
+
+        // Now set the anchor style on the edge
+        set_edge_anchor_style(e.editor.model_mut(), edge_id, AnchorEnd::Source, &source_anchor)?;
+        set_edge_anchor_style(e.editor.model_mut(), edge_id, AnchorEnd::Target, &target_anchor)?;
+
+        // Return the edge index
+        let json = match serde_json::to_value(edge_id) {
+            Ok(v) => v,
+            Err(_) => return Err("ConnectError: failed to serialize edge ID"),
+        };
+        match json.get("idx") {
+            Some(v) => Ok(v.as_u64().map(|n| n as u32).unwrap_or(0)),
+            None => Ok(0),
+        }
+    });
+
+    match result {
+        Ok(Ok(edge_idx)) => Ok(edge_idx),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Parse anchor from string kind and normalized coordinates.
+fn parse_anchor_from_strings(kind: &str, nx: f64, ny: f64) -> Result<Anchor, &'static str> {
+    match kind.trim().to_lowercase().as_str() {
+        "auto" => Ok(Anchor::Auto),
+        "north" => Ok(Anchor::Cardinal(Direction::North)),
+        "south" => Ok(Anchor::Cardinal(Direction::South)),
+        "east" => Ok(Anchor::Cardinal(Direction::East)),
+        "west" => Ok(Anchor::Cardinal(Direction::West)),
+        "normalized" => Ok(Anchor::Normalized { nx, ny }),
+        _ => Err("ConnectError: invalid source_anchor_kind"),
+    }
+}
+
+/// Set anchor style keys on an edge's style.
+fn set_edge_anchor_style(
+    model: &mut diagram_core::DiagramModel,
+    edge_id: diagram_core::EdgeId,
+    end: AnchorEnd,
+    anchor: &Anchor,
+) -> Result<(), &'static str> {
+    // Get the current style_id for the edge
+    let style_id = {
+        let edge = model.store.edge(edge_id).ok_or("EdgeNotFound")?;
+        edge.style_id
+    };
+
+    // Clone the existing style or create a new one
+    let mut style = style_id
+        .and_then(|sid| model.store.style(sid).cloned())
+        .unwrap_or_default();
+
+    // For the anchor end we're setting, remove any existing anchor keys
+    let (exit_prefix, entry_prefix) = match end {
+        AnchorEnd::Source => ("exit", "entry"),
+        AnchorEnd::Target => ("exit", "entry"),
+    };
+
+    // Remove existing exit/entry keys for this end
+    style.remove(exit_prefix);
+    style.remove(&format!("{}X", exit_prefix));
+    style.remove(&format!("{}Y", exit_prefix));
+    style.remove(&format!("{}Perimeter", exit_prefix));
+    style.remove(entry_prefix);
+    style.remove(&format!("{}X", entry_prefix));
+    style.remove(&format!("{}Y", entry_prefix));
+    style.remove(&format!("{}Perimeter", entry_prefix));
+
+    // Add the new anchor keys
+    let keys = anchor_to_style_keys(anchor, end);
+    for (key, value) in keys {
+        style.insert(key, StyleValue(value));
+    }
+
+    // Insert the modified style
+    let new_style_id = model.store.insert_style(style);
+
+    // Now update the edge with the new style_id
+    let edge = model.store.edge_mut(edge_id).ok_or("EdgeNotFound")?;
+    edge.style_id = Some(new_style_id);
+
+    Ok(())
+}
+
+/// Set an edge's anchor on a specific end (source or target).
+///
+/// `edge_idx` is the edge's slotmap index (the `idx` field from SlotmapId).
+/// `end` is 0 for source, 1 for target.
+/// `anchor_kind` is "auto", "north", "south", "east", "west", or "normalized".
+/// For "normalized", nx and ny specify the position; otherwise they are ignored.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `EdgeNotFound` if the edge does not exist
+#[wasm_bindgen]
+pub fn set_edge_anchor(
+    handle: u32,
+    edge_idx: u32,
+    end: u32,
+    anchor_kind: String,
+    nx: f64,
+    ny: f64,
+) -> Result<(), JsValue> {
+    let anchor_end = match end {
+        0 => AnchorEnd::Source,
+        1 => AnchorEnd::Target,
+        _ => return Err(JsValue::from_str("set_edge_anchor: end must be 0 (source) or 1 (target)")),
+    };
+
+    let result = with_engine_mut(handle, |e| {
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("EdgeNotFound");
+            }
+        };
+
+        let anchor = parse_anchor_from_strings(&anchor_kind, nx, ny)?;
+        set_edge_anchor_style(e.editor.model_mut(), eid, anchor_end, &anchor)
+            .map_err(|err| Box::leak(err.to_string().into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Clear an edge's anchor on a specific end (source or target), resetting it to Auto.
+///
+/// `edge_idx` is the edge's slotmap index (the `idx` field from SlotmapId).
+/// `end` is 0 for source, 1 for target.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `EdgeNotFound` if the edge does not exist
+#[wasm_bindgen]
+pub fn clear_edge_anchor(handle: u32, edge_idx: u32, end: u32) -> Result<(), JsValue> {
+    let anchor_end = match end {
+        0 => AnchorEnd::Source,
+        1 => AnchorEnd::Target,
+        _ => {
+            return Err(JsValue::from_str(
+                "clear_edge_anchor: end must be 0 (source) or 1 (target)",
+            ))
+        }
+    };
+
+    let result = with_engine_mut(handle, |e| {
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("EdgeNotFound");
+            }
+        };
+
+        set_edge_anchor_style(e.editor.model_mut(), eid, anchor_end, &Anchor::Auto)
+            .map_err(|err| Box::leak(err.to_string().into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Get the anchor information for an edge.
+///
+/// `edge_idx` is the edge's slotmap index (the `idx` field from SlotmapId).
+///
+/// Returns an `EdgeAnchorsDto` with the source and target anchor information.
+/// Anchor kind is "auto", "north", "south", "east", "west", or "normalized".
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `EdgeNotFound` if the edge does not exist
+#[wasm_bindgen]
+pub fn get_edge_anchors(handle: u32, edge_idx: u32) -> Result<JsValue, JsValue> {
+    let result = with_engine(handle, |e| {
+        let eid = match find_edge_by_idx(e.editor.model(), edge_idx) {
+            Some(id) => id,
+            None => {
+                return Err("EdgeNotFound");
+            }
+        };
+
+        let edge = e
+            .editor
+            .model()
+            .store
+            .edge(eid)
+            .ok_or("EdgeNotFound")?;
+
+        // Get or create style
+        let style = match edge.style_id {
+            Some(sid) => e.editor.model().store.style(sid).cloned().unwrap_or_default(),
+            None => StyleMap::new(),
+        };
+
+        // Resolve source and target anchors
+        let source_anchor = style_keys_to_anchor(&style, AnchorEnd::Source);
+        let target_anchor = style_keys_to_anchor(&style, AnchorEnd::Target);
+
+        // Convert to DTO strings
+        let (source_kind, source_nx, source_ny) = anchor_to_dto_parts(&source_anchor);
+        let (target_kind, target_nx, target_ny) = anchor_to_dto_parts(&target_anchor);
+
+        let dto = EdgeAnchorsDto {
+            source_anchor_kind: source_kind,
+            source_nx,
+            source_ny,
+            target_anchor_kind: target_kind,
+            target_nx,
+            target_ny,
+        };
+
+        serde_json::to_string(&dto)
+            .map_err(|err| Box::leak(format!("Serialize: {}", err).into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(json)) => Ok(JsValue::from_str(&json)),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Convert an anchor to kind string and normalized coordinates.
+fn anchor_to_dto_parts(anchor: &Anchor) -> (String, f64, f64) {
+    match anchor {
+        Anchor::Auto => ("auto".to_string(), 0.0, 0.0),
+        Anchor::Cardinal(dir) => {
+            let kind = match dir {
+                Direction::North => "north",
+                Direction::South => "south",
+                Direction::East => "east",
+                Direction::West => "west",
+            };
+            (kind.to_string(), 0.0, 0.0)
+        }
+        Anchor::Normalized { nx, ny } => ("normalized".to_string(), *nx, *ny),
+    }
+}

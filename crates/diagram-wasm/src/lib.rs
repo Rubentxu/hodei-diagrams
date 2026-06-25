@@ -36,11 +36,17 @@ mod metadata;
 mod render;
 mod scene;
 mod stencil;
+mod types;
 
 pub use commands::{
-    ROUTING_KIND_ORTHOGONAL, ROUTING_KIND_STRAIGHT, connect_vertices, disconnect_edge,
-    engine_can_redo, engine_can_undo, execute_command, execute_transaction, get_resolved_style,
-    redo, undo,
+    ROUTING_KIND_ORTHOGONAL, ROUTING_KIND_STRAIGHT, clear_edge_anchor, connect_vertices,
+    connect_vertices_anchored, disconnect_edge, engine_can_redo, engine_can_undo,
+    execute_command, execute_transaction, get_edge_anchors, get_resolved_style, redo, set_edge_anchor,
+    undo,
+};
+pub use types::{
+    anchor_dto_auto, anchor_dto_cardinal, anchor_dto_normalized, AnchorDto, AnchorEnd,
+    AnchorNormalizedDto, EdgeAnchorsDto,
 };
 pub use engine::{create_engine, dispose_engine};
 pub use export::{export_drawio, export_drawio_fresh_engine};
