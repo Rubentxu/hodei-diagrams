@@ -761,6 +761,24 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Set whether math typesetting is enabled on a page.
+   * @param pageIdx The page's slotmap index (page_id.idx)
+   * @param enabled true to enable math rendering, false to disable
+   * @returns Ok on success, or an error
+   */
+  setPageMathEnabled(pageIdx: number, enabled: boolean): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.set_page_math_enabled(this.handle as number, pageIdx, enabled);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }
 
 export interface EdgeAnchorsDto {

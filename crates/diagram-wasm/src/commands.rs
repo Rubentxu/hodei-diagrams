@@ -97,6 +97,8 @@ pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsVal
             Command::DisconnectEdge(_) => tx,
             // SetEdgeLabelOffset has a dedicated WASM function, but also handle via transaction
             Command::SetEdgeLabelOffset(p) => tx.set_edge_label_offset(p.id, p.offset),
+            // SetPageMathEnabled: enable/disable math typesetting on a page
+            Command::SetPageMathEnabled(p) => tx.set_page_math_enabled(p.page_id, p.enabled),
             // Handle any future variants gracefully (non_exhaustive)
             _ => tx,
         }
@@ -204,6 +206,28 @@ fn find_edge_by_idx(model: &diagram_core::DiagramModel, idx: u32) -> Option<diag
             json_idx == idx
         })
         .map(|(eid, _)| eid)
+}
+
+/// Find a page ID by its raw index.
+fn find_page_by_idx(model: &diagram_core::DiagramModel, idx: u32) -> Option<diagram_core::PageId> {
+    model
+        .store
+        .pages_with_ids()
+        .find(|(pid, _)| {
+            let json = match serde_json::to_value(pid) {
+                Ok(v) => v,
+                Err(_) => return false,
+            };
+            let json_idx = match json.get("idx") {
+                Some(v) => match v.as_u64() {
+                    Some(n) => n as u32,
+                    None => return false,
+                },
+                None => return false,
+            };
+            json_idx == idx
+        })
+        .map(|(pid, _)| pid)
 }
 
 /// Connect two vertices with an edge, using the specified routing algorithm.
@@ -713,6 +737,41 @@ pub fn clear_edge_label_offset(handle: u32, edge_idx: u32) -> Result<(), JsValue
             }
         };
         let tx = Transaction::new().set_edge_label_offset(eid, None);
+        tx.commit(&mut e.editor)
+            .map_err(|err| Box::leak(format!("{err}").into_boxed_str()) as &str)
+    });
+
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
+}
+
+/// Set whether math typesetting is enabled on a page.
+///
+/// `handle` is the engine handle (u32).
+/// `page_idx` is the page's slotmap index (the `idx` field from SlotmapId).
+/// `enabled` is true to enable math rendering, false to disable.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `SetPageMathEnabled: page not found` if the page ID does not exist
+#[wasm_bindgen]
+pub fn set_page_math_enabled(
+    handle: u32,
+    page_idx: u32,
+    enabled: bool,
+) -> Result<(), JsValue> {
+    let result = with_engine_mut(handle, |e| {
+        let pid = match find_page_by_idx(e.editor.model(), page_idx) {
+            Some(id) => id,
+            None => {
+                return Err("SetPageMathEnabled: page not found");
+            }
+        };
+        let tx = Transaction::new().set_page_math_enabled(pid, enabled);
         tx.commit(&mut e.editor)
             .map_err(|err| Box::leak(format!("{err}").into_boxed_str()) as &str)
     });

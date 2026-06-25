@@ -186,6 +186,13 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   snapItem.id = 'menu-item-snap';
   viewList.appendChild(snapItem);
 
+  const mathModeItem = document.createElement('button');
+  mathModeItem.className = 'menu-item has-checkmark';
+  mathModeItem.setAttribute('data-testid', 'menu-math-mode');
+  mathModeItem.textContent = 'Math Mode';
+  mathModeItem.id = 'menu-item-math-mode';
+  viewList.appendChild(mathModeItem);
+
   const presentItem = document.createElement('button');
   presentItem.className = 'menu-item';
   presentItem.textContent = 'Present';
@@ -209,6 +216,26 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
 
   viewMenu.appendChild(viewList);
   menuBar.appendChild(viewMenu);
+
+  // ─── Insert menu ─────────────────────────────────────────────────────────
+  const insertMenu = document.createElement('details');
+  insertMenu.className = 'menu-dropdown';
+  insertMenu.setAttribute('data-testid', 'menu-insert');
+  const insertSummary = document.createElement('summary');
+  insertSummary.textContent = 'Insert';
+  insertMenu.appendChild(insertSummary);
+  const insertList = document.createElement('div');
+  insertList.className = 'menu-items';
+
+  const mathFormulaItem = document.createElement('button');
+  mathFormulaItem.className = 'menu-item';
+  mathFormulaItem.textContent = 'Math Formula';
+  mathFormulaItem.setAttribute('data-testid', 'menu-insert-math');
+  mathFormulaItem.id = 'menu-item-insert-math';
+  insertList.appendChild(mathFormulaItem);
+
+  insertMenu.appendChild(insertList);
+  menuBar.appendChild(insertMenu);
 
   // ─── Arrange menu ──────────────────────────────────────────────────────────
   const arrangeMenu = document.createElement('details');

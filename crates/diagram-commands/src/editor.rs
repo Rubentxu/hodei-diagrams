@@ -12,7 +12,7 @@ use crate::payload::{
     ConnectVerticesCommand, DisconnectEdgeCommand, EditEdgeLabelPayload, EditLabelPayload,
     MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
     RemoveVertexPayload, RenamePagePayload, RoutingKind, SetEdgeLabelOffsetPayload,
-    SetEdgeWaypointsPayload, SetVertexParentPayload,
+    SetEdgeWaypointsPayload, SetPageMathEnabledPayload, SetVertexParentPayload,
 };
 use diagram_core::{
     CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, Point, StyleMap,
@@ -350,6 +350,15 @@ impl Transaction {
     pub fn rename_page(mut self, id: PageId, name: Label) -> Self {
         self.commands
             .push(Command::RenamePage(RenamePagePayload::new(id, name)));
+        self
+    }
+
+    /// Set whether math typesetting is enabled on a page.
+    pub fn set_page_math_enabled(mut self, page_id: PageId, enabled: bool) -> Self {
+        self.commands
+            .push(Command::SetPageMathEnabled(SetPageMathEnabledPayload::new(
+                page_id, enabled,
+            )));
         self
     }
 

@@ -1321,6 +1321,65 @@ impl RenamePagePayload {
     }
 }
 
+/// Payload for enabling or disabling math typesetting on a page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetPageMathEnabledPayload {
+    /// The ID of the page to modify.
+    pub page_id: PageId,
+    /// The new math_enabled value.
+    pub enabled: bool,
+    /// The previous math_enabled value. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_enabled: Option<bool>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetPageMathEnabledPayload {
+    /// Create a new payload for setting page math enabled state.
+    pub fn new(page_id: PageId, enabled: bool) -> Self {
+        Self {
+            page_id,
+            enabled,
+            prev_enabled: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-page-math-enabled operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let page = model
+            .store
+            .page_mut(self.page_id)
+            .ok_or(CommandError::PageNotFound(self.page_id))?;
+
+        // Capture previous value
+        self.prev_enabled = Some(page.math_enabled);
+
+        // Apply new value
+        page.math_enabled = self.enabled;
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the set-page-math-enabled operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_enabled.ok_or(CommandError::NotApplied)?;
+        let page = model
+            .store
+            .page_mut(self.page_id)
+            .ok_or(CommandError::PageNotFound(self.page_id))?;
+        page.math_enabled = prev;
+        self.applied = false;
+        Ok(())
+    }
+}
+
 /// Payload for connecting two vertices with an edge (Phase 0 interactive edge creation).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectVerticesCommand {

@@ -27,6 +27,8 @@ import type { PageToken, PageRender, SlotmapId, ScenePage } from './types.js';
 import { EMPTY_METADATA } from './types.js';
 import { VersionStore } from './version-store.js';
 import { HistoryPanel } from './history-panel.js';
+import { runMathOverlay } from './math/math-overlay.js';
+import { openMathInsertDialog } from './math/math-dialog.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
@@ -527,6 +529,59 @@ async function bootstrap(): Promise<void> {
     toggleGrid();
   });
 
+  // ─── View > Math Mode toggle ───────────────────────────────────────────────
+  const mathModeMenuItem = document.getElementById('menu-item-math-mode');
+  function syncMathModeCheckmark(): void {
+    const sceneResult = activeEditor?.getSceneCache();
+    const scenePages = sceneResult?.ok ? sceneResult.value : [];
+    const pageIdx = activeEditor?.activePageIdx ?? 0;
+    const page = scenePages[pageIdx];
+    const enabled = page?.math_enabled ?? false;
+    mathModeMenuItem?.classList.toggle('has-checkmark', enabled);
+  }
+  mathModeMenuItem?.addEventListener('click', () => {
+    if (!activeSession || !activeEditor) return;
+    const pageIdx = activeEditor.activePageIdx;
+    const sceneResult = activeEditor.getSceneCache();
+    const scenePages = sceneResult?.ok ? sceneResult.value : [];
+    const page = scenePages[pageIdx];
+    const currentlyEnabled = page?.math_enabled ?? false;
+    const result = activeSession.setPageMathEnabled(pageIdx, !currentlyEnabled);
+    if (result.ok) {
+      syncMathModeCheckmark();
+      refreshMathOverlay();
+    }
+  });
+  syncMathModeCheckmark();
+
+  // ─── Insert > Math Formula ─────────────────────────────────────────────────
+  const insertMathMenuItem = document.getElementById('menu-item-insert-math');
+  insertMathMenuItem?.addEventListener('click', () => {
+    openMathInsertDialog((latex: string) => {
+      // Insert a rectangle at canvas center with the LaTeX as its label.
+      // The math overlay will render it as KaTeX after the next scene refresh,
+      // provided the current page has View > Math Mode toggled on.
+      activeEditor?.insertMathFormula(latex);
+      refreshMathOverlay();
+    });
+  });
+
+  // ─── Math overlay helper ──────────────────────────────────────────────────
+  /**
+   * Refresh the math overlay on the current SVG.
+   * Called after mountSvg to apply KaTeX overlays on math-labeled text elements.
+   */
+  function refreshMathOverlay(): void {
+    const svgEl = ui.viewer.querySelector('svg');
+    if (!svgEl) return;
+    const sceneResult = activeEditor?.getSceneCache();
+    const scenePages = sceneResult?.ok ? sceneResult.value : [];
+    const pageIdx = activeEditor?.activePageIdx ?? 0;
+    const page = scenePages[pageIdx];
+    const mathEnabled = page?.math_enabled ?? false;
+    runMathOverlay(svgEl as SVGElement, mathEnabled);
+  }
+
   // ─── 14.7. Ctrl+G keyboard shortcut for grid toggle ──────────────────────
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
@@ -603,6 +658,7 @@ async function bootstrap(): Promise<void> {
     const renderResult = activeSession.renderAllPages();
     if (renderResult.ok && renderResult.value.length > 0) {
       mountSvg(ui.viewer, renderResult.value[0]!.svg);
+      refreshMathOverlay();
     }
     activeEditor?.refreshScene();
     await historyPanel.render();
@@ -691,6 +747,7 @@ async function bootstrap(): Promise<void> {
     activePages = renderResult.value;
     if (activePages.length > 0) {
       mountSvg(ui.viewer, activePages[0]!.svg);
+      refreshMathOverlay();
       populatePageTabs(ui.pageTabContainer, activePages, 0, {
         onSelect: handlePageSelect,
         onRename: handlePageRename,
@@ -859,6 +916,7 @@ async function bootstrap(): Promise<void> {
         if (activeEditor) {
           activeEditor.activePageIdx = idx;
           activeEditor.refreshScene();
+          refreshMathOverlay();
         }
         // Update HUD page info
         ui.hud.setPage(idx + 1, activePages.length);
@@ -917,6 +975,7 @@ async function bootstrap(): Promise<void> {
       const svg = activeSession.getPage(newPage.pageId);
       if (svg) {
         mountSvg(ui.viewer, svg);
+        refreshMathOverlay();
       }
       ui.hud.setPage(newIdx + 1, activePages.length);
     }
@@ -979,6 +1038,7 @@ async function bootstrap(): Promise<void> {
       const svg = activeSession.getPage(newPage.pageId);
       if (svg) {
         mountSvg(ui.viewer, svg);
+        refreshMathOverlay();
       }
     }
     ui.hud.setPage(newIdx + 1, activePages.length);

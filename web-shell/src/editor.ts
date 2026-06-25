@@ -9,6 +9,7 @@ import type {
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
+import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
 
 /** Active tool from the palette. */
@@ -378,6 +379,26 @@ export class Editor {
     }
 
     return pastedIds;
+  }
+
+  /**
+   * Insert a math formula at the center of the canvas.
+   * Creates a rectangle with the LaTeX text as its label.
+   * The caller is responsible for ensuring the page has math_enabled=true
+   * so that the math overlay will render the KaTeX output.
+   */
+  insertMathFormula(latex: string): void {
+    const svgEl = this.#viewer.querySelector('svg');
+    const cx = svgEl ? parseFloat(svgEl.getAttribute('width') ?? '800') / 2 : 400;
+    const cy = svgEl ? parseFloat(svgEl.getAttribute('height') ?? '600') / 2 : 300;
+
+    const cmd = this.#buildAddVertexCmd('Rectangle', cx - 60, cy - 40);
+    const r = this.#session.executeCommand(cmd);
+    if (!r.ok) {
+      this.#onError(r.error);
+    } else {
+      this.#replay();
+    }
   }
 
   /** Select all shapes in the current page. */
@@ -3076,6 +3097,36 @@ export class Editor {
           return;
         }
       }
+    }
+
+    // Check if double-clicking on a math text element (data-math-id + data-latex)
+    const mathTextEl = target.closest('[data-math-id][data-latex]');
+    if (mathTextEl) {
+      const latex = mathTextEl.getAttribute('data-latex') ?? '';
+      const mathId = mathTextEl.getAttribute('data-math-id');
+      if (mathId) {
+        e.preventDefault();
+        e.stopPropagation();
+        const vertexId = parseSlotmapAttr(mathId);
+        if (vertexId) {
+            openMathEditDialog(latex, (newLatex: string) => {
+              // Update the label via EditVertexLabel command
+              const cmd = JSON.stringify({
+                EditVertexLabel: {
+                  id: slotmapIdToField(vertexId),
+                  label: { text: newLatex },
+                },
+              });
+              const result = this.#session.executeCommand(cmd);
+              if (!result.ok) {
+                this.#onError(result.error);
+              } else {
+                this.#replay();
+              }
+            });
+        }
+      }
+      return;
     }
 
     const shapeEl = target.closest('[data-vertex-id]');
