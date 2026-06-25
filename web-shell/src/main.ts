@@ -28,6 +28,7 @@ import { EMPTY_METADATA } from './types.js';
 import { VersionStore } from './version-store.js';
 import { HistoryPanel } from './history-panel.js';
 import { runMathOverlay } from './math/math-overlay.js';
+import { openMathInsertDialog } from './math/math-dialog.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
@@ -526,6 +527,20 @@ async function bootstrap(): Promise<void> {
 
   gridMenuItem?.addEventListener('click', () => {
     toggleGrid();
+  });
+
+  // ─── Insert > Math Formula ─────────────────────────────────────────────────
+  const insertMathMenuItem = document.getElementById('menu-item-insert-math');
+  insertMathMenuItem?.addEventListener('click', () => {
+    openMathInsertDialog((latex: string) => {
+      // Insert a rectangle at canvas center with the LaTeX as its label.
+      // The math overlay will render it as KaTeX after the next scene refresh.
+      // Note: page-level math_enabled must be true for the overlay to activate.
+      // TODO: wire a SetPageMathEnabled command or toolbar toggle to enable
+      // math mode on the current page before inserting math vertices.
+      activeEditor?.insertMathFormula(latex);
+      refreshMathOverlay();
+    });
   });
 
   // ─── Math overlay helper ──────────────────────────────────────────────────
