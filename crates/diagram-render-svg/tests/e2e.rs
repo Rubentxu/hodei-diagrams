@@ -159,3 +159,158 @@ fn multi_segment_style_preserves_remaining() {
         "SVG should contain style attribute for remaining keys"
     );
 }
+
+#[test]
+fn swimlane_pool_lane_renders_with_header_and_nested_groups() {
+    // swimlane-pool-lane.drawio has:
+    //   pool  at (10, 10, 700, 400)            — top-level, style=swimlane
+    //   lane1 at (0, 0, 700, 120) parent=pool  — relative inside pool
+    //   lane2 at (0, 120, 700, 120) parent=pool — relative inside pool
+    //   s1    at (20, 40, 120, 60) parent=lane1 — relative inside lane1
+    //   s2    at (20, 40, 120, 60) parent=lane2 — relative inside lane2
+    //
+    // Expected: pool has a header rect (default startSize=40, horizontal=false
+    // → top band at pool_origin.y, width=700, height=40).
+    let scene = scene_from_fixture("swimlane-pool-lane");
+    let renderer = SvgRenderer::new();
+    let pages = renderer
+        .render_pages(&scene)
+        .expect("render_pages should succeed");
+
+    assert_eq!(pages.len(), 1, "swimlane-pool-lane should have one page");
+    let svg = &pages[0].1;
+
+    // Header rect must be at the top of the pool (x=10, y=10, w=700, h=40)
+    assert!(
+        svg.contains(r#"<rect x="10" y="10" width="700" height="40" class="swimlane-header""#),
+        "pool header rect must be emitted at (10, 10, 700, 40), got:\n{}",
+        svg
+    );
+
+    // The header rect is emitted first inside the group's clip-path region
+    // (svg should contain clip-path for the pool)
+    assert!(
+        svg.contains("clip-path=\"url(#clip_0)\""),
+        "pool must be clipped, got:\n{}",
+        svg
+    );
+
+    // Two child shapes must be rendered (s1 in lane1, s2 in lane2)
+    // s1 accumulates: pool(10,10) + lane1(0,0) + shape(20,40) = (30, 50)
+    // s2 accumulates: pool(10,10) + lane2(0,120) + shape(20,40) = (30, 170)
+    assert!(
+        svg.contains(r#"<rect x="30" y="50" width="120" height="60""#),
+        "s1 must be at accumulated coords (30, 50), got:\n{}",
+        svg
+    );
+    assert!(
+        svg.contains(r#"<rect x="30" y="170" width="120" height="60""#),
+        "s2 must be at accumulated coords (30, 170), got:\n{}",
+        svg
+    );
+}
+
+#[test]
+fn swimlane_flat_renders_with_header_and_child_shapes() {
+    // swimlane-flat.drawio has:
+    //   pool at (10, 10, 600, 300) — top-level, style=swimlane
+    //   s1   at (20, 40, 120, 60) parent=pool — relative
+    //   s2   at (160, 40, 120, 60) parent=pool — relative
+    //
+    // Expected:
+    //   pool has header rect at (10, 10, 600, 40)
+    //   s1 at accumulated (30, 50)
+    //   s2 at accumulated (170, 50)
+    let scene = scene_from_fixture("swimlane-flat");
+    let renderer = SvgRenderer::new();
+    let pages = renderer
+        .render_pages(&scene)
+        .expect("render_pages should succeed");
+
+    assert_eq!(pages.len(), 1, "swimlane-flat should have one page");
+    let svg = &pages[0].1;
+
+    // Header rect at top of pool
+    assert!(
+        svg.contains(r#"<rect x="10" y="10" width="600" height="40" class="swimlane-header""#),
+        "pool header rect must be emitted at (10, 10, 600, 40), got:\n{}",
+        svg
+    );
+
+    // s1: pool(10,10) + s1(20,40) = (30, 50)
+    assert!(
+        svg.contains(r#"<rect x="30" y="50" width="120" height="60""#),
+        "s1 must be at accumulated coords (30, 50), got:\n{}",
+        svg
+    );
+
+    // s2: pool(10,10) + s2(160,40) = (170, 50)
+    assert!(
+        svg.contains(r#"<rect x="170" y="50" width="120" height="60""#),
+        "s2 must be at accumulated coords (170, 50), got:\n{}",
+        svg
+    );
+
+    // Both shapes are inside the pool's clip region
+    assert!(
+        svg.contains("clip-path=\"url(#clip_0)\""),
+        "pool must be clipped, got:\n{}",
+        svg
+    );
+}
+
+#[test]
+fn swimlane_golden_snapshots_are_well_formed() {
+    // Property-based golden regression guard: render both swimlane fixtures
+    // and assert that:
+    //   1. The SVG is well-formed XML (balanced tags, valid entities)
+    //   2. The output is deterministic across two runs (golden property)
+    //   3. Both fixtures produce exactly 1 page each
+    //   4. The viewBox captures the pool bounds (10,10 to w+10, h+10)
+    let pool_lane_scene = scene_from_fixture("swimlane-pool-lane");
+    let flat_scene = scene_from_fixture("swimlane-flat");
+
+    let renderer = SvgRenderer::new();
+    let pool_lane_pages_1 = renderer.render_pages(&pool_lane_scene).unwrap();
+    let flat_pages_1 = renderer.render_pages(&flat_scene).unwrap();
+
+    // Determinism: re-render and compare byte-for-byte
+    let pool_lane_pages_2 = renderer.render_pages(&pool_lane_scene).unwrap();
+    let flat_pages_2 = renderer.render_pages(&flat_scene).unwrap();
+    assert_eq!(
+        pool_lane_pages_1[0].1, pool_lane_pages_2[0].1,
+        "swimlane-pool-lane render must be deterministic"
+    );
+    assert_eq!(
+        flat_pages_1[0].1, flat_pages_2[0].1,
+        "swimlane-flat render must be deterministic"
+    );
+
+    // Both fixtures produce 1 page each
+    assert_eq!(pool_lane_pages_1.len(), 1);
+    assert_eq!(flat_pages_1.len(), 1);
+
+    // Both SVGs are well-formed
+    assert!(
+        is_well_formed(&pool_lane_pages_1[0].1),
+        "swimlane-pool-lane SVG is not well-formed:\n{}",
+        pool_lane_pages_1[0].1
+    );
+    assert!(
+        is_well_formed(&flat_pages_1[0].1),
+        "swimlane-flat SVG is not well-formed:\n{}",
+        flat_pages_1[0].1
+    );
+
+    // viewBox captures the pool bounds
+    assert!(
+        pool_lane_pages_1[0].1.contains(r#"viewBox="10 10 700 400""#),
+        "swimlane-pool-lane viewBox should be 10 10 700 400, got:\n{}",
+        pool_lane_pages_1[0].1
+    );
+    assert!(
+        flat_pages_1[0].1.contains(r#"viewBox="10 10 600 300""#),
+        "swimlane-flat viewBox should be 10 10 600 300, got:\n{}",
+        flat_pages_1[0].1
+    );
+}

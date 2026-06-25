@@ -3,7 +3,9 @@
 use diagram_core::VertexId;
 use diagram_core::geometry::{Point, Rect, Size};
 use diagram_render_svg::{RenderError, SvgRenderer};
-use diagram_scene::{PageId, RectElement, ResolvedStyle, Scene, VisualElement};
+use diagram_scene::{
+    PageId, RectElement, ResolvedStyle, Scene, VisualElement,
+};
 
 #[test]
 fn simple_rect_renders_correctly() {
@@ -167,4 +169,32 @@ fn multiple_rects_render_in_order() {
     // Both rects should be present
     assert!(svg.contains("fill=\"#ff0000\""));
     assert!(svg.contains("fill=\"#0000ff\""));
+}
+
+// FIXME(image-element): ImageElement not yet implemented in diagram-scene
+#[test]
+#[ignore]
+fn image_to_svg_data_uri() {
+    todo!("ImageElement not yet implemented in diagram-scene")
+}
+
+// FIXME(image-element): ImageElement not yet implemented in diagram-scene
+#[test]
+#[ignore]
+fn image_to_svg_url_with_ampersand_escaped() {
+    todo!("ImageElement not yet implemented in diagram-scene")
+}
+
+// FIXME(image-element): ImageElement not yet implemented in diagram-scene
+#[test]
+#[ignore]
+fn image_to_svg_none_emits_placeholder() {
+    todo!("ImageElement not yet implemented in diagram-scene")
+}
+
+// FIXME(image-element): ImageElement not yet implemented in diagram-scene
+#[test]
+#[ignore]
+fn image_aspect_variants_map_to_preserve_aspect_ratio() {
+    todo!("ImageElement not yet implemented in diagram-scene")
 }

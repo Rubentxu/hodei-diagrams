@@ -1,0 +1,17 @@
+<mxfile>
+  <diagram name="Flat Swimlane">
+    <mxGraphModel>
+      <root>
+        <mxCell id="pool" value="Pool 1" style="swimlane" vertex="1">
+          <mxGeometry x="10" y="10" width="600" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="s1" value="Task A" vertex="1" parent="pool">
+          <mxGeometry x="20" y="40" width="120" height="60"/>
+        </mxCell>
+        <mxCell id="s2" value="Task B" vertex="1" parent="pool">
+          <mxGeometry x="160" y="40" width="120" height="60"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

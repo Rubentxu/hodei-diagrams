@@ -89,6 +89,7 @@ fn render_pages_clip_counter_resets_per_page() {
         style: empty_style(),
         children: vec![],
         clip: true,
+        header: None,
     });
 
     let page_a = PageScene {

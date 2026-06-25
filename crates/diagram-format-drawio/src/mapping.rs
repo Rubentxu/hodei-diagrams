@@ -202,7 +202,13 @@ impl DrawioMapping {
 
             for (idx, cell) in diagram.cells.iter().enumerate() {
                 z_orders.insert(cell.id.clone(), idx as i32);
-                if cell.vertex && !cell.edge {
+                // Swimlane cells carry vertex=1 but are containers — classify as group
+                let is_swimlane = cell
+                    .style
+                    .as_ref()
+                    .map(|s| s.contains("swimlane"))
+                    .unwrap_or(false);
+                if cell.vertex && !cell.edge && !is_swimlane {
                     let vid = model.store.insert_vertex(Vertex {
                         page_id,
                         ..Default::default()
@@ -295,6 +301,7 @@ impl DrawioMapping {
                     }
                     CellRef::Group(gid) => {
                         let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
+                        let parent = resolve_parent(&cell.parent, &id_map, diags);
                         // Preserve page_id set during pass 1
                         let page_id = model.store.group(gid).and_then(|g| g.page_id);
                         // z_order from XML child index; locked/visible from extra attributes
@@ -305,6 +312,7 @@ impl DrawioMapping {
                             geometry: cell_geo,
                             label,
                             style_id,
+                            parent,
                             page_id,
                             z_order,
                             locked,
@@ -631,7 +639,7 @@ impl DrawioMapping {
                     style,
                     vertex: false,
                     edge: false,
-                    parent: None,
+                    parent: group.parent.and_then(|gid| id_map.get_external_group(gid)),
                     source: None,
                     target: None,
                     geometry,
@@ -1359,5 +1367,203 @@ mod tests {
         assert_eq!(synthesized.edges.len(), 1);
         // Group gets g0
         assert_eq!(synthesized.groups.len(), 1);
+    }
+
+    // =============================================================================
+    // Task 1.2 — Swimlane style-based classification
+    // =============================================================================
+
+    #[test]
+    fn test_swimlane_vertex_classified_as_group_no_orphan() {
+        // A cell with vertex=1 but style containing "swimlane" must be classified
+        // as a Group, not a Vertex. This prevents an OrphanedShape diagnostic
+        // (a group does not require a parent the way a vertex does).
+        let mapper = DrawioMapping::new();
+        let doc = RawDrawioDocument {
+            diagrams: vec![RawDrawioDiagram {
+                name: Some("Swimlane Page".to_owned()),
+                background: None,
+                cells: vec![RawDrawioCell {
+                    id: "pool".to_owned(),
+                    value: Some("Pool 1".to_owned()),
+                    // vertex=1 but style contains "swimlane" → should be Group
+                    style: Some("swimlane".to_owned()),
+                    vertex: true,
+                    edge: false,
+                    parent: None,
+                    source: None,
+                    target: None,
+                    geometry: None,
+                    extra: Default::default(),
+                }],
+            }],
+        };
+        let mut diags = Vec::new();
+        let (model, _id_map) = mapper.to_domain_with_diagnostics(&doc, &mut diags).unwrap();
+
+        // Must be a group, not a vertex
+        assert_eq!(
+            model.store.len_group(),
+            1,
+            "swimlane cell must be classified as Group"
+        );
+        assert_eq!(
+            model.store.len_vertex(),
+            0,
+            "swimlane cell must NOT be a Vertex"
+        );
+
+        // No OrphanedShape diagnostic (groups don't require parents)
+        let orphaned = diags
+            .iter()
+            .filter(|d| d.message.contains("orphan"))
+            .count();
+        assert_eq!(orphaned, 0, "no orphan diagnostics for swimlane group");
+    }
+
+    #[test]
+    fn test_swimlane_child_vertex_with_parent_linkage() {
+        // A normal vertex that is a child of a swimlane group must carry the
+        // correct parent GroupId.
+        let mapper = DrawioMapping::new();
+        let doc = RawDrawioDocument {
+            diagrams: vec![RawDrawioDiagram {
+                name: Some("Swimlane Page".to_owned()),
+                background: None,
+                cells: vec![
+                    // Pool (swimlane, top-level, parent=None)
+                    RawDrawioCell {
+                        id: "pool".to_owned(),
+                        value: Some("Pool 1".to_owned()),
+                        style: Some("swimlane".to_owned()),
+                        vertex: true,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                    // Shape inside the pool (normal vertex, parent=pool)
+                    RawDrawioCell {
+                        id: "s1".to_owned(),
+                        value: Some("Task A".to_owned()),
+                        style: None,
+                        vertex: true,
+                        edge: false,
+                        parent: Some("pool".to_owned()),
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                ],
+            }],
+        };
+        let mut diags = Vec::new();
+        let (model, id_map) = mapper.to_domain_with_diagnostics(&doc, &mut diags).unwrap();
+
+        assert_eq!(model.store.len_group(), 1, "pool is a group");
+        assert_eq!(model.store.len_vertex(), 1, "s1 is a vertex");
+
+        // The vertex's parent must point to the pool's GroupId
+        let pool_gid = id_map
+            .get_internal_group("pool")
+            .expect("pool must be mapped");
+        let s1_vertex = model.store.vertices_with_ids().find(|(_, v)| {
+            v.label
+                .as_ref()
+                .map(|l| l.text.as_str() == "Task A")
+                .unwrap_or(false)
+        });
+        let (_, s1) = s1_vertex.expect("Task A vertex must exist");
+        assert_eq!(
+            s1.parent,
+            Some(pool_gid),
+            "vertex parent must reference pool group"
+        );
+
+        // No orphaned-shape diagnostics
+        let orphaned = diags
+            .iter()
+            .filter(|d| d.message.contains("orphan"))
+            .count();
+        assert_eq!(orphaned, 0, "no orphan diagnostics");
+    }
+
+    // =============================================================================
+    // Task 1.8 — Round-trip: group.parent preserved through to_raw → re-parse
+    // =============================================================================
+
+    #[test]
+    fn test_group_parent_roundtrip() {
+        // A nested group (lane inside a pool) must preserve its parent linkage
+        // through: to_domain → to_raw → to_domain again.
+        let mapper = DrawioMapping::new();
+        let doc = RawDrawioDocument {
+            diagrams: vec![RawDrawioDiagram {
+                name: Some("Roundtrip Page".to_owned()),
+                background: None,
+                cells: vec![
+                    RawDrawioCell {
+                        id: "pool".to_owned(),
+                        value: Some("Pool".to_owned()),
+                        style: Some("swimlane".to_owned()),
+                        vertex: true,
+                        edge: false,
+                        parent: None,
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                    RawDrawioCell {
+                        id: "lane".to_owned(),
+                        value: Some("Lane".to_owned()),
+                        style: Some("swimlane".to_owned()),
+                        vertex: true,
+                        edge: false,
+                        parent: Some("pool".to_owned()),
+                        source: None,
+                        target: None,
+                        geometry: None,
+                        extra: Default::default(),
+                    },
+                ],
+            }],
+        };
+
+        // First parse
+        let (model1, id_map1) = mapper.to_domain(&doc).unwrap();
+        assert_eq!(model1.store.len_group(), 2, "two groups: pool and lane");
+
+        // Verify lane's parent is pool
+        let pool_gid = id_map1.get_internal_group("pool").unwrap();
+        let lane_gid = id_map1.get_internal_group("lane").unwrap();
+        let lane = model1.store.group(lane_gid).unwrap();
+        assert_eq!(lane.parent, Some(pool_gid), "lane.parent must be pool");
+
+        // Export to raw
+        let mut diags = Vec::new();
+        let raw = mapper.to_raw(&model1, &id_map1, &mut diags).unwrap();
+        assert!(diags.is_empty(), "to_raw should have no diagnostics");
+
+        // Re-parse the raw document
+        let (model2, id_map2) = mapper.to_domain(&raw).unwrap();
+        assert_eq!(
+            model2.store.len_group(),
+            2,
+            "still two groups after round-trip"
+        );
+
+        // Verify lane's parent survived the round-trip
+        let pool_gid2 = id_map2.get_internal_group("pool").unwrap();
+        let lane_gid2 = id_map2.get_internal_group("lane").unwrap();
+        let lane2 = model2.store.group(lane_gid2).unwrap();
+        assert_eq!(
+            lane2.parent,
+            Some(pool_gid2),
+            "lane.parent must survive round-trip"
+        );
     }
 }

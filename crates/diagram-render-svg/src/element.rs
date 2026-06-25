@@ -4,8 +4,8 @@ use diagram_core::{EdgeId, VertexId};
 use diagram_scene::{
     CloudElement, CylinderElement, DiamondElement, EllipseElement, EntityId, GroupElement,
     HexagonElement, LineElement, ParallelogramElement, PathCommand, PathElement, PolygonElement,
-    RectElement, RoundedRectElement, StencilElement, TextElement, TrapezoidElement,
-    TriangleElement, VisualElement,
+    RectElement, RoundedRectElement, StencilElement, SwimlaneHeader, TextElement,
+    TrapezoidElement, TriangleElement, VisualElement,
 };
 
 use crate::clip::ClipPathManager;
@@ -708,6 +708,13 @@ fn group_to_svg(
         .map(|child| element_to_svg(child, clip, defs, child_indent))
         .collect();
 
+    // Render swimlane header (if any) as the first element inside the group,
+    // so it sits behind any nested lanes/shapes but in front of the pool background.
+    let header_svg = g
+        .header
+        .as_ref()
+        .map(|h| header_to_svg(h, &g.style, defs));
+
     let (open_tag, close_tag) = if g.clip {
         let clip_id = clip.register(
             g.bounds.origin.x,
@@ -727,12 +734,43 @@ fn group_to_svg(
     result.push_str(&ind);
     result.push_str(&open_tag);
     result.push('\n');
+    if let Some(ref h_svg) = header_svg {
+        result.push_str(h_svg);
+        result.push('\n');
+    }
     for child_svg in &children_svg {
         result.push_str(child_svg);
         result.push('\n');
     }
     result.push_str(&close_tag);
     result
+}
+
+/// Render a swimlane header as an SVG `<rect>` element.
+///
+/// The header is a visual band that occupies either the top edge
+/// (`horizontal=false`) or the left edge (`horizontal=true`) of the
+/// enclosing pool, sized by `startSize` in the swimlane style.
+///
+/// The header inherits the pool's `fill`, `stroke`, and `opacity` so it
+/// reads as part of the pool's visual identity (it's the "title strip").
+/// A `class="swimlane-header"` hook is added so stylesheets can override
+/// the look.
+fn header_to_svg(
+    h: &SwimlaneHeader,
+    pool_style: &diagram_scene::ResolvedStyle,
+    defs: &mut DefsManager,
+) -> String {
+    let ind = make_indent(0);
+    let x = h.bounds.origin.x;
+    let y = h.bounds.origin.y;
+    let w = h.bounds.size.width;
+    let height = h.bounds.size.height;
+    let style = shape_style_defaults(pool_style, AttrContext::Shape, defs);
+    format!(
+        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" class=\"swimlane-header\"{}/>",
+        ind, x, y, w, height, style
+    )
 }
 
 #[cfg(test)]
@@ -1003,6 +1041,7 @@ mod tests {
             style: empty_style(),
             children: vec![],
             clip: false,
+            header: None,
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
@@ -1027,6 +1066,7 @@ mod tests {
             style: empty_style(),
             children: vec![],
             clip: true,
+            header: None,
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
@@ -1063,6 +1103,7 @@ mod tests {
             style: empty_style(),
             children: vec![child_rect],
             clip: false,
+            header: None,
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
@@ -1070,6 +1111,227 @@ mod tests {
         assert!(result.contains("<g>"));
         assert!(result.contains("</g>"));
         assert!(result.contains("<rect"));
+    }
+
+    // ─── swimlane header rendering ──────────────────────────────────────────────
+
+    #[test]
+    fn group_with_horizontal_header_emits_left_strip() {
+        // horizontal=true → header is a vertical strip on the left edge.
+        // Pool at (100, 100, 700, 400) with horizontal=true, startSize=30.
+        // Expected header rect: x=100, y=100, w=30, h=400.
+        let pool_rect = VisualElement::Rect(RectElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 100.0, y: 100.0 },
+                size: Size {
+                    width: 700.0,
+                    height: 400.0,
+                },
+            },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
+            style: empty_style(),
+        });
+        let header = SwimlaneHeader {
+            bounds: Rect {
+                origin: Point { x: 100.0, y: 100.0 },
+                size: Size {
+                    width: 30.0,
+                    height: 400.0,
+                },
+            },
+            horizontal: true,
+        };
+        let group = VisualElement::Group(diagram_scene::GroupElement {
+            id: GroupId::default(),
+            bounds: Rect {
+                origin: Point { x: 100.0, y: 100.0 },
+                size: Size {
+                    width: 700.0,
+                    height: 400.0,
+                },
+            },
+            style: empty_style(),
+            children: vec![pool_rect],
+            clip: true,
+            header: Some(header),
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+
+        // Header rect must be emitted with x=100, y=100, w=30, h=400
+        assert!(
+            result.contains(r#"<rect x="100" y="100" width="30" height="400""#),
+            "horizontal header must emit a left-strip rect, got:\n{}",
+            result
+        );
+    }
+
+    #[test]
+    fn group_with_vertical_header_emits_top_band() {
+        // horizontal=false → header is a horizontal band at the top edge.
+        // Pool at (50, 80, 600, 300) with horizontal=false, startSize=40.
+        // Expected header rect: x=50, y=80, w=600, h=40.
+        let child_rect = VisualElement::Rect(RectElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 100.0, y: 200.0 },
+                size: Size {
+                    width: 80.0,
+                    height: 40.0,
+                },
+            },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
+            style: empty_style(),
+        });
+        let header = SwimlaneHeader {
+            bounds: Rect {
+                origin: Point { x: 50.0, y: 80.0 },
+                size: Size {
+                    width: 600.0,
+                    height: 40.0,
+                },
+            },
+            horizontal: false,
+        };
+        let group = VisualElement::Group(diagram_scene::GroupElement {
+            id: GroupId::default(),
+            bounds: Rect {
+                origin: Point { x: 50.0, y: 80.0 },
+                size: Size {
+                    width: 600.0,
+                    height: 300.0,
+                },
+            },
+            style: empty_style(),
+            children: vec![child_rect],
+            clip: true,
+            header: Some(header),
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+
+        // Header rect must be emitted with x=50, y=80, w=600, h=40
+        assert!(
+            result.contains(r#"<rect x="50" y="80" width="600" height="40""#),
+            "vertical header must emit a top-band rect, got:\n{}",
+            result
+        );
+        // The child's rect (100, 200, 80, 40) must still be emitted
+        assert!(
+            result.contains(r#"<rect x="100" y="200" width="80" height="40""#),
+            "child rect must be emitted after header, got:\n{}",
+            result
+        );
+    }
+
+    #[test]
+    fn group_without_header_does_not_emit_extra_rect() {
+        // A group with header=None must NOT emit any rect for a header —
+        // only its children are rendered.
+        let child_rect = VisualElement::Rect(RectElement {
+            id: VertexId::default(),
+            bounds: Rect {
+                origin: Point { x: 20.0, y: 30.0 },
+                size: Size {
+                    width: 50.0,
+                    height: 25.0,
+                },
+            },
+            rotation: 0.0,
+            flip_h: false,
+            flip_v: false,
+            style: empty_style(),
+        });
+        let group = VisualElement::Group(diagram_scene::GroupElement {
+            id: GroupId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 200.0,
+                    height: 200.0,
+                },
+            },
+            style: empty_style(),
+            children: vec![child_rect],
+            clip: false,
+            header: None,
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+
+        // Only one rect (the child)
+        let rect_count = result.matches("<rect").count();
+        assert_eq!(
+            rect_count, 1,
+            "group without header must emit only the child rect, got {} rects in:\n{}",
+            rect_count, result
+        );
+    }
+
+    #[test]
+    fn group_with_header_inherits_pool_style() {
+        // The header rect must inherit the pool's fill/stroke colours
+        // so the header visually matches the pool body (it's the "title strip").
+        let pool_style = ResolvedStyle {
+            fill_color: Some("#dae8fc".to_owned()),
+            stroke_color: Some("#6c8ebf".to_owned()),
+            opacity: Some(0.3),
+            ..Default::default()
+        };
+        let header = SwimlaneHeader {
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 600.0,
+                    height: 40.0,
+                },
+            },
+            horizontal: false,
+        };
+        let group = VisualElement::Group(diagram_scene::GroupElement {
+            id: GroupId::default(),
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 600.0,
+                    height: 300.0,
+                },
+            },
+            style: pool_style.clone(),
+            children: vec![],
+            clip: false,
+            header: Some(header),
+        });
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+
+        // The header rect must have fill=#dae8fc (inherited from pool)
+        assert!(
+            result.contains("fill=\"#dae8fc\""),
+            "header must inherit pool fill colour, got:\n{}",
+            result
+        );
+        // The header rect must have stroke=#6c8ebf (inherited from pool)
+        assert!(
+            result.contains("stroke=\"#6c8ebf\""),
+            "header must inherit pool stroke colour, got:\n{}",
+            result
+        );
+        // The header rect must have opacity=0.3 (inherited from pool)
+        assert!(
+            result.contains("opacity=\"0.3\""),
+            "header must inherit pool opacity, got:\n{}",
+            result
+        );
     }
 
     // ─── new shape SVG rendering tests ────────────────────────────────────────
