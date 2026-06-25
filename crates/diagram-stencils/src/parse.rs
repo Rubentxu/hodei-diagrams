@@ -267,6 +267,28 @@ pub fn parse_stencil_library(xml: &str) -> Result<Vec<Stencil>, StencilError> {
                             format!("unsupported element '{}' in {} - skipped", name, location),
                         ));
                     }
+                    "fillstroke" if in_background || in_foreground => {
+                        let target = if in_background { &mut background } else { &mut foreground };
+                        target.push(PathCommand::FillStroke);
+                    }
+                    "fill" if in_background || in_foreground => {
+                        let target = if in_background { &mut background } else { &mut foreground };
+                        target.push(PathCommand::Fill);
+                    }
+                    "stroke" if in_background || in_foreground => {
+                        let target = if in_background { &mut background } else { &mut foreground };
+                        target.push(PathCommand::Stroke);
+                    }
+                    _ if in_background || in_foreground => {
+                        if !encountered_unsupported.contains(&name) {
+                            encountered_unsupported.insert(name.clone());
+                            let location = if in_background { "background" } else { "foreground" };
+                            diagnostics.push(Diagnostic::new(
+                                format!("<{}>", name),
+                                format!("unsupported element '{}' in {} - skipped", name, location),
+                            ));
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -454,6 +476,28 @@ pub fn parse_stencil(xml: &str) -> Result<Stencil, StencilError> {
                             format!("<{}>", name),
                             format!("unsupported element '{}' in {} - skipped", name, location),
                         ));
+                    }
+                    "fillstroke" if in_background || in_foreground => {
+                        let target = if in_background { &mut background } else { &mut foreground };
+                        target.push(PathCommand::FillStroke);
+                    }
+                    "fill" if in_background || in_foreground => {
+                        let target = if in_background { &mut background } else { &mut foreground };
+                        target.push(PathCommand::Fill);
+                    }
+                    "stroke" if in_background || in_foreground => {
+                        let target = if in_background { &mut background } else { &mut foreground };
+                        target.push(PathCommand::Stroke);
+                    }
+                    _ if in_background || in_foreground => {
+                        if !encountered_unsupported.contains(&name) {
+                            encountered_unsupported.insert(name.clone());
+                            let location = if in_background { "background" } else { "foreground" };
+                            diagnostics.push(Diagnostic::new(
+                                format!("<{}>", name),
+                                format!("unsupported element '{}' in {} - skipped", name, location),
+                            ));
+                        }
                     }
                     _ => {}
                 }
