@@ -566,20 +566,11 @@ impl SceneBuilder {
             if !child_group.visible {
                 continue;
             }
-            // Accumulate offset: child's relative offset within this group
-            let child_geom = match child_group.geometry {
-                Some(g) => g,
-                None => continue,
-            };
-            let child_offset = if child_geom.relative {
-                CorePoint {
-                    x: group_offset.x + child_geom.x,
-                    y: group_offset.y + child_geom.y,
-                }
-            } else {
-                CorePoint { x: child_geom.x, y: child_geom.y }
-            };
-            let child_elem = self.project_group(store, child_gid, child_group, page_id, child_offset)?;
+            // `group_offset` is THIS group's page origin (the parent of the
+            // children we are about to recurse into). Pass it as
+            // `parent_offset` so the recursive `project_group` call adds the
+            // child's geometry to it correctly.
+            let child_elem = self.project_group(store, child_gid, child_group, page_id, group_offset)?;
             children.push(child_elem);
         }
 
