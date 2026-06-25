@@ -186,6 +186,13 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   snapItem.id = 'menu-item-snap';
   viewList.appendChild(snapItem);
 
+  const mathModeItem = document.createElement('button');
+  mathModeItem.className = 'menu-item has-checkmark';
+  mathModeItem.setAttribute('data-testid', 'menu-math-mode');
+  mathModeItem.textContent = 'Math Mode';
+  mathModeItem.id = 'menu-item-math-mode';
+  viewList.appendChild(mathModeItem);
+
   const presentItem = document.createElement('button');
   presentItem.className = 'menu-item';
   presentItem.textContent = 'Present';

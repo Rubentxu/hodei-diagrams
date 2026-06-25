@@ -529,15 +529,38 @@ async function bootstrap(): Promise<void> {
     toggleGrid();
   });
 
+  // ─── View > Math Mode toggle ───────────────────────────────────────────────
+  const mathModeMenuItem = document.getElementById('menu-item-math-mode');
+  function syncMathModeCheckmark(): void {
+    const sceneResult = activeEditor?.getSceneCache();
+    const scenePages = sceneResult?.ok ? sceneResult.value : [];
+    const pageIdx = activeEditor?.activePageIdx ?? 0;
+    const page = scenePages[pageIdx];
+    const enabled = page?.math_enabled ?? false;
+    mathModeMenuItem?.classList.toggle('has-checkmark', enabled);
+  }
+  mathModeMenuItem?.addEventListener('click', () => {
+    if (!activeSession || !activeEditor) return;
+    const pageIdx = activeEditor.activePageIdx;
+    const sceneResult = activeEditor.getSceneCache();
+    const scenePages = sceneResult?.ok ? sceneResult.value : [];
+    const page = scenePages[pageIdx];
+    const currentlyEnabled = page?.math_enabled ?? false;
+    const result = activeSession.setPageMathEnabled(pageIdx, !currentlyEnabled);
+    if (result.ok) {
+      syncMathModeCheckmark();
+      refreshMathOverlay();
+    }
+  });
+  syncMathModeCheckmark();
+
   // ─── Insert > Math Formula ─────────────────────────────────────────────────
   const insertMathMenuItem = document.getElementById('menu-item-insert-math');
   insertMathMenuItem?.addEventListener('click', () => {
     openMathInsertDialog((latex: string) => {
       // Insert a rectangle at canvas center with the LaTeX as its label.
-      // The math overlay will render it as KaTeX after the next scene refresh.
-      // Note: page-level math_enabled must be true for the overlay to activate.
-      // TODO: wire a SetPageMathEnabled command or toolbar toggle to enable
-      // math mode on the current page before inserting math vertices.
+      // The math overlay will render it as KaTeX after the next scene refresh,
+      // provided the current page has View > Math Mode toggled on.
       activeEditor?.insertMathFormula(latex);
       refreshMathOverlay();
     });
