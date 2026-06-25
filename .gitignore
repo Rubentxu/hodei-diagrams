@@ -69,3 +69,7 @@ sddk/
 *.snap.png
 __snapshots__/
 playwright/.cache/
+
+# Debug examples — temporary debugging scripts left in examples/ during
+# feature work (should not be committed; remove when no longer needed)
+crates/**/examples/debug_*.rs
