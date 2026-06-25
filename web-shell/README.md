@@ -4,11 +4,10 @@ TypeScript viewer shell for the Hodei Diagrams Diagram Engine. Loads `.drawio` f
 
 ## Architecture
 
-- **Viewer-only v1**: Import `.drawio` + render SVG. No editing capabilities.
-- **Editor v1.1**: Click-to-select, drag-to-move, delete, undo/redo (Ctrl+Z/Y), palette (rectangle/ellipse). All mutations via `executeCommand`.
+- **Full Editor v1**: Complete diagram editing — shapes, edges, text, groups, layers, layouts, export. All mutations via `executeCommand`.
 - **DiagramEngineSession**: Single TypeScript class wrapping the WASM bridge. All engine communication goes through it.
 - **SVG-string injection**: The engine renders SVG strings; the shell injects them into the DOM.
-- **editor.ts**: New module for hit-testing, selection state, drag FSM, command construction. Never imports `./wasm`.
+- **editor.ts**: Module for hit-testing, selection state, drag FSM, command construction. Never imports `./wasm`.
 - **NO domain logic, NO style logic, NO editing logic** — everything delegates to the Rust engine. Shell only builds command JSON payloads.
 
 The shell is **outside** the Rust workspace (`crates/`). See:
@@ -45,8 +44,8 @@ npm run test:e2e
 | `npm run build:wasm` | Build diagram-wasm for wasm32 target |
 | `npm run lint`       | ESLint                               |
 | `npm run typecheck`  | TypeScript strict check              |
-| `npm test`           | Vitest unit tests (83 tests)         |
-| `npm run test:e2e`   | Playwright E2E tests (12 tests)      |
+| `npm test`           | Vitest unit tests (50 tests)        |
+| `npm run test:e2e`   | Playwright E2E tests (35 tests)      |
 | `npm run verify`     | Full verification pipeline           |
 
 ## Directory Structure
@@ -61,15 +60,29 @@ web-shell/
 │   ├── renderer.ts     # SVG injection into DOM, applySelectionClass
 │   ├── ui.ts           # File input, page nav, error display, toolbar
 │   ├── editor.ts       # Hit-test, selection, drag FSM, command builders
-│   └── types.ts        # Branded types, Result<T>, PageRender, SlotmapId, ScenePage
+│   ├── types.ts        # Branded types, Result<T>, PageRender, SlotmapId, ScenePage
+│   ├── sidebar.ts      # Shape palette with search filter
+│   ├── navbar.ts      # Top bar with menus (File, Edit, View, Insert, Arrange, Tools)
+│   ├── inspector.ts    # Right panel: style/geometry/text/effects sections
+│   ├── hud.ts         # Zoom level + status bar
+│   ├── rail.ts        # Left toolbar: text/zoom-fit/tools
+│   ├── context-menu.ts # Right-click context menu
+│   ├── history-panel.ts # Version history timeline
+│   ├── version-store.ts # IndexedDB persistence layer
+│   ├── export-raster.ts # PNG/PDF/HTML export
+│   ├── stencil-loader.ts # Stencil library loading and caching
+│   ├── style-keys.ts  # Style key constants
+│   └── icon.ts        # SVG icon helper
 ├── tests/
-│   ├── session.test.ts # Vitest unit tests (mocked WASM)
+│   ├── session.test.ts
+│   ├── context-menu.test.ts
 │   └── e2e/
-│       └── viewer.spec.ts  # Playwright E2E (real WASM)
+│       ├── smoke/         # Feature smoke tests (35 E2E)
+│       └── regression/     # Regression test suite
 └── pkg/                # wasm-pack output (gitignored)
 ```
 
 ## Status
 
-**v0.5.2** — Viewer v1 + Editor v1.1 complete. 83 unit tests + 12 E2E tests passing.
-Capabilities: import, page navigation, click-to-select, drag-to-move, delete, undo/redo, palette (rectangle + ellipse).
+**v0.63.0** — Full editor complete. 50 unit tests + 35 E2E tests passing.
+Capabilities: import/export .drawio, page tabs (add/rename/delete), click-to-select, drag-to-move, delete, undo/redo, palette (rectangle + ellipse), Ctrl+D duplicate, arrow key nudge, zoom (+/-/0), right-click context menu, shape search, background color, curved edges, port selection, edge label drag, group/ungroup, edge arrowheads, edge label editing, zoom keyboard shortcuts, zoom to fit, arrange layouts (Tree/Hierarchical/Organic/Circular/Grid), bend editing on edges, version history with IDB, PNG/PDF/HTML export, presentation mode fullscreen.
