@@ -46,6 +46,7 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       set_edge_anchor: mod.set_edge_anchor,
       clear_edge_anchor: mod.clear_edge_anchor,
       get_edge_anchors: mod.get_edge_anchors,
+      set_page_math_enabled: mod.set_page_math_enabled,
     };
 
     return ok(wasm);

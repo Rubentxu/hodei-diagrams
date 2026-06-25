@@ -48,6 +48,7 @@ export type WasmModule = {
   set_edge_anchor(_h: number, _edge_idx: number, _end: number, _anchor_kind: string, _nx: number, _ny: number): void;
   clear_edge_anchor(_h: number, _edge_idx: number, _end: number): void;
   get_edge_anchors(_h: number, _edge_idx: number): string;
+  set_page_math_enabled(_h: number, _page_idx: number, _enabled: boolean): void;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
