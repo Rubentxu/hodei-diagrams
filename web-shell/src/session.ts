@@ -619,4 +619,116 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  /**
+   * Connect two vertices with an edge, using the specified anchors.
+   * @param from Source vertex SlotmapId
+   * @param to Target vertex SlotmapId
+   * @param sourceAnchor Anchor specification: { kind: 'auto'|'north'|'south'|'east'|'west'|'normalized', nx?: number, ny?: number }
+   * @param targetAnchor Anchor specification: { kind: 'auto'|'north'|'south'|'east'|'west'|'normalized', nx?: number, ny?: number }
+   * @returns The new edge's SlotmapId, or an error
+   */
+  connectVerticesAnchored(
+    from: SlotmapId,
+    to: SlotmapId,
+    sourceAnchor: { kind: string; nx?: number; ny?: number },
+    targetAnchor: { kind: string; nx?: number; ny?: number },
+  ): Result<SlotmapId, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const rawEdgeId = this.wasm.connect_vertices_anchored(
+        this.handle as number,
+        from.idx,
+        to.idx,
+        sourceAnchor.kind,
+        sourceAnchor.nx ?? 0,
+        sourceAnchor.ny ?? 0,
+        targetAnchor.kind,
+        targetAnchor.nx ?? 0,
+        targetAnchor.ny ?? 0,
+      );
+      this.#onStateChange?.();
+      return ok({ idx: rawEdgeId, version: 0 });
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Set an edge's anchor on a specific end (source or target).
+   * @param edgeId The edge's SlotmapId
+   * @param end 0 for source, 1 for target
+   * @param anchor Anchor specification: { kind: 'auto'|'north'|'south'|'east'|'west'|'normalized', nx?: number, ny?: number }
+   */
+  setEdgeAnchor(
+    edgeId: SlotmapId,
+    end: 0 | 1,
+    anchor: { kind: string; nx?: number; ny?: number },
+  ): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.set_edge_anchor(
+        this.handle as number,
+        edgeId.idx,
+        end,
+        anchor.kind,
+        anchor.nx ?? 0,
+        anchor.ny ?? 0,
+      );
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Clear an edge's anchor on a specific end (source or target), resetting it to Auto.
+   * @param edgeId The edge's SlotmapId
+   * @param end 0 for source, 1 for target
+   */
+  clearEdgeAnchor(edgeId: SlotmapId, end: 0 | 1): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.clear_edge_anchor(this.handle as number, edgeId.idx, end);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Get the anchor information for an edge.
+   * @param edgeId The edge's SlotmapId
+   * @returns The anchor information, or an error
+   */
+  getEdgeAnchors(edgeId: SlotmapId): Result<EdgeAnchorsDto, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const raw = this.wasm.get_edge_anchors(this.handle as number, edgeId.idx);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return err('EdgeAnchorsParse: ' + (e instanceof Error ? e.message : String(e)));
+      }
+      return ok(parsed as EdgeAnchorsDto);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+}
+
+export interface EdgeAnchorsDto {
+  source_anchor_kind: string;
+  source_nx: number;
+  source_ny: number;
+  target_anchor_kind: string;
+  target_nx: number;
+  target_ny: number;
 }
