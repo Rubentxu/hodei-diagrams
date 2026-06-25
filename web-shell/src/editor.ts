@@ -9,6 +9,7 @@ import type {
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
+import { PortHandlesOverlay } from './port-handles.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -53,7 +54,7 @@ interface MarqueeState {
   currentY: number;
 }
 
-/** Connect-mode FSM state (two-click edge creation). */
+/** Connect-mode FSM state (drag-based edge creation with anchor resolution). */
 interface ConnectState {
   sourceId: SlotmapId;
   /** Document-space position of source center for preview line. */
@@ -63,6 +64,18 @@ interface ConnectState {
   sourceClientX: number;
   /** Client-space Y of the source click (for port computation). */
   sourceClientY: number;
+  /** Source shape bounds for normalized anchor computation. */
+  sourceBounds: { x: number; y: number; width: number; height: number };
+}
+
+/** Drag tracking for connect mode. */
+interface ConnectDrag {
+  sourceId: SlotmapId;
+  sourceBounds: { x: number; y: number; width: number; height: number };
+  startClientX: number;
+  startClientY: number;
+  moveHandler: (e: PointerEvent) => void;
+  upHandler: (e: PointerEvent) => void;
 }
 
 /** Error callback type. */
@@ -98,6 +111,7 @@ export class Editor {
   #dragState: DragState | null = null;
   #activeTool: ToolKind = null;
   #connectState: ConnectState | null = null;
+  #connectDrag: ConnectDrag | null = null;
   #previewLine: SVGSVGElement | null = null;
   #sceneCache: ScenePage[] = [];
   #activePageSlotId: SlotmapId | null = null;
@@ -145,6 +159,9 @@ export class Editor {
   #onBendDragMoveBound: (e: PointerEvent) => void;
   #onBendDragUpBound: (e: PointerEvent) => void;
 
+  // ─── Port Handles Overlay ──────────────────────────────────────────────────
+  readonly #portHandles: PortHandlesOverlay;
+
   // Internal clipboard for copy/paste
   #clipboard: { vertices: Vertex[]; offset: number } | null = null;
 
@@ -168,6 +185,9 @@ export class Editor {
     // Initialize bound event handlers for bend dragging
     this.#onBendDragMoveBound = (e: PointerEvent) => this.#onBendDragMove(e);
     this.#onBendDragUpBound = () => this.#onBendDragUp();
+
+    // Initialize port handles overlay
+    this.#portHandles = new PortHandlesOverlay(viewer, () => this.#sceneCache, session);
   }
 
   // ─── Public Selection API ──────────────────────────────────────────────────
@@ -1105,6 +1125,7 @@ export class Editor {
     this.#cancelMarquee();
     this.#cancelConnect();
     this.#clearEdgeSelection();
+    this.#portHandles.dispose();
   }
 
   /** Execute undo and replay. For toolbar button binding. */
@@ -1774,9 +1795,12 @@ export class Editor {
     // Re-apply selection if still valid
     this.#reapplySelection();
 
-    // Re-render bend handles if an edge is selected
+    // Re-render bend handles and port handles if an edge is selected
     if (this.#selectedEdgeId) {
       this.#renderBendHandles();
+      this.#portHandles.render(new Set([this.#selectedEdgeId]));
+    } else {
+      this.#portHandles.render(new Set());
     }
   }
 
@@ -1890,6 +1914,8 @@ export class Editor {
     this.#selectedEdgeId = null;
     this.#selectedBendIndex = null;
     this.#viewer.querySelectorAll('.bend-handle').forEach((el) => el.remove());
+    // Clear port handles
+    this.#viewer.querySelectorAll('.port-handle').forEach((el) => el.remove());
   }
 
   // ─── Marquee Selection ────────────────────────────────────────────────────
@@ -2007,7 +2033,17 @@ export class Editor {
     // Ignore non-primary button
     if (e.button !== 0) return;
 
-    // Check if clicking on a bend handle FIRST (before any other hit testing)
+    // Check if clicking on a port handle FIRST (before any other hit testing)
+    // Port handles use data-edge-idx and data-end attributes
+    const portHandle = (e.target as Element)?.closest('.port-handle');
+    if (portHandle && this.#selectedEdgeId) {
+      // Port handle drag is handled entirely by the PortHandlesOverlay
+      // which registered its own mousedown listener — just stop propagation here
+      e.stopPropagation();
+      return;
+    }
+
+    // Check if clicking on a bend handle (before any other hit testing)
     const bendHandle = (e.target as Element)?.closest('.bend-handle');
     if (bendHandle && this.#selectedEdgeId) {
       const bendIndex = parseInt(bendHandle.getAttribute('data-bend-index') || '0');
@@ -2539,8 +2575,12 @@ export class Editor {
 
   /**
    * Handle a pointer click in connect tool mode.
-   * First click: records source vertex and shows preview line.
-   * Second click: creates the edge and resets.
+   * Mousedown on a shape: start drag tracking and show preview line.
+   * Mousemove: update preview line end.
+   * Mouseup on another shape: compute anchors and create edge with connect_vertices_anchored.
+   * Mouseup on empty: cancel.
+   *
+   * Fallback (no drag): source anchor = Auto, target anchor = Auto.
    */
   #onConnectClick(e: PointerEvent): void {
     const hit = this.#hitTest(e);
@@ -2551,23 +2591,27 @@ export class Editor {
     }
 
     if (!this.#connectState) {
-      // First click: record source
+      // First click: record source shape and start drag tracking
       const geom = this.#findOriginalGeometry(hit);
       if (!geom) return;
+
       this.#connectState = {
         sourceId: hit,
         sourceX: geom.x + geom.width / 2,
         sourceY: geom.y + geom.height / 2,
         sourceClientX: e.clientX,
         sourceClientY: e.clientY,
+        sourceBounds: geom,
       };
-      this.#showPreviewLine(this.#connectState.sourceX, this.#connectState.sourceY);
+
+      // Start drag tracking on document
+      this.#startConnectDrag(hit, geom, e.clientX, e.clientY);
       return;
     }
 
-    // Second click: create edge
+    // Second click (no significant drag): create edge with auto anchors
     const sourceId = this.#connectState.sourceId;
-    this.#hidePreviewLine();
+    this.#cancelConnectDrag();
 
     // Don't connect a vertex to itself
     if (hit.idx === sourceId.idx && hit.version === sourceId.version) {
@@ -2575,15 +2619,13 @@ export class Editor {
       return;
     }
 
-    // Compute ports from click positions
-    const sourcePort = this.#computePortFromClick(
+    // Use auto anchors for click-to-connect fallback
+    const r = this.#session.connectVerticesAnchored(
       sourceId,
-      this.#connectState.sourceClientX,
-      this.#connectState.sourceClientY,
+      hit,
+      { kind: 'auto' },
+      { kind: 'auto' },
     );
-    const targetPort = this.#computePortFromClick(hit, e.clientX, e.clientY);
-
-    const r = this.#session.connectVertices(sourceId, hit, 'orthogonal', sourcePort, targetPort);
     if (!r.ok) {
       this.#onError(r.error);
     } else {
@@ -2591,6 +2633,115 @@ export class Editor {
     }
 
     this.#connectState = null;
+  }
+
+  /**
+   * Start drag tracking for connect mode.
+   * Sets up document-level pointermove/pointerup to handle drag outside the viewer.
+   */
+  #startConnectDrag(
+    sourceId: SlotmapId,
+    sourceBounds: { x: number; y: number; width: number; height: number },
+    clientX: number,
+    clientY: number,
+  ): void {
+    // Show preview line from source center to cursor
+    const sourceCenterX = sourceBounds.x + sourceBounds.width / 2;
+    const sourceCenterY = sourceBounds.y + sourceBounds.height / 2;
+    this.#showPreviewLine(sourceCenterX, sourceCenterY);
+
+    const moveHandler = (e: PointerEvent) => {
+      // Update preview line end
+      const previewSvg = this.#previewLine;
+      if (previewSvg) {
+        const line = previewSvg.querySelector('line');
+        if (line) {
+          const pos = this.#clientToDoc(e.clientX, e.clientY);
+          line.setAttribute('x2', String(pos.x));
+          line.setAttribute('y2', String(pos.y));
+        }
+      }
+    };
+
+    const upHandler = (e: PointerEvent) => {
+      // Cancel drag tracking
+      document.removeEventListener('pointermove', moveHandler);
+      document.removeEventListener('pointerup', upHandler);
+      document.removeEventListener('pointercancel', upHandler);
+
+      // Check if we're over a shape
+      const targetHit = this.#hitTest(e);
+      if (!targetHit) {
+        // Mouseup on empty space — cancel
+        this.#cancelConnectDrag();
+        this.#cancelConnect();
+        return;
+      }
+
+      // Don't connect to self
+      if (targetHit.idx === sourceId.idx && targetHit.version === sourceId.version) {
+        this.#cancelConnectDrag();
+        this.#cancelConnect();
+        return;
+      }
+
+      // Get target shape bounds
+      const targetBounds = this.#findOriginalGeometry(targetHit);
+      if (!targetBounds) {
+        this.#cancelConnectDrag();
+        this.#cancelConnect();
+        return;
+      }
+
+      // Compute normalized anchors from the actual drag positions
+      const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
+      const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
+
+      const sourceNorm = this.#computePerimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
+      const targetNorm = this.#computePerimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
+
+      const sourceKind = this.#classifyAnchorKind(sourceNorm.nx, sourceNorm.ny);
+      const targetKind = this.#classifyAnchorKind(targetNorm.nx, targetNorm.ny);
+
+      const sourceAnchor =
+        sourceKind === 'normalized'
+          ? { kind: 'normalized' as const, nx: sourceNorm.nx, ny: sourceNorm.ny }
+          : { kind: sourceKind };
+
+      const targetAnchor =
+        targetKind === 'normalized'
+          ? { kind: 'normalized' as const, nx: targetNorm.nx, ny: targetNorm.ny }
+          : { kind: targetKind };
+
+      this.#hidePreviewLine();
+
+      // Call the anchored connect with resolved anchors
+      const r = this.#session.connectVerticesAnchored(sourceId, targetHit, sourceAnchor, targetAnchor);
+      if (!r.ok) {
+        this.#onError(r.error);
+      } else {
+        this.#replay();
+      }
+
+      this.#connectState = null;
+      this.#connectDrag = null;
+    };
+
+    this.#connectDrag = { sourceId, sourceBounds, startClientX: clientX, startClientY: clientY, moveHandler, upHandler };
+    document.addEventListener('pointermove', moveHandler);
+    document.addEventListener('pointerup', upHandler);
+    document.addEventListener('pointercancel', upHandler);
+  }
+
+  /** Cancel connect drag tracking without canceling the connect state. */
+  #cancelConnectDrag(): void {
+    if (this.#connectDrag) {
+      document.removeEventListener('pointermove', this.#connectDrag.moveHandler);
+      document.removeEventListener('pointerup', this.#connectDrag.upHandler);
+      document.removeEventListener('pointercancel', this.#connectDrag.upHandler);
+      this.#connectDrag = null;
+    }
+    this.#hidePreviewLine();
   }
 
   /**
@@ -2624,7 +2775,7 @@ export class Editor {
 
   /** Cancel connect mode and clean up preview. */
   #cancelConnect(): void {
-    this.#hidePreviewLine();
+    this.#cancelConnectDrag();
     this.#connectState = null;
   }
 
@@ -3223,13 +3374,92 @@ export class Editor {
       );
     }
     if (cmds.length === 0) return;
-    const result = this.#session.executeTransaction(
-      JSON.stringify(cmds),
-    );
+    const result = this.#session.executeTransaction(cmds);
     if (!result.ok) {
       this.#onError(result.error);
       return;
     }
     this.#replay();
+  }
+
+  // ─── Connect Anchor Helpers ─────────────────────────────────────────────────
+
+  /**
+   * Compute normalized (0-1) anchor coordinates from shape bounds and a document-space point.
+   * Projects the point onto the rectangle perimeter.
+   */
+  #computePerimeterNormalized(
+    bounds: { x: number; y: number; width: number; height: number },
+    docX: number,
+    docY: number,
+  ): { nx: number; ny: number } {
+    const cx = bounds.x + bounds.width / 2;
+    const cy = bounds.y + bounds.height / 2;
+    const hw = bounds.width / 2;
+    const hh = bounds.height / 2;
+
+    // Direction from center to point
+    const dx = docX - cx;
+    const dy = docY - cy;
+
+    // Determine which side we exit
+    let anchorX: number;
+    let anchorY: number;
+    let nx: number;
+    let ny: number;
+
+    if (Math.abs(dx) * hh > Math.abs(dy) * hw) {
+      // Exiting left or right
+      if (dx > 0) {
+        anchorX = bounds.x + bounds.width;
+        anchorY = cy + (dy / Math.abs(dx || 1)) * hw;
+        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
+        nx = 1.0;
+        ny = (anchorY - bounds.y) / bounds.height;
+      } else {
+        anchorX = bounds.x;
+        anchorY = cy - (dy / Math.abs(dx || 1)) * hw;
+        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
+        nx = 0.0;
+        ny = (anchorY - bounds.y) / bounds.height;
+      }
+    } else {
+      // Exiting top or bottom
+      if (dy > 0) {
+        anchorY = bounds.y + bounds.height;
+        anchorX = cx + (dx / Math.abs(dy || 1)) * hh;
+        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
+        ny = 1.0;
+        nx = (anchorX - bounds.x) / bounds.width;
+      } else {
+        anchorY = bounds.y;
+        anchorX = cx - (dx / Math.abs(dy || 1)) * hh;
+        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
+        ny = 0.0;
+        nx = (anchorX - bounds.x) / bounds.width;
+      }
+    }
+
+    // Clamp to [0, 1]
+    nx = Math.max(0, Math.min(1, nx));
+    ny = Math.max(0, Math.min(1, ny));
+
+    return { nx, ny };
+  }
+
+  /**
+   * Classify normalized anchor coordinates as a cardinal direction or "normalized".
+   * If within 5% of a cardinal axis, return that cardinal.
+   */
+  #classifyAnchorKind(
+    nx: number,
+    ny: number,
+  ): 'north' | 'south' | 'east' | 'west' | 'normalized' {
+    const threshold = 0.05;
+    if (ny <= threshold) return 'north';
+    if (ny >= 1 - threshold) return 'south';
+    if (nx >= 1 - threshold) return 'east';
+    if (nx <= threshold) return 'west';
+    return 'normalized';
   }
 }
