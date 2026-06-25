@@ -55,9 +55,16 @@ pub struct RawDrawioDocument {
     pub diagrams: Vec<RawDrawioDiagram>,
 }
 
+/// Attributes captured from an `<mxGraphModel>` element.
+///
+/// Uses `Vec<(String, String)>` (not `BTreeMap`) to preserve insertion order
+/// for byte-faithful round-trip. The `draw.io` format has an open attribute set,
+/// so we capture all attributes verbatim.
+pub type RawGraphModelAttrs = Vec<(String, String)>;
+
 /// A single `<diagram>` element, which corresponds to a [`crate::page::Page`]
 /// in the domain model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RawDrawioDiagram {
     /// Optional diagram name (matches the `name` attribute on `<diagram>`).
     pub name: Option<String>,
@@ -66,6 +73,10 @@ pub struct RawDrawioDiagram {
     pub background: Option<String>,
     /// Cells (vertices, edges, groups) belonging to this diagram.
     pub cells: Vec<RawDrawioCell>,
+    /// Attributes from the `<mxGraphModel>` element (e.g., `math="1"`, `dx`, `dy`).
+    /// Captured in insertion order for verbatim round-trip.
+    #[serde(default)]
+    pub graph_model: RawGraphModelAttrs,
 }
 
 /// A single `<mxCell>` element.

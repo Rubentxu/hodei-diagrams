@@ -66,7 +66,12 @@ fn write_diagram(
     }
     writer.write_event(Event::Start(diagram_start))?;
 
-    writer.write_event(Event::Start(BytesStart::new("mxGraphModel")))?;
+    let mut mxgraphmodel_start = BytesStart::new("mxGraphModel");
+    // Emit all captured mxGraphModel attributes in insertion order
+    for (k, v) in &diagram.graph_model {
+        mxgraphmodel_start.push_attribute((k.as_str(), v.as_str()));
+    }
+    writer.write_event(Event::Start(mxgraphmodel_start))?;
     writer.write_event(Event::Start(BytesStart::new("root")))?;
 
     // Hardcoded A4 portrait page size (draw.io point units)
@@ -237,6 +242,7 @@ mod tests {
                 name: Some("Page-1".to_owned()),
                 background: None,
                 cells: vec![cell],
+                graph_model: Default::default(),
             }],
         };
 
