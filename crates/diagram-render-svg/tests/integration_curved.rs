@@ -21,6 +21,7 @@ fn page_with_element(elem: VisualElement) -> Scene {
         height: 200.0,
         display_list: vec![elem],
         background: None,
+        math_enabled: false,
     };
     Scene { pages: vec![page] }
 }

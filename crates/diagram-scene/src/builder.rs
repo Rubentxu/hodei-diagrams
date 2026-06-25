@@ -113,6 +113,7 @@ impl SceneBuilder {
                     anchor,
                     text: label.text.clone(),
                     style,
+                    is_math: page.math_enabled,
                 });
                 entries.push((vertex.z_order, 1, index, text_elem));
                 index += 1;
@@ -156,6 +157,7 @@ impl SceneBuilder {
                                 anchor,
                                 text: label.text.clone(),
                                 style,
+                                is_math: page.math_enabled,
                             });
                             entries.push((edge.z_order, 3, index, text_elem));
                             index += 1;
@@ -210,6 +212,7 @@ impl SceneBuilder {
             height: page.size.height,
             display_list,
             background: page.background.clone(),
+            math_enabled: page.math_enabled,
         })
     }
 
@@ -511,6 +514,10 @@ impl SceneBuilder {
             .geometry
             .ok_or(SceneError::MissingGroupGeometry(gid))?;
 
+        // Look up the page to get math_enabled for child label projections.
+        // The page must exist since build_page already validated it.
+        let page = store.page(page_id).expect("page must exist in store");
+
         let style_map = style_for(store, group.style_id);
         let resolved_style = self.resolver.resolve(&style_map);
 
@@ -566,6 +573,7 @@ impl SceneBuilder {
                     anchor,
                     text: label.text.clone(),
                     style: child_style,
+                    is_math: page.math_enabled,
                 });
                 children.push(text_elem);
             }

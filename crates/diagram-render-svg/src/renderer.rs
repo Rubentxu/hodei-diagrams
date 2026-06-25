@@ -219,6 +219,7 @@ mod tests {
             height: 100.0,
             display_list: vec![],
             background: None,
+            math_enabled: false,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -239,6 +240,7 @@ mod tests {
             height: 300.0,
             display_list: vec![],
             background: None,
+            math_enabled: false,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -255,6 +257,7 @@ mod tests {
             height: 600.0,
             display_list: vec![],
             background: None,
+            math_enabled: false,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -291,6 +294,7 @@ mod tests {
             height: 100.0,
             display_list: vec![rect],
             background: None,
+            math_enabled: false,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
@@ -323,6 +327,7 @@ mod tests {
             height: 100.0,
             display_list: vec![rect],
             background: None,
+            math_enabled: false,
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
