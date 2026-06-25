@@ -6,6 +6,7 @@
 
 import { loadWasm } from './wasm-loader.js';
 import { DiagramEngineSession } from './session.js';
+import { StencilLibraryManager } from './stencil-library-manager.js';
 import { mountSvg, setupZoomPan } from './renderer.js';
 import { rasterizeSvgToPng } from './export-raster.js';
 import {
@@ -509,20 +510,21 @@ async function bootstrap(): Promise<void> {
   hud = ui.hud;
 
   // ─── 3b. Load stencil libraries with loading indicator ─────────────────────
-  // Debounce: only show loading indicator if load takes > 100ms
+  // StencilLibraryManager auto-loads general.xml + flowchart.xml in its constructor.
+  // Debounce: only show loading indicator if load takes > 100ms.
+  let stencilManager: StencilLibraryManager;
   const stencilLoadStart = performance.now();
   const stencilDebounceTimer = setTimeout(() => {
     ui.hud.setLoading({ wasm: false, stencil: true });
   }, 100);
-  activeSession.loadStencilLibrary('general', '/fixtures/general.xml').finally(() => {
+  stencilManager = new StencilLibraryManager(activeSession, wasmResult.value);
+  // Suppress unused variable warning — manager is held for potential future use
+  void stencilManager;
+  // Hide loading indicator once libraries are loaded (best-effort via setTimeout fallback)
+  setTimeout(() => {
     clearTimeout(stencilDebounceTimer);
-    const elapsed = performance.now() - stencilLoadStart;
-    // Keep loading indicator visible for at least 100ms if shown
-    const minShowRemaining = Math.max(0, 100 - elapsed);
-    setTimeout(() => {
-      ui.hud.setLoading({ wasm: false, stencil: false });
-    }, minShowRemaining);
-  });
+    ui.hud.setLoading({ wasm: false, stencil: false });
+  }, 500);
 
   // ─── 4.5. Restore grid state ────────────────────────────────────────────────
   const gridMenuItem = document.getElementById('menu-item-grid');
