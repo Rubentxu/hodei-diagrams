@@ -9,7 +9,9 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use crate::error::{Diagnostic, FormatError, FormatResult};
-use crate::raw::{RawDrawioCell, RawDrawioDiagram, RawDrawioDocument, RawDrawioGeometry};
+use crate::raw::{
+    RawDrawioCell, RawDrawioDiagram, RawDrawioDocument, RawDrawioGeometry, RawGraphModelAttrs,
+};
 
 /// Stateless `.drawio` parser.
 #[derive(Debug, Default, Clone, Copy)]
@@ -93,6 +95,19 @@ impl DrawioParser {
                         b"mxGraphModel" => {
                             in_mxgraph_model = true;
                             saw_mxgraph_model = true;
+                            // Capture all attributes from mxGraphModel for round-trip
+                            let mut attrs: RawGraphModelAttrs = Vec::new();
+                            for attr in e.attributes().with_checks(false).flatten() {
+                                let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
+                                let val = std::str::from_utf8(&attr.value)
+                                    .map(|s| s.to_owned())
+                                    .unwrap_or_default();
+                                attrs.push((key, val));
+                            }
+                            // Store in current diagram's graph_model
+                            if let Some(ref mut diagram) = current_diagram {
+                                diagram.graph_model = attrs;
+                            }
                         }
                         b"root" => {
                             in_root = true;
