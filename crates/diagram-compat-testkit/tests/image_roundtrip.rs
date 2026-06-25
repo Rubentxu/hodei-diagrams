@@ -7,9 +7,9 @@ use std::fs;
 fn image_datauri_roundtrip_preserves_style() {
     let xml = fs::read_to_string("fixtures/image-datauri.drawio").unwrap();
     let parsed = parse_drawio(&xml).unwrap();
-    assert_eq!(parsed.len(), 1, "expected 1 diagram");
+    assert_eq!(parsed.diagrams.len(), 1, "expected 1 diagram");
 
-    let diagram = &parsed[0];
+    let diagram = &parsed.diagrams[0];
     let cells = &diagram.cells;
 
     // Find the image vertex
@@ -32,11 +32,11 @@ fn image_datauri_roundtrip_preserves_style() {
     );
 
     // Round-trip: write back and parse again
-    let written = write_drawio(parsed).unwrap();
+    let written = write_drawio(&parsed).unwrap();
     let reparsed = parse_drawio(&written).unwrap();
-    assert_eq!(reparsed.len(), 1);
+    assert_eq!(reparsed.diagrams.len(), 1);
 
-    let reparsed_cell = reparsed[0]
+    let reparsed_cell = reparsed.diagrams[0]
         .cells
         .iter()
         .find(|c| c.vertex && c.geometry.is_some())
@@ -54,9 +54,9 @@ fn image_datauri_roundtrip_preserves_style() {
 fn image_url_roundtrip_preserves_style() {
     let xml = fs::read_to_string("fixtures/image-url.drawio").unwrap();
     let parsed = parse_drawio(&xml).unwrap();
-    assert_eq!(parsed.len(), 1);
+    assert_eq!(parsed.diagrams.len(), 1);
 
-    let diagram = &parsed[0];
+    let diagram = &parsed.diagrams[0];
     let image_cell = diagram
         .cells
         .iter()
@@ -76,10 +76,10 @@ fn image_url_roundtrip_preserves_style() {
     );
 
     // Round-trip
-    let written = write_drawio(parsed).unwrap();
+    let written = write_drawio(&parsed).unwrap();
     let reparsed = parse_drawio(&written).unwrap();
 
-    let reparsed_cell = reparsed[0]
+    let reparsed_cell = reparsed.diagrams[0]
         .cells
         .iter()
         .find(|c| c.vertex && c.geometry.is_some())
