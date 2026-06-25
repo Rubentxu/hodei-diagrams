@@ -425,7 +425,7 @@ fn edit_edge_label_to_none_from_no_label() {
 
 #[test]
 fn add_page_creates_page_with_name() {
-    let mut model = DiagramModel::new();
+    let model = DiagramModel::new();
     let mut editor = Editor::new(model);
 
     // Add a page with a name
@@ -453,7 +453,7 @@ fn add_page_creates_page_with_name() {
 
 #[test]
 fn add_page_increments_page_count() {
-    let mut model = DiagramModel::new();
+    let model = DiagramModel::new();
     let mut editor = Editor::new(model);
 
     // Add first page
@@ -535,8 +535,8 @@ fn remove_page_cascades_to_groups() {
 #[test]
 fn remove_page_undo_restores_page_and_cells() {
     let (mut model, pid) = make_model_with_page();
-    let v1 = make_vertex(&mut model, pid, "V1", 0.0, 0.0);
-    let v2 = make_vertex(&mut model, pid, "V2", 100.0, 0.0);
+    make_vertex(&mut model, pid, "V1", 0.0, 0.0);
+    make_vertex(&mut model, pid, "V2", 100.0, 0.0);
 
     let mut editor = Editor::new(model);
 
@@ -583,7 +583,7 @@ fn remove_page_undo_restores_page_and_cells() {
 
 #[test]
 fn rename_page_updates_name() {
-    let (mut model, pid) = make_model_with_page();
+    let (model, pid) = make_model_with_page();
     let mut editor = Editor::new(model);
 
     // Verify initial name is None
@@ -665,7 +665,7 @@ fn rename_page_undo_restores_original() {
 
 #[test]
 fn rename_page_none_to_some() {
-    let (mut model, pid) = make_model_with_page();
+    let (model, pid) = make_model_with_page();
     let mut editor = Editor::new(model);
 
     // Initial name is None
@@ -691,7 +691,7 @@ fn rename_page_none_to_some() {
 
 #[test]
 fn rename_page_undo_restores_none() {
-    let (mut model, pid) = make_model_with_page();
+    let (model, pid) = make_model_with_page();
     let mut editor = Editor::new(model);
 
     // Rename from None to Some
