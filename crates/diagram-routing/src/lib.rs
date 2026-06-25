@@ -44,7 +44,10 @@ pub use diagram_core::geometry::Point;
 pub use error::{RoutingError, RoutingResult};
 pub use orth::route_orthogonal;
 pub use perimeter::{auto_perimeter_points, perimeter_point, perimeter_point_normalized};
-pub use port::{Anchor, Direction, parse_port_constraint, port_constraint_from_style, resolve_anchor};
+pub use port::{
+    Anchor, AnchorEnd, Direction, anchor_to_style_keys, parse_port_constraint,
+    port_constraint_from_style, resolve_anchor, style_keys_to_anchor,
+};
 pub use segment::route_segment;
 
 use diagram_core::style::StyleMap;
