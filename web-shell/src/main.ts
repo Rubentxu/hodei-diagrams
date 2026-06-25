@@ -6,6 +6,7 @@
 
 import { loadWasm } from './wasm-loader.js';
 import { DiagramEngineSession } from './session.js';
+import { StencilLibraryManager } from './stencil-library-manager.js';
 import { mountSvg, setupZoomPan } from './renderer.js';
 import { rasterizeSvgToPng } from './export-raster.js';
 import {
@@ -458,10 +459,10 @@ async function bootstrap(): Promise<void> {
 
   activeSession = sessionResult.value;
 
-  // ─── 3. Load stencil libraries ─────────────────────────────────────────────
-  // Load the general.xml stencil library (Rectangle, Ellipse from draw.io)
-  // This makes stencil:general:Rectangle and stencil:general:Ellipse available
-  // (Moved to after buildEmptyUi to enable loading indicator via hud.setLoading)
+  // ─── 3. Create StencilLibraryManager ───────────────────────────────────────
+  // The manager auto-loads general.xml + flowchart.xml in its constructor.
+  // It must exist BEFORE buildEmptyUi so the sidebar can subscribe to it.
+  const stencilManager = new StencilLibraryManager(activeSession, wasmResult.value);
 
   // ─── 4. Build Inspector (needed before UI for update wiring) ──────────────
   const inspector = buildInspector(activeSession);
@@ -503,26 +504,10 @@ async function bootstrap(): Promise<void> {
     onHelp: () => {
       toggleShortcutsOverlay();
     },
-  });
+  }, stencilManager);
 
   // Make hud accessible to module-level save functions
   hud = ui.hud;
-
-  // ─── 3b. Load stencil libraries with loading indicator ─────────────────────
-  // Debounce: only show loading indicator if load takes > 100ms
-  const stencilLoadStart = performance.now();
-  const stencilDebounceTimer = setTimeout(() => {
-    ui.hud.setLoading({ wasm: false, stencil: true });
-  }, 100);
-  activeSession.loadStencilLibrary('general', '/fixtures/general.xml').finally(() => {
-    clearTimeout(stencilDebounceTimer);
-    const elapsed = performance.now() - stencilLoadStart;
-    // Keep loading indicator visible for at least 100ms if shown
-    const minShowRemaining = Math.max(0, 100 - elapsed);
-    setTimeout(() => {
-      ui.hud.setLoading({ wasm: false, stencil: false });
-    }, minShowRemaining);
-  });
 
   // ─── 4.5. Restore grid state ────────────────────────────────────────────────
   const gridMenuItem = document.getElementById('menu-item-grid');
@@ -817,6 +802,16 @@ async function bootstrap(): Promise<void> {
         e.preventDefault();
         if (!activeEditor) return;
         activeEditor.endStencilDrag(e.clientX, e.clientY);
+      });
+      // ─────────────────────────────────────────────────────────────────────
+
+      // ── Dynamic stencil library shape activation (click-to-add) ───────────
+      ui.sidebar.addEventListener('stencil-shape-activate', (e) => {
+        if (!activeSession) return;
+        const event = e as CustomEvent<{ library: string; name: string }>;
+        const { library, name } = event.detail;
+        // Add at canvas center (400, 300) as default activation position
+        activeSession.addStencilVertex(library, name, 400, 300);
       });
       // ─────────────────────────────────────────────────────────────────────
 

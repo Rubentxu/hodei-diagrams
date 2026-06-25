@@ -10,6 +10,7 @@ import type { DiagramEngineSession } from './session.js';
 import { buildNavbar, type ToolbarControls } from './navbar.js';
 import { buildSidebar } from './sidebar.js';
 import { buildRail, type RailCallbacks } from './rail.js';
+import type { StencilLibraryManager } from './stencil-library-manager.js';
 import { buildHud, type HudControls } from './hud.js';
 import { ICONS } from './icon.js';
 
@@ -88,6 +89,7 @@ export function buildEmptyUi(
   session: DiagramEngineSession,
   inspectorContainer?: HTMLElement,
   railCallbacks?: RailCallbacks,
+  stencilManager?: StencilLibraryManager,
 ): UiElements {
   root.innerHTML = '';
   root.setAttribute('data-testid', 'app-grid');
@@ -108,7 +110,7 @@ export function buildEmptyUi(
   const navbar = buildNavbar(session);
 
   // ─── Zone 2: Sidebar ─────────────────────────────────────────────────────
-  const sidebar = buildSidebar();
+  const sidebar = buildSidebar(stencilManager);
 
   // ─── Zone 3: Canvas ──────────────────────────────────────────────────────
   const canvasContainer = document.createElement('div');

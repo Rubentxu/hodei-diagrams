@@ -406,6 +406,45 @@ export class DiagramEngineSession {
   }
 
   /**
+   * Add a vertex from a dynamic stencil library shape at the given canvas position.
+   *
+   * The shape is referenced as `stencil:<library>:<name>` (e.g. `stencil:flowchart:Process`).
+   *
+   * @param library The library name (e.g. "flowchart")
+   * @param name The shape name within the library (e.g. "Process")
+   * @param x The X coordinate in document space
+   * @param y The Y coordinate in document space
+   * @returns The new vertex's SlotmapId, or an error
+   */
+  addStencilVertex(
+    library: string,
+    name: string,
+    x: number,
+    y: number,
+  ): Result<SlotmapId, EngineError> {
+    const cmd = JSON.stringify({
+      AddVertex: {
+        vertex: {
+          geometry: {
+            x,
+            y,
+            width: 80,
+            height: 80,
+            relative: false,
+          },
+          page_id: { idx: 0, version: 0 },
+        },
+        style: { shape: `stencil:${library}:${name}` },
+      },
+    });
+    const r = this.executeCommand(cmd);
+    if (!r.ok) return r;
+    // Note: returning the vertex ID would require engine-side ID reporting.
+    // For now, return a zero ID as a placeholder — callers use fire-and-forget.
+    return ok({ idx: 0, version: 0 });
+  }
+
+  /**
    * Load a stencil library XML file from a URL into the engine's cache.
    *
    * After loading, shapes in the library can be referenced as

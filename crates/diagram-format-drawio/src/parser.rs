@@ -128,13 +128,11 @@ impl DrawioParser {
                         b"Array" => {
                             // Check if this is a points array: <Array as="points">
                             let mut is_points = false;
-                            for attr_result in e.attributes().with_checks(false) {
-                                if let Ok(attr) = attr_result {
-                                    if attr.key.as_ref() == b"as" {
-                                        if let Ok(val) = std::str::from_utf8(&attr.value) {
-                                            if val == "points" {
-                                                is_points = true;
-                                            }
+                            for attr in e.attributes().with_checks(false).flatten() {
+                                if attr.key.as_ref() == b"as" {
+                                    if let Ok(val) = std::str::from_utf8(&attr.value) {
+                                        if val == "points" {
+                                            is_points = true;
                                         }
                                     }
                                 }
@@ -181,14 +179,12 @@ impl DrawioParser {
                         if let Some(ref mut points) = collecting_points {
                             let mut x = 0.0;
                             let mut y = 0.0;
-                            for attr_result in e.attributes().with_checks(false) {
-                                if let Ok(attr) = attr_result {
-                                    if let Ok(val) = std::str::from_utf8(&attr.value) {
-                                        match attr.key.as_ref() {
-                                            b"x" => x = val.parse().unwrap_or(0.0),
-                                            b"y" => y = val.parse().unwrap_or(0.0),
-                                            _ => {}
-                                        }
+                            for attr in e.attributes().with_checks(false).flatten() {
+                                if let Ok(val) = std::str::from_utf8(&attr.value) {
+                                    match attr.key.as_ref() {
+                                        b"x" => x = val.parse().unwrap_or(0.0),
+                                        b"y" => y = val.parse().unwrap_or(0.0),
+                                        _ => {}
                                     }
                                 }
                             }

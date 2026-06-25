@@ -937,9 +937,9 @@ export class Editor {
   /**
    * Build an SVG shape element for a given stencil tool.
    * Returns the shape element (rect, ellipse, polygon, or path).
+   * Falls back to a generic placeholder rect for unknown tools.
    */
   #buildStencilShapeEl(tool: string): SVGElement | null {
-    // Mirror the SVG icon paths from sidebar.ts STENCIL_SHAPES
     switch (tool) {
       case 'rectangle-stencil':
       case 'rectangle': {
@@ -1043,8 +1043,18 @@ export class Editor {
         poly.setAttribute('stroke-width', '1.5');
         return poly;
       }
-      default:
-        return null;
+      default: {
+        // Generic placeholder rect for unknown stencil tools
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', '2');
+        rect.setAttribute('y', '2');
+        rect.setAttribute('width', '28');
+        rect.setAttribute('height', '20');
+        rect.setAttribute('fill', 'none');
+        rect.setAttribute('stroke', '#F8FAFC');
+        rect.setAttribute('stroke-width', '1.5');
+        return rect;
+      }
     }
   }
 

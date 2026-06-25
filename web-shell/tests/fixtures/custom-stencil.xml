@@ -1,0 +1,75 @@
+<!-- Custom stencil library for testing file picker loading -->
+<shapes name="custom">
+  <shape name="Star" w="60" h="60" aspect="fixed">
+    <background>
+      <path>M 30,0 L 36,20 L 56,20 L 40,32 L 46,52 L 30,40 L 14,52 L 20,32 L 4,20 L 24,20 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+  <shape name="Heart" w="60" h="54" aspect="fixed">
+    <background>
+      <path>M 30,54 C 10,34 0,20 0,14 C 0,4 8,0 16,0 C 22,0 28,4 30,10 C 32,4 38,0 44,0 C 52,0 60,4 60,14 C 60,20 50,34 30,54 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+  <shape name="Cross" w="50" h="50" aspect="fixed">
+    <background>
+      <path>M 20,0 L 30,0 L 30,20 L 50,20 L 50,30 L 30,30 L 30,50 L 20,50 L 20,30 L 0,30 L 0,20 L 20,20 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+  <shape name="Lightning" w="40" h="80" aspect="fixed">
+    <background>
+      <path>M 20,0 L 0,35 L 15,35 L 10,80 L 40,40 L 22,40 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+  <shape name="Hexagon" w="60" h="52" aspect="fixed">
+    <background>
+      <path>M 30,0 L 56,13 L 56,39 L 30,52 L 4,39 L 4,13 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+  <shape name="Pentagon" w="60" h="56" aspect="fixed">
+    <background>
+      <path>M 30,0 L 58,20 L 48,54 L 12,54 L 2,20 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+  <shape name="Octagon" w="60" h="60" aspect="fixed">
+    <background>
+      <path>M 18,0 L 42,0 L 60,18 L 60,42 L 42,60 L 18,60 L 0,42 L 0,18 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+  <shape name="Crescent" w="60" h="60" aspect="fixed">
+    <background>
+      <path>M 40,0 A 30,30 0 1,1 40,60 A 20,20 0 1,0 40,0 Z</path>
+    </background>
+    <foreground>
+      <fill/>
+      <stroke/>
+    </foreground>
+  </shape>
+</shapes>
