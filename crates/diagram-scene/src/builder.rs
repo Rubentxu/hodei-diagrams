@@ -210,6 +210,7 @@ impl SceneBuilder {
             height: page.size.height,
             display_list,
             background: page.background.clone(),
+            math_enabled: page.math_enabled,
         })
     }
 

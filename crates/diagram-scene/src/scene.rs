@@ -28,4 +28,9 @@ pub struct PageScene {
     /// The page background color. `None` means white.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
+    /// Whether math typesetting is enabled for this page.
+    /// When `true`, label text may contain raw LaTeX and the SVG renderer
+    /// emits `data-math-id` and `data-latex` attributes on the `<text>` element.
+    #[serde(default)]
+    pub math_enabled: bool,
 }
