@@ -31,6 +31,7 @@ fn render_pages_returns_all_pages_in_order() {
         height: 100.0,
         display_list: vec![],
         background: None,
+        math_enabled: false,
     };
     let page_b = PageScene {
         page_id: PageId::default(),
@@ -39,6 +40,7 @@ fn render_pages_returns_all_pages_in_order() {
         height: 200.0,
         display_list: vec![],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene {
@@ -61,6 +63,7 @@ fn render_pages_contains_correct_titles() {
         height: 100.0,
         display_list: vec![],
         background: None,
+        math_enabled: false,
     };
     let page_b = PageScene {
         page_id: PageId::default(),
@@ -69,6 +72,7 @@ fn render_pages_contains_correct_titles() {
         height: 200.0,
         display_list: vec![],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene {
@@ -99,6 +103,7 @@ fn render_pages_clip_counter_resets_per_page() {
         height: 100.0,
         display_list: vec![clip_group.clone()],
         background: None,
+        math_enabled: false,
     };
     let page_b = PageScene {
         page_id: PageId::default(),
@@ -107,6 +112,7 @@ fn render_pages_clip_counter_resets_per_page() {
         height: 100.0,
         display_list: vec![clip_group],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene {
@@ -157,6 +163,7 @@ fn remaining_style_emitted_in_lexicographic_order() {
         height: 100.0,
         display_list: vec![rect],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene { pages: vec![page] };
@@ -179,6 +186,7 @@ fn render_pages_deterministic_same_scene_twice() {
         height: 100.0,
         display_list: vec![],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene { pages: vec![page] };
@@ -201,6 +209,7 @@ fn render_pages_cross_instance_determinism() {
         height: 100.0,
         display_list: vec![],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene { pages: vec![page] };

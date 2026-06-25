@@ -364,6 +364,12 @@ pub struct TextElement {
     pub text: String,
     /// The resolved style.
     pub style: super::ResolvedStyle,
+    /// Whether this label is math-bearing (raw LaTeX content).
+    ///
+    /// When `true`, the SVG renderer emits `data-math-id` and `data-latex`
+    /// attributes on the `<text>` element so the TS layer can inject KaTeX overlays.
+    #[serde(default)]
+    pub is_math: bool,
 }
 
 /// A straight line element.
@@ -508,6 +514,7 @@ mod tests {
             anchor,
             text: "hello".to_owned(),
             style,
+            is_math: false,
         };
 
         // Round-trip through Debug + Clone

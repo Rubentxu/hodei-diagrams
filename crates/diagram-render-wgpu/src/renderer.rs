@@ -384,6 +384,7 @@ mod tests {
             height: 600.0,
             display_list,
             background: None,
+            math_enabled: false,
         }
     }
 

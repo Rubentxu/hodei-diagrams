@@ -47,6 +47,7 @@ fn group_with_clip_emits_defs_and_clip_path() {
         height: 300.0,
         display_list: vec![group],
         background: None,
+        math_enabled: false,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -98,6 +99,7 @@ fn group_without_clip_no_defs() {
         height: 300.0,
         display_list: vec![group],
         background: None,
+        math_enabled: false,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -132,6 +134,7 @@ fn path_element_emits_m_l_format() {
         height: 100.0,
         display_list: vec![path],
         background: None,
+        math_enabled: false,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -174,6 +177,7 @@ fn two_clip_groups_get_incrementing_ids() {
         height: 300.0,
         display_list: vec![group1, group2],
         background: None,
+        math_enabled: false,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -201,6 +205,7 @@ fn edge_connect_line_between_vertices() {
         height: 100.0,
         display_list: vec![line],
         background: None,
+        math_enabled: false,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -233,6 +238,7 @@ fn empty_defs_when_no_clipping() {
         height: 100.0,
         display_list: vec![rect],
         background: None,
+        math_enabled: false,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
@@ -271,6 +277,7 @@ fn nested_group_with_child_vertex() {
         height: 200.0,
         display_list: vec![group],
         background: None,
+        math_enabled: false,
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();

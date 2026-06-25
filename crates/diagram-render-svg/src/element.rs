@@ -473,14 +473,41 @@ fn text_to_svg(t: &TextElement, defs: &mut DefsManager, indent: usize) -> String
     let ind = make_indent(indent);
     let style = style_to_attrs(&t.style, AttrContext::Text, defs);
     let escaped = escape_text(&t.text);
+
     // Add data-edge-label attribute for edge labels to enable drag interaction
     let edge_label_attr = match &t.owner {
         EntityId::Edge(eid) => format!(" data-edge-label=\"{}\"", eid_attr(eid).trim()),
         _ => String::new(),
     };
+
+    // MATH-020: emit data-math-id and data-latex for math-bearing labels.
+    // The text content is the raw LaTeX verbatim (XML-escaped for safety).
+    // No <foreignObject> is emitted — HTML overlay is the TS layer's concern.
+    let math_attrs = if t.is_math {
+        let stable_id = match &t.owner {
+            EntityId::Vertex(vid) => {
+                let v = serde_json::to_value(vid).expect("VertexId should serialize");
+                let idx = v["idx"].as_u64().expect("idx should be u64");
+                let version = v["version"].as_u64().expect("version should be u64");
+                format!("{idx}:{version}")
+            }
+            EntityId::Edge(eid) => {
+                let v = serde_json::to_value(eid).expect("EdgeId should serialize");
+                let idx = v["idx"].as_u64().expect("idx should be u64");
+                let version = v["version"].as_u64().expect("version should be u64");
+                format!("{idx}:{version}")
+            }
+            _ => return String::new(), // non-math owner types fall back to no math attrs
+        };
+        let latex_attr = format!(r#" data-latex="{}""#, escape_attr(&t.text));
+        format!(r#" data-math-id="{}"{}"#, stable_id, latex_attr)
+    } else {
+        String::new()
+    };
+
     format!(
-        "{}<text x=\"{}\" y=\"{}\"{}{}>{}</text>",
-        ind, t.anchor.x, t.anchor.y, edge_label_attr, style, escaped
+        "{}<text x=\"{}\" y=\"{}\"{}{}{}>{}</text>",
+        ind, t.anchor.x, t.anchor.y, edge_label_attr, math_attrs, style, escaped
     )
 }
 
@@ -954,6 +981,7 @@ mod tests {
             anchor: Point { x: 0.0, y: 0.0 },
             text: "if x < 5 && y > 3".to_owned(),
             style: empty_style(),
+            is_math: false,
         };
         let mut defs = DefsManager::new();
         let result = text_to_svg(&text, &mut defs, 0);

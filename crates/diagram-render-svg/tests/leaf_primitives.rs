@@ -34,6 +34,7 @@ fn simple_rect_renders_correctly() {
         height: 1169.0,
         display_list: vec![rect],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene { pages: vec![page] };
@@ -99,6 +100,7 @@ fn rect_with_no_style_renders() {
         height: 100.0,
         display_list: vec![rect],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene { pages: vec![page] };
@@ -158,6 +160,7 @@ fn multiple_rects_render_in_order() {
         height: 100.0,
         display_list: vec![rect1, rect2],
         background: None,
+        math_enabled: false,
     };
 
     let scene = Scene { pages: vec![page] };
