@@ -237,6 +237,7 @@ mod tests {
                 name: Some("Page-1".to_owned()),
                 background: None,
                 cells: vec![cell],
+                graph_model: Default::default(),
             }],
         };
 

@@ -656,6 +656,7 @@ impl DrawioMapping {
                 name: diagram_name,
                 background: diagram_background,
                 cells,
+                graph_model: Default::default(),
             });
         }
 
@@ -747,6 +748,7 @@ mod tests {
                 name: Some("Empty Page".to_owned()),
                 background: None,
                 cells: vec![],
+                graph_model: Default::default(),
             }],
         };
         let (model, _id_map) = mapper.to_domain(&doc).unwrap();
@@ -772,6 +774,7 @@ mod tests {
                     geometry: None,
                     extra: Default::default(),
                 }],
+                graph_model: Default::default(),
             }],
         };
         let (mut model, _id_map) = mapper.to_domain(&doc).unwrap();
@@ -829,6 +832,7 @@ mod tests {
                         extra: Default::default(),
                     },
                 ],
+                graph_model: Default::default(),
             }],
         };
         let (model, _id_map) = mapper.to_domain(&doc).unwrap();
@@ -859,6 +863,7 @@ mod tests {
                     geometry: None,
                     extra: Default::default(),
                 }],
+                graph_model: Default::default(),
             }],
         };
         let mut diags = Vec::new();
@@ -899,6 +904,7 @@ mod tests {
                     geometry: None,
                     extra: Default::default(),
                 }],
+                graph_model: Default::default(),
             }],
         };
         let mut diags = Vec::new();
@@ -1002,6 +1008,7 @@ mod tests {
                     geometry: None,
                     extra: Default::default(),
                 }],
+                graph_model: Default::default(),
             }],
         };
         let (model, id_map) = mapper.to_domain(&doc).unwrap();
@@ -1067,6 +1074,7 @@ mod tests {
                         extra: Default::default(),
                     },
                 ],
+                graph_model: Default::default(),
             }],
         };
         let (model, id_map) = mapper.to_domain(&doc).unwrap();
@@ -1103,6 +1111,7 @@ mod tests {
                     geometry: None,
                     extra: Default::default(),
                 }],
+                graph_model: Default::default(),
             }],
         };
         let (model, id_map) = mapper.to_domain(&doc).unwrap();
@@ -1127,6 +1136,7 @@ mod tests {
                 name: Some("Empty Page".to_owned()),
                 background: None,
                 cells: vec![],
+                graph_model: Default::default(),
             }],
         };
         let (model, id_map) = mapper.to_domain(&doc).unwrap();
@@ -1159,6 +1169,7 @@ mod tests {
                         geometry: None,
                         extra: Default::default(),
                     }],
+                    graph_model: Default::default(),
                 },
                 RawDrawioDiagram {
                     name: Some("Page-2".to_owned()),
@@ -1175,6 +1186,7 @@ mod tests {
                         geometry: None,
                         extra: Default::default(),
                     }],
+                    graph_model: Default::default(),
                 },
             ],
         };
@@ -1220,6 +1232,7 @@ mod tests {
                     geometry: None,
                     extra: Default::default(),
                 }],
+                graph_model: Default::default(),
             }],
         };
         let (model, _id_map) = mapper.to_domain(&doc).unwrap();
@@ -1278,6 +1291,7 @@ mod tests {
                         extra: Default::default(),
                     },
                 ],
+                graph_model: Default::default(),
             }],
         };
         let (model, _id_map) = mapper.to_domain(&doc).unwrap();
@@ -1356,6 +1370,7 @@ mod tests {
                         extra: Default::default(),
                     },
                 ],
+                graph_model: Default::default(),
             }],
         };
         let (model, _id_map) = mapper.to_domain(&doc).unwrap();
@@ -1396,6 +1411,7 @@ mod tests {
                     geometry: None,
                     extra: Default::default(),
                 }],
+                graph_model: Default::default(),
             }],
         };
         let mut diags = Vec::new();
@@ -1458,6 +1474,7 @@ mod tests {
                         extra: Default::default(),
                     },
                 ],
+                graph_model: Default::default(),
             }],
         };
         let mut diags = Vec::new();
@@ -1530,6 +1547,7 @@ mod tests {
                         extra: Default::default(),
                     },
                 ],
+                graph_model: Default::default(),
             }],
         };
 

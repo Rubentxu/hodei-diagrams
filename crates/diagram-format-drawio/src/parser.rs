@@ -87,6 +87,7 @@ impl DrawioParser {
                                 name: diagram_name,
                                 background: diagram_background,
                                 cells: Vec::new(),
+                                graph_model: Vec::new(),
                             });
                         }
                         b"mxGraphModel" => {

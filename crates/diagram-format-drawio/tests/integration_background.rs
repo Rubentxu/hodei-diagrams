@@ -172,6 +172,7 @@ fn background_parsed_from_raw_document_roundtrips_correctly() {
                 geometry: None,
                 extra: Default::default(),
             }],
+            graph_model: Default::default(),
         }],
     };
 
@@ -234,6 +235,7 @@ fn empty_background_string_preserved() {
             name: Some("Page-1".to_owned()),
             background: Some("".to_owned()),
             cells: vec![],
+            graph_model: Default::default(),
         }],
     };
 
