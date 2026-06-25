@@ -459,10 +459,10 @@ async function bootstrap(): Promise<void> {
 
   activeSession = sessionResult.value;
 
-  // ─── 3. Load stencil libraries ─────────────────────────────────────────────
-  // Load the general.xml stencil library (Rectangle, Ellipse from draw.io)
-  // This makes stencil:general:Rectangle and stencil:general:Ellipse available
-  // (Moved to after buildEmptyUi to enable loading indicator via hud.setLoading)
+  // ─── 3. Create StencilLibraryManager ───────────────────────────────────────
+  // The manager auto-loads general.xml + flowchart.xml in its constructor.
+  // It must exist BEFORE buildEmptyUi so the sidebar can subscribe to it.
+  const stencilManager = new StencilLibraryManager(activeSession, wasmResult.value);
 
   // ─── 4. Build Inspector (needed before UI for update wiring) ──────────────
   const inspector = buildInspector(activeSession);
@@ -504,27 +504,10 @@ async function bootstrap(): Promise<void> {
     onHelp: () => {
       toggleShortcutsOverlay();
     },
-  });
+  }, stencilManager);
 
   // Make hud accessible to module-level save functions
   hud = ui.hud;
-
-  // ─── 3b. Load stencil libraries with loading indicator ─────────────────────
-  // StencilLibraryManager auto-loads general.xml + flowchart.xml in its constructor.
-  // Debounce: only show loading indicator if load takes > 100ms.
-  let stencilManager: StencilLibraryManager;
-  const stencilLoadStart = performance.now();
-  const stencilDebounceTimer = setTimeout(() => {
-    ui.hud.setLoading({ wasm: false, stencil: true });
-  }, 100);
-  stencilManager = new StencilLibraryManager(activeSession, wasmResult.value);
-  // Suppress unused variable warning — manager is held for potential future use
-  void stencilManager;
-  // Hide loading indicator once libraries are loaded (best-effort via setTimeout fallback)
-  setTimeout(() => {
-    clearTimeout(stencilDebounceTimer);
-    ui.hud.setLoading({ wasm: false, stencil: false });
-  }, 500);
 
   // ─── 4.5. Restore grid state ────────────────────────────────────────────────
   const gridMenuItem = document.getElementById('menu-item-grid');
