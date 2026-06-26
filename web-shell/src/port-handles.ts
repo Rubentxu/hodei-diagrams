@@ -9,7 +9,7 @@
 
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
-import { parseSlotmapAttr, slotmapIdToField } from './types.js';
+import { } from './types.js';
 
 /** Anchor specification compatible with the WASM interface. */
 export interface AnchorSpec {
@@ -51,8 +51,8 @@ export class PortHandlesOverlay {
   readonly #sceneProvider: () => ScenePage[];
   readonly #session: DiagramEngineSession;
   #dragHandle: DragHandle | null = null;
-  #onMoveBound: (e: PointerEvent) => void;
-  #onUpBound: (e: PointerEvent) => void;
+  #onMoveBound: (_e: PointerEvent) => void;
+  #onUpBound: (_e: PointerEvent) => void;
 
   constructor(
     svgLayer: HTMLElement,

@@ -32,7 +32,7 @@ test.describe('Slice D: PDF Export', () => {
     // Intercept window.print using evaluate before clicking
     await page.evaluate(() => {
       (window as unknown as Record<string, unknown>).__printIntercept = false;
-      const originalPrint = window.print.bind(window);
+      const _originalPrint = window.print.bind(window);
       window.print = () => {
         (window as unknown as Record<string, unknown>).__printIntercept = true;
         // Don't call originalPrint() since we don't want to open print dialog in test

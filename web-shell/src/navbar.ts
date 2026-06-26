@@ -23,8 +23,8 @@ export interface NavbarControls {
 /** Toolbar controls exposed for wiring in main.ts */
 export interface ToolbarControls {
   container: HTMLElement;
-  setEditor(editor: Editor): void;
-  update(selection: readonly SlotmapId[]): void;
+  setEditor(_editor: Editor): void;
+  update(_selection: readonly SlotmapId[]): void;
 }
 
 export function buildNavbar(session: DiagramEngineSession): NavbarControls {
@@ -812,7 +812,7 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     },
     update(selection: readonly SlotmapId[]): void {
       const hasSelection = selection.length > 0;
-      const hasMultiSelection = selection.length > 1;
+      const _hasMultiSelection = selection.length > 1;
 
       // Delete, front, back require at least one selection
       deleteBtn.disabled = !hasSelection || !activeEditor;

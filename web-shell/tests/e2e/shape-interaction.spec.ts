@@ -183,7 +183,7 @@ test.describe('Suite D: shape-interaction', () => {
     const viewer = page.locator('[data-testid="viewer"]');
 
     // Count shapes before delete
-    const countBefore = await viewer.locator('[data-vertex-id]').count();
+    const _countBefore = await viewer.locator('[data-vertex-id]').count();
 
     // Select the shape
     const rect = viewer.locator('[data-vertex-id]').first();

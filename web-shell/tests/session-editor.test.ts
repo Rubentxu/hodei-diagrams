@@ -91,7 +91,7 @@ describe('executeCommands', () => {
   });
 
   it('returns aggregate ok when all commands succeed', () => {
-    const { session, wasm } = createSession();
+    const { session, wasm: _wasm } = createSession();
     const cmds = ['{"cmd":1}', '{"cmd":2}'];
     const r = session.executeCommands(cmds);
     expect(r.ok).toBe(true);

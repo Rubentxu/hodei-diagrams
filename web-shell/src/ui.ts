@@ -5,7 +5,7 @@
  * with E2E tests.
  */
 
-import type { PageRender, SlotmapId } from './types.js';
+import type { PageRender } from './types.js';
 import type { DiagramEngineSession } from './session.js';
 import { buildNavbar, type ToolbarControls } from './navbar.js';
 import { buildSidebar } from './sidebar.js';
@@ -71,7 +71,7 @@ export interface UiElements {
 
   // Diagnostics
   diagnosticsBadge: HTMLElement;
-  setDiagnostics(state: DiagnosticState, msg?: string): void;
+  setDiagnostics(_state: DiagnosticState, _msg?: string): void;
 
   // Core containers
   app: HTMLElement;
@@ -308,9 +308,9 @@ export function buildEmptyUi(
 // ─── Page Tab Management ──────────────────────────────────────────────────────
 
 export interface PageTabCallbacks {
-  onSelect: (pageId: number) => void;
-  onRename: (pageId: number, newName: string) => void;
-  onDelete: (pageId: number) => void;
+  onSelect: (_pageId: number) => void;
+  onRename: (_pageId: number, _newName: string) => void;
+  onDelete: (_pageId: number) => void;
 }
 
 /** Update page tabs in the bottom bar. */
@@ -362,7 +362,7 @@ function startRename(
   pageId: number,
   currentName: string,
   tabName: HTMLButtonElement,
-  onCommit: (newName: string) => void,
+  onCommit: (_newName: string) => void,
 ): void {
   const input = document.createElement('input');
   input.type = 'text';
@@ -438,7 +438,6 @@ export function wireDismiss(button: HTMLButtonElement, onDismiss: () => void): v
 // ─── Properties Dialog ───────────────────────────────────────────────────────
 
 import type { MetadataInfo } from './types.js';
-import { EMPTY_METADATA } from './types.js';
 
 /** Build a properties dialog overlay and mount it to document.body.
  *
@@ -447,7 +446,7 @@ import { EMPTY_METADATA } from './types.js';
  */
 export function buildPropertiesDialog(
   current: MetadataInfo,
-  onSave: (info: MetadataInfo) => void,
+  onSave: (_info: MetadataInfo) => void,
 ): HTMLElement {
   const overlay = document.createElement('div');
   overlay.className = 'dialog-overlay';

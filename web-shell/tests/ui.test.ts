@@ -5,13 +5,13 @@ import type { DiagramEngineSession } from '../src/session.js';
 
 // Minimal mock session for testing buildEmptyUi without engine
 const mockSession: DiagramEngineSession = {
-  executeCommand: (cmd: string): Result<void, string> => ({ ok: true, value: undefined }),
-  executeTransaction: (cmds: string[]): Result<void, string> => ({ ok: true, value: undefined }),
+  executeCommand: (_cmd: string): Result<void, string> => ({ ok: true, value: undefined }),
+  executeTransaction: (_cmds: string[]): Result<void, string> => ({ ok: true, value: undefined }),
   undo: (): Result<void, string> => ({ ok: true, value: undefined }),
   redo: (): Result<void, string> => ({ ok: true, value: undefined }),
   canUndo: (): boolean => false,
   canRedo: (): boolean => false,
-  importDrawio: (xml: string): Result<void, string> => ({ ok: true, value: undefined }),
+  importDrawio: (_xml: string): Result<void, string> => ({ ok: true, value: undefined }),
   exportDrawio: (): Result<string, string> => ({ ok: true, value: '' }),
   renderAllPages: (): Result<PageRender[], string> => ({ ok: true, value: [] }),
   renderPage: (_pageIdx: bigint): Result<string, string> => ({ ok: true, value: '' }),
@@ -99,9 +99,15 @@ describe('ui', () => {
 
     const tabs = container.querySelectorAll('.page-tab');
     expect(tabs.length).toBe(3);
-    expect(tabs[0]?.textContent).toBe('Page A');
-    expect(tabs[1]?.textContent).toBe('Page B');
-    expect(tabs[2]?.textContent).toBe('Page C');
+
+    // Each tab renders the page name inside a .page-tab-name button; the tab
+    // container also holds a close button (×), so textContent at the tab level
+    // would include the × — assert against the name element directly.
+    const tabNames = container.querySelectorAll('.page-tab-name');
+    expect(tabNames.length).toBe(3);
+    expect(tabNames[0]?.textContent).toBe('Page A');
+    expect(tabNames[1]?.textContent).toBe('Page B');
+    expect(tabNames[2]?.textContent).toBe('Page C');
     expect(tabs[1]?.classList.contains('active')).toBe(true);
   });
 
@@ -119,9 +125,14 @@ describe('ui', () => {
 
     populatePageTabs(container, pages, 0, callbacks);
 
-    const secondTab = container.querySelector('[data-testid="page-tab-1"]') as HTMLElement;
-    expect(secondTab).not.toBeNull();
-    secondTab.click();
+    // The onSelect listener is bound to the inner .page-tab-name button, not
+    // the tab container (clicks on the close button must not select). Click the
+    // name button to trigger selection.
+    const secondTabName = container.querySelector(
+      '[data-testid="page-tab-1"] .page-tab-name',
+    ) as HTMLElement;
+    expect(secondTabName).not.toBeNull();
+    secondTabName.click();
     expect(callbacks.onSelect).toHaveBeenCalledWith(20);
   });
 

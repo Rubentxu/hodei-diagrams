@@ -15,17 +15,17 @@ export type LoadingState = { wasm: boolean; stencil: boolean };
 
 export interface HudControls {
   container: HTMLElement;
-  setSelection: (label: string) => void;
-  setPage: (current: number, total: number) => void;
-  setZoom: (percent: number) => void;
-  setMode: (mode: 'Edit' | 'Read Only' | 'Present') => void;
-  onZoomClick: (handler: () => void) => void;
-  setSnap: (enabled: boolean) => void;
-  setGrid: (visible: boolean) => void;
-  setCursor: (x: number, y: number) => void;
-  setSelectionCount: (n: number) => void;
-  setSaveStatus: (status: SaveStatus) => void;
-  setLoading: (state: LoadingState) => void;
+  setSelection: (_label: string) => void;
+  setPage: (_current: number, _total: number) => void;
+  setZoom: (_percent: number) => void;
+  setMode: (_mode: 'Edit' | 'Read Only' | 'Present') => void;
+  onZoomClick: (_handler: () => void) => void;
+  setSnap: (_enabled: boolean) => void;
+  setGrid: (_visible: boolean) => void;
+  setCursor: (_x: number, _y: number) => void;
+  setSelectionCount: (_n: number) => void;
+  setSaveStatus: (_status: SaveStatus) => void;
+  setLoading: (_state: LoadingState) => void;
 }
 
 export function buildHud(): HudControls {

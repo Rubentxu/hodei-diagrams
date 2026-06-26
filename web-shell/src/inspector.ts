@@ -13,12 +13,12 @@ import { ARRANGE_ICONS } from './icon.js';
 
 export interface InspectorControls {
   container: HTMLElement;
-  setEditor(editor: Editor): void;
-  setSelectionSize(count: number): void;
+  setEditor(_editor: Editor): void;
+  setSelectionSize(_count: number): void;
   update(
-    selection: readonly SlotmapId[],
-    sceneCache: ScenePage[],
-    activePageIdx: number,
+    _selection: readonly SlotmapId[],
+    _sceneCache: ScenePage[],
+    _activePageIdx: number,
   ): void;
 }
 
@@ -692,7 +692,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   arrangeFields.insertBefore(positionSection, arrangeFields.firstChild);
 
   // Position button tracking for disabled state
-  const positionButtons: HTMLButtonElement[] = [rotateBtn];
+  const _positionButtons: HTMLButtonElement[] = [rotateBtn];
 
   // Commit handler for Position inputs (debounced)
   function commitPositionChange(): void {
@@ -989,7 +989,7 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   });
 
   // Slider input handlers (real-time preview during drag)
-  function handleShadowSlider(input: HTMLInputElement, valueEl: HTMLElement, field: 'dx' | 'dy' | 'blur') {
+  function handleShadowSlider(input: HTMLInputElement, valueEl: HTMLElement, _field: 'dx' | 'dy' | 'blur') {
     input.addEventListener('input', () => {
       valueEl.textContent = input.value;
       if (!shadowToggle.checked) return;

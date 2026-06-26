@@ -167,10 +167,6 @@ test.describe('Suite B: diagram-render', () => {
    * as Playwright itself throws before the app processes the input.
    * The app handles FileReader errors internally via the WASM engine.
    */
-  test.skip('Load non-existent file → error message', async ({ page }) => {
-    // This test is skipped because Playwright's setInputFiles throws ENOENT
-    // before the application can process the file path.
-  });
 
   /**
    * Test 10: Re-load same file → previous content replaced (no duplicates)

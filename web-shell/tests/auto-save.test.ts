@@ -19,7 +19,6 @@ describe('Auto-save idle debounce', () => {
     let lastCommandAt = 0;
     let lastSavedAt = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let _saveCount = 0;
 
     function scheduleAutoSave() {
@@ -52,7 +51,6 @@ describe('Auto-save idle debounce', () => {
     let lastCommandAt = 0;
     let lastSavedAt = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let _saveCount = 0;
 
     function scheduleAutoSave() {
@@ -93,7 +91,6 @@ describe('Auto-save idle debounce', () => {
     let lastCommandAt = 0;
     let lastSavedAt = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let _saveCount = 0;
 
     function scheduleAutoSave() {

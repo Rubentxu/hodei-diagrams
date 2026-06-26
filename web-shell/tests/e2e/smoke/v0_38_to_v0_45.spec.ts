@@ -13,7 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 
-const SIMPLE_RECT =
+const _SIMPLE_RECT =
   '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
 const TWO_SHAPES =
   '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/two-shapes.drawio';
@@ -145,7 +145,7 @@ test.describe('Smoke v0.38-v0.45: new features', () => {
 
     // A bend handle should appear (engine creates a <g> or similar for the bend)
     // Look for any bend-related element
-    const bendHandle = page.locator('[data-bend-handle], .bend-handle, [data-testid="bend-handle"]');
+    const _bendHandle = page.locator('[data-bend-handle], .bend-handle, [data-testid="bend-handle"]');
     // Just verify no crash — bend handle may or may not appear depending on edge geometry
     const errorBanner = page.locator('[data-testid="error-banner"]');
     await expect(errorBanner).not.toBeVisible();
@@ -162,7 +162,7 @@ test.describe('Smoke v0.38-v0.45: new features', () => {
     // Try to find and drag a bend handle
     const bendHandle = page.locator('[data-bend-handle], .bend-handle').first();
     if (await bendHandle.count() > 0) {
-      const beforeTransform = await bendHandle.getAttribute('transform');
+      const _beforeTransform = await bendHandle.getAttribute('transform');
       await bendHandle.dragTo(page.locator('[data-testid="viewer"] svg'), {
         targetPosition: { x: 100, y: 100 },
       });
@@ -266,12 +266,12 @@ test.describe('Smoke v0.38-v0.45: new features', () => {
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     // Check that edges have marker-end attribute for the arrowhead
-    const edgeWithMarker = page.locator('[data-edge-id]').filter({ has: page.locator('[marker-end]') });
+    const _edgeWithMarker = page.locator('[data-edge-id]').filter({ has: page.locator('[marker-end]') });
     const edgeCount = await page.locator('[data-edge-id]').count();
     expect(edgeCount).toBeGreaterThan(0);
 
     // At least one edge should have a marker-end attribute
-    const markerEndCount = await page.locator('[data-edge-id][marker-end]').count();
+    const _markerEndCount = await page.locator('[data-edge-id][marker-end]').count();
     // Some edges may have marker-end; verify the attribute exists on the SVG elements
     const hasMarkerEnd = await page.locator('[data-edge-id]').first().getAttribute('marker-end');
     // Just verify the attribute exists (value may vary)

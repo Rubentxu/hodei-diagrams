@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SIMPLE_RECT_PATH =
+const _SIMPLE_RECT_PATH =
   '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
 
 test.describe('Presentation Mode Fullscreen', () => {

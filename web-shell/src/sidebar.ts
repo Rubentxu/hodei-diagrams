@@ -125,7 +125,7 @@ const GENERAL_SHAPES: ShapeEntry[] = [
   },
 ];
 
-import { CATEGORY_ICONS_SVG, categoryIcon } from './icon';
+import { categoryIcon } from './icon';
 
 const FUTURE_CATEGORIES = [
   'Arrows',
@@ -435,7 +435,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   // Initial render and subscribe to manager changes
   if (stencilManager) {
     renderDynamicStencilCategories();
-    const unsubscribe = stencilManager.subscribe(renderDynamicStencilCategories);
+    const _unsubscribe = stencilManager.subscribe(renderDynamicStencilCategories);
     // Note: unsubscribe is intentionally not called — manager lives for the session lifetime
   }
 

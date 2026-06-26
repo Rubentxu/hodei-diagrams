@@ -68,7 +68,7 @@ test.describe('Suite M: visual-regression', () => {
     // The SVG element should have a fill attribute reflecting the change
     // or the parent group should have the style applied
     const shape = page.locator('[data-vertex-id]').first();
-    const fill = await shape.getAttribute('fill');
+    const _fill = await shape.getAttribute('fill');
     // Note: the fill may be on the element or inherited from SVG
     // We verify the SVG re-rendered (shape still present)
     await expect(shape).toBeVisible();

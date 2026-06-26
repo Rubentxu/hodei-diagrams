@@ -206,7 +206,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
     await page.mouse.up({ button: 'middle' });
     await page.waitForTimeout(200);
 
-    const transformAfterPan = await canvas.evaluate((el) => el.style.transform);
+    const _transformAfterPan = await canvas.evaluate((el) => el.style.transform);
 
     // Switch to second page
     const secondTab = page.locator('[data-testid="page-tabs"] .page-tab').nth(1);
@@ -216,7 +216,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
     // After switching page, the transform behavior is documented:
     // Either pan persists (transform still has translate) or resets to 0,0
     // This test documents the behavior
-    const transformAfterSwitch = await canvas.evaluate((el) => el.style.transform);
+    const _transformAfterSwitch = await canvas.evaluate((el) => el.style.transform);
     // Just verify no crash and SVG still visible
     await expect(page.locator('[data-testid="viewer"] svg')).toBeVisible();
   });

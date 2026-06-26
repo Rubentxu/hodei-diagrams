@@ -196,7 +196,7 @@ test.describe('Suite F: text-editing', () => {
     // The SVG text element is a sibling of the rect, not a child, so we query
     // the viewer directly.
     const vid = await shape.getAttribute('data-vertex-id');
-    const textSelector = `[data-vertex-id="${vid}"] ~ text`;
+    const _textSelector = `[data-vertex-id="${vid}"] ~ text`;
     const textEl = viewer.locator('text').filter({ hasText: 'Persisted Text' }).first();
     await expect(textEl).toBeVisible();
   });

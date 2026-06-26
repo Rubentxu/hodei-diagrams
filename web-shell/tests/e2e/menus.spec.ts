@@ -275,7 +275,7 @@ test.describe('Z-order dispatch shape (CellTarget JSON)', () => {
     await page.waitForTimeout(500);
 
     // Verify a BringToFront command with Vertex target was dispatched
-    const bringToFrontCmd = dispatchedCommands.find((cmd) => cmd.includes('BringToFront'));
+    const _bringToFrontCmd = dispatchedCommands.find((cmd) => cmd.includes('BringToFront'));
     // If __captureCommand wasn't set up (E2E bridge), verify via DOM behavior
     // This is a dry-run test — real verification requires WASM bridge instrumentation
     // For now, verify the shape is still selectable (no crash)
