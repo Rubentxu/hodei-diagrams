@@ -7,7 +7,10 @@ use wasm_bindgen::prelude::*;
 
 #[derive(serde::Serialize)]
 struct PageRender {
-    page_id: u64,
+    /// Full slotmap key (idx + version). Storing only the `idx` would
+    /// drop the version, so RemovePage / SetPageMathEnabled calls from
+    /// the TS editor would fail to find the page.
+    page_id: diagram_core::PageId,
     svg: String,
 }
 
@@ -66,19 +69,7 @@ pub fn render_pages(handle: u32) -> Result<String, JsValue> {
             .render_pages(&scene)
             .map_err(|err| Box::leak(format!("{err:?}").into_boxed_str()) as &str)?
             .into_iter()
-            .map(|(page_id, svg)| {
-                // PageId serializes as {"idx":..., "version":...} via slotmap serde
-                let page_id_value = serde_json::to_value(page_id).expect("PageId should serialize");
-                let page_id_index = page_id_value
-                    .as_object()
-                    .expect("PageId should serialize to object")["idx"]
-                    .as_u64()
-                    .expect("PageId idx should be u64") as u64;
-                PageRender {
-                    page_id: page_id_index,
-                    svg,
-                }
-            })
+            .map(|(page_id, svg)| PageRender { page_id, svg })
             .collect();
 
         serde_json::to_string(&pages)

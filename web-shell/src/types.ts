@@ -2,12 +2,20 @@
 export type EngineHandle = number & { readonly __brand: 'EngineHandle' };
 export type PageToken = number & { readonly __brand: 'PageToken' };
 
+/** Engine-owned page identifier: (slotmap idx, slotmap version). */
+export interface PageSlotId {
+  idx: number;
+  version: number;
+}
+
 export type EngineError = string;
 
 export type Result<T, E = EngineError> = { ok: true; value: T } | { ok: false; error: E };
 
 export interface PageRender {
   pageId: PageToken;
+  /** Engine-owned slotmap id for the page (needed to dispatch RemovePage, etc.). */
+  slotmapId: PageSlotId;
   name: string;
   svg: string;
 }

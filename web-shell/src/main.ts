@@ -459,7 +459,17 @@ async function bootstrap(): Promise<void> {
   const stencilManager = new StencilLibraryManager(activeSession, wasmResult.value);
 
   // ─── 4. Build Inspector (needed before UI for update wiring) ──────────────
-  const inspector = buildInspector(activeSession);
+  // Wire the inspector's style change events to the editor. The editor is
+  // created later (in the bootstrap), so we capture activeEditor via a
+  // closure that reads the module-level variable on each call.
+  const inspector = buildInspector(activeSession, (changes) => {
+    if (changes.fillColor !== undefined) {
+      activeEditor?.applyFillToSelection(changes.fillColor);
+    }
+    if (changes.strokeColor !== undefined) {
+      activeEditor?.applyStrokeToSelection(changes.strokeColor);
+    }
+  });
 
   // ─── 4.5. Create zoom/pan controls early so rail callbacks can reference them ─
   // We create a minimal container just for zoom/pan, then rebuild properly in buildEmptyUi
@@ -788,14 +798,17 @@ async function bootstrap(): Promise<void> {
     zoomIn: () => {
       zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
       ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+      ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
     },
     zoomOut: () => {
       zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
       ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+      ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
     },
     resetZoom: () => {
       zoomPan?.resetView();
       ui.hud.setZoom(100);
+      ui.zoomDisplay.textContent = '100%';
     },
   });
 
@@ -1036,9 +1049,14 @@ async function bootstrap(): Promise<void> {
   /** Delete an existing page (cannot delete the last page). */
   function handlePageDelete(pageIdNum: number): void {
     if (!activeSession || activePages.length <= 1) return;
+    // Look up the full slotmap id (idx, version) for this page. The bare
+    // idx is not enough — RemovePage requires a PageId that exists in the
+    // engine's slotmap, and versions can be non-zero after deletes.
+    const target = activePages.find((p) => p.pageId === pageIdNum);
+    if (!target) return;
     const cmd = JSON.stringify({
       RemovePage: {
-        id: { idx: pageIdNum, version: 0 },
+        id: target.slotmapId,
       },
     });
     const r = activeSession.executeCommand(cmd);

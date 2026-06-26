@@ -308,6 +308,17 @@ mod tests {
         assert!(parsed.is_empty());
     }
 
+    /// Verify that a BringToFront command JSON deserializes correctly.
+    /// This is the shape the TS editor emits for z-order operations.
+    #[test]
+    fn bring_to_front_json_deserializes() {
+        let json = r#"[{"BringToFront":{"target":{"kind":"Vertex","idx":1,"version":1}}}]"#;
+        let parsed: Vec<Command> = serde_json::from_str(json)
+            .expect("BringToFront JSON emitted by TS editor must deserialize");
+        assert_eq!(parsed.len(), 1);
+        assert!(matches!(parsed[0], Command::BringToFront(_)));
+    }
+
     /// Verify that a single AddVertex command parses correctly.
     #[test]
     fn execute_transaction_single_command_parses() {

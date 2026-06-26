@@ -906,7 +906,6 @@ button:disabled {
   overflow-x: auto;
   overflow-y: hidden;
 }
-}
 
 .hud-weighted {
   background: var(--hud-weight-bg);

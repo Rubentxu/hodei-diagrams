@@ -11,6 +11,7 @@ export function showContextMenu(x: number, y: number, items: ContextMenuItem[]):
     
     const menu = document.createElement('div');
     menu.className = 'context-menu';
+    menu.setAttribute('data-testid', 'context-menu');
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     

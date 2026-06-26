@@ -1205,6 +1205,42 @@ export class Editor {
    * If commit=false: applies temporary shadow style directly to the DOM for
    * real-time preview without engine mutation or undo entries.
    */
+  /** Apply a fill color to all selected vertices. */
+  applyFillToSelection(color: string): void {
+    if (this.#selection.size === 0) return;
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      commands.push(
+        JSON.stringify({
+          ChangeStyle: {
+            id: slotmapIdToField(id),
+            style: { fillColor: color },
+          },
+        }),
+      );
+    }
+    this.#session.executeTransaction(commands);
+    this.#replay();
+  }
+
+  /** Apply a stroke color to all selected vertices. */
+  applyStrokeToSelection(color: string): void {
+    if (this.#selection.size === 0) return;
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      commands.push(
+        JSON.stringify({
+          ChangeStyle: {
+            id: slotmapIdToField(id),
+            style: { strokeColor: color },
+          },
+        }),
+      );
+    }
+    this.#session.executeTransaction(commands);
+    this.#replay();
+  }
+
   applyShadowToSelection(
     shadow: Partial<import('./types.js').ShadowConfig>,
     commit: boolean,
@@ -3358,22 +3394,22 @@ export class Editor {
       return;
     }
 
-    // + / = → zoom in
-    if (!hasMod && (e.key === '=' || e.key === '+')) {
+    // Ctrl/Cmd + = / + → zoom in (most browsers send '=' with shift)
+    if (hasMod && (e.key === '=' || e.key === '+')) {
       e.preventDefault();
       this.#zoomIn?.();
       return;
     }
 
-    // - → zoom out
-    if (!hasMod && e.key === '-') {
+    // Ctrl/Cmd + - → zoom out
+    if (hasMod && e.key === '-') {
       e.preventDefault();
       this.#zoomOut?.();
       return;
     }
 
-    // 0 → reset zoom
-    if (!hasMod && e.key === '0') {
+    // Ctrl/Cmd + 0 → reset zoom
+    if (hasMod && e.key === '0') {
       e.preventDefault();
       this.#resetZoom?.();
       return;
