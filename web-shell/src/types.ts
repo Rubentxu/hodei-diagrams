@@ -32,6 +32,7 @@ export type WasmModule = {
   render_pages(_h: number): string;
   import_drawio(_h: number, _xml: string): void;
   export_drawio(_h: number): string;
+  export_drawio_fresh_engine(_h: number): string;
   undo(_h: number): void;
   redo(_h: number): void;
   engine_can_undo(_h: number): boolean;

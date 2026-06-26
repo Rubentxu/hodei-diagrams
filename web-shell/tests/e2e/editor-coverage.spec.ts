@@ -151,10 +151,7 @@ test.describe('Editor: feature coverage audit', () => {
     expect(after).toBeGreaterThan(before);
   });
 
-  // TODO(feature-gap): Extras > Edit XML is currently disabled with
-  // title "XML editor not yet available". The feature is in the navbar
-  // but the implementation is pending. Track as a follow-up.
-  test.skip('Extras > Edit XML opens a dialog', async ({ page }) => {
+  test('Extras > Edit XML opens a dialog with the current .drawio XML', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
@@ -165,9 +162,13 @@ test.describe('Editor: feature coverage audit', () => {
     await page.locator('[data-testid="menu-edit-xml"]').click({ force: true });
     await page.waitForTimeout(300);
 
-    // Should show a textarea or dialog
-    const textarea = page.locator('textarea').first();
-    await expect(textarea).toBeVisible({ timeout: 5_000 });
+    // The dialog should appear with a textarea pre-filled with the XML
+    const dialog = page.locator('[data-testid="edit-xml-dialog"]');
+    await expect(dialog).toBeVisible();
+    const textarea = page.locator('[data-testid="edit-xml-textarea"]');
+    await expect(textarea).toBeVisible();
+    const xml = await textarea.inputValue();
+    expect(xml).toContain('<mxfile');
   });
 
   test('Inspector Style tab is interactive: change fill color updates the shape', async ({ page }) => {
