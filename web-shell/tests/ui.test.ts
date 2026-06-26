@@ -5,13 +5,13 @@ import type { DiagramEngineSession } from '../src/session.js';
 
 // Minimal mock session for testing buildEmptyUi without engine
 const mockSession: DiagramEngineSession = {
-  executeCommand: (cmd: string): Result<void, string> => ({ ok: true, value: undefined }),
-  executeTransaction: (cmds: string[]): Result<void, string> => ({ ok: true, value: undefined }),
+  executeCommand: (_cmd: string): Result<void, string> => ({ ok: true, value: undefined }),
+  executeTransaction: (_cmds: string[]): Result<void, string> => ({ ok: true, value: undefined }),
   undo: (): Result<void, string> => ({ ok: true, value: undefined }),
   redo: (): Result<void, string> => ({ ok: true, value: undefined }),
   canUndo: (): boolean => false,
   canRedo: (): boolean => false,
-  importDrawio: (xml: string): Result<void, string> => ({ ok: true, value: undefined }),
+  importDrawio: (_xml: string): Result<void, string> => ({ ok: true, value: undefined }),
   exportDrawio: (): Result<string, string> => ({ ok: true, value: '' }),
   renderAllPages: (): Result<PageRender[], string> => ({ ok: true, value: [] }),
   renderPage: (_pageIdx: bigint): Result<string, string> => ({ ok: true, value: '' }),

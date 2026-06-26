@@ -75,8 +75,8 @@ interface ConnectDrag {
   sourceBounds: { x: number; y: number; width: number; height: number };
   startClientX: number;
   startClientY: number;
-  moveHandler: (e: PointerEvent) => void;
-  upHandler: (e: PointerEvent) => void;
+  moveHandler: (_e: PointerEvent) => void;
+  upHandler: (_e: PointerEvent) => void;
 }
 
 /** Error callback type. */
@@ -132,7 +132,7 @@ export class Editor {
   #stencilDragTool: string | null = null;
 
   // ─── Cursor Move Callback (rAF-throttled) ─────────────────────────────────
-  #cursorMoveCb: ((p: { x: number; y: number }) => void) | null = null;
+  #cursorMoveCb: ((_p: { x: number; y: number }) => void) | null = null;
   #cursorMoveRafId: number | null = null;
 
   // ─── Snap ────────────────────────────────────────────────────────────────
@@ -157,8 +157,8 @@ export class Editor {
   #selectedEdgeId: SlotmapId | null = null;
   #selectedBendIndex: number | null = null;
   #bendDrag: { edgeId: SlotmapId; bendIndex: number } | null = null;
-  #onBendDragMoveBound: (e: PointerEvent) => void;
-  #onBendDragUpBound: (e: PointerEvent) => void;
+  #onBendDragMoveBound: (_e: PointerEvent) => void;
+  #onBendDragUpBound: (_e: PointerEvent) => void;
 
   // ─── Port Handles Overlay ──────────────────────────────────────────────────
   readonly #portHandles: PortHandlesOverlay;
@@ -387,7 +387,10 @@ export class Editor {
    * The caller is responsible for ensuring the page has math_enabled=true
    * so that the math overlay will render the KaTeX output.
    */
-  insertMathFormula(latex: string): void {
+  // TODO(math): latex param is received but not passed to the vertex label.
+  // The vertex is created as a plain Rectangle — should carry the LaTeX as its
+  // label so the math overlay renders it. Tracked separately from lint cleanup.
+  insertMathFormula(_latex: string): void {
     const svgEl = this.#viewer.querySelector('svg');
     const cx = svgEl ? parseFloat(svgEl.getAttribute('width') ?? '800') / 2 : 400;
     const cy = svgEl ? parseFloat(svgEl.getAttribute('height') ?? '600') / 2 : 300;
@@ -1086,7 +1089,7 @@ export class Editor {
    * whenever the pointer moves over the canvas.
    * Coordinates are in document space (accounting for zoom).
    */
-  onCursorMove(cb: (p: { x: number; y: number }) => void): void {
+  onCursorMove(cb: (_p: { x: number; y: number }) => void): void {
     this.#cursorMoveCb = cb;
   }
 
@@ -1374,7 +1377,7 @@ export class Editor {
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
 
   /** Start inline text editing for a vertex. Shows an input overlay on the shape. */
-  #startTextEdit(vertexId: SlotmapId, e: MouseEvent): void {
+  #startTextEdit(vertexId: SlotmapId, _e: MouseEvent): void {
     // If already editing, do nothing
     if (this.#textEdit) return;
 
@@ -1733,12 +1736,9 @@ export class Editor {
 
   // ─── Snap Guides ──────────────────────────────────────────────────────────
 
-  #activeGuides: { x?: number; y?: number } = {};
-
   /** Render snap guide SVG lines at the given guide coordinates. */
   #renderGuides(guides: { x?: number; y?: number }): void {
     this.#clearGuides();
-    this.#activeGuides = guides;
 
     const svg = this.#viewer.querySelector('svg');
     if (!svg) return;
@@ -1771,7 +1771,6 @@ export class Editor {
   /** Remove all snap guide elements from the DOM. */
   #clearGuides(): void {
     this.#viewer.querySelectorAll('[data-testid="snap-guide"]').forEach((el) => el.remove());
-    this.#activeGuides = {};
   }
 
   // ─── Public Snap API ─────────────────────────────────────────────────────
@@ -2237,7 +2236,7 @@ export class Editor {
     }
   }
 
-  #onPointerUp(e: PointerEvent): void {
+  #onPointerUp(_e: PointerEvent): void {
     // Clean up listeners first
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
@@ -2775,35 +2774,6 @@ export class Editor {
     this.#hidePreviewLine();
   }
 
-  /**
-   * Determine which side of a vertex the click hit, based on click position
-   * relative to the vertex's bounding box.
-   * Returns: 0=auto, 1=N, 2=E, 3=S, 4=W
-   */
-  #computePortFromClick(vertexId: SlotmapId, clientX: number, clientY: number): number {
-    // Get vertex geometry from scene data
-    const el = this.#viewer.querySelector(
-      `[data-vertex-id="${vertexId.idx}:${vertexId.version}"]`,
-    ) as SVGGraphicsElement | null;
-    if (!el) return 0;
-
-    const bbox = el.getBBox();
-    const cx = bbox.x + bbox.width / 2;
-    const cy = bbox.y + bbox.height / 2;
-
-    // Convert click to document coordinates (same as clientToDoc)
-    const docPoint = this.#clientToDoc(clientX, clientY);
-
-    const dx = docPoint.x - cx;
-    const dy = docPoint.y - cy;
-
-    if (Math.abs(dx) > Math.abs(dy)) {
-      return dx > 0 ? 2 : 4; // East or West
-    } else {
-      return dy > 0 ? 3 : 1; // South or North
-    }
-  }
-
   /** Cancel connect mode and clean up preview. */
   #cancelConnect(): void {
     this.#cancelConnectDrag();
@@ -3040,7 +3010,7 @@ export class Editor {
   // ─── Bend Drag FSM ───────────────────────────────────────────────────────
 
   /** Start dragging a bend handle. */
-  #startBendDrag(edgeId: SlotmapId, bendIndex: number, e: PointerEvent): void {
+  #startBendDrag(edgeId: SlotmapId, bendIndex: number, _e: PointerEvent): void {
     this.#bendDrag = { edgeId, bendIndex };
     this.#selectedBendIndex = bendIndex;
     this.#viewer.addEventListener('pointermove', this.#onBendDragMoveBound);
