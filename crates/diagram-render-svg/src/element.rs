@@ -7,23 +7,36 @@ use diagram_scene::{
     PathElement, PolygonElement, RectElement, RoundedRectElement, StencilElement, SwimlaneHeader,
     TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
+use serde::Serialize;
 
 use crate::clip::ClipPathManager;
 use crate::defs::DefsManager;
 use crate::escape::{escape_attr, escape_text};
 use crate::style::{AttrContext, style_to_attrs};
 
+/// Extract a stable string id from any slotmap key (VertexId/EdgeId/GroupId/...).
+///
+/// Slotmap keys serialize to JSON objects with `idx` and `version` u64 fields.
+/// This helper returns the compact `idx:version` form used by both `data-*`
+/// attributes and `data-math-id` references.
+///
+/// Centralizing this avoids the previous duplication across `vid_attr`,
+/// `eid_attr`, and the inline math-id extraction in `text_to_svg`.
+fn stable_id<T: Serialize>(id: &T) -> String {
+    let v = serde_json::to_value(id).expect("slotmap key should serialize");
+    let idx = v["idx"].as_u64().expect("slotmap key idx should be u64");
+    let version = v["version"]
+        .as_u64()
+        .expect("slotmap key version should be u64");
+    format!("{idx}:{version}")
+}
+
 /// Serialize a `VertexId` to a `data-vertex-id` attribute string.
 ///
 /// Format: `data-vertex-id="idx:version"` — compact, no quote-escaping needed
 /// in SVG attributes. Both fields are required for slotmap lookups.
 fn vid_attr(id: &VertexId) -> String {
-    let v = serde_json::to_value(id).expect("VertexId should serialize");
-    let idx = v["idx"].as_u64().expect("VertexId idx should be u64");
-    let version = v["version"]
-        .as_u64()
-        .expect("VertexId version should be u64");
-    format!(" data-vertex-id=\"{idx}:{version}\"")
+    format!(" data-vertex-id=\"{}\"", stable_id(id))
 }
 
 /// Serialize an `EdgeId` to a `data-edge-id` attribute string.
@@ -31,10 +44,7 @@ fn vid_attr(id: &VertexId) -> String {
 /// Format: `data-edge-id="idx:version"` — compact, no quote-escaping needed
 /// in SVG attributes. Both fields are required for slotmap lookups.
 fn eid_attr(id: &EdgeId) -> String {
-    let v = serde_json::to_value(id).expect("EdgeId should serialize");
-    let idx = v["idx"].as_u64().expect("EdgeId idx should be u64");
-    let version = v["version"].as_u64().expect("EdgeId version should be u64");
-    format!(" data-edge-id=\"{idx}:{version}\"")
+    format!(" data-edge-id=\"{}\"", stable_id(id))
 }
 
 /// Converts a `VisualElement` to an SVG string.
@@ -484,23 +494,13 @@ fn text_to_svg(t: &TextElement, defs: &mut DefsManager, indent: usize) -> String
     // The text content is the raw LaTeX verbatim (XML-escaped for safety).
     // No <foreignObject> is emitted — HTML overlay is the TS layer's concern.
     let math_attrs = if t.is_math {
-        let stable_id = match &t.owner {
-            EntityId::Vertex(vid) => {
-                let v = serde_json::to_value(vid).expect("VertexId should serialize");
-                let idx = v["idx"].as_u64().expect("idx should be u64");
-                let version = v["version"].as_u64().expect("version should be u64");
-                format!("{idx}:{version}")
-            }
-            EntityId::Edge(eid) => {
-                let v = serde_json::to_value(eid).expect("EdgeId should serialize");
-                let idx = v["idx"].as_u64().expect("idx should be u64");
-                let version = v["version"].as_u64().expect("version should be u64");
-                format!("{idx}:{version}")
-            }
+        let stable = match &t.owner {
+            EntityId::Vertex(vid) => stable_id(vid),
+            EntityId::Edge(eid) => stable_id(eid),
             _ => return String::new(), // non-math owner types fall back to no math attrs
         };
         let latex_attr = format!(r#" data-latex="{}""#, escape_attr(&t.text));
-        format!(r#" data-math-id="{}"{}"#, stable_id, latex_attr)
+        format!(r#" data-math-id="{}"{}"#, stable, latex_attr)
     } else {
         String::new()
     };

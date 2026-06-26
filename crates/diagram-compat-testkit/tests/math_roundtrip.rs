@@ -45,6 +45,24 @@ fn math_roundtrip_golden_fixture() {
         "Should have 1 vertex (the math cell)"
     );
 
+    // MATH-011/MATH-013 lock: the label text must be preserved verbatim through
+    // parse → to_domain. drawio keeps the $...$ delimiters inside the cell value,
+    // so the engine receives the full literal expression including delimiters.
+    let (_, vertex) = model
+        .store
+        .vertices_with_ids()
+        .next()
+        .expect("vertex should exist");
+    let label_text = vertex
+        .label
+        .as_ref()
+        .expect("math cell should carry a label")
+        .as_str();
+    assert_eq!(
+        label_text, r"$\int_0^1 x\,dx$",
+        "label text must be preserved verbatim through parse → to_domain (MATH-011)"
+    );
+
     // Write back
     let mut diags = Vec::new();
     let roundtrip_raw = mapper
