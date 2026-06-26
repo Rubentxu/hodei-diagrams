@@ -2365,10 +2365,19 @@ export class Editor {
           width,
           height,
           relative: false,
+          rotation: 0,
+          flip_h: false,
+          flip_v: false,
         },
+        label: null,
+        style_id: null,
+        parent: null,
         page_id: this.#activePageSlotId
           ? slotmapIdToField(this.#activePageSlotId)
           : { idx: 0, version: 0 },
+        z_order: 0,
+        locked: false,
+        visible: true,
       },
     };
     // Include inline style based on shape kind (engine classifies by style properties)
@@ -2429,10 +2438,19 @@ export class Editor {
           width: newGeom.width,
           height: newGeom.height,
           relative: false,
+          rotation: 0,
+          flip_h: false,
+          flip_v: false,
         },
+        label: null,
+        style_id: null,
+        parent: null,
         page_id: this.#activePageSlotId
           ? slotmapIdToField(this.#activePageSlotId)
           : { idx: 0, version: 0 },
+        z_order: 0,
+        locked: false,
+        visible: true,
       },
     };
     // Copy style if present
