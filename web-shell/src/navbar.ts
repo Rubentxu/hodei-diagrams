@@ -537,8 +537,8 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   editXmlItem.className = 'menu-item';
   editXmlItem.textContent = 'Edit XML';
   editXmlItem.setAttribute('data-testid', 'menu-edit-xml');
-  editXmlItem.disabled = true;
-  editXmlItem.title = 'XML editor not yet available';
+  editXmlItem.id = 'menu-item-edit-xml';
+  editXmlItem.title = 'Edit the .drawio XML of the current page';
   extrasList.appendChild(editXmlItem);
 
   const copySvgItem = document.createElement('button');

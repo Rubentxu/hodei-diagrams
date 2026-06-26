@@ -329,6 +329,22 @@ export class DiagramEngineSession {
   }
 
   /**
+   * Export using a synthesized IdMap (no import context required).
+   * Useful when the editor was bootstrapped programmatically and
+   * `exportDrawio` fails with `ExportFailed: no import context`.
+   */
+  exportDrawioFresh(): Result<string, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const xml = this.wasm.export_drawio_fresh_engine(this.handle as number);
+      return ok(xml);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
    * Connect two vertices with an edge.
    * @param from Source vertex SlotmapId
    * @param to Target vertex SlotmapId

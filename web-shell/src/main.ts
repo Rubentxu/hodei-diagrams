@@ -29,6 +29,7 @@ import { VersionStore } from './version-store.js';
 import { HistoryPanel } from './history-panel.js';
 import { runMathOverlay } from './math/math-overlay.js';
 import { openMathInsertDialog } from './math/math-dialog.js';
+import { showEditXmlDialog } from './edit-xml-dialog.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
@@ -570,6 +571,35 @@ async function bootstrap(): Promise<void> {
     }
   });
   syncMathModeCheckmark();
+
+  // ─── Extras > Edit XML ─────────────────────────────────────────────────────
+  // Opens a dialog with the current .drawio XML, lets the user edit it,
+  // and re-imports the result back into the engine on Apply.
+  const editXmlMenuItem = document.getElementById('menu-item-edit-xml');
+  editXmlMenuItem?.addEventListener('click', () => {
+    if (!activeSession) return;
+    // Try the import-context export first (preserves original .drawio IDs).
+    // Fall back to the fresh-engine export when the engine was bootstrapped
+    // programmatically (no import yet) — it synthesizes IDs from the model.
+    let result = activeSession.exportDrawio();
+    if (!result.ok) {
+      result = activeSession.exportDrawioFresh();
+    }
+    if (!result.ok) {
+      showError(ui.errorBanner, ui.errorMessage, 'Edit XML failed: ' + result.error);
+      return;
+    }
+    showEditXmlDialog(result.value, (newXml: string) => {
+      if (!activeSession) return false;
+      const r = activeSession.importDrawio(newXml);
+      if (!r.ok) {
+        showError(ui.errorBanner, ui.errorMessage, 'Edit XML failed: ' + r.error);
+        return false;
+      }
+      handleImport(newXml);
+      return true;
+    });
+  });
 
   // ─── Insert > Math Formula ─────────────────────────────────────────────────
   const insertMathMenuItem = document.getElementById('menu-item-insert-math');

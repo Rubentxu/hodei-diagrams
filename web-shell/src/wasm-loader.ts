@@ -22,6 +22,7 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       render_pages: mod.render_pages,
       import_drawio: mod.import_drawio,
       export_drawio: mod.export_drawio,
+      export_drawio_fresh_engine: mod.export_drawio_fresh_engine,
       undo: mod.undo,
       redo: mod.redo,
       engine_can_undo: mod.engine_can_undo,
