@@ -97,7 +97,6 @@ describe('StencilLibraryManager', () => {
       mockWasm.parse_stencil_library_xml.mockReturnValue(JSON.stringify(SAMPLE_STENCILS));
 
       // Create manager — constructor kicks off auto-load
-      // eslint-disable-next-line no-new
       new StencilLibraryManager(mockSession as never, mockWasm as never);
 
       // Wait for async constructor to settle

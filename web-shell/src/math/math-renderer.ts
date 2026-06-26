@@ -42,7 +42,7 @@ export interface MathRenderer {
    * @param displayMode Whether to use display mode (block) or inline
    * @param target The HTML element to render into
    */
-  render(latex: string, displayMode: boolean, target: HTMLElement): void;
+  render(_latex: string, _displayMode: boolean, _target: HTMLElement): void;
   /** Returns true once the renderer is ready (i.e., library loaded). */
   isReady(): boolean;
 }
@@ -68,7 +68,6 @@ export class KaTeXRenderer implements MathRenderer {
     void this.#renderImpl(latex, displayMode, target, currentReady);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   async #renderImpl(
     latex: string,
     displayMode: boolean,

@@ -14,7 +14,7 @@ import { showDialog, hideDialog } from '../ui.js';
  * @param onInsert Called with the LaTeX string when user confirms.
  *                  The caller creates the vertex and sets the label.
  */
-export function openMathInsertDialog(onInsert: (latex: string) => void): void {
+export function openMathInsertDialog(onInsert: (_latex: string) => void): void {
   const overlay = document.createElement('div');
   overlay.className = 'dialog-overlay';
 
@@ -100,7 +100,7 @@ export function openMathInsertDialog(onInsert: (latex: string) => void): void {
  */
 export function openMathEditDialog(
   currentLatex: string,
-  onSave: (newLatex: string) => void,
+  onSave: (_newLatex: string) => void,
 ): void {
   const overlay = document.createElement('div');
   overlay.className = 'dialog-overlay';

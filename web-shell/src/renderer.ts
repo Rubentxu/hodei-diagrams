@@ -49,20 +49,20 @@ export function applySelectionClass(viewer: HTMLElement, id: SlotmapId | null): 
 
 export interface ZoomPanControls {
   /** Set the current zoom level (clamped 0.1–5). */
-  setZoom(z: number): void;
+  setZoom(_z: number): void;
   /** Get the current zoom level. */
   getZoom(): number;
   /** Reset zoom to 1x and pan to (0,0). */
   resetView(): void;
   /** Set pan offset in CSS pixels. */
-  setPan(x: number, y: number): void;
+  setPan(_x: number, _y: number): void;
   /** Convert screen client coordinates to document-space coordinates. */
-  clientToDoc(clientX: number, clientY: number): { x: number; y: number };
+  clientToDoc(_clientX: number, _clientY: number): { x: number; y: number };
   /**
    * Zoom and pan so all shapes fit within the viewport.
    * Uses 5% viewport margin by default. Safe no-op when viewer is empty.
    */
-  fitToView(padding?: number): void;
+  fitToView(_padding?: number): void;
 }
 
 /**

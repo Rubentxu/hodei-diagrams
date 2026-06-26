@@ -47,7 +47,7 @@ function normalizeOverlayHtml(html: string): string {
     .trim();
 }
 
-const MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
+const _MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" type="device">
   <diagram name="math-test" id="math-test-1">
     <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="800" pageHeight="600" math="1" shadow="0">
@@ -62,7 +62,7 @@ const MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </diagram>
 </mxfile>`;
 
-const NON_MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
+const _NON_MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" type="device">
   <diagram name="no-math" id="no-math-1">
     <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="800" pageHeight="600">

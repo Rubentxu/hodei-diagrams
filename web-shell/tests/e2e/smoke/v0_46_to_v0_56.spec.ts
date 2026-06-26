@@ -134,7 +134,7 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
 
       // Context menu should appear with delete or close option
       const deleteOption = page.locator('text=Delete').or(page.locator('text=Close'));
-      const menuVisible = await deleteOption.count() > 0;
+      const _menuVisible = await deleteOption.count() > 0;
       // If no menu appeared, at least verify no crash
       const errorBanner = page.locator('[data-testid="error-banner"]');
       await expect(errorBanner).not.toBeVisible();
@@ -360,14 +360,14 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
     const searchInput = page.locator('[data-testid="sidebar-search"]');
     if (await searchInput.count() > 0) {
       // Get initial vertex count
-      const initialCount = await page.locator('[data-vertex-id]').count();
+      const _initialCount = await page.locator('[data-vertex-id]').count();
 
       // Type a search term
       await searchInput.fill('rect');
       await page.waitForTimeout(300);
 
       // Count may or may not change depending on matching
-      const afterCount = await page.locator('[data-vertex-id]').count();
+      const _afterCount = await page.locator('[data-vertex-id]').count();
       // At minimum verify search didn't crash the app
       const errorBanner = page.locator('[data-testid="error-banner"]');
       await expect(errorBanner).not.toBeVisible();
@@ -436,14 +436,14 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
     await page.waitForTimeout(200);
 
     // Get initial position
-    const initialTransform = await vertex.getAttribute('transform');
+    const _initialTransform = await vertex.getAttribute('transform');
 
     // Press arrow key
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(200);
 
     // Position should change
-    const afterTransform = await vertex.getAttribute('transform');
+    const _afterTransform = await vertex.getAttribute('transform');
     // Note: position may or may not change depending on implementation,
     // but at minimum verify no crash
     const errorBanner = page.locator('[data-testid="error-banner"]');
@@ -460,14 +460,14 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
 
     // Get initial zoom if display exists
     const zoomDisplay = page.locator('[data-testid="zoom-display"]');
-    const initialZoom = await zoomDisplay.textContent().catch(() => '100');
+    const _initialZoom = await zoomDisplay.textContent().catch(() => '100');
 
     // Press + key
     await page.keyboard.press('+');
     await page.waitForTimeout(200);
 
     // Check zoom changed
-    const afterZoom = await zoomDisplay.textContent().catch(() => '100');
+    const _afterZoom = await zoomDisplay.textContent().catch(() => '100');
 
     // Verify no error occurred
     const errorBanner = page.locator('[data-testid="error-banner"]');
@@ -478,7 +478,7 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    const zoomDisplay = page.locator('[data-testid="zoom-display"]');
+    const _zoomDisplay = page.locator('[data-testid="zoom-display"]');
 
     // Press - key
     await page.keyboard.press('-');

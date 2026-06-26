@@ -56,7 +56,7 @@ test.describe('Version History', () => {
     // Should now have one version row
     // Use :not() to exclude child elements (label, time) that also start with "history-row-"
     const versionRows = page.locator('[data-testid^="history-row-"]:not([data-testid*="label"]):not([data-testid*="time"]):not([data-testid*="label"]):not([data-testid*="time"])');
-    const rowTexts = await versionRows.allTextContents();
+    const _rowTexts = await versionRows.allTextContents();
 
     await expect(versionRows).toHaveCount(1);
 

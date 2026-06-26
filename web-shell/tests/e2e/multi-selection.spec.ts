@@ -59,7 +59,7 @@ test.describe('Multi-selection', () => {
 
       const viewer = page.locator('[data-testid="viewer"]');
       const shapes = viewer.locator('[data-vertex-id]');
-      const shapeCount = await shapes.count();
+      const _shapeCount = await shapes.count();
 
       // Click a shape to select it
       await shapes.first().click();
@@ -204,7 +204,7 @@ test.describe('Multi-selection', () => {
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
       const viewer = page.locator('[data-testid="viewer"]');
-      const shapes = viewer.locator('[data-vertex-id]');
+      const _shapes = viewer.locator('[data-vertex-id]');
 
       // Place one more shape
       await page.locator('[data-testid="rect-tool-btn"]').click();
