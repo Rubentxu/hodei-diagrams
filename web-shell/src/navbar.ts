@@ -159,6 +159,17 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   deleteItem.setAttribute('data-testid', 'menu-delete');
   editList.appendChild(deleteItem);
 
+  // Separator
+  const editSep1 = document.createElement('hr');
+  editList.appendChild(editSep1);
+
+  const selectAllItem = document.createElement('button');
+  selectAllItem.className = 'menu-item';
+  selectAllItem.textContent = 'Select All';
+  selectAllItem.title = 'Ctrl+A';
+  selectAllItem.setAttribute('data-testid', 'menu-select-all');
+  editList.appendChild(selectAllItem);
+
   editMenu.appendChild(editList);
   menuBar.appendChild(editMenu);
 
