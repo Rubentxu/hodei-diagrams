@@ -1206,6 +1206,12 @@ async function bootstrap(): Promise<void> {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
   });
 
+  // Edit > Select All (Ctrl+A)
+  const menuSelectAll = document.querySelector('[data-testid="menu-select-all"]');
+  menuSelectAll?.addEventListener('click', () => {
+    activeEditor?.selectAll();
+  });
+
   // View > Zoom In
   const menuZoomIn = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(1)');
   menuZoomIn?.addEventListener('click', () => {
