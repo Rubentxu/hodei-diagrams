@@ -52,14 +52,6 @@ let hud: HudControls | null = null;
 // ─── Grid overlay state ───────────────────────────────────────────────────────
 const GRID_LS_KEY = 'hodei:grid-visible';
 
-function isGridVisible(): boolean {
-  try {
-    return localStorage.getItem(GRID_LS_KEY) === 'true';
-  } catch {
-    return false;
-  }
-}
-
 function setGridVisible(visible: boolean): void {
   try {
     localStorage.setItem(GRID_LS_KEY, String(visible));
@@ -511,9 +503,20 @@ async function bootstrap(): Promise<void> {
   // Make hud accessible to module-level save functions
   hud = ui.hud;
 
-  // ─── 4.5. Restore grid state ────────────────────────────────────────────────
+  // ─── 4.5. Restore grid state (default: visible) ─────────────────────────
+  // The empty canvas benefits from a visible grid so users see the
+  // drawing surface immediately. Default flipped from hidden to visible
+  // in fix/empty-canvas-bootstrap.
   const gridMenuItem = document.getElementById('menu-item-grid');
-  if (isGridVisible()) {
+  const shouldShowGrid = (() => {
+    try {
+      const stored = localStorage.getItem(GRID_LS_KEY);
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  })();
+  if (shouldShowGrid) {
     ui.canvasContainer.classList.add('show-grid');
     gridMenuItem?.classList.add('has-checkmark');
   }
@@ -724,7 +727,159 @@ async function bootstrap(): Promise<void> {
     }
   };
 
+  // ─── Bootstrap empty canvas ──────────────────────────────────────────────
+  // The fresh engine has zero pages (DiagramModel::default). Without a
+  // page, renderAllPages() returns an empty array, mountSvg is never
+  // called, and the viewer stays dark. Add a default empty page so the
+  // canvas is immediately visible and editable.
+  const bootstrapResult = activeSession.executeCommand(JSON.stringify({
+    AddPage: {
+      page: {
+        id: { idx: 0, version: 0 },
+        name: { text: 'Page 1' },
+        size: { width: 800, height: 600 },
+      },
+    },
+  }));
+  if (!bootstrapResult.ok) {
+    showError(ui.errorBanner, ui.errorMessage, 'Bootstrap failed: ' + bootstrapResult.error);
+  }
+
+  // Render the initial empty page
+  const bootstrapRender = activeSession.renderAllPages();
+  if (bootstrapRender.ok && bootstrapRender.value.length > 0) {
+    activePages = bootstrapRender.value;
+    mountSvg(ui.viewer, activePages[0]!.svg);
+    populatePageTabs(ui.pageTabContainer, activePages, 0, {
+      onSelect: handlePageSelect,
+      onRename: handlePageRename,
+      onDelete: handlePageDelete,
+    });
+    ui.hud.setPage(1, activePages.length);
+    ui.hud.setMode('Edit');
+    ui.saveButton.disabled = false;
+  }
+
+  // ─── Initialize editor and wire shape/drop listeners at startup ─────────
+  // Previously this lived inside handleImport, so before any file load the
+  // canvas was inert and shape buttons did nothing. Now the editor is
+  // ready as soon as the engine session is up.
+  activeEditor = new Editor(
+    activeSession,
+    ui.viewer,
+    onEditorError,
+    onStateChange,
+    onSelectionChange,
+    onToolChange,
+    () => zoomPan?.getZoom() ?? 1,
+  );
+  activeEditor.attach();
+
+  activeEditor.setZoomCallbacks({
+    zoomIn: () => {
+      zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
+      ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+    },
+    zoomOut: () => {
+      zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
+      ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+    },
+    resetZoom: () => {
+      zoomPan?.resetView();
+      ui.hud.setZoom(100);
+    },
+  });
+
+  activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
+
+  // Snap menu wiring
+  const snapMenuItem = document.getElementById('menu-item-snap');
+  function updateSnapCheckState(): void {
+    if (!activeEditor) return;
+    snapMenuItem?.classList.toggle('has-checkmark', activeEditor.snapEnabled);
+  }
+  snapMenuItem?.addEventListener('click', () => {
+    if (!activeEditor) return;
+    activeEditor.toggleSnap();
+    updateSnapCheckState();
+    ui.hud.setSnap(activeEditor.snapEnabled);
+  });
+
+  inspector.setEditor(activeEditor);
+  ui.toolbar.setEditor(activeEditor);
+  ui.toolbar.update([]);
+
+  // Stencil drag-and-drop
+  const stencilBtns = [
+    ui.rectangleStencilButton,
+    ui.ellipseStencilButton,
+    ui.diamondStencilButton,
+    ui.triangleStencilButton,
+    ui.hexagonStencilButton,
+    ui.cylinderStencilButton,
+    ui.cloudStencilButton,
+    ui.parallelogramStencilButton,
+    ui.trapezoidStencilButton,
+    ui.blockArrowStencilButton,
+  ];
+
+  for (const btn of stencilBtns) {
+    if (!btn) continue;
+    btn.addEventListener('dragstart', (e) => {
+      if (!activeEditor) return;
+      const stencilName = btn.getAttribute('data-stencil-name') ?? '';
+      const toolMap: Record<string, string> = {
+        rectangle: 'rectangle-stencil',
+        ellipse: 'ellipse-stencil',
+        diamond: 'diamond-stencil',
+        triangle: 'triangle-stencil',
+        hexagon: 'hexagon-stencil',
+        cylinder: 'cylinder-stencil',
+        cloud: 'cloud-stencil',
+        parallelogram: 'parallelogram-stencil',
+        trapezoid: 'trapezoid-stencil',
+        blockArrow: 'blockArrow-stencil',
+      };
+      const tool = toolMap[stencilName] ?? 'rectangle-stencil';
+      activeEditor.startStencilDrag(tool, e.clientX, e.clientY);
+    });
+  }
+
+  ui.canvasContainer.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (!activeEditor) return;
+    activeEditor.updateStencilDragPreview(e.clientX, e.clientY);
+  });
+
+  ui.canvasContainer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!activeEditor) return;
+    activeEditor.endStencilDrag(e.clientX, e.clientY);
+  });
+
+  // Dynamic stencil library shape activation (click-to-add)
+  ui.sidebar.addEventListener('stencil-shape-activate', (e) => {
+    if (!activeSession) return;
+    const event = e as CustomEvent<{ library: string; name: string }>;
+    const { library, name } = event.detail;
+    activeSession.addStencilVertex(library, name, 400, 300);
+  });
+
+  // Re-render when session state changes
+  activeSession.setOnStateChange(() => {
+    activeEditor?.triggerReplay();
+    onStateChange();
+  });
+
+  activeEditor.refreshScene();
+  activeEditorIdx = 0;
+  activeEditor.activePageIdx = 0;
+  updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+
   // ─── 6. Import handler ────────────────────────────────────────────────────
+  // Editor + shape listeners are wired at startup (above). This handler
+  // just replaces the engine contents with the imported diagram and
+  // re-renders the canvas.
   function handleImport(xml: string): void {
     if (!activeSession) return;
     const importResult = activeSession.importDrawio(xml);
@@ -755,148 +910,15 @@ async function bootstrap(): Promise<void> {
       });
     }
 
-    // Wire editor after successful import
-    if (!activeEditor) {
-      activeEditor = new Editor(
-        activeSession,
-        ui.viewer,
-        onEditorError,
-        onStateChange,
-        onSelectionChange,
-        onToolChange,
-        () => zoomPan?.getZoom() ?? 1,
-      );
-      activeEditor.attach();
-
-      // Wire zoom keyboard shortcuts
-      activeEditor.setZoomCallbacks({
-        zoomIn: () => {
-          zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
-          ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-        },
-        zoomOut: () => {
-          zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
-          ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-        },
-        resetZoom: () => {
-          zoomPan?.resetView();
-          ui.hud.setZoom(100);
-        },
-      });
-
-      // Wire cursor position to HUD (rAF-throttled)
-      activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
-
-      // ── Snap menu ───────────────────────────────────────────────────────────────
-      const snapMenuItem = document.getElementById('menu-item-snap');
-      function updateSnapCheckState(): void {
-        if (!activeEditor) return;
-        const snapEnabled = activeEditor.snapEnabled;
-        snapMenuItem?.classList.toggle('has-checkmark', snapEnabled);
-      }
-      snapMenuItem?.addEventListener('click', () => {
-        if (!activeEditor) return;
-        activeEditor.toggleSnap();
-        updateSnapCheckState();
-        ui.hud.setSnap(activeEditor.snapEnabled);
-      });
-
-      // Wire inspector to editor for arrange operations
-      inspector.setEditor(activeEditor);
-
-      // Wire toolbar to editor for context-sensitive controls
-      ui.toolbar.setEditor(activeEditor);
-
-      // Initialize toolbar disabled state (no selection yet)
-      ui.toolbar.update([]);
-
-      // ── Stencil drag-and-drop ─────────────────────────────────────────────
-      // Wire dragstart on all stencil sidebar buttons
-      const stencilBtns = [
-        ui.rectangleStencilButton,
-        ui.ellipseStencilButton,
-        ui.diamondStencilButton,
-        ui.triangleStencilButton,
-        ui.hexagonStencilButton,
-        ui.cylinderStencilButton,
-        ui.cloudStencilButton,
-        ui.parallelogramStencilButton,
-        ui.trapezoidStencilButton,
-        ui.blockArrowStencilButton,
-      ];
-
-      for (const btn of stencilBtns) {
-        if (!btn) continue;
-        btn.addEventListener('dragstart', (e) => {
-          if (!activeEditor) return;
-          const stencilName = btn.getAttribute('data-stencil-name') ?? '';
-          // Map to ToolKind stencil variant
-          const toolMap: Record<string, string> = {
-            rectangle: 'rectangle-stencil',
-            ellipse: 'ellipse-stencil',
-            diamond: 'diamond-stencil',
-            triangle: 'triangle-stencil',
-            hexagon: 'hexagon-stencil',
-            cylinder: 'cylinder-stencil',
-            cloud: 'cloud-stencil',
-            parallelogram: 'parallelogram-stencil',
-            trapezoid: 'trapezoid-stencil',
-            blockArrow: 'blockArrow-stencil',
-          };
-          const tool = toolMap[stencilName] ?? 'rectangle-stencil';
-          activeEditor.startStencilDrag(tool, e.clientX, e.clientY);
-        });
-      }
-
-      // Wire canvas container for dragover (update preview) and drop (create shape)
-      ui.canvasContainer.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        if (!activeEditor) return;
-        activeEditor.updateStencilDragPreview(e.clientX, e.clientY);
-      });
-
-      ui.canvasContainer.addEventListener('drop', (e) => {
-        e.preventDefault();
-        if (!activeEditor) return;
-        activeEditor.endStencilDrag(e.clientX, e.clientY);
-      });
-      // ─────────────────────────────────────────────────────────────────────
-
-      // ── Dynamic stencil library shape activation (click-to-add) ───────────
-      ui.sidebar.addEventListener('stencil-shape-activate', (e) => {
-        if (!activeSession) return;
-        const event = e as CustomEvent<{ library: string; name: string }>;
-        const { library, name } = event.detail;
-        // Add at canvas center (400, 300) as default activation position
-        activeSession.addStencilVertex(library, name, 400, 300);
-      });
-      // ─────────────────────────────────────────────────────────────────────
-
-      // Re-render when inspector modifies state via session.executeCommand
-      activeSession.setOnStateChange(() => {
-        activeEditor?.triggerReplay();
-        // Also update UI buttons and schedule auto-save
-        onStateChange();
-      });
-    }
-
-    // Ensure the editor's scene cache is refreshed after import
-    // This is needed because attach() might have been called when the engine had no diagram
-    activeEditor.refreshScene();
-
+    activeEditor?.refreshScene();
     activeEditorIdx = 0;
     if (activeEditor) activeEditor.activePageIdx = 0;
 
-    // Update HUD page info
     ui.hud.setPage(1, activePages.length);
     ui.hud.setMode('Edit');
-
-    // Enable Save button
     ui.saveButton.disabled = false;
-
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
 
-    // Reset zoom on import
     zoomPan?.resetView();
     ui.zoomDisplay.textContent = '100%';
     ui.hud.setZoom(100);

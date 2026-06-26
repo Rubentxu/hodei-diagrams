@@ -6,3 +6,6 @@ playwright-report/
 test-results/
 coverage/
 *.log
+
+# Local scratch / verification-only Playwright specs (not shipped with repo)
+tests/e2e/_verify/
