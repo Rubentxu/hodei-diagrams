@@ -42,7 +42,7 @@ fn simple_rect_renders_correctly() {
     let svg = renderer.render(&scene, PageId::default()).unwrap();
 
     // Assert output begins with correct SVG tag
-    assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 827 1169\">"));
+    assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 827 1169\" preserveAspectRatio=\"none\">"));
 
     // Assert contains title
     assert!(svg.contains("<title>Page-1</title>"));

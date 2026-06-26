@@ -55,7 +55,7 @@
   /* Layout */
   --navbar-h: 76px;
   --sidebar-w: 220px;
-  --inspector-w: 260px;
+  --inspector-w: 230px;
   --bottom-h: 36px;
   --rail-w: 36px;
 
@@ -867,7 +867,10 @@ button:disabled {
 }
 
 /* ─── Slice B: Grid Overlay ─────────────────────────────────────────────────── */
-.canvas-container.show-grid::before {
+/* Grid rendered ON TOP of the viewer (z-index: 2) so the user sees
+   grid lines across the white page background. Pointer events pass
+   through (pointer-events: none) so hit-testing still works. */
+.canvas-container.show-grid::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -876,11 +879,11 @@ button:disabled {
     linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
   background-size: calc(var(--grid-cell) * var(--zoom, 1)) calc(var(--grid-cell) * var(--zoom, 1));
   pointer-events: none;
-  z-index: 0;
-  opacity: 1;
+  z-index: 2;
+  opacity: 0.45;
 }
 
-.canvas-container.show-grid .viewer {
+.canvas-container .viewer {
   position: relative;
   z-index: 1;
 }
@@ -890,7 +893,8 @@ button:disabled {
   grid-area: hud;
   display: flex;
   align-items: center;
-  gap: var(--lg);
+  flex-wrap: wrap;
+  gap: var(--md);
   background: var(--bg-secondary);
   border-top: 1px solid var(--bg-surface);
   border-bottom: 1px solid var(--bg-surface);
@@ -899,7 +903,9 @@ button:disabled {
   font-size: 11px;
   color: var(--text-dim);
   min-height: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
 }
 
 .hud-weighted {
