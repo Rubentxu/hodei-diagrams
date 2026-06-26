@@ -150,3 +150,54 @@ doctor:
 # ─── Default ────────────────────────────────────────────────────────────────
 
 default: doctor
+
+# ─── Visual Validation ─────────────────────────────────────────────────────
+# These recipes run the visual smoke suite that captures screenshots and
+# asserts no console errors. Output goes to web-shell/tests/e2e/_verify/screenshots/
+
+# Resolve Playwright browser cache (override with PLAYWRIGHT_BROWSERS_PATH env var)
+PLAYWRIGHT_CACHE := env_var_or_default("PLAYWRIGHT_BROWSERS_PATH", env_var("HOME") + "/.cache/ms-playwright")
+
+_check-playwright-prereqs:
+    @command -v npx >/dev/null || { echo "❌ npx not installed"; exit 1; }
+    @if [ ! -d "{{PLAYWRIGHT_CACHE}}" ]; then \
+        echo "⚠️  No Playwright browser cache at {{PLAYWRIGHT_CACHE}}. Will download on first run."; \
+    fi
+
+# Run the visual smoke suite against a running dev server
+# Usage: just visual-verify
+# Pre: a dev server must be running on :4100 (run `just dev` in another terminal)
+visual-verify: _check-playwright-prereqs
+    @echo "🎨 Running visual smoke suite against http://localhost:{{VITE_PORT}}…"
+    cd {{WEB_SHELL_DIR}} && PLAYWRIGHT_BROWSERS_PATH={{PLAYWRIGHT_CACHE}} npx playwright test tests/e2e/_verify/visual-smoke.spec.ts --reporter=line
+
+# Boot the dev server in the background, run the visual suite, then kill the server.
+# Usage: just visual-verify-all
+visual-verify-all: _check-wasm-prereqs _ensure-deps web-wasm
+    @echo "🎬 Booting dev server + running visual smoke suite…"
+    @cd {{WEB_SHELL_DIR}} && (nohup npx vite --port {{VITE_PORT}} --strictPort > /tmp/vite.log 2>&1 & echo $$! > /tmp/vite.pid; sleep 6) && \
+        (PLAYWRIGHT_BROWSERS_PATH={{PLAYWRIGHT_CACHE}} npx playwright test tests/e2e/_verify/visual-smoke.spec.ts --reporter=line; \
+        TEST_EXIT=$$?; \
+        kill $$(cat /tmp/vite.pid) 2>/dev/null || true; \
+        rm -f /tmp/vite.pid; \
+        exit $$TEST_EXIT)
+
+# Run the visual suite + full Rust + web-shell test suite (one-shot CI for visual validation)
+visual-ci: test web-test visual-verify
+    @echo ""
+    @echo "✅ Visual CI complete. Snapshots in {{WEB_SHELL_DIR}}/tests/e2e/_verify/screenshots/"
+
+# List visual snapshots captured (run visual-verify first)
+visual-snapshots:
+    @echo "📸 Snapshots in {{WEB_SHELL_DIR}}/tests/e2e/_verify/screenshots:"
+    @ls -la {{WEB_SHELL_DIR}}/tests/e2e/_verify/screenshots/ 2>&1 | tail -20 || echo "(no snapshots yet — run just visual-verify first)"
+
+# Open a captured snapshot in the system viewer (Linux only)
+visual-open name:
+    @xdg-open {{WEB_SHELL_DIR}}/tests/e2e/_verify/screenshots/{{name}}.png 2>/dev/null || \
+        echo "❌ No image viewer available or snapshot '{{name}}' not found"
+
+# Alias for visual-verify
+visual: visual-verify
+
+# Update the default to show the most common dev command

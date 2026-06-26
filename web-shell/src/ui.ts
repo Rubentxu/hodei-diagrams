@@ -95,7 +95,7 @@ export function buildEmptyUi(
   root.setAttribute('data-testid', 'app-grid');
 
   // ─── Zone 0: Rail ────────────────────────────────────────────────────────
-  const rail = railCallbacks
+  const _rail = railCallbacks
     ? buildRail(railCallbacks)
     : buildRail({
         onSelectTool: () => {},
@@ -182,7 +182,7 @@ export function buildEmptyUi(
   bottomBar.appendChild(errorBanner);
 
   // ─── Assemble into grid ──────────────────────────────────────────────────
-  root.appendChild(rail.container);
+  root.appendChild(_rail.container);
   root.appendChild(navbar.container);
   root.appendChild(sidebar.container);
   root.appendChild(canvasContainer);
@@ -242,7 +242,7 @@ export function buildEmptyUi(
 
   return {
     // Zone 0
-    railContainer: rail.container,
+    railContainer: _rail.container,
 
     // Zone 1
     fileInput: navbar.fileInput,

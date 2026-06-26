@@ -107,49 +107,24 @@ export function buildHud(): HudControls {
   gridItem.appendChild(gridValue);
   container.appendChild(gridItem);
 
-  // ─── Cursor position ───────────────────────────────────────────────────────
+  // ─── Cursor position + selection count ──────────────────────────────────────
+  // Single compact "cursor" item showing X / Y, plus selection count.
+  // Kept narrow so all HUD items fit in a 28px row at 1280px viewport.
   const cursorItem = document.createElement('div');
   cursorItem.className = 'hud-item hud-cursor';
 
   const cursorLabel = document.createElement('span');
   cursorLabel.className = 'hud-label';
-  cursorLabel.textContent = 'X:';
+  cursorLabel.textContent = 'XY:';
 
   const cursorXValue = document.createElement('span');
   cursorXValue.className = 'hud-value';
   cursorXValue.setAttribute('data-testid', 'hud-cursor');
-  cursorXValue.textContent = '0';
-
-  const cursorSep = document.createElement('span');
-  cursorSep.className = 'hud-value';
-  cursorSep.textContent = ' Y:';
-
-  const cursorYValue = document.createElement('span');
-  cursorYValue.className = 'hud-value';
-  cursorYValue.textContent = '0';
+  cursorXValue.textContent = '0,0';
 
   cursorItem.appendChild(cursorLabel);
   cursorItem.appendChild(cursorXValue);
-  cursorItem.appendChild(cursorSep);
-  cursorItem.appendChild(cursorYValue);
   container.appendChild(cursorItem);
-
-  // ─── Selection count ──────────────────────────────────────────────────────
-  const countItem = document.createElement('div');
-  countItem.className = 'hud-item hud-count';
-
-  const countLabel = document.createElement('span');
-  countLabel.className = 'hud-label';
-  countLabel.textContent = 'Count:';
-
-  const countValue = document.createElement('span');
-  countValue.className = 'hud-value';
-  countValue.setAttribute('data-testid', 'hud-count');
-  countValue.textContent = '0';
-
-  countItem.appendChild(countLabel);
-  countItem.appendChild(countValue);
-  container.appendChild(countItem);
 
   // ─── Separator ────────────────────────────────────────────────────────────
   const sep1 = document.createElement('div');
@@ -265,11 +240,11 @@ export function buildHud(): HudControls {
       gridValue.textContent = visible ? 'On' : 'Off';
     },
     setCursor: (x: number, y: number) => {
-      cursorXValue.textContent = String(Math.round(x));
-      cursorYValue.textContent = String(Math.round(y));
+      cursorXValue.textContent = `${Math.round(x)},${Math.round(y)}`;
     },
-    setSelectionCount: (n: number) => {
-      countValue.textContent = String(n);
+    setSelectionCount: (_n: number) => {
+      // Selection count is now reflected in the Selection label
+      // ("Rect: 0:0 (3 selected)"); the HUD has no separate counter.
     },
     setSaveStatus: (status: SaveStatus) => {
       saveStatusItem.dataset['status'] = status;

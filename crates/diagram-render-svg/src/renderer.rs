@@ -55,9 +55,12 @@ impl SvgRenderer {
 
         let (view_x, view_y, view_w, view_h) = effective_view_box(page);
 
-        // Open svg tag with viewBox
+        // Open svg tag with viewBox + preserveAspectRatio="none" so the page
+        // stretches to fill the canvas container regardless of its aspect
+        // ratio (without this attribute the SVG defaults to xMidYMid meet
+        // which leaves dark bands when container and page aspect differ).
         output.push_str(&format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\">\n",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\" preserveAspectRatio=\"none\">\n",
             view_x, view_y, view_w, view_h
         ));
 
@@ -225,8 +228,10 @@ mod tests {
         let renderer = SvgRenderer::new();
         let result = renderer.render(&scene, PageId::default()).unwrap();
         assert!(
-            result
-                .starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">")
+            result.starts_with(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"none\">"
+            ),
+            "expected SVG to start with preserveAspectRatio=\"none\", got: {result}"
         );
         assert!(result.ends_with("</svg>"));
     }
