@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:wasm": "cd .. && wasm-pack build --target web crates/diagram-wasm --out-dir web-shell/src/wasm",
+    "build:wasm": "cd .. && wasm-pack build --target web crates/diagram-wasm --out-dir ../../web-shell/src/wasm",
     "preview": "vite preview",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
