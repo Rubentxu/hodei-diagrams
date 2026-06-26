@@ -26,12 +26,14 @@ fn apply_set_page_math_enabled_true() {
 
     // Verify initial state: math_enabled is false
     let page = model.store.page(pid).unwrap();
-    assert!(!page.math_enabled, "Page should start with math_enabled=false");
+    assert!(
+        !page.math_enabled,
+        "Page should start with math_enabled=false"
+    );
 
     // Apply SetPageMathEnabled to enable math
-    let mut cmd = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(pid, true),
-    );
+    let mut cmd =
+        Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(pid, true));
     cmd.apply(&mut model).unwrap();
 
     // Verify math_enabled is now true
@@ -47,15 +49,13 @@ fn apply_set_page_math_enabled_false() {
     let (mut model, pid) = make_model_with_page();
 
     // First enable math
-    let mut cmd_enable = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(pid, true),
-    );
+    let mut cmd_enable =
+        Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(pid, true));
     cmd_enable.apply(&mut model).unwrap();
 
     // Apply SetPageMathEnabled to disable math
-    let mut cmd_disable = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(pid, false),
-    );
+    let mut cmd_disable =
+        Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(pid, false));
     cmd_disable.apply(&mut model).unwrap();
 
     // Verify math_enabled is now false
@@ -75,9 +75,8 @@ fn undo_set_page_math_enabled_restores_previous_state() {
     assert!(!page_before);
 
     // Apply SetPageMathEnabled to enable math
-    let mut cmd = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(pid, true),
-    );
+    let mut cmd =
+        Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(pid, true));
     cmd.apply(&mut model).unwrap();
 
     // Verify math_enabled changed
@@ -100,14 +99,12 @@ fn set_page_math_enabled_idempotent_when_same_value() {
     let (mut model, pid) = make_model_with_page();
 
     // Apply twice with same value (true)
-    let mut cmd1 = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(pid, true),
-    );
+    let mut cmd1 =
+        Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(pid, true));
     cmd1.apply(&mut model).unwrap();
 
-    let mut cmd2 = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(pid, true),
-    );
+    let mut cmd2 =
+        Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(pid, true));
     cmd2.apply(&mut model).unwrap();
 
     // Should still be true, no panic
@@ -120,11 +117,14 @@ fn apply_set_page_math_enabled_page_not_found() {
     let (mut model, _pid) = make_model_with_page();
     let bogus_pid = PageId::default();
 
-    let mut cmd = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(bogus_pid, true),
-    );
+    let mut cmd = Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(
+        bogus_pid, true,
+    ));
     let err = cmd.apply(&mut model).unwrap_err();
-    assert!(matches!(err, diagram_commands::CommandError::PageNotFound(_)));
+    assert!(matches!(
+        err,
+        diagram_commands::CommandError::PageNotFound(_)
+    ));
 }
 
 #[test]
@@ -139,9 +139,8 @@ fn editor_execute_set_page_math_enabled() {
     let mut editor = Editor::new(model);
 
     // Execute SetPageMathEnabled
-    let cmd = Command::SetPageMathEnabled(
-        diagram_commands::SetPageMathEnabledPayload::new(pid, true),
-    );
+    let cmd =
+        Command::SetPageMathEnabled(diagram_commands::SetPageMathEnabledPayload::new(pid, true));
     editor.execute(cmd).unwrap();
 
     // Verify

@@ -759,11 +759,7 @@ pub fn clear_edge_label_offset(handle: u32, edge_idx: u32) -> Result<(), JsValue
 /// - `InvalidHandle` if the engine handle is invalid
 /// - `SetPageMathEnabled: page not found` if the page ID does not exist
 #[wasm_bindgen]
-pub fn set_page_math_enabled(
-    handle: u32,
-    page_idx: u32,
-    enabled: bool,
-) -> Result<(), JsValue> {
+pub fn set_page_math_enabled(handle: u32, page_idx: u32, enabled: bool) -> Result<(), JsValue> {
     let result = with_engine_mut(handle, |e| {
         let pid = match find_page_by_idx(e.editor.model(), page_idx) {
             Some(id) => id,
