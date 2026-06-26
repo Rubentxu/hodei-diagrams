@@ -2,19 +2,50 @@
  * math-rendering.spec.ts — E2E tests for math typesetting UI.
  *
  * Spec scenarios covered:
- * - MATH-030: KaTeX overlay replaces math text
+ * - MATH-030: KaTeX overlay replaces math text + snapshot of rendered HTML
  * - MATH-031: No KaTeX fetch when math disabled
  * - MATH-032: Insert math formula via menu
  * - MATH-033: Edit math formula via double-click
- * - MATH-034: Fallback on malformed LaTeX
+ * - MATH-034: Fallback on malformed LaTeX + snapshot of fallback HTML
  *
  * Requires the dev server running on http://localhost:4100.
  * Run with: `npx playwright test web-shell/tests/e2e/math-rendering.spec.ts`
  *
  * If Playwright browsers are not installed, run `npx playwright install chromium` first.
+ *
+ * Snapshot baselines (web-shell/tests/e2e/*.spec.ts-snapshots/) are NOT shipped
+ * with the repo. To generate them on first run:
+ *   npx playwright test web-shell/tests/e2e/math-rendering.spec.ts --update-snapshots
+ * Then re-run without --update-snapshots to verify the baseline matches.
+ *
+ * KaTeX renders deterministically for a given input expression (counter-based IDs
+ * reset per page load), so snapshots are stable across runs. When upgrading
+ * `katex`, regenerate baselines with --update-snapshots and review the diff.
  */
 
 import { expect, test } from '@playwright/test';
+
+/**
+ * Normalize KaTeX overlay HTML for snapshot comparison.
+ *
+ * KaTeX emits stable output for a given input, but two sources of non-determinism
+ * need stripping before snapshotting:
+ *
+ * 1. `MathML-UniqueKey-N` — counter that increments per render call; stable within
+ *    a page load but not guaranteed across reloads.
+ * 2. Whitespace between tags — Vite dev vs build can differ slightly; collapse
+ *    to a single normal form.
+ *
+ * Keep this minimal. Over-sanitizing defeats the purpose of snapshot tests
+ * (catching real regressions in rendered markup).
+ */
+function normalizeOverlayHtml(html: string): string {
+  return html
+    .replace(/MathML-UniqueKey-\d+/g, 'MathML-UniqueKey-X')
+    .replace(/\s+/g, ' ')
+    .replace(/>\s+</g, '><')
+    .trim();
+}
 
 const MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" type="device">
@@ -65,6 +96,11 @@ test.describe('math rendering (MATH-030..034)', () => {
     // The overlay should contain KaTeX-rendered content (not just raw LaTeX)
     const html = await overlay.innerHTML();
     expect(html).toContain('katex');
+
+    // Snapshot: lock the rendered KaTeX markup to catch regressions when KaTeX
+    // or the overlay runner changes. Baseline must be generated with
+    // `--update-snapshots` on first run (see file header).
+    expect(normalizeOverlayHtml(html)).toMatchSnapshot('math-030-katex-overlay.txt');
   });
 
   test('math_031_no_katex_fetch_when_math_disabled', async ({ page }) => {
@@ -143,6 +179,12 @@ test.describe('math rendering (MATH-030..034)', () => {
     // Overlay should contain raw LaTeX as monospace (fallback)
     const text = await overlay.textContent();
     expect(text).toContain('\\not_a_real_command{');
+
+    // Snapshot: lock the fallback rendering path (raw LaTeX, not KaTeX-processed)
+    // to catch regressions in error handling. Baseline must be generated with
+    // `--update-snapshots` on first run (see file header).
+    const fallbackHtml = await overlay.innerHTML();
+    expect(normalizeOverlayHtml(fallbackHtml)).toMatchSnapshot('math-034-fallback.txt');
 
     // No uncaught exception should have reached console
     // (This is verified indirectly — if the page crashed, the overlay wouldn't render)
