@@ -83,16 +83,37 @@ export class DiagramEngineSession {
       const pages: PageRender[] = [];
       for (let i = 0; i < parsed.length; i++) {
         const entry = parsed[i] as Record<string, unknown>;
-        const pageId = entry['page_id'];
-        if (typeof pageId !== 'number') {
-          return err('RenderFailed: page_id is not a number at index ' + i);
+        const pageIdRaw = entry['page_id'];
+        // The engine now serializes page_id as the full slotmap key
+        // `{ idx, version }`. Older runtimes sent a bare u64; we accept
+        // both for backward compatibility.
+        let slotmapId: { idx: number; version: number };
+        if (
+          typeof pageIdRaw === 'object' &&
+          pageIdRaw !== null &&
+          'idx' in pageIdRaw &&
+          'version' in pageIdRaw
+        ) {
+          const obj = pageIdRaw as { idx: number; version: number };
+          slotmapId = { idx: obj.idx, version: obj.version };
+        } else if (typeof pageIdRaw === 'number') {
+          slotmapId = { idx: pageIdRaw, version: 0 };
+        } else {
+          return err(
+            'RenderFailed: page_id has unexpected shape at index ' +
+              i +
+              ': ' +
+              JSON.stringify(pageIdRaw),
+          );
         }
+        const pageId = slotmapId.idx as PageToken;
         // Cache the SVG
-        this.svgCache.set(pageId as PageToken, entry['svg'] as string);
+        this.svgCache.set(pageId, entry['svg'] as string);
         // Use name or default
         const name = typeof entry['name'] === 'string' ? entry['name'] : 'Page ' + (i + 1);
         pages.push({
-          pageId: pageId as PageToken,
+          pageId,
+          slotmapId,
           name,
           svg: entry['svg'] as string,
         });
@@ -157,7 +178,12 @@ export class DiagramEngineSession {
     const g = this.guard();
     if (!g.ok) return g;
     try {
-      const json = JSON.stringify(cmdJsons);
+      // The Rust side deserializes a Vec<Command>, not a Vec<String>.
+      // We must re-serialize the parsed objects so each element is a real
+      // Command object (not a stringified blob that serde rejects with
+      // "unknown variant").
+      const commands = cmdJsons.map((s) => JSON.parse(s));
+      const json = JSON.stringify(commands);
       this.wasm.execute_transaction(this.handle as number, json);
       this.#onStateChange?.();
       return ok(undefined);

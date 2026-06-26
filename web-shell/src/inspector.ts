@@ -36,7 +36,10 @@ interface StyleChanges {
   italic?: string;
 }
 
-export function buildInspector(session: DiagramEngineSession): InspectorControls {
+export function buildInspector(
+  session: DiagramEngineSession,
+  onStyleChange?: (_changes: { fillColor?: string; strokeColor?: string }) => void,
+): InspectorControls {
   const container = document.createElement('div');
   container.className = 'inspector';
   container.setAttribute('data-testid', 'inspector');
@@ -112,10 +115,12 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   fillGroup.field.appendChild(fillHex);
   fillInput.addEventListener('input', () => {
     fillHex.value = fillInput.value;
+    onStyleChange?.({ fillColor: fillInput.value });
   });
   fillHex.addEventListener('input', () => {
     if (/^#[0-9A-Fa-f]{6}$/.test(fillHex.value)) {
       fillInput.value = fillHex.value;
+      onStyleChange?.({ fillColor: fillHex.value });
     }
   });
   appearanceSection.appendChild(fillGroup.container);
@@ -138,10 +143,12 @@ export function buildInspector(session: DiagramEngineSession): InspectorControls
   strokeGroup.field.appendChild(strokeHex);
   strokeInput.addEventListener('input', () => {
     strokeHex.value = strokeInput.value;
+    onStyleChange?.({ strokeColor: strokeInput.value });
   });
   strokeHex.addEventListener('input', () => {
     if (/^#[0-9A-Fa-f]{6}$/.test(strokeHex.value)) {
       strokeInput.value = strokeHex.value;
+      onStyleChange?.({ strokeColor: strokeHex.value });
     }
   });
   appearanceSection.appendChild(strokeGroup.container);

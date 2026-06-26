@@ -85,9 +85,9 @@ describe('ui', () => {
   it('populatePageTabs creates one tab per page and marks active', () => {
     const container = document.createElement('div');
     const pages: PageRender[] = [
-      { pageId: 1 as PageToken, name: 'Page A', svg: '' },
-      { pageId: 2 as PageToken, name: 'Page B', svg: '' },
-      { pageId: 3 as PageToken, name: 'Page C', svg: '' },
+      { pageId: 1 as PageToken, slotmapId: { idx: 1, version: 0 }, name: 'Page A', svg: '' },
+      { pageId: 2 as PageToken, slotmapId: { idx: 2, version: 0 }, name: 'Page B', svg: '' },
+      { pageId: 3 as PageToken, slotmapId: { idx: 3, version: 0 }, name: 'Page C', svg: '' },
     ];
     const callbacks = {
       onSelect: vi.fn(),
@@ -114,8 +114,8 @@ describe('ui', () => {
   it('populatePageTabs click triggers onSelect', () => {
     const container = document.createElement('div');
     const pages: PageRender[] = [
-      { pageId: 10 as PageToken, name: 'Page A', svg: '' },
-      { pageId: 20 as PageToken, name: 'Page B', svg: '' },
+      { pageId: 10 as PageToken, slotmapId: { idx: 10, version: 0 }, name: 'Page A', svg: '' },
+      { pageId: 20 as PageToken, slotmapId: { idx: 20, version: 0 }, name: 'Page B', svg: '' },
     ];
     const callbacks = {
       onSelect: vi.fn(),

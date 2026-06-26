@@ -24,8 +24,8 @@ describe('renderer', () => {
   it('showPage mounts the matching page and returns true', () => {
     const div = createDiv();
     const pages: PageRender[] = [
-      { pageId: 1 as PageToken, name: 'Page 1', svg: '<svg>page1</svg>' },
-      { pageId: 2 as PageToken, name: 'Page 2', svg: '<svg>page2</svg>' },
+      { pageId: 1 as PageToken, slotmapId: { idx: 1, version: 0 }, name: 'Page 1', svg: '<svg>page1</svg>' },
+      { pageId: 2 as PageToken, slotmapId: { idx: 2, version: 0 }, name: 'Page 2', svg: '<svg>page2</svg>' },
     ];
 
     const result = showPage(pages, 2 as PageToken, div);
@@ -38,7 +38,7 @@ describe('renderer', () => {
     const div = createDiv();
     div.innerHTML = '<svg>original</svg>';
     const pages: PageRender[] = [
-      { pageId: 1 as PageToken, name: 'Page 1', svg: '<svg>page1</svg>' },
+      { pageId: 1 as PageToken, slotmapId: { idx: 1, version: 0 }, name: 'Page 1', svg: '<svg>page1</svg>' },
     ];
 
     const result = showPage(pages, 99 as PageToken, div);
