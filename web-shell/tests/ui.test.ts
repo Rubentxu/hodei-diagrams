@@ -99,9 +99,15 @@ describe('ui', () => {
 
     const tabs = container.querySelectorAll('.page-tab');
     expect(tabs.length).toBe(3);
-    expect(tabs[0]?.textContent).toBe('Page A');
-    expect(tabs[1]?.textContent).toBe('Page B');
-    expect(tabs[2]?.textContent).toBe('Page C');
+
+    // Each tab renders the page name inside a .page-tab-name button; the tab
+    // container also holds a close button (×), so textContent at the tab level
+    // would include the × — assert against the name element directly.
+    const tabNames = container.querySelectorAll('.page-tab-name');
+    expect(tabNames.length).toBe(3);
+    expect(tabNames[0]?.textContent).toBe('Page A');
+    expect(tabNames[1]?.textContent).toBe('Page B');
+    expect(tabNames[2]?.textContent).toBe('Page C');
     expect(tabs[1]?.classList.contains('active')).toBe(true);
   });
 
@@ -119,9 +125,14 @@ describe('ui', () => {
 
     populatePageTabs(container, pages, 0, callbacks);
 
-    const secondTab = container.querySelector('[data-testid="page-tab-1"]') as HTMLElement;
-    expect(secondTab).not.toBeNull();
-    secondTab.click();
+    // The onSelect listener is bound to the inner .page-tab-name button, not
+    // the tab container (clicks on the close button must not select). Click the
+    // name button to trigger selection.
+    const secondTabName = container.querySelector(
+      '[data-testid="page-tab-1"] .page-tab-name',
+    ) as HTMLElement;
+    expect(secondTabName).not.toBeNull();
+    secondTabName.click();
     expect(callbacks.onSelect).toHaveBeenCalledWith(20);
   });
 
