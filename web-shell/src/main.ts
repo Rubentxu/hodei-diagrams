@@ -551,8 +551,12 @@ async function bootstrap(): Promise<void> {
     const currentlyEnabled = page?.math_enabled ?? false;
     const result = activeSession.setPageMathEnabled(pageIdx, !currentlyEnabled);
     if (result.ok) {
-      syncMathModeCheckmark();
+      // Toggle the checkmark immediately using the value we just applied.
+      // Reading it back from the scene cache would be racy because the
+      // editor's triggerReplay() is rAF-scheduled.
+      mathModeMenuItem?.classList.toggle('has-checkmark', !currentlyEnabled);
       refreshMathOverlay();
+      requestAnimationFrame(syncMathModeCheckmark);
     }
   });
   syncMathModeCheckmark();
@@ -686,6 +690,11 @@ async function bootstrap(): Promise<void> {
 
   const onStateChange = () => {
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
+    // Reflect any snap-toggle triggered by a keyboard shortcut or the snap
+    // menu (the menu's own click handler updates the HUD itself).
+    if (activeEditor) {
+      ui.hud.setSnap(activeEditor.snapEnabled);
+    }
     // Track command for auto-save suppression (Q8: timestamp comparison)
     last_command_at = Date.now();
     scheduleAutoSave();

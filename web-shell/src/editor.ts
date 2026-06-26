@@ -1778,6 +1778,7 @@ export class Editor {
   /** Toggle snap-to-grid and snap-to-shape on/off. */
   toggleSnap(): void {
     this.#snapEnabled = !this.#snapEnabled;
+    this.#onStateChange?.();
   }
 
   /** Check whether snap is currently enabled. */

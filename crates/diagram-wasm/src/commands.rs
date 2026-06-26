@@ -3,7 +3,7 @@
 use crate::engine::{with_engine, with_engine_mut};
 use diagram_commands::{Command, RoutingKind, Transaction};
 use diagram_core::geometry::CellGeometry;
-use diagram_core::{Group, VertexId};
+use diagram_core::{Group, PageId, VertexId};
 use diagram_scene::resolver::StyleResolver;
 use wasm_bindgen::prelude::*;
 
@@ -208,25 +208,17 @@ fn find_edge_by_idx(model: &diagram_core::DiagramModel, idx: u32) -> Option<diag
         .map(|(eid, _)| eid)
 }
 
-/// Find a page ID by its raw index.
-fn find_page_by_idx(model: &diagram_core::DiagramModel, idx: u32) -> Option<diagram_core::PageId> {
+/// Find a page ID by insertion order index (0-based).
+///
+/// Note: this is NOT the slotmap internal `idx` — slotmap reuses slots, so
+/// after deletes the internal idx of page N may be different from N. Instead,
+/// we return the N-th page in insertion order, which is stable for the
+/// lifetime of the engine and matches the JS-side `activePageIdx`.
+fn find_page_by_idx(model: &diagram_core::DiagramModel, idx: u32) -> Option<PageId> {
     model
         .store
         .pages_with_ids()
-        .find(|(pid, _)| {
-            let json = match serde_json::to_value(pid) {
-                Ok(v) => v,
-                Err(_) => return false,
-            };
-            let json_idx = match json.get("idx") {
-                Some(v) => match v.as_u64() {
-                    Some(n) => n as u32,
-                    None => return false,
-                },
-                None => return false,
-            };
-            json_idx == idx
-        })
+        .nth(idx as usize)
         .map(|(pid, _)| pid)
 }
 
