@@ -36,6 +36,12 @@ function createMockWasm() {
     // v0.44 group methods
     group_vertices: vi.fn(),
     ungroup_vertices: vi.fn(),
+    // v0.56-v0.65 anchored edges + math
+    connect_vertices_anchored: vi.fn(),
+    set_edge_anchor: vi.fn(),
+    clear_edge_anchor: vi.fn(),
+    get_edge_anchors: vi.fn(),
+    set_page_math_enabled: vi.fn(),
   };
 }
 

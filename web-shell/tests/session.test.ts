@@ -25,6 +25,19 @@ function createMockWasm() {
     get_resolved_style: vi.fn(),
     get_metadata: vi.fn(),
     set_metadata: vi.fn(),
+    apply_layout: vi.fn(),
+    apply_hierarchical_layout: vi.fn(),
+    route_all_edges: vi.fn(),
+    insert_bend: vi.fn(),
+    move_bend: vi.fn(),
+    remove_bend: vi.fn(),
+    group_vertices: vi.fn(),
+    ungroup_vertices: vi.fn(),
+    connect_vertices_anchored: vi.fn(),
+    set_edge_anchor: vi.fn(),
+    clear_edge_anchor: vi.fn(),
+    get_edge_anchors: vi.fn(),
+    set_page_math_enabled: vi.fn(),
   };
 }
 
