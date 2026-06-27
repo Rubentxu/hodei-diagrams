@@ -1,13 +1,14 @@
 import { test, expect, Page } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const TWO_SHAPES_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/two-shapes.drawio';
+  fixturePath('two-shapes.drawio');
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const ALIGN_TEST_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/align-test.drawio';
+  fixturePath('align-test.drawio');
 const DISTRIBUTE_TEST_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/distribute-test.drawio';
+  fixturePath('distribute-test.drawio');
 
 /**
  * Helper to click the Arrange tab in the inspector.

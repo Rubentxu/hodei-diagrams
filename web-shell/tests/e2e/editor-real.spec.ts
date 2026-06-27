@@ -6,11 +6,12 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const MULTI_SHAPES_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/multi-shapes.drawio';
+  fixturePath('multi-shapes.drawio');
 
 test.describe('Editor: real feature coverage', () => {
   test('Selecting a shape via click updates the inspector Style pane', async ({ page }) => {

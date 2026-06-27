@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const _SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 
 test.describe('Presentation Mode Fullscreen', () => {
   test.beforeEach(async ({ page }) => {

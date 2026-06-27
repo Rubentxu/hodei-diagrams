@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const ALL_SHAPES_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/all-shapes.drawio';
+  fixturePath('all-shapes.drawio');
 const DIAMOND_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/multi-shapes-diamond.drawio';
+  fixturePath('multi-shapes-diamond.drawio');
 
 test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
   /**

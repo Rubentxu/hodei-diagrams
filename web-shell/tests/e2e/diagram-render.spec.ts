@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const TWO_PAGE_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/two-page.drawio';
+  fixturePath('two-page.drawio');
 const INVALID_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/invalid.drawio';
+  fixturePath('invalid.drawio');
 
 test.describe('Suite B: diagram-render', () => {
   /**
@@ -30,7 +31,7 @@ test.describe('Suite B: diagram-render', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const awsPath = '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/aws-admision.drawio';
+    const awsPath = fixturePath('aws-admision.drawio');
     await page.setInputFiles('[data-testid="file-input"]', awsPath);
 
     // Should not crash and SVG should appear

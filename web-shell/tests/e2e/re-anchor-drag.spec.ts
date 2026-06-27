@@ -10,9 +10,10 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const TWO_SHAPES =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/two-shapes.drawio';
+  fixturePath('two-shapes.drawio');
 
 test.describe('Phase B: re-anchor-drag', () => {
   test.beforeEach(async ({ page }) => {
