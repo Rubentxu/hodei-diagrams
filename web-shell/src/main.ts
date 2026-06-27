@@ -952,6 +952,15 @@ async function bootstrap(): Promise<void> {
     ui.setDiagnostics('clean');
 
     activePages = renderResult.value;
+    // Point the editor at page 0 BEFORE refreshScene so the cache
+    // reads the imported state. Then mount the SVG and refresh the
+    // math overlay — the overlay reads math_enabled from the scene
+    // cache, so the cache must be fresh before the overlay runs.
+    activeEditorIdx = 0;
+    if (activeEditor) {
+      activeEditor.activePageIdx = 0;
+      activeEditor.refreshScene();
+    }
     if (activePages.length > 0) {
       mountSvg(ui.viewer, activePages[0]!.svg);
       refreshMathOverlay();
@@ -961,10 +970,6 @@ async function bootstrap(): Promise<void> {
         onDelete: handlePageDelete,
       });
     }
-
-    activeEditor?.refreshScene();
-    activeEditorIdx = 0;
-    if (activeEditor) activeEditor.activePageIdx = 0;
 
     ui.hud.setPage(1, activePages.length);
     ui.hud.setMode('Edit');

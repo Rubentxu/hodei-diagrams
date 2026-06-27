@@ -65,8 +65,11 @@ test.describe('math rendering (MATH-030..034)', () => {
     await page.goto('/');
     await page.waitForSelector('svg', { timeout: 10_000 });
     await page.setInputFiles('[data-testid="file-input"]', MATH_FIXTURE_PATH);
-    // Wait for the SVG to re-render after fixture import
-    await page.waitForSelector('text[data-math-id]', { timeout: 10_000 });
+    // Wait for the SVG to re-render after fixture import. Use
+    // state: 'attached' (default) and then check visibility separately —
+    // once the overlay activates, the text element is set to
+    // visibility:hidden (the overlay div sits on top of it visually).
+    await page.waitForSelector('text[data-math-id]', { state: 'attached', timeout: 10_000 });
 
     // The math_enabled flag is set on the fixture; overlay should activate.
     // Wait for the overlay div to appear (it's async — KaTeX loads on demand).
@@ -77,7 +80,10 @@ test.describe('math rendering (MATH-030..034)', () => {
     const text = page.locator('text[data-math-id]').first();
     await expect(text).toHaveCSS('visibility', 'hidden');
 
-    // The overlay should contain KaTeX-rendered content (not just raw LaTeX)
+    // The overlay should contain KaTeX-rendered content (not just raw LaTeX).
+    // KaTeX is lazy-loaded — wait for the innerHTML to be non-empty before
+    // asserting on it.
+    await expect.poll(async () => (await overlay.innerHTML()).length, { timeout: 15_000 }).toBeGreaterThan(0);
     const html = await overlay.innerHTML();
     expect(html).toContain('katex');
 
@@ -146,10 +152,12 @@ test.describe('math rendering (MATH-030..034)', () => {
     await page.goto('/');
     await page.waitForSelector('svg', { timeout: 10_000 });
 
-    // Toggle Math Mode on
+    // Open View menu, click Math Mode to enable math on the bootstrap page.
+    await page.locator('summary:has-text("View")').first().click();
     await page.click('#menu-item-math-mode');
 
-    // Insert malformed LaTeX
+    // Open Insert menu, click Math Formula to open the insert dialog.
+    await page.locator('summary:has-text("Insert")').first().click();
     await page.click('#menu-item-insert-math');
     const input = page.locator('[data-testid="math-latex-input"]');
     await input.fill('\\not_a_real_command{');
