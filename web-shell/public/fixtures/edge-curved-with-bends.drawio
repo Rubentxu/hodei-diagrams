@@ -1,0 +1,23 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="2" vertex="1">
+          <mxGeometry x="60" y="60" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" vertex="1">
+          <mxGeometry x="260" y="180" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" edge="1" style="edgeStyle=curvedEdgeStyle" source="2" target="3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="80" y="240"/>
+              <mxPoint x="150" y="100"/>
+              <mxPoint x="240" y="240"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
