@@ -31,6 +31,17 @@ export function runMathOverlay(svgRoot: SVGElement, mathEnabled: boolean): void 
     const latex = textEl.getAttribute('data-latex');
     if (!latex) continue;
 
+    // Strip TeX-style delimiters that the .drawio round-trip stores on
+    // labels ($...$ for inline, $$...$$ for display) but KaTeX does not
+    // recognize by default — KaTeX's built-in delimiters are \(...\)
+    // for inline and \[...\] for display. Stripping here keeps the SVG
+    // store as-is (so the same `.drawio` round-trips back identically)
+    // and just unwraps the delimiters before handing the source to the
+    // renderer. Without this, every math label falls back to the raw
+    // monospace error path.
+    const { source: latexSource, displayMode: detectedDisplay } = stripLatexDelimiters(latex);
+    const displayMode = textEl.getAttribute('data-math-display') === 'true' || detectedDisplay;
+
     // Get the bbox of the text element in document coordinates
     // getBBox is synchronous and works on SVG elements in the DOM
     let bbox: DOMRect;
@@ -45,9 +56,6 @@ export function runMathOverlay(svgRoot: SVGElement, mathEnabled: boolean): void 
     const svgRect = svgRoot.getBoundingClientRect();
     const absX = svgRect.left + bbox.x;
     const absY = svgRect.top + bbox.y;
-
-    // Determine displayMode from the data attribute (default to inline)
-    const displayMode = textEl.getAttribute('data-math-display') === 'true';
 
     // Create overlay div positioned absolutely over the text
     const overlay = document.createElement('div');
@@ -68,6 +76,24 @@ export function runMathOverlay(svgRoot: SVGElement, mathEnabled: boolean): void 
     textEl.style.visibility = 'hidden';
 
     // Render KaTeX into the overlay (fire-and-forget)
-    renderer.render(latex, displayMode, overlay);
+    renderer.render(latexSource, displayMode, overlay);
   }
+}
+
+/**
+ * Strip TeX-style delimiters (`$...$` inline, `$$...$$` display) from a
+ * math source string. Returns the unwrapped source and a flag indicating
+ * whether the original used display delimiters. The SVG label store
+ * preserves the delimiters (so .drawio round-trip is unchanged); this
+ * helper is the boundary where they get unwrapped before rendering.
+ */
+function stripLatexDelimiters(latex: string): { source: string; displayMode: boolean } {
+  const trimmed = latex.trim();
+  if (trimmed.startsWith('$$') && trimmed.endsWith('$$') && trimmed.length >= 4) {
+    return { source: trimmed.slice(2, -2).trim(), displayMode: true };
+  }
+  if (trimmed.startsWith('$') && trimmed.endsWith('$') && trimmed.length >= 2) {
+    return { source: trimmed.slice(1, -1).trim(), displayMode: false };
+  }
+  return { source: latex, displayMode: false };
 }
