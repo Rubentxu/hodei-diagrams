@@ -13,17 +13,26 @@
  *
  * If Playwright browsers are not installed, run `npx playwright install chromium` first.
  *
- * Snapshot baselines (web-shell/tests/e2e/*.spec.ts-snapshots/) are NOT shipped
- * with the repo. To generate them on first run:
+ * Snapshot baselines live in `web-shell/tests/e2e/math-rendering.spec.ts-snapshots/`.
+ * They ARE committed to the repo so CI can detect regressions.
+ *
+ * To regenerate baselines when intentionally changing output (e.g. upgrading katex):
  *   npx playwright test web-shell/tests/e2e/math-rendering.spec.ts --update-snapshots
- * Then re-run without --update-snapshots to verify the baseline matches.
+ * Then review the diff and commit the new snapshots.
  *
  * KaTeX renders deterministically for a given input expression (counter-based IDs
- * reset per page load), so snapshots are stable across runs. When upgrading
- * `katex`, regenerate baselines with --update-snapshots and review the diff.
+ * reset per page load), so snapshots are stable across runs. The `normalizeOverlayHtml`
+ * helper strips `MathML-UniqueKey-N` counters that differ per render call.
+ *
+ * Tests that need math-enabled pages (math_030, math_033) load the
+ * `math-enabled.drawio` fixture via the file picker. Tests that insert math
+ * (math_032, math_034) work from the empty bootstrap canvas and toggle Math Mode.
  */
 
 import { expect, test } from '@playwright/test';
+
+const MATH_FIXTURE_PATH =
+  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/math-enabled.drawio';
 
 /**
  * Normalize KaTeX overlay HTML for snapshot comparison.
@@ -47,42 +56,16 @@ function normalizeOverlayHtml(html: string): string {
     .trim();
 }
 
-const _MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" type="device">
-  <diagram name="math-test" id="math-test-1">
-    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="800" pageHeight="600" math="1" shadow="0">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-        <mxCell id="2" value="$\\int_0^1 x\\,dx$" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="200" y="100" width="120" height="60" as="geometry" />
-        </mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
-</mxfile>`;
-
-const _NON_MATH_PAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" type="device">
-  <diagram name="no-math" id="no-math-1">
-    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="800" pageHeight="600">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-        <mxCell id="2" value="Hello" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="200" y="100" width="120" height="60" as="geometry" />
-        </mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
-</mxfile>`;
-
 test.describe('math rendering (MATH-030..034)', () => {
   test('math_030_katex_overlay_replaces_math_text', async ({ page }) => {
-    // Navigate to editor with a math-enabled .drawio loaded via the file picker
-    // (or initial fixture if available). For this test we use the math-page fixture.
+    // Navigate to editor with a math-enabled .drawio loaded via the file picker.
+    // The fixture has math="1" on mxGraphModel so the page-level math_enabled flag
+    // is set on load and the overlay activates automatically.
     await page.goto('/');
     await page.waitForSelector('svg', { timeout: 10_000 });
+    await page.setInputFiles('[data-testid="file-input"]', MATH_FIXTURE_PATH);
+    // Wait for the SVG to re-render after fixture import
+    await page.waitForSelector('text[data-math-id]', { timeout: 10_000 });
 
     // The math_enabled flag is set on the fixture; overlay should activate.
     // Wait for the overlay div to appear (it's async — KaTeX loads on demand).
@@ -137,13 +120,12 @@ test.describe('math rendering (MATH-030..034)', () => {
   });
 
   test('math_033_edit_math_formula_via_double_click', async ({ page }) => {
-    // Assumes a math-enabled page is loaded (MATH_PAGE_XML or similar).
-    // This test requires a fixture loaded via file picker or initial state.
+    // Load math-enabled fixture so the page has math vertices to edit.
     await page.goto('/');
     await page.waitForSelector('svg', { timeout: 10_000 });
+    await page.setInputFiles('[data-testid="file-input"]', MATH_FIXTURE_PATH);
+    await page.waitForSelector('text[data-math-id]', { timeout: 10_000 });
 
-    // The page must have Math Mode enabled for the overlay to be active
-    // (or this test will skip due to no math vertices)
     const mathText = page.locator('text[data-math-id]').first();
     await mathText.dblclick({ force: true });
 
@@ -190,13 +172,3 @@ test.describe('math rendering (MATH-030..034)', () => {
     // (This is verified indirectly — if the page crashed, the overlay wouldn't render)
   });
 });
-
-// Note: To run these tests, you need:
-// 1. `npx playwright install chromium`
-// 2. Either a built WASM bundle + initial fixture, or programmatic loading of MATH_PAGE_XML
-// 3. Dev server running (`npm run dev` in web-shell/) — Playwright starts it automatically
-//
-// The page loading mechanism (initial fixture vs file picker) is intentionally
-// abstracted to allow reuse across test setups. If your local setup loads
-// NON_MATH_PAGE_XML by default, tests math_030 and math_033 will need their
-// own fixture loader.
