@@ -5,12 +5,12 @@
 //! command that includes a target cell ID will fail to deserialize
 //! and surface an "unknown variant" error in the UI.
 
-use diagram_core::{EdgeId, GroupId, PageId, StyleId, VertexId};
+use diagram_core::{EdgeId, GroupId, PageId, StableIdExt, StyleId, VertexId};
 
 #[test]
 fn vertex_id_serializes_as_idx_version_object() {
     let id = VertexId::default();
-    let json = serde_json::to_value(&id).expect("serialize VertexId");
+    let json = serde_json::to_value(id).expect("serialize VertexId");
     let obj = json
         .as_object()
         .expect("VertexId should serialize as a JSON object");
@@ -27,7 +27,7 @@ fn vertex_id_serializes_as_idx_version_object() {
 #[test]
 fn edge_id_serializes_as_idx_version_object() {
     let id = EdgeId::default();
-    let json = serde_json::to_value(&id).expect("serialize EdgeId");
+    let json = serde_json::to_value(id).expect("serialize EdgeId");
     let obj = json
         .as_object()
         .expect("EdgeId should serialize as a JSON object");
@@ -44,7 +44,7 @@ fn edge_id_serializes_as_idx_version_object() {
 #[test]
 fn page_id_serializes_as_idx_version_object() {
     let id = PageId::default();
-    let json = serde_json::to_value(&id).expect("serialize PageId");
+    let json = serde_json::to_value(id).expect("serialize PageId");
     let obj = json
         .as_object()
         .expect("PageId should serialize as a JSON object");
@@ -61,7 +61,7 @@ fn page_id_serializes_as_idx_version_object() {
 #[test]
 fn group_id_serializes_as_idx_version_object() {
     let id = GroupId::default();
-    let json = serde_json::to_value(&id).expect("serialize GroupId");
+    let json = serde_json::to_value(id).expect("serialize GroupId");
     let obj = json
         .as_object()
         .expect("GroupId should serialize as a JSON object");
@@ -78,7 +78,7 @@ fn group_id_serializes_as_idx_version_object() {
 #[test]
 fn style_id_serializes_as_idx_version_object() {
     let id = StyleId::default();
-    let json = serde_json::to_value(&id).expect("serialize StyleId");
+    let json = serde_json::to_value(id).expect("serialize StyleId");
     let obj = json
         .as_object()
         .expect("StyleId should serialize as a JSON object");
@@ -98,10 +98,53 @@ fn roundtrip_preserves_value() {
     let mut store = ModelStore::new();
     store.insert_page(diagram_core::Page::default());
     let pid = store.pages_with_ids().next().unwrap().0;
-    let json = serde_json::to_value(&pid).unwrap();
+    let json = serde_json::to_value(pid).unwrap();
     let back: PageId = serde_json::from_value(json).expect("roundtrip PageId");
     assert_eq!(
         pid, back,
         "PageId should roundtrip through {{idx, version}} JSON"
     );
+}
+
+/// `StableIdExt::stable_id_parts` is the FFI-safe accessor that lets the
+/// SVG backend skip JSON serialization on a rendering hot path. Its
+/// output must match what `serde_json::to_value` would produce for
+/// `idx` and `version` — otherwise `data-vertex-id="idx:version"`
+/// attributes would silently drift from the canonical JSON form.
+#[test]
+fn stable_id_parts_match_json_for_default_vertex_id() {
+    let id = VertexId::default();
+    let (idx, version) = id.stable_id_parts();
+    let json = serde_json::to_value(id).expect("serialize VertexId");
+    assert_eq!(
+        idx,
+        json["idx"].as_u64().expect("idx should be u64") as u32,
+        "stable_id_parts idx should match JSON idx"
+    );
+    assert_eq!(
+        version,
+        json["version"].as_u64().expect("version should be u64") as u32,
+        "stable_id_parts version should match JSON version"
+    );
+}
+
+#[test]
+fn stable_id_parts_match_json_for_default_edge_id() {
+    let id = EdgeId::default();
+    let (idx, version) = id.stable_id_parts();
+    let json = serde_json::to_value(id).expect("serialize EdgeId");
+    assert_eq!(idx, json["idx"].as_u64().unwrap() as u32);
+    assert_eq!(version, json["version"].as_u64().unwrap() as u32);
+}
+
+#[test]
+fn stable_id_parts_match_json_for_real_page_id() {
+    use diagram_core::ModelStore;
+    let mut store = ModelStore::new();
+    store.insert_page(diagram_core::Page::default());
+    let pid = store.pages_with_ids().next().unwrap().0;
+    let (idx, version) = pid.stable_id_parts();
+    let json = serde_json::to_value(pid).expect("serialize PageId");
+    assert_eq!(idx, json["idx"].as_u64().unwrap() as u32);
+    assert_eq!(version, json["version"].as_u64().unwrap() as u32);
 }

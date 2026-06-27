@@ -619,8 +619,6 @@ dependencies = [
  "diagram-core",
  "diagram-format-drawio",
  "diagram-scene",
- "serde",
- "serde_json",
 ]
 
 [[package]]

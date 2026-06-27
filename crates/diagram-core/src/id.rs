@@ -42,3 +42,41 @@ impl_display!(EdgeId, "edge");
 impl_display!(GroupId, "group");
 impl_display!(PageId, "page");
 impl_display!(StyleId, "style");
+
+/// Access the `(idx, version)` pair of a slotmap key without going through
+/// `serde_json`. Implemented for every `new_key_type!` produced in this crate.
+///
+/// Used by hot paths that need a compact `"idx:version"` representation
+/// (e.g. SVG `data-vertex-id` / `data-edge-id` attributes) and by tests
+/// that want to assert against the raw slotmap identity without serializing.
+///
+/// The values match what `slotmap`'s serde impl produces:
+/// `version` is the odd-encoded `NonZeroU32::get()` value, and `idx` is the
+/// raw slot index. We extract them by decomposing `KeyData::as_ffi()` —
+/// `KeyData`'s fields are private in slotmap 1.x, so we cannot read them
+/// directly.
+pub trait StableIdExt {
+    /// Returns `(idx, version)` — the same values slotmap's serde impl emits.
+    fn stable_id_parts(&self) -> (u32, u32);
+}
+
+macro_rules! impl_stable_id_ext {
+    ($($name:ident),* $(,)?) => {
+        $(
+            impl StableIdExt for $name {
+                fn stable_id_parts(&self) -> (u32, u32) {
+                    // as_ffi() packs `(version << 32) | idx` into a u64.
+                    // version here is the same value serde emits (the odd
+                    // NonZeroU32::get()), so the output matches the old
+                    // JSON-based stable_id byte-for-byte.
+                    let ffi = self.0.as_ffi();
+                    let idx = (ffi & 0xffff_ffff) as u32;
+                    let version = (ffi >> 32) as u32;
+                    (idx, version)
+                }
+            }
+        )*
+    };
+}
+
+impl_stable_id_ext!(VertexId, EdgeId, GroupId, PageId, StyleId);

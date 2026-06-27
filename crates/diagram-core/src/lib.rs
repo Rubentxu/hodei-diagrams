@@ -29,7 +29,7 @@ pub use error::CoreError;
 pub use geometry::CellGeometry;
 pub use geometry::Point;
 pub use group::Group;
-pub use id::{EdgeId, GroupId, PageId, StyleId, VertexId};
+pub use id::{EdgeId, GroupId, PageId, StableIdExt, StyleId, VertexId};
 pub use label::Label;
 pub use model::DiagramModel;
 pub use model::Metadata;

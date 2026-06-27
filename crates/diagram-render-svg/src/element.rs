@@ -7,27 +7,23 @@ use diagram_scene::{
     PathElement, PolygonElement, RectElement, RoundedRectElement, StencilElement, SwimlaneHeader,
     TextElement, TrapezoidElement, TriangleElement, VisualElement,
 };
-use serde::Serialize;
 
 use crate::clip::ClipPathManager;
 use crate::defs::DefsManager;
 use crate::escape::{escape_attr, escape_text};
 use crate::style::{AttrContext, style_to_attrs};
 
-/// Extract a stable string id from any slotmap key (VertexId/EdgeId/GroupId/...).
+/// Extract a stable string id from a slotmap key (VertexId/EdgeId/...).
 ///
-/// Slotmap keys serialize to JSON objects with `idx` and `version` u64 fields.
-/// This helper returns the compact `idx:version` form used by both `data-*`
-/// attributes and `data-math-id` references.
+/// Slotmap new_key_type! keys serialize to `{idx, version}` objects. We
+/// read those parts directly via `diagram_core::StableIdExt` instead of
+/// going through JSON serialization — this is a rendering hot path and
+/// the JSON round-trip was a measurable cost on large diagrams.
 ///
-/// Centralizing this avoids the previous duplication across `vid_attr`,
-/// `eid_attr`, and the inline math-id extraction in `text_to_svg`.
-fn stable_id<T: Serialize>(id: &T) -> String {
-    let v = serde_json::to_value(id).expect("slotmap key should serialize");
-    let idx = v["idx"].as_u64().expect("slotmap key idx should be u64");
-    let version = v["version"]
-        .as_u64()
-        .expect("slotmap key version should be u64");
+/// Format: `"idx:version"` — compact, no quote-escaping needed in SVG
+/// attributes. Both fields are required for slotmap lookups.
+fn stable_id(id: &impl diagram_core::StableIdExt) -> String {
+    let (idx, version) = id.stable_id_parts();
     format!("{idx}:{version}")
 }
 
