@@ -87,11 +87,14 @@ pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsVal
             // (angle delta is relative, not absolute). Skip in transaction path for now.
             Command::RotateVertex(_) => tx,
             Command::FlipVertex(_) => tx,
-            // Z-order commands — no direct transaction builder; skip for now
-            Command::BringToFront(_) => tx,
-            Command::SendToBack(_) => tx,
-            Command::BringForward(_) => tx,
-            Command::SendBackward(_) => tx,
+            // Z-order commands: route through transaction builder methods
+            // (added in the cycle 6 fix; previously these were no-ops which
+            // meant TS editor's bringToFront/sendToBack/bringForward/sendBackward
+            // calls silently failed).
+            Command::BringToFront(p) => tx.bring_to_front(p.target),
+            Command::SendToBack(p) => tx.send_to_back(p.target),
+            Command::BringForward(p) => tx.bring_forward(p.target),
+            Command::SendBackward(p) => tx.send_backward(p.target),
             // ConnectVertices and DisconnectEdge have their own dedicated WASM functions
             Command::ConnectVertices(_) => tx,
             Command::DisconnectEdge(_) => tx,

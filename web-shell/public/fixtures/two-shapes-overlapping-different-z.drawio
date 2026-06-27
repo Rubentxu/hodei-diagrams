@@ -1,0 +1,16 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <!-- id=2 first in XML → drawn first → behind -->
+        <mxCell id="2" vertex="1" value="Behind">
+          <mxGeometry x="60" y="60" width="120" height="120" as="geometry"/>
+        </mxCell>
+        <!-- id=3 second in XML → drawn second → on top (overlapping region) -->
+        <mxCell id="3" vertex="1" value="On Top">
+          <mxGeometry x="160" y="100" width="80" height="40" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

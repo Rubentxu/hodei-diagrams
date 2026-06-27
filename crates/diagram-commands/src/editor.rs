@@ -8,11 +8,13 @@ use crate::Command;
 use crate::error::{CommandError, CommandResult};
 use crate::history::History;
 use crate::payload::{
-    AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, ChangeStylePayload,
-    ConnectVerticesCommand, DisconnectEdgeCommand, EditEdgeLabelPayload, EditLabelPayload,
-    MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
-    RemoveVertexPayload, RenamePagePayload, RoutingKind, SetEdgeLabelOffsetPayload,
-    SetEdgeWaypointsPayload, SetPageMathEnabledPayload, SetVertexParentPayload,
+    AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, BringForwardPayload,
+    BringToFrontPayload, CellTarget, ChangeStylePayload, ConnectVerticesCommand,
+    DisconnectEdgeCommand, EditEdgeLabelPayload, EditLabelPayload, MoveGroupPayload,
+    MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
+    RemoveVertexPayload, RenamePagePayload, RoutingKind, SendBackwardPayload, SendToBackPayload,
+    SetEdgeLabelOffsetPayload, SetEdgeWaypointsPayload, SetPageMathEnabledPayload,
+    SetVertexParentPayload,
 };
 use diagram_core::{
     CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, Point, StyleMap,
@@ -307,6 +309,34 @@ impl Transaction {
     pub fn change_style(mut self, id: VertexId, style: StyleMap) -> Self {
         self.commands
             .push(Command::ChangeStyle(ChangeStylePayload::new(id, style)));
+        self
+    }
+
+    /// Bring a cell to the front (topmost z-order) in the transaction.
+    pub fn bring_to_front(mut self, target: CellTarget) -> Self {
+        self.commands
+            .push(Command::BringToFront(BringToFrontPayload::new(target)));
+        self
+    }
+
+    /// Send a cell to the back (bottommost z-order) in the transaction.
+    pub fn send_to_back(mut self, target: CellTarget) -> Self {
+        self.commands
+            .push(Command::SendToBack(SendToBackPayload::new(target)));
+        self
+    }
+
+    /// Bring a cell one step forward in z-order in the transaction.
+    pub fn bring_forward(mut self, target: CellTarget) -> Self {
+        self.commands
+            .push(Command::BringForward(BringForwardPayload::new(target)));
+        self
+    }
+
+    /// Send a cell one step backward in z-order in the transaction.
+    pub fn send_backward(mut self, target: CellTarget) -> Self {
+        self.commands
+            .push(Command::SendBackward(SendBackwardPayload::new(target)));
         self
     }
 
