@@ -2,6 +2,35 @@
 //!
 //! `SceneBuilder` walks the diagram model, resolves styles eagerly, flattens
 //! geometry into page coordinates, and produces a `Scene` with nested elements.
+//!
+//! # Math typesetting scope (per-page vs per-cell)
+//!
+//! Math rendering is page-scoped: `is_math` on each `TextElement` is set
+//! directly from `page.math_enabled`. This matches the draw.io MVP and
+//! keeps the Label type as a single owned String (no `Label::Math`
+//! variant, which would churn every call site that constructs a label).
+//!
+//! The deferred enhancement is per-cell toggle ("disable math for this
+//! vertex/edge"). When real users report they need per-cell control:
+//!
+//! 1. Add `math_opt_out: bool` (or `math_enabled: Option<bool>`) to
+//!    `Vertex` and `Edge` in `diagram-core`. Default `false` preserves
+//!    the page-scoped behavior for existing documents.
+//! 2. Replace `is_math: page.math_enabled` with
+//!    `is_math: page.math_enabled && !vertex.math_opt_out` at each
+//!    call site below (3 occurrences: vertex label, edge label,
+//!    edge-as-vertex label).
+//! 3. Wire a UI affordance (e.g. right-click → "Render as plain text")
+//!    that flips the new flag via a `SetVertexMathOptOut` command
+//!    (mirror of `SetPageMathEnabled`).
+//! 4. Extend the `.drawio` round-trip mapping in
+//!    `crates/diagram-format-drawio` to read/write the per-cell flag
+//!    on `<mxCell>` (e.g. via a style attribute or a dedicated attr).
+//!
+//! This is intentionally deferred until the trigger fires (user demand),
+//! not implemented speculatively. The trade-off (per-cell boolean vs
+//! `Label::Math` variant) is documented here so future work does not
+//! re-litigate it.
 
 use diagram_core::geometry::{Point as CorePoint, Rect as CoreRect, Size};
 use diagram_core::{
@@ -113,6 +142,12 @@ impl SceneBuilder {
                     anchor,
                     text: label.text.clone(),
                     style,
+                    // Math typesetting is page-scoped (matches draw.io MVP).
+                    // Per-cell toggle (e.g. "disable math on this vertex")
+                    // is intentionally deferred — see scene builder header
+                    // for the trade-off rationale. When the trigger fires
+                    // (real users asking for per-cell control), the change
+                    // here is `page.math_enabled && !vertex.math_opt_out`.
                     is_math: page.math_enabled,
                 });
                 entries.push((vertex.z_order, 1, index, text_elem));
