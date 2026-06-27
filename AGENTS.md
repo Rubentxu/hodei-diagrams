@@ -82,7 +82,6 @@ Tipos:
 | `refactor` | cambio de código sin cambio de comportamiento |
 | `perf` | mejora de rendimiento |
 | `test` | solo tests |
-| `ci` | cambios en CI/CD |
 | `revert` | reversión de un commit anterior |
 
 Ejemplos:
@@ -562,33 +561,109 @@ fn roundtrip_simple_rect_drawio() {
 
 ---
 
-## 13. Entorno de Desarrollo
+## 13. Entorno de Desarrollo y Verificación Local
 
-### 13.1 Fast Development Cycle (INVARIANTE)
+**Toda la verificación del proyecto es local**. No hay CI en GitHub Actions —
+el flujo `just` reemplaza ese rol y se ejecuta antes de cada PR (ver §3.4).
 
-El ciclo de desarrollo rápido es el siguiente, en orden de preferencia:
+### 13.1 Filosofía del Ciclo Local
+
+- **`just` es la interfaz única** para verificación, build, tests y dev server.
+  Los comandos `cargo` / `npm` crudos están disponibles pero `just` es el path recomendado.
+- **Orden de preferencia en el ciclo rápido**:
+  1. `just check` — solo verificación de tipos, 2-10× más rápido que build
+  2. `just test` — tests en paralelo (nextest si está disponible)
+  3. `cargo watch -x check -x 'just test'` — hot reload en local
+  4. `just build` — build completo cuando check + tests pasan
+  5. `just verify` — fmt + clippy + check + test antes de commit
+- **Pre-PR**: `just all` corre TODO (verify Rust + web-shell + e2e). Si esto pasa, el PR es seguro.
+
+### 13.2 Inventario Completo de `just` Recipes
+
+Las recetas viven en `justfile` (raíz del repo). **Esta tabla es la fuente de verdad — si una receta cambia, actualizar aquí.**
+
+| Recipe | Tipo | Qué hace | Cuándo usarla |
+|--------|------|----------|---------------|
+| `just doctor` | Diagnóstico | Imprime versiones de toolchain + estado de `node_modules` y artefacto WASM | Primera ejecución en un setup nuevo, o cuando algo "no anda" |
+| `just status` | Diagnóstico | `git status` + últimos 5 commits | Antes de empezar a trabajar |
+| `just check` | Rust | `cargo check --workspace` | Loop principal de dev (el más rápido) |
+| `just build` | Rust | `cargo build --workspace` | Cuando `check` pasa y necesitás el binario |
+| `just test` | Rust | `cargo nextest run` o `cargo test` (fallback) | Tests Rust |
+| `just fmt` | Rust | `cargo fmt --all` | Formatea todo el workspace |
+| `just fmt-check` | Rust | `cargo fmt --all -- --check` | CI dry-run del formato |
+| `just lint` | Rust | `cargo clippy --workspace --all-targets -- -D warnings` | Lint estricto |
+| `just verify` | Rust | `fmt-check` + `lint` + `check` + `test` | Verificación completa Rust |
+| `just web-install` | Web | `npm install` en `web-shell/` | Una vez por setup |
+| `just web-typecheck` | Web | `npx tsc --noEmit` | Verifica tipos TS |
+| `just web-test` | Web | `npx vitest run` | Tests unitarios web-shell |
+| `just web-e2e` | Web | `npx playwright test` | E2E tests (requiere dev server o `reuseExistingServer`) |
+| `just web-dev` | Web | Vite dev server en `:4100` | Desarrollo manual con hot reload |
+| `just web-wasm` | WASM | `wasm-pack build --target web` del crate `diagram-wasm` | Rebuild del binario WASM |
+| `just web-verify` | Web | `web-wasm` + `npm run verify` (lint + typecheck + wasm + build) | Verificación completa web-shell |
+| `just web-build` | Web | `web-wasm` + `vite build` | Build de producción |
+| `just dev` | One-shot | `web-wasm` + `vite dev` en `:4100` | Arranca todo y deja dev server corriendo |
+| `just e2e` | One-shot | `web-wasm` + `npx playwright test` | E2E completo (sin dev server persistente) |
+| `just ci` | One-shot | `verify` + `web-wasm` + `playwright test` | **Alias del verificador local — reemplazo del CI de GitHub** |
+| `just all-verify` | Combined | `verify` + `web-verify` | Verifica Rust + Web sin E2E |
+| `just all` | Combined | `verify` + `web-verify` + `e2e` | **Pre-PR gate — lo más exhaustivo** |
+| `just visual-verify` | Visual | Visual smoke suite (screenshots + console errors) contra dev server existente | Requiere `just dev` en otra terminal |
+| `just visual-verify-all` | Visual | Arranca dev server + corre visual smoke + mata server | One-shot sin setup manual |
+| `just visual-ci` | Visual | `test` + `web-test` + `visual-verify` | CI visual one-shot |
+| `just visual-snapshots` | Visual | Lista screenshots capturados | Después de `visual-verify` |
+| `just visual-open <name>` | Visual | Abre un snapshot en el visor del sistema | Debug visual |
+
+### 13.3 Pre-PR Gate (INVARIANTE)
+
+Antes de mergear un PR, correr — en este orden — y todos deben pasar limpio:
 
 ```bash
-# 1. Feedback instantáneo — solo verificación de tipos, sin binario (2-10x más rápido que build)
-cargo check --workspace
-
-# 2. Tests en paralelo — hasta 3x más rápido que cargo test
-cargo nextest run --workspace
-
-# 3. Hot reload en local — recompila y corre tests en cada cambio
-cargo watch -x check -x nextest run
-
-# 4. Build completo cuando check y nextest pasan
-cargo build --workspace
-
-# 5. Verificación final: fmt + clippy + check antes de commit
-cargo fmt
-cargo clippy --workspace --all-targets -- -D warnings
+just all           # verify Rust + web-shell + e2e
+just visual-ci     # opcional pero recomendado para cambios de UI
 ```
 
-### 13.2 Perfiles de Compilación Optimizados para Dev
+Si `just all` pasa, el código está listo para PR. No hay CI remoto que valide de nuevo — la verificación local es la fuente de verdad.
 
-Agregar al `Cargo.toml` del workspace root:
+### 13.4 Setup Inicial (orden de ejecución una sola vez)
+
+```bash
+# 1. Toolchain Rust (verificar primero)
+rustc --version  # debe ser >= 1.96
+cargo --version
+
+# 2. Tools de ciclo rápido
+cargo install just           # https://github.com/casey/just
+cargo install cargo-nextest  # parallel test runner
+cargo install cargo-watch    # hot reload (opcional)
+cargo install sccache        # compilation cache (opcional)
+cargo install wasm-pack      # build WASM (lo usa `just web-wasm`)
+
+# 3. Node.js (>= 20)
+node --version
+npm --version
+
+# 4. Verificación rápida del setup
+just doctor
+just web-install
+just web-wasm
+
+# 5. Smoke test completo
+just all
+```
+
+### 13.5 Reglas del Ciclo Rápido (INVARIANTES)
+
+1. **`just check`** es el primer paso del loop diario — nunca `cargo build` primero
+2. **`just test`** usa `cargo nextest` si está instalado (hasta 3× más rápido), fallback a `cargo test`
+3. **`just verify`** antes de cada commit — incluye fmt, clippy, check, test
+4. **`just all`** antes de cada PR — la verificación es local y exhaustiva
+5. **`cargo watch`** para hot reload local (re-construye + corre tests en cada cambio)
+6. **`sccache`** solo para dev/test; **nunca** activar en release builds
+7. **No activar `lto` en release** sin medición real de impacto
+8. **Web-shell se verifica vía `just`**, no npm directo — `just web-*` envuelve los comandos para mantener el path de verificación único
+
+### 13.6 Perfiles de Compilación Optimizados para Dev
+
+Estos perfiles viven en el `Cargo.toml` del workspace root:
 
 ```toml
 # Perfil dev optimizado para ciclos de desarrollo más rápidos
@@ -610,23 +685,7 @@ lto = false
 codegen-units = 1
 ```
 
-### 13.3 Herramientas para el Ciclo Rápido (Instalar una vez)
-
-```bash
-# Parallel test runner — hasta 3x más rápido que cargo test
-cargo install cargo-nextest
-
-# Hot reload: corre comandos en cada cambio de archivo
-cargo install cargo-watch
-
-# Compilation cache — solo para builds dev/test (nunca para release)
-cargo install sccache
-
-# WASM build + hot reload para el web-shell
-cargo install trunk
-```
-
-### 13.4 Configuración de sccache (opcional, solo dev/test)
+### 13.7 Configuración de `sccache` (opcional, solo dev/test)
 
 ```bash
 # En ~/.bashrc o ~/.zshrc
@@ -638,39 +697,17 @@ sccache --version
 
 **Importante**: `sccache` es solo para ciclos de desarrollo. No debe activarse en builds de release porque puede relentizarlos hasta un 50%.
 
-### 13.5 Comandos Completos del Entorno
+### 13.8 Por qué no hay CI en GitHub Actions
 
-```bash
-# Verificar versión
-rustc --version  # >= 1.95
-cargo --version
+Decisión consciente del usuario (2026-06-27):
 
-# Build
-cargo build --workspace
+- **El loop local es más rápido** — feedback en segundos, no en minutos esperando runners.
+- **No hay infraestructura remota** que mantener (secrets, runners, branches protegidas).
+- **El modelo de contribución es trunk-based con PRs** (§3.4) — la revisión humana del PR reemplaza la verificación automática de CI.
+- **`just all` + `just visual-ci`** cubren lo mismo que un workflow de GitHub Actions pero ejecutándose en la máquina del desarrollador.
+- Si en el futuro se necesita CI remoto (release pipelines, contribuidores externos), re-introducir workflows es trivial — los archivos de GitHub Actions no tienen dependencias complejas.
 
-# Lint
-cargo fmt
-cargo clippy --workspace --all-targets -- -D warnings
-cargo check --workspace
-
-# Test rápido (parallel, hot reload)
-cargo nextest run --workspace
-
-# Test completo (para antes de PR)
-cargo test --workspace
-
-# WASM (cuando aplique)
-cargo +wasm32 build -p diagram-wasm  # verificar soporte primero
-```
-
-### 13.6 Reglas del Ciclo Rápido (INVARIANTES)
-
-1. **`cargo check`** es siempre el primer paso del ciclo — nunca `cargo build` primero
-2. **`cargo nextest run`** reemplaza a `cargo test` para todo el workspace
-3. **`cargo watch`** para desarrollo local con hot reload
-4. **`sccache`** solo para builds de dev/test; **nunca** para release
-5. Perfil dev optimizado desde el día 1 en `Cargo.toml`
-6. **No activar `lto` en release** hasta tener medición real de impacto
+**Regla**: nunca añadir `.github/workflows/*.yml` sin reconsiderar esta decisión.
 
 ---
 
