@@ -5,6 +5,28 @@
  * - Lazy-imports katex and its CSS on first use (preserves initial load perf).
  * - Memoizes the dynamic import so multiple elements share one renderer.
  * - Catches KaTeX errors and falls back to raw LaTeX as monospace text.
+ *
+ * Renderer swap path (MathJax 4, etc.):
+ *
+ * The `MathRenderer` interface is the abstraction boundary — consumers
+ * (currently `math-overlay.ts`) only depend on the interface, never on
+ * the concrete `KaTeXRenderer`. To swap renderers:
+ *
+ * 1. Implement `MathRenderer` for the new library (e.g. `MathJaxRenderer`).
+ *    - Mirror the fire-and-forget `render()` contract.
+ *    - Implement `isReady()` once the library is loaded.
+ *    - Handle library-specific parse errors and fall back to raw LaTeX
+ *      via the same monospace convention so the snapshot tests in
+ *      `math-rendering.spec.ts` stay stable.
+ * 2. Update `ensureMathRenderer()` (or add a selection branch) to return
+ *    the new implementation. Consumers do not need changes.
+ * 3. Update `tests/math-renderer.test.ts` to also cover the new fallback
+ *    path if its error semantics differ from KaTeX's.
+ *
+ * The trigger for actually doing this swap is real-world coverage gaps —
+ * when users report LaTeX constructs KaTeX cannot render that are common
+ * in their domain. This is intentionally deferred until that trigger
+ * fires; the abstraction is already in place to make the swap cheap.
  */
 
 let katexImportPromise: Promise<typeof import('katex')> | null = null;
