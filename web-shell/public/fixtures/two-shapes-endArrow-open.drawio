@@ -1,0 +1,17 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="2" vertex="1">
+          <mxGeometry x="60" y="80" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" vertex="1">
+          <mxGeometry x="240" y="80" width="80" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" edge="1" style="endArrow=open" source="2" target="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
