@@ -334,6 +334,32 @@ describe('Editor', () => {
     });
   });
 
+  describe('insertMathFormula (MATH-032)', () => {
+    it('dispatches AddVertex with the LaTeX label verbatim', () => {
+      wasm.execute_command.mockReturnValue(undefined);
+
+      editor.insertMathFormula('\\frac{1}{2}');
+
+      expect(wasm.execute_command).toHaveBeenCalled();
+      const cmd = wasm.execute_command.mock.calls[0]?.[1] as string;
+      const parsed = JSON.parse(cmd) as { AddVertex: { vertex: { label: { text: string } | null } } };
+      expect(parsed.AddVertex).toBeDefined();
+      // The fix: the label must carry the LaTeX verbatim so the math
+      // overlay can render it (otherwise the vertex has no data-latex
+      // attribute and the KaTeX overlay stays empty).
+      expect(parsed.AddVertex.vertex.label).toEqual({ text: '\\frac{1}{2}' });
+    });
+
+    it('preserves special chars in the LaTeX label verbatim', () => {
+      wasm.execute_command.mockReturnValue(undefined);
+      const latex = '$\\int_0^1 x\\,dx$';
+      editor.insertMathFormula(latex);
+      const cmd = wasm.execute_command.mock.calls[0]?.[1] as string;
+      const parsed = JSON.parse(cmd) as { AddVertex: { vertex: { label: { text: string } | null } } };
+      expect(parsed.AddVertex.vertex.label).toEqual({ text: latex });
+    });
+  });
+
   describe('undoCmd / redoCmd', () => {
     it('undoCmd calls session.undo and replays', () => {
       wasm.undo.mockReturnValue(undefined);

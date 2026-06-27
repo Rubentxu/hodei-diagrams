@@ -387,15 +387,12 @@ export class Editor {
    * The caller is responsible for ensuring the page has math_enabled=true
    * so that the math overlay will render the KaTeX output.
    */
-  // TODO(math): latex param is received but not passed to the vertex label.
-  // The vertex is created as a plain Rectangle — should carry the LaTeX as its
-  // label so the math overlay renders it. Tracked separately from lint cleanup.
-  insertMathFormula(_latex: string): void {
+  insertMathFormula(latex: string): void {
     const svgEl = this.#viewer.querySelector('svg');
     const cx = svgEl ? parseFloat(svgEl.getAttribute('width') ?? '800') / 2 : 400;
     const cy = svgEl ? parseFloat(svgEl.getAttribute('height') ?? '600') / 2 : 300;
 
-    const cmd = this.#buildAddVertexCmd('Rectangle', cx - 60, cy - 40);
+    const cmd = this.#buildAddVertexCmd('Rectangle', cx - 60, cy - 40, latex);
     const r = this.#session.executeCommand(cmd);
     if (!r.ok) {
       this.#onError(r.error);
@@ -2391,6 +2388,7 @@ export class Editor {
       | 'BlockArrowStencil',
     x: number,
     y: number,
+    label: string | null = null,
   ): string {
     const width = kind === 'Rectangle' || kind === 'RoundedRect' ? 120 : 80;
     const height = 80;
@@ -2406,7 +2404,7 @@ export class Editor {
           flip_h: false,
           flip_v: false,
         },
-        label: null,
+        label: label !== null ? { text: label } : null,
         style_id: null,
         parent: null,
         page_id: this.#activePageSlotId
