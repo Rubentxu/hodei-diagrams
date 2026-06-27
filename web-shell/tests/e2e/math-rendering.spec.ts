@@ -14,7 +14,8 @@
  * If Playwright browsers are not installed, run `npx playwright install chromium` first.
  *
  * Snapshot baselines live in `web-shell/tests/e2e/math-rendering.spec.ts-snapshots/`.
- * They ARE committed to the repo so CI can detect regressions.
+ * They ARE committed to the repo so `just verify` (and `just all`) can
+ * detect regressions.
  *
  * To regenerate baselines when intentionally changing output (e.g. upgrading katex):
  *   npx playwright test web-shell/tests/e2e/math-rendering.spec.ts --update-snapshots

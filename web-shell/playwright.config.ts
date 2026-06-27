@@ -10,7 +10,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     port: 4100,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
   projects: [
     {
