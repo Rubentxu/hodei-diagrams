@@ -127,10 +127,10 @@ test.describe('math rendering (MATH-030..034)', () => {
 
     // Open Insert > Math Formula dialog
     await page.click('#menu-item-insert-math');
-    const input = page.locator('[data-testid="math-formula-input"]');
+    const input = page.locator('[data-testid="math-latex-input"]');
     await expect(input).toBeVisible({ timeout: 5_000 });
     await input.fill('\\sum_{i=0}^n i^2');
-    await page.click('[data-testid="math-formula-confirm"]');
+    await page.click('[data-testid="math-insert-dialog-insert"]');
 
     // A new math vertex should be present with data-math-id
     await expect(page.locator('text[data-math-id]')).toHaveCount(1, { timeout: 5_000 });
@@ -147,10 +147,10 @@ test.describe('math rendering (MATH-030..034)', () => {
     const mathText = page.locator('text[data-math-id]').first();
     await mathText.dblclick({ force: true });
 
-    const input = page.locator('[data-testid="math-formula-input"]');
+    const input = page.locator('[data-testid="math-latex-input"]');
     await expect(input).toBeVisible({ timeout: 5_000 });
     await input.fill('\\sum_{i=0}^n i');
-    await page.click('[data-testid="math-formula-confirm"]');
+    await page.click('[data-testid="math-edit-dialog-save"]');
 
     // data-latex should reflect the new source
     await expect(page.locator('text[data-math-id]').first()).toHaveAttribute(
@@ -168,9 +168,9 @@ test.describe('math rendering (MATH-030..034)', () => {
 
     // Insert malformed LaTeX
     await page.click('#menu-item-insert-math');
-    const input = page.locator('[data-testid="math-formula-input"]');
+    const input = page.locator('[data-testid="math-latex-input"]');
     await input.fill('\\not_a_real_command{');
-    await page.click('[data-testid="math-formula-confirm"]');
+    await page.click('[data-testid="math-insert-dialog-insert"]');
 
     // Wait for the overlay to appear
     const overlay = page.locator('.math-overlay').first();
