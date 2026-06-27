@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 // Use absolute paths - the Playwright config's webServer serves from web-shell/
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const INVALID_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/invalid.drawio';
+  fixturePath('invalid.drawio');
 
 test.describe('viewer-only web shell', () => {
   test('viewer page mounts with Open button and viewer container', async ({ page }) => {

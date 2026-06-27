@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const INVALID_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/invalid.drawio';
+  fixturePath('invalid.drawio');
 
 test.describe('export-drawio round-trip', () => {
   test('Save button is visible and clickable after import', async ({ page }) => {

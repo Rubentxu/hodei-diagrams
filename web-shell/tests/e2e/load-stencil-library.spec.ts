@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath, testFixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const CUSTOM_STENCIL_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/tests/fixtures/custom-stencil.xml';
+  testFixturePath('custom-stencil.xml');
 
 test.describe('Stencil Library File Picker', () => {
   /**

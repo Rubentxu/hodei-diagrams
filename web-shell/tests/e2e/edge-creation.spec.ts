@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const TWO_SHAPES_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/two-shapes.drawio';
+  fixturePath('two-shapes.drawio');
 
 /** Selector for edge elements in the engine SVG (edges are rendered as <line>). */
 const edgeSelector = 'svg > line[fill="none"]';

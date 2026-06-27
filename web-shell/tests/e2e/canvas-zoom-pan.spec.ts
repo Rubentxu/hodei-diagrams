@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const TWO_PAGE_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/two-page.drawio';
+  fixturePath('two-page.drawio');
 
 test.describe('Suite C: canvas-zoom-pan', () => {
   /**

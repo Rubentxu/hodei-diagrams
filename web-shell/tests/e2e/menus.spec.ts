@@ -9,9 +9,10 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 
 test.describe('Arrange menu', () => {
   test.beforeEach(async ({ page }) => {
@@ -344,7 +345,7 @@ test.describe('Multi-selection atomicity', () => {
 
     // Load a multi-shape diagram
     const multiPath =
-      '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/multi-shapes.drawio';
+      fixturePath('multi-shapes.drawio');
     await page.setInputFiles('[data-testid="file-input"]', multiPath);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 

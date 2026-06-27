@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 
 test.describe('5-zone UI layout', () => {
   test('all 5 zones are present on initial load', async ({ page }) => {
@@ -107,7 +108,7 @@ test.describe('5-zone UI layout', () => {
 
     // Import invalid to trigger error
     const INVALID_PATH =
-      '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/invalid.drawio';
+      fixturePath('invalid.drawio');
     await page.setInputFiles('[data-testid="file-input"]', INVALID_PATH);
     await page.waitForSelector('[data-testid="error-banner"]:not([hidden])', { timeout: 3000 });
 

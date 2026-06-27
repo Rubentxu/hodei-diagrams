@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 const SIMPLE_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/simple-rect.drawio';
+  fixturePath('simple-rect.drawio');
 const TWO_SHAPES_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/two-shapes.drawio';
+  fixturePath('two-shapes.drawio');
 const ROTATED_RECT_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/rotated-rect.drawio';
+  fixturePath('rotated-rect.drawio');
 
 test.describe('Rotation and Flip (ADR-0057)', () => {
   /**
