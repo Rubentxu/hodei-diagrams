@@ -32,6 +32,10 @@ pnpm-debug.log*
 playwright-report/
 playwright/.cache/
 test-results/
+# Playwright screenshot evidence — generated for local test validation only,
+# never committed (they bloat the repo and don't diff meaningfully across
+# chromium/headless variants). See ADR-0075.
+**/*.spec.ts-snapshots/*.png
 coverage/
 *.lcov
 
