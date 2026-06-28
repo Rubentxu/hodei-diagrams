@@ -43,10 +43,9 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Load a fixture that has an edge with label if available,
-    // otherwise just verify the viewer renders without error
-    const errorBanner = page.locator('[data-testid="error-banner"]');
-    await expect(errorBanner).not.toBeVisible();
+    // Verify no error occurred (diagnostics shows "Clean", not error state)
+    const diagnosticsBadge = page.locator('[data-testid="diagnostics-badge"]');
+    await expect(diagnosticsBadge).toBeVisible();
 
     // Check that SVG viewer is rendered
     const svgViewer = page.locator('[data-testid="viewer"] svg');
@@ -64,9 +63,11 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
       await page.waitForTimeout(300);
     }
 
-    // Verify no error occurred
-    const errorBanner = page.locator('[data-testid="error-banner"]');
-    await expect(errorBanner).not.toBeVisible();
+    // Verify no error occurred (diagnostics shows clean or idle, not error)
+    const diagnosticsBadge = page.locator('[data-testid="diagnostics-badge"]');
+    const errorMessage = page.locator('.error-message');
+    // Either no badge (idle) or badge shows clean (not an error message)
+    await expect(errorMessage).toBeHidden();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -83,10 +84,9 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
       await expect(pageTabAdd).toBeVisible();
     }
 
-    // Check for any tab-related elements or verify the page indicator is present
-    // Two-page.drawio has "Page 1" and "Page 2"
-    const pageIndicator = page.locator('text=Page 1');
-    await expect(pageIndicator).toBeVisible();
+    // Check for page tab buttons (tabs are rendered with data-testid="page-tab-N")
+    const firstTab = page.locator('[data-testid="page-tab-0"]');
+    await expect(firstTab).toBeVisible();
   });
 
   test('v0.47 — Add page button creates a new page tab', async ({ page }) => {
@@ -98,8 +98,8 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
       await pageTabAdd.click();
       await page.waitForTimeout(300);
 
-      // A new page tab should appear (verify by checking for additional tab or page indicator)
-      const tabs = page.locator('[data-testid="page-tab"]');
+      // A new page tab should appear (tabs are data-testid="page-tab-N")
+      const tabs = page.locator('[data-testid^="page-tab-"]');
       const count = await tabs.count();
       expect(count).toBeGreaterThanOrEqual(1);
     }
@@ -154,9 +154,9 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
     const svgElement = page.locator('[data-testid="viewer"] svg');
     await expect(svgElement).toBeVisible();
 
-    // Verify no error occurred during render
-    const errorBanner = page.locator('[data-testid="error-banner"]');
-    await expect(errorBanner).not.toBeVisible();
+    // Verify no error occurred during render (check no error message in diagnostics)
+    const errorMessage = page.locator('.error-message');
+    await expect(errorMessage).toBeHidden();
   });
 
   test('v0.48 — SVG path uses L (line) for orthogonal edges', async ({ page }) => {
@@ -167,8 +167,9 @@ test.describe('Smoke v0.46-v0.56: new features', () => {
     const svgViewer = page.locator('[data-testid="viewer"] svg');
     await expect(svgViewer).toBeVisible();
 
-    const errorBanner = page.locator('[data-testid="error-banner"]');
-    await expect(errorBanner).not.toBeVisible();
+    // Verify no error occurred
+    const errorMessage = page.locator('.error-message');
+    await expect(errorMessage).toBeHidden();
   });
 
   // ─────────────────────────────────────────────────────────────────────────

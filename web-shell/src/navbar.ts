@@ -213,16 +213,22 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   const zoomInItem = document.createElement('button');
   zoomInItem.className = 'menu-item';
   zoomInItem.textContent = 'Zoom In';
+  zoomInItem.setAttribute('data-testid', 'menu-zoom-in');
+  zoomInItem.id = 'menu-item-zoom-in';
   viewList.appendChild(zoomInItem);
 
   const zoomOutItem = document.createElement('button');
   zoomOutItem.className = 'menu-item';
   zoomOutItem.textContent = 'Zoom Out';
+  zoomOutItem.setAttribute('data-testid', 'menu-zoom-out');
+  zoomOutItem.id = 'menu-item-zoom-out';
   viewList.appendChild(zoomOutItem);
 
   const zoomResetItem = document.createElement('button');
   zoomResetItem.className = 'menu-item';
   zoomResetItem.textContent = 'Zoom Reset';
+  zoomResetItem.setAttribute('data-testid', 'menu-zoom-reset');
+  zoomResetItem.id = 'menu-item-zoom-reset';
   viewList.appendChild(zoomResetItem);
 
   viewMenu.appendChild(viewList);

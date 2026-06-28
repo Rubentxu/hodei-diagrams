@@ -517,6 +517,9 @@ async function bootstrap(): Promise<void> {
   // Make hud accessible to module-level save functions
   hud = ui.hud;
 
+  // Start loading stencil libraries — HUD is now ready to receive callbacks
+  stencilManager.startAutoLoad();
+
   // ─── 4.5. Restore grid state (default: visible) ─────────────────────────
   // The empty canvas benefits from a visible grid so users see the
   // drawing surface immediately. Default flipped from hidden to visible
@@ -843,6 +846,26 @@ async function bootstrap(): Promise<void> {
       ui.hud.setZoom(100);
       ui.zoomDisplay.textContent = '100%';
     },
+  });
+
+  // Zoom menu item wiring (View > Zoom In/Out/Reset)
+  const zoomInMenuItem = document.getElementById('menu-item-zoom-in');
+  const zoomOutMenuItem = document.getElementById('menu-item-zoom-out');
+  const zoomResetMenuItem = document.getElementById('menu-item-zoom-reset');
+  zoomInMenuItem?.addEventListener('click', () => {
+    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
+    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
+  });
+  zoomOutMenuItem?.addEventListener('click', () => {
+    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
+    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
+  });
+  zoomResetMenuItem?.addEventListener('click', () => {
+    zoomPan?.resetView();
+    ui.hud.setZoom(100);
+    ui.zoomDisplay.textContent = '100%';
   });
 
   activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));

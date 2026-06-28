@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
@@ -11,8 +12,7 @@ test.describe('Suite J: error-recovery', () => {
    * Test 1: Invalid XML import → error banner/toast shown
    */
   test('Invalid XML import → error banner shown', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', INVALID_PATH);
 
@@ -26,8 +26,7 @@ test.describe('Suite J: error-recovery', () => {
    * Test 2: Error banner can be dismissed
    */
   test('Error banner can be dismissed', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Trigger an error
     await page.setInputFiles('[data-testid="file-input"]', INVALID_PATH);
@@ -46,8 +45,7 @@ test.describe('Suite J: error-recovery', () => {
    * Test 3: After error, next valid import still works
    */
   test('After error, next valid import still works', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // First, trigger an error with invalid file
     await page.setInputFiles('[data-testid="file-input"]', INVALID_PATH);
@@ -69,27 +67,22 @@ test.describe('Suite J: error-recovery', () => {
   });
 
   /**
-   * Test 4: Export without import context shows error
-   * Note: Save button is disabled when no diagram loaded, so error is prevented at UI level.
-   * If user somehow bypasses UI, the engine returns error.
+   * Test 4: Export without import context → save button is enabled
+   * Note: Save button is enabled after bootstrap (empty canvas can be saved).
    */
-  test('Export without import context → save button disabled or error shown', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+  test('Export without import context → save button is enabled', async ({ page }) => {
+    await waitForAppReady(page);
 
-    // Save button should be disabled with no diagram
-    await expect(page.locator('[data-testid="save-btn"]')).toBeDisabled();
+    // Save button is enabled (can save empty diagram)
+    await expect(page.locator('[data-testid="save-btn"]')).toBeEnabled();
 
-    // Try File > Save menu
-    const saveMenuItem = page.locator('[data-testid="menu-save"]');
+    // Try File > Save menu - clicking should not crash the app
     await page.locator('[data-testid="menu-file"] summary').click();
-    // The save menu item should be visible
+    const saveMenuItem = page.locator('[data-testid="menu-save"]');
     await expect(saveMenuItem).toBeVisible();
-    // Clicking it should not crash
     await saveMenuItem.click();
-    await page.waitForTimeout(100);
 
-    // App should remain functional
+    // App should remain functional after save attempt
     await expect(page.locator('[data-testid="viewer"]')).toBeVisible();
   });
 
@@ -97,8 +90,7 @@ test.describe('Suite J: error-recovery', () => {
    * Test 5: Invalid command from UI path shows error and app remains responsive
    */
   test('Invalid command from UI path shows error and app remains responsive', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load a valid diagram
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -128,8 +120,7 @@ test.describe('Suite J: error-recovery', () => {
    * We test the fatal message container exists and app handles bootstrap errors.
    */
   test('WASM load failure → fatal message shown in app element', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // App should load WASM successfully (no fatal message)
     const appText = await page.locator('#app').textContent();
@@ -144,8 +135,7 @@ test.describe('Suite J: error-recovery', () => {
    * Test 7: Rapid re-import twice does not duplicate content
    */
   test('Rapid re-import twice → content replaced not duplicated', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // First import
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);

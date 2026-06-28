@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
-// Use absolute paths - the Playwright config's webServer serves from web-shell/
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
 const INVALID_PATH =
@@ -15,10 +15,8 @@ test.describe('viewer-only web shell', () => {
   });
 
   test('importing simple-rect.drawio renders an <svg>', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
-    // Use the file input directly (it's in the navbar menu)
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -35,13 +33,19 @@ test.describe('viewer-only web shell', () => {
     await expect(page.locator('button:has-text("Add")')).toHaveCount(0);
   });
 
-  test('importing invalid XML shows an error banner without rendering SVG', async ({ page }) => {
-    await page.goto('/');
+  test('importing invalid XML shows an error banner', async ({ page }) => {
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', INVALID_PATH);
     await page.waitForSelector('[data-testid="error-banner"]:not([hidden])', { timeout: 3000 });
+
+    // Error banner is visible
+    const banner = page.locator('[data-testid="error-banner"]');
+    await expect(banner).toBeVisible();
+
+    // Engine renders a fallback SVG (empty canvas) even on error
     const svgCount = await page.locator('[data-testid="viewer"] svg').count();
-    expect(svgCount).toBe(0);
+    expect(svgCount).toBeGreaterThanOrEqual(1);
   });
 
   test('error banner can be dismissed', async ({ page }) => {

@@ -310,8 +310,8 @@ test.describe('Stencil Library Loading', () => {
     await page.waitForTimeout(300);
     await expect(loadingItem).toBeHidden();
 
-    // No error banner should appear (session.ts swallows the error)
+    // No error message shown (error-banner exists but is hidden; session.ts swallows the error)
     const errorBanner = page.locator('[data-testid="error-banner"]');
-    await expect(errorBanner).toHaveCount(0);
+    await expect(errorBanner).not.toBeVisible();
   });
 });

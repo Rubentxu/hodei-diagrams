@@ -28,7 +28,14 @@ export class StencilLibraryManager {
     this.session = session;
     this.wasm = wasm;
     if (onLoadingChange) this.onLoadingChange = onLoadingChange;
-    // Auto-load default libraries
+    // NOTE: Do NOT auto-load here. The HUD (which displays loading state)
+    // is created AFTER this constructor returns (in buildEmptyUi). Loading
+    // callbacks fire synchronously during construction, so the HUD would be null.
+    // Call startAutoLoad() after the HUD is ready.
+  }
+
+  /** Start auto-loading default stencil libraries. Call after HUD is ready. */
+  startAutoLoad(): void {
     this.loadFromUrl('general', '/fixtures/general.xml').catch((e) => {
       console.error('[StencilLibraryManager] Failed to auto-load general.xml:', e);
     });
