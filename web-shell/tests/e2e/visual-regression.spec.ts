@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
@@ -11,8 +12,7 @@ test.describe('Suite M: visual-regression', () => {
    * is not configured. Visual gap documented.
    */
   test('Snapshot simple-rect default render', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -47,8 +47,7 @@ test.describe('Suite M: visual-regression', () => {
    * Test 2: Snapshot after changing fill color to red via inspector
    */
   test('Snapshot after changing fill color to red via inspector', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -87,17 +86,25 @@ test.describe('Suite M: visual-regression', () => {
    * Test 3: Snapshot with grid enabled
    */
   test('Snapshot with grid enabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
+    // Ensure grid is OFF first (toggle to known state)
+    const canvasContainer = page.locator('[data-testid="canvas-container"]');
+    const gridInitiallyVisible = await canvasContainer.evaluate(
+      (el) => el.classList.contains('show-grid'),
+    );
+    if (gridInitiallyVisible) {
+      await page.keyboard.press('Control+g');
+      await page.waitForTimeout(100);
+    }
+
     // Enable grid via Ctrl+G
     await page.keyboard.press('Control+g');
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(200);
 
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
     await expect(canvasContainer).toHaveClass(/show-grid/);
 
     // Verify grid CSS class is applied

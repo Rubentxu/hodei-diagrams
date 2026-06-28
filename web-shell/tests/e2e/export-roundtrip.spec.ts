@@ -3,6 +3,7 @@ import { fixturePath } from './fixtures.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
@@ -11,25 +12,23 @@ const INVALID_PATH =
 
 test.describe('export-drawio round-trip', () => {
   test('Save button is visible and clickable after import', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
-    // Save button should exist but be disabled before import
+    // Save button is enabled after bootstrap (empty diagram can be saved)
     const saveBtn = page.locator('[data-testid="save-btn"]');
     await expect(saveBtn).toBeVisible();
-    await expect(saveBtn).toBeDisabled();
+    await expect(saveBtn).toBeEnabled();
 
     // Import a diagram
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Save button should now be enabled
+    // Save button should still be enabled after import
     await expect(saveBtn).toBeEnabled();
   });
 
   test('Save button click initiates download of valid .drawio XML', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Import fixture
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -50,23 +49,20 @@ test.describe('export-drawio round-trip', () => {
     expect(xml).toContain('<mxCell');
   });
 
-  test('Save button shows error when no import context', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+  test('Save button is enabled even after invalid import (engine session persists)', async ({ page }) => {
+    await waitForAppReady(page);
 
-    // Import invalid XML to ensure an engine exists
+    // Import invalid XML - engine session still exists
     await page.setInputFiles('[data-testid="file-input"]', INVALID_PATH);
     // The error banner will show, but the engine session still exists
 
-    // Click Save - since we imported invalid data, the engine has no id_map
+    // Save button remains enabled since a session exists
     const saveBtn = page.locator('[data-testid="save-btn"]');
-    // Save is still disabled since import failed
-    await expect(saveBtn).toBeDisabled();
+    await expect(saveBtn).toBeEnabled();
   });
 
   test('Downloaded XML can be re-imported and renders', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // First import
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);

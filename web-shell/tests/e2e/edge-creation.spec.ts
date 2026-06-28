@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 const TWO_SHAPES_PATH =
   fixturePath('two-shapes.drawio');
@@ -12,8 +13,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 1: Click Connector tool → connect mode active (rail button highlighted)
    */
   test('Click Connector tool → connect mode active', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Click the connector tool button
     await page.click('[data-testid="rail-connector-btn"]');
@@ -32,8 +32,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 2: Click source shape → pending target state (preview line visible)
    */
   test('Click source shape → pending target state (preview line visible)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

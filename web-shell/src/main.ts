@@ -1013,6 +1013,8 @@ async function bootstrap(): Promise<void> {
         ui.zoomDisplay.textContent = '100%';
         ui.hud.setZoom(100);
         ui.canvasContainer.style.setProperty('--zoom', '1');
+        // Re-render page tabs so the active class updates
+        refreshPageTabs();
       }
     }
   }
