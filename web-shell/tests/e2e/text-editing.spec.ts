@@ -121,10 +121,11 @@ test.describe('Suite F: text-editing', () => {
     // Type new text
     await labelEditor.fill('New Text');
 
-    // Click outside (on canvas container) to blur
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
-    const canvasBox = await canvasContainer.boundingBox();
-    await page.mouse.click(canvasBox!.x + 10, canvasBox!.y + 10);
+    // Click outside (on canvas container) to blur — click on the toolbar area since
+    // the label-editor is position:fixed with z-index:1000 and covers the entire canvas
+    // We click on the toolbar button which is above the label editor
+    await page.click('[data-testid="rect-tool-btn"]');
+    await page.waitForTimeout(100);
 
     // Editor should be gone
     await expect(page.locator('.label-editor')).not.toBeVisible();

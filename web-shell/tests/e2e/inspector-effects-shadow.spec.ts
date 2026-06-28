@@ -48,10 +48,8 @@ test.describe('Suite: inspector-shadow', () => {
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Click on empty area to deselect
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
-    const canvasBox = await canvasContainer.boundingBox();
-    await page.mouse.click(canvasBox!.x + 5, canvasBox!.y + 5);
+    // Deselect via Escape key (reliable — avoids click coords hitting shape at origin)
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
     // Shadow section should be disabled

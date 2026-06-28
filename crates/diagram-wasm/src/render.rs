@@ -1,6 +1,6 @@
 //! SVG rendering: render scene pages to SVG strings.
 
-use crate::engine::with_engine;
+use crate::engine::{WasmStencilProvider, with_engine};
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::SceneBuilder;
 use wasm_bindgen::prelude::*;
@@ -26,7 +26,9 @@ struct PageRender {
 #[wasm_bindgen]
 pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
     with_engine(handle, |e| {
+        let provider = WasmStencilProvider::new(e.stencil_libraries.clone());
         let scene = SceneBuilder::new()
+            .with_stencil_provider(Box::new(provider))
             .build(e.editor.model())
             .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
 
@@ -61,7 +63,9 @@ pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
 #[wasm_bindgen]
 pub fn render_pages(handle: u32) -> Result<String, JsValue> {
     with_engine(handle, |e| {
+        let provider = WasmStencilProvider::new(e.stencil_libraries.clone());
         let scene = SceneBuilder::new()
+            .with_stencil_provider(Box::new(provider))
             .build(e.editor.model())
             .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
 

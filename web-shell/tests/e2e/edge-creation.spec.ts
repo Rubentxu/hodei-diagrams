@@ -109,9 +109,8 @@ test.describe('Suite N: edge-creation', () => {
     await shapes.first().click();
     await page.waitForTimeout(200);
 
-    // Click empty area to cancel
-    const canvasBox = await canvasContainer.boundingBox();
-    await page.mouse.click(canvasBox!.x + 5, canvasBox!.y + 5);
+    // Cancel connect mode via Escape (reliable — avoids click coords)
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
     // No edge should be created

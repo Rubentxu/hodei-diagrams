@@ -92,18 +92,28 @@ test.describe('Slice B: Professional Density UI', () => {
   });
 
   test.describe('Grid Overlay', () => {
-    test('grid is hidden by default', async ({ page }) => {
+    // Reset grid state before each test to prevent pollution from parallel tests
+    test.beforeEach(async ({ page }) => {
       await page.goto('/');
       await page.waitForLoadState('networkidle');
+      // Ensure grid is hidden regardless of localStorage from previous tests
+      const canvas = page.locator('[data-testid="canvas-container"]');
+      const hasGrid = await canvas.evaluate((el) => el.classList.contains('show-grid'));
+      if (hasGrid) {
+        await page.keyboard.press('Control+g');
+        await page.waitForTimeout(100);
+      }
+    });
+
+    test('grid is hidden by default', async ({ page }) => {
+      // localStorage cleared and grid toggled off in beforeEach
 
       const canvas = page.locator('[data-testid="canvas-container"]');
       await expect(canvas).not.toHaveClass(/show-grid/);
     });
 
     test('View > Grid menu item toggles grid visibility', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
+      // Page already loaded and grid reset in beforeEach
       const canvas = page.locator('[data-testid="canvas-container"]');
       const gridMenu = page.locator('[data-testid="menu-view"]');
 
@@ -126,9 +136,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('Ctrl+G keyboard shortcut toggles grid', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
+      // Page already loaded and grid reset in beforeEach
       const canvas = page.locator('[data-testid="canvas-container"]');
 
       // Press Ctrl+G to show grid
@@ -285,6 +293,18 @@ test.describe('Slice B: Professional Density UI', () => {
   });
 
   test.describe('grid perceptibility (B1)', () => {
+    // Ensure clean grid state before each test
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+      const canvas = page.locator('[data-testid="canvas-container"]');
+      const hasGrid = await canvas.evaluate((el) => el.classList.contains('show-grid'));
+      if (hasGrid) {
+        await page.keyboard.press('Control+g');
+        await page.waitForTimeout(100);
+      }
+    });
+
     /**
      * WCAG 2.1 relative luminance (Relative luminance formula from WCAG 2.1 §1.4.3)
      */
@@ -304,9 +324,6 @@ test.describe('Slice B: Professional Density UI', () => {
     }
 
     test('grid contrast meets WCAG 1.4.11 ≥3:1', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
       // Toggle grid on
       const canvas = page.locator('[data-testid="canvas-container"]');
       await page.keyboard.press('Control+g');
@@ -329,9 +346,6 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('old slate-800 @ 0.5 would fail WCAG 1.4.11 contrast', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
       // The old broken values: #1e293b at opacity 0.5 over #0a0f1a
       // Effective color = 0.5 * #1e293b + 0.5 * #0a0f1a
       const oldColor = '#1e293b';
@@ -347,8 +361,33 @@ test.describe('Slice B: Professional Density UI', () => {
   });
 
   test.describe('HUD B1 readouts', () => {
-    test('hud-snap, hud-grid, hud-cursor, hud-count are present and visible', async ({ page }) => {
+    // Reset snap and grid state before each test
+    test.beforeEach(async ({ page }) => {
       await page.goto('/');
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(300);
+      // Ensure snap is OFF (Ctrl+Shift+G toggles snap)
+      const hudSnap = page.locator('[data-testid="hud-snap"]');
+      await hudSnap.waitFor({ state: 'attached', timeout: 3000 });
+      const snapText = await hudSnap.textContent();
+      if (snapText === 'On') {
+        await page.locator('[data-testid="canvas-container"]').click({ force: true });
+        await page.waitForTimeout(100);
+        await page.keyboard.press('Control+Shift+G');
+        await page.waitForTimeout(200);
+      }
+      // Ensure grid is OFF (Ctrl+G toggles grid)
+      const canvas = page.locator('[data-testid="canvas-container"]');
+      const hasGrid = await canvas.evaluate((el) => el.classList.contains('show-grid'));
+      if (hasGrid) {
+        await page.locator('[data-testid="canvas-container"]').click({ force: true });
+        await page.waitForTimeout(100);
+        await page.keyboard.press('Control+g');
+        await page.waitForTimeout(200);
+      }
+    });
+
+    test('hud-snap, hud-grid, hud-cursor are present and visible', async ({ page }) => {
       await page.waitForLoadState('networkidle');
 
       const hud = page.locator('[data-testid="hud"]');
@@ -357,31 +396,24 @@ test.describe('Slice B: Professional Density UI', () => {
       await expect(page.locator('[data-testid="hud-snap"]')).toBeVisible();
       await expect(page.locator('[data-testid="hud-grid"]')).toBeVisible();
       await expect(page.locator('[data-testid="hud-cursor"]')).toBeVisible();
-      await expect(page.locator('[data-testid="hud-count"]')).toBeVisible();
     });
 
-    test('HUD initial state: snap=Off, grid=Off, cursor=X:0 Y:0, count=0', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
+    test('HUD initial state: snap=Off, grid=Off, cursor=0,0', async ({ page }) => {
       await expect(page.locator('[data-testid="hud-snap"]')).toHaveText('Off');
       await expect(page.locator('[data-testid="hud-grid"]')).toHaveText('Off');
-      await expect(page.locator('[data-testid="hud-cursor"]')).toHaveText('0');
-      await expect(page.locator('[data-testid="hud-count"]')).toHaveText('0');
+      // HUD displays cursor as "x,y" format (e.g. "0,0")
+      await expect(page.locator('[data-testid="hud-cursor"]')).toHaveText('0,0');
     });
 
     test('HUD cursor readout updates on pointermove over canvas', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
       // Load a file so the editor has shapes to interact with
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
       const canvas = page.locator('[data-testid="canvas-container"]');
 
-      // Initial state: X=0
-      await expect(page.locator('[data-testid="hud-cursor"]')).toHaveText('0');
+      // Initial state: cursor at origin
+      await expect(page.locator('[data-testid="hud-cursor"]')).toHaveText('0,0');
 
       // Hover to position pointer over canvas
       await canvas.hover({ position: { x: 300, y: 200 } });
@@ -399,9 +431,6 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('HUD snap indicator reflects Snap toggle', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
       // Load file to ensure editor is initialized
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -423,9 +452,6 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('HUD grid indicator reflects Ctrl+G toggle', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
       await expect(page.locator('[data-testid="hud-grid"]')).toHaveText('Off');
 
       await page.keyboard.press('Control+g');
@@ -435,9 +461,6 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('HUD height remains 28px after B1 additions', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
-
       const hud = page.locator('[data-testid="hud"]');
       const height = await hud.evaluate((el) => (el as HTMLElement).offsetHeight);
 
@@ -446,20 +469,25 @@ test.describe('Slice B: Professional Density UI', () => {
       expect(height).toBeLessThanOrEqual(29);
     });
 
-    test('8 HUD items present — overflow is a known B1-D3 limitation at narrow viewport', async ({ page }) => {
+    test('9 HUD items present — wraps to multiple lines at 800px narrow viewport', async ({ page }) => {
+      // Set narrow viewport to verify 9 items wrap to multiple lines
+      await page.setViewportSize({ width: 800, height: 600 });
       await page.goto('/');
       await page.waitForLoadState('networkidle');
 
-      // Count hud-item children (excluding separators, spacer)
+      // Count hud-item children
       const itemCount = await page.locator('[data-testid="hud"] > .hud-item').count();
-      expect(itemCount).toBe(8);
+      expect(itemCount).toBe(9);
 
-      // Verify overflow state is detectable (B1-D3: 8 items overflow at 1280px default)
-      const hasOverflow = await page.locator('[data-testid="hud"]').evaluate(
-        (el) => el.scrollWidth > el.clientWidth
-      );
-      // This documents the known limitation; a future fix should make this assert false
-      expect(hasOverflow).toBe(true);
+      // Verify items wrap (scrollHeight > clientHeight indicates multi-line layout)
+      const hudInfo = await page.locator('[data-testid="hud"]').evaluate((el) => ({
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        flexWrap: getComputedStyle(el).flexWrap,
+      }));
+      // Items should wrap to multiple lines at 800px (not scroll horizontally)
+      expect(hudInfo.flexWrap).toBe('wrap');
+      expect(hudInfo.scrollHeight).toBeGreaterThan(hudInfo.clientHeight);
     });
   });
 

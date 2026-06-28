@@ -10,15 +10,24 @@ import type { StencilInfo } from './types.js';
 import type { DiagramEngineSession } from './session.js';
 import type { WasmModule } from './types.js';
 
+export type StencilLoadingCallback = (loading: boolean) => void;
+
 export class StencilLibraryManager {
   private readonly session: DiagramEngineSession;
   private readonly wasm: WasmModule;
   private readonly libraries = new Map<string, StencilInfo[]>();
   private readonly subscribers = new Set<() => void>();
+  private onLoadingChange: StencilLoadingCallback | undefined;
+  private activeLoads = 0;
 
-  constructor(session: DiagramEngineSession, wasm: WasmModule) {
+  constructor(
+    session: DiagramEngineSession,
+    wasm: WasmModule,
+    onLoadingChange?: StencilLoadingCallback,
+  ) {
     this.session = session;
     this.wasm = wasm;
+    if (onLoadingChange) this.onLoadingChange = onLoadingChange;
     // Auto-load default libraries
     this.loadFromUrl('general', '/fixtures/general.xml').catch((e) => {
       console.error('[StencilLibraryManager] Failed to auto-load general.xml:', e);
@@ -32,20 +41,38 @@ export class StencilLibraryManager {
    * Fetch a stencil library XML from a URL, parse it, and register it with the engine.
    */
   async loadFromUrl(name: string, url: string): Promise<void> {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(`Failed to fetch ${url}: ${resp.status} ${resp.statusText}`);
+    this.activeLoads++;
+    this.onLoadingChange?.(true);
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch ${url}: ${resp.status} ${resp.statusText}`);
+      }
+      const xml = await resp.text();
+      await this.#parseAndRegister(name, xml);
+    } finally {
+      this.activeLoads--;
+      if (this.activeLoads === 0) {
+        this.onLoadingChange?.(false);
+      }
     }
-    const xml = await resp.text();
-    await this.#parseAndRegister(name, xml);
   }
 
   /**
    * Read a stencil library XML from a File object, parse it, and register it with the engine.
    */
   async loadFromFile(name: string, file: File): Promise<void> {
-    const xml = await file.text();
-    await this.#parseAndRegister(name, xml);
+    this.activeLoads++;
+    this.onLoadingChange?.(true);
+    try {
+      const xml = await file.text();
+      await this.#parseAndRegister(name, xml);
+    } finally {
+      this.activeLoads--;
+      if (this.activeLoads === 0) {
+        this.onLoadingChange?.(false);
+      }
+    }
   }
 
   async #parseAndRegister(name: string, xml: string): Promise<void> {

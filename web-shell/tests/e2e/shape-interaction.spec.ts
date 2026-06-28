@@ -42,7 +42,6 @@ test.describe('Suite D: shape-interaction', () => {
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     const viewer = page.locator('[data-testid="viewer"]');
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
     const rect = viewer.locator('[data-vertex-id]').first();
 
     // Select the rect
@@ -50,14 +49,8 @@ test.describe('Suite D: shape-interaction', () => {
     await page.waitForTimeout(200);
     await expect(rect).toHaveClass(/selected/);
 
-    // Get the canvas-container's bounding box - click outside the viewer
-    // The viewer is positioned inside canvas-container, click at canvas-container's
-    // top-left corner which is outside the viewer (which only has the small SVG)
-    const canvasBox = await canvasContainer.boundingBox();
-    expect(canvasBox).not.toBeNull();
-
-    // Click at top-left of canvas container (far from the small 80x40 SVG)
-    await page.mouse.click(canvasBox!.x + 5, canvasBox!.y + 5);
+    // Deselect via Escape (reliable — avoids click coords issues)
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
 
     // Check if the rect is still selected

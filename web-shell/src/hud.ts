@@ -54,6 +54,7 @@ export function buildHud(): HudControls {
   const loadingItem = document.createElement('div');
   loadingItem.className = 'hud-item hud-loading';
   loadingItem.setAttribute('aria-live', 'polite');
+  loadingItem.setAttribute('data-testid', 'hud-loading');
   loadingItem.style.display = 'none';
 
   const loadingLabel = document.createElement('span');
@@ -66,7 +67,6 @@ export function buildHud(): HudControls {
 
   const loadingValue = document.createElement('span');
   loadingValue.className = 'hud-value';
-  loadingValue.setAttribute('data-testid', 'hud-loading');
 
   loadingItem.appendChild(loadingLabel);
   loadingItem.appendChild(loadingSpinner);

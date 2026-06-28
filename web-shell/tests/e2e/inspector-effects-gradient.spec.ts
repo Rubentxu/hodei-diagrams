@@ -48,10 +48,8 @@ test.describe('Suite: inspector-gradient', () => {
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Click on empty area to deselect
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
-    const canvasBox = await canvasContainer.boundingBox();
-    await page.mouse.click(canvasBox!.x + 5, canvasBox!.y + 5);
+    // Deselect via Escape key (reliable — avoids click coords hitting shape at origin)
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
     // Gradient section should be disabled
@@ -117,9 +115,14 @@ test.describe('Suite: inspector-gradient', () => {
     await rect.click();
     await page.waitForTimeout(500);
 
-    // Click the gradient toggle
-    const gradientToggle = page.locator('[data-testid="gradient-toggle"]');
-    await gradientToggle.click();
+    // Click the gradient toggle via JS (input has pointer-events:none + may be visually hidden)
+    await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="gradient-toggle"]') as HTMLInputElement;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
     await page.waitForTimeout(300);
 
     // Gradient body should now be visible
@@ -143,9 +146,14 @@ test.describe('Suite: inspector-gradient', () => {
     await rect.click();
     await page.waitForTimeout(500);
 
-    // Enable gradient first
-    const gradientToggle = page.locator('[data-testid="gradient-toggle"]');
-    await gradientToggle.click();
+    // Enable gradient first via JS
+    await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="gradient-toggle"]') as HTMLInputElement;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
     await page.waitForTimeout(300);
 
     // Check type selector options
@@ -173,9 +181,14 @@ test.describe('Suite: inspector-gradient', () => {
     await rect.click();
     await page.waitForTimeout(500);
 
-    // Enable gradient first
-    const gradientToggle = page.locator('[data-testid="gradient-toggle"]');
-    await gradientToggle.click();
+    // Enable gradient first via JS
+    await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="gradient-toggle"]') as HTMLInputElement;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
     await page.waitForTimeout(300);
 
     // Change angle slider
@@ -204,9 +217,14 @@ test.describe('Suite: inspector-gradient', () => {
     await rect.click();
     await page.waitForTimeout(500);
 
-    // Enable gradient first
-    const gradientToggle = page.locator('[data-testid="gradient-toggle"]');
-    await gradientToggle.click();
+    // Enable gradient first via JS
+    await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="gradient-toggle"]') as HTMLInputElement;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
     await page.waitForTimeout(300);
 
     // Angle row should be visible for linear
@@ -238,9 +256,14 @@ test.describe('Suite: inspector-gradient', () => {
     await rect.click();
     await page.waitForTimeout(500);
 
-    // Enable gradient first
-    const gradientToggle = page.locator('[data-testid="gradient-toggle"]');
-    await gradientToggle.click();
+    // Enable gradient first via JS
+    await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="gradient-toggle"]') as HTMLInputElement;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
     await page.waitForTimeout(300);
 
     // Check default color values

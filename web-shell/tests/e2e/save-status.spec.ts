@@ -73,7 +73,9 @@ test.describe('Save-Status Display', () => {
     const saveStatus = page.locator('[data-testid="hud-save-status"]');
     await expect(saveStatus).toHaveText('Unsaved changes');
 
-    // Trigger manual save via File > Save
+    // Trigger manual save via File > Save (need to open File menu first)
+    await page.locator('[data-testid="menu-file"]').click();
+    await page.waitForTimeout(100);
     await page.locator('[data-testid="menu-save"]').click();
 
     // Poll for "Saving..." then "Saved" (within 2s)
@@ -164,6 +166,9 @@ test.describe('Save-Status Display', () => {
     await expect(saveStatus).toHaveText('Unsaved changes');
 
     // Undo — setOnStateChange does NOT fire on undo (per session.ts:175-178)
+    // Need to open Edit menu first
+    await page.locator('[data-testid="menu-edit"]').click();
+    await page.waitForTimeout(100);
     await page.click('[data-testid="menu-undo"]');
 
     // Status should remain "Unsaved changes" — undo doesn't save
@@ -211,9 +216,11 @@ test.describe('WASM Init Loading', () => {
 
   // ─── Task 5.3.1: Loading overlay visible pre-mount ───────────────────────
   test('WASM init → loading overlay shown before UI mounts', async ({ page }) => {
-    // Use route interception to delay WASM load and catch the overlay
-    await page.route(/\/wasm-loader\.js$/, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    // Use route interception to delay WASM load and catch the overlay.
+    // The delay must be long enough for Playwright to observe the overlay
+    // (headless WASM compilation can be fast; 3-5s needed in CI/headless environments).
+    await page.route(/\/wasm\/diagram_wasm\.js/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 8000));
       await route.continue();
     });
 
@@ -262,9 +269,16 @@ test.describe('Stencil Library Loading', () => {
 
   // ─── Task 5.4.2: Stencil load > 100ms → loading indicator visible ────────
   test('slow stencil load → loading indicator appears then removed', async ({ page }) => {
-    // Delay the stencil library fetch by 300ms
+    // Delay BOTH stencil library fetches by 800ms.
+    // Both general.xml and flowchart.xml are loaded in parallel by StencilLibraryManager,
+    // so both must be delayed for the loading indicator to stay visible long enough
+    // to be observed by Playwright in headless environments.
     await page.route(/\/fixtures\/general\.xml$/, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      await route.continue();
+    });
+    await page.route(/\/fixtures\/flowchart\.xml$/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
       await route.continue();
     });
 

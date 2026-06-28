@@ -337,10 +337,8 @@ test.describe('Suite E: inspector-style', () => {
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Ensure no shape is selected - click on empty area
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
-    const canvasBox = await canvasContainer.boundingBox();
-    await page.mouse.click(canvasBox!.x + 5, canvasBox!.y + 5);
+    // Ensure no shape is selected - use Escape (reliable)
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
 
     // Inspector should show no-selection message in the active pane (style pane)

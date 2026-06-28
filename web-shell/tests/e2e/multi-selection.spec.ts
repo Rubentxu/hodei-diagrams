@@ -66,8 +66,8 @@ test.describe('Multi-selection', () => {
       await shapes.first().click();
       await page.waitForTimeout(100);
 
-      // Click far from any shape (top-left corner of viewport)
-      await viewer.click({ position: { x: 10, y: 10 } });
+      // Click far from any shape (the rect is at 0,0 size 80x40, so use bottom-right area)
+      await viewer.click({ position: { x: 500, y: 500 } });
       await page.waitForTimeout(100);
 
       // Check no shapes are selected

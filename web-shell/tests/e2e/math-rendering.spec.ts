@@ -31,9 +31,9 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { fixturePath } from './fixtures.js';
 
-const MATH_FIXTURE_PATH =
-  '/var/home/rubentxu/Proyectos/rust/hodei-diagrams/web-shell/public/fixtures/math-enabled.drawio';
+const MATH_FIXTURE_PATH = fixturePath('math-enabled.drawio');
 
 /**
  * Normalize KaTeX overlay HTML for snapshot comparison.
@@ -112,10 +112,12 @@ test.describe('math rendering (MATH-030..034)', () => {
     await page.goto('/');
     await page.waitForSelector('svg', { timeout: 10_000 });
 
-    // Toggle Math Mode on
+    // Open View menu, then toggle Math Mode on
+    await page.locator('summary:has-text("View")').first().click();
     await page.click('#menu-item-math-mode');
 
     // Open Insert > Math Formula dialog
+    await page.locator('summary:has-text("Insert")').first().click();
     await page.click('#menu-item-insert-math');
     const input = page.locator('[data-testid="math-latex-input"]');
     await expect(input).toBeVisible({ timeout: 5_000 });
@@ -131,10 +133,20 @@ test.describe('math rendering (MATH-030..034)', () => {
     await page.goto('/');
     await page.waitForSelector('svg', { timeout: 10_000 });
     await page.setInputFiles('[data-testid="file-input"]', MATH_FIXTURE_PATH);
-    await page.waitForSelector('text[data-math-id]', { timeout: 10_000 });
+    await page.waitForSelector('text[data-math-id]', { state: 'attached', timeout: 10_000 });
 
+    // Use page.evaluate to dispatch dblclick directly on the element.
+    // The math text SVG element is visibility:hidden (covered by KaTeX overlay
+    // with pointer-events:none). Playwright's force:true may not correctly route
+    // the click through the overlay to the SVG text element below.
     const mathText = page.locator('text[data-math-id]').first();
-    await mathText.dblclick({ force: true });
+    const handle = await mathText.elementHandle();
+    if (handle) {
+      await page.evaluate((el) => {
+        const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window });
+        el.dispatchEvent(event);
+      }, handle);
+    }
 
     const input = page.locator('[data-testid="math-latex-input"]');
     await expect(input).toBeVisible({ timeout: 5_000 });
@@ -166,6 +178,16 @@ test.describe('math rendering (MATH-030..034)', () => {
     // Wait for the overlay to appear
     const overlay = page.locator('.math-overlay').first();
     await expect(overlay).toBeVisible({ timeout: 15_000 });
+
+    // The overlay is created synchronously but content is set async (fire-and-forget render).
+    // Wait for textContent to be populated before checking.
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('.math-overlay') as HTMLElement | null;
+        return el !== null && el.textContent !== null && el.textContent.length > 0;
+      },
+      { timeout: 10_000 },
+    );
 
     // Overlay should contain raw LaTeX as monospace (fallback)
     const text = await overlay.textContent();

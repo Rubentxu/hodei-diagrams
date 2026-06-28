@@ -456,6 +456,7 @@ export class DiagramEngineSession {
    * @param name The shape name within the library (e.g. "Process")
    * @param x The X coordinate in document space
    * @param y The Y coordinate in document space
+   * @param pageId The page to add the vertex to (optional, defaults to { idx: 0, version: 0 })
    * @returns The new vertex's SlotmapId, or an error
    */
   addStencilVertex(
@@ -463,6 +464,7 @@ export class DiagramEngineSession {
     name: string,
     x: number,
     y: number,
+    pageId?: SlotmapId,
   ): Result<SlotmapId, EngineError> {
     const cmd = JSON.stringify({
       AddVertex: {
@@ -473,8 +475,14 @@ export class DiagramEngineSession {
             width: 80,
             height: 80,
             relative: false,
+            rotation: 0,
+            flip_h: false,
+            flip_v: false,
           },
-          page_id: { idx: 0, version: 0 },
+          page_id: pageId ? slotmapIdToField(pageId) : { idx: 0, version: 0 },
+          z_order: 0,
+          locked: false,
+          visible: true,
         },
         style: { shape: `stencil:${library}:${name}` },
       },

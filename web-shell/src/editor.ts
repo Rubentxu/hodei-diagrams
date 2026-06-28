@@ -1139,6 +1139,14 @@ export class Editor {
     return { ok: true, value: this.#sceneCache };
   }
 
+  /**
+   * Returns the SlotmapId of the currently active page, or null if no page is active.
+   * Used by callers that need to construct engine commands with the correct page_id.
+   */
+  getActivePageSlotId(): SlotmapId | null {
+    return this.#activePageSlotId;
+  }
+
   /** Detach event listeners from the viewer container. */
   detach(): void {
     this.#abortController?.abort();

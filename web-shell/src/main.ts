@@ -457,7 +457,10 @@ async function bootstrap(): Promise<void> {
   // ─── 3. Create StencilLibraryManager ───────────────────────────────────────
   // The manager auto-loads general.xml + flowchart.xml in its constructor.
   // It must exist BEFORE buildEmptyUi so the sidebar can subscribe to it.
-  const stencilManager = new StencilLibraryManager(activeSession, wasmResult.value);
+  // Pass a callback to update the HUD loading indicator (hud is available via closure after line ~515).
+  const stencilManager = new StencilLibraryManager(activeSession, wasmResult.value, (loading: boolean) => {
+    hud?.setLoading({ wasm: false, stencil: loading });
+  });
 
   // ─── 4. Build Inspector (needed before UI for update wiring) ──────────────
   // Wire the inspector's style change events to the editor. The editor is
@@ -914,7 +917,13 @@ async function bootstrap(): Promise<void> {
     if (!activeSession) return;
     const event = e as CustomEvent<{ library: string; name: string }>;
     const { library, name } = event.detail;
-    activeSession.addStencilVertex(library, name, 400, 300);
+    const pageId = activeEditor?.getActivePageSlotId() ?? undefined;
+    const result = activeSession.addStencilVertex(library, name, 400, 300, pageId);
+    if (result.ok) {
+      // Re-render the scene to show the newly added vertex
+      activeEditor?.refreshScene();
+      activeEditor?.triggerReplay();
+    }
   });
 
   // Re-render when session state changes
@@ -1243,10 +1252,19 @@ async function bootstrap(): Promise<void> {
   // ─── 13. Wire menu items ──────────────────────────────────────────────────
 
   // File > Open - re-use fileInput
-  // File > Save
+  // File > Save → version-store save + download
   const menuSave = document.querySelector('[data-testid="menu-save"]');
-  menuSave?.addEventListener('click', () => {
-    ui.saveButton.click();
+  menuSave?.addEventListener('click', async () => {
+    if (!activeSession) return;
+    // Save to version store (updates HUD to "Saved")
+    await manualSaveVersion();
+    // Also download as .drawio (preserves existing toolbar behaviour)
+    const result = activeSession.exportDrawio();
+    if (result.ok) {
+      downloadDrawio(result.value, 'diagram.drawio');
+    } else {
+      showError(ui.errorBanner, ui.errorMessage, 'Export failed: ' + result.error);
+    }
   });
 
   // Edit > Undo

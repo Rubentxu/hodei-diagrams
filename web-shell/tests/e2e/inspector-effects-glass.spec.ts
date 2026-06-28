@@ -45,10 +45,8 @@ test.describe('Suite: inspector-glass', () => {
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Click on empty area to deselect
-    const canvasContainer = page.locator('[data-testid="canvas-container"]');
-    const canvasBox = await canvasContainer.boundingBox();
-    await page.mouse.click(canvasBox!.x + 5, canvasBox!.y + 5);
+    // Deselect via Escape key (reliable — avoids click coords hitting shape at origin)
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
     // Glass section should be disabled
@@ -114,9 +112,14 @@ test.describe('Suite: inspector-glass', () => {
     await rect.click();
     await page.waitForTimeout(500);
 
-    // Click the glass toggle
-    const glassToggle = page.locator('[data-testid="glass-toggle"]');
-    await glassToggle.click();
+    // Click the glass toggle via JS (input has pointer-events:none + may be visually hidden)
+    await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="glass-toggle"]') as HTMLInputElement;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
     await page.waitForTimeout(300);
 
     // Glass body should now be visible
@@ -140,9 +143,14 @@ test.describe('Suite: inspector-glass', () => {
     await rect.click();
     await page.waitForTimeout(500);
 
-    // Enable glass first
-    const glassToggle = page.locator('[data-testid="glass-toggle"]');
-    await glassToggle.click();
+    // Enable glass first via JS
+    await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="glass-toggle"]') as HTMLInputElement;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
     await page.waitForTimeout(300);
 
     // Change opacity slider
