@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
-  fixturePath('simple-rect.drawio');
+  fixturePath('simple-rect-sized.drawio');
 
 /**
  * Multi-selection E2E tests covering ADR-0054 and ADR-0055.
@@ -66,8 +66,8 @@ test.describe('Multi-selection', () => {
       await shapes.first().click();
       await page.waitForTimeout(100);
 
-      // Click far from any shape (the rect is at 0,0 size 80x40, so use bottom-right area)
-      await viewer.click({ position: { x: 500, y: 500 } });
+      // Click far from any shape (rect is 100,100 80x40 on a 1000x1000 page; click bottom-right)
+      await viewer.click({ position: { x: 700, y: 500 } });
       await page.waitForTimeout(100);
 
       // Check no shapes are selected
@@ -151,12 +151,15 @@ test.describe('Multi-selection', () => {
       const box = await viewer.boundingBox();
       if (!box) throw new Error('Viewer not found');
 
+      // Hold Shift BEFORE moving/clicking so the pointer event has shiftKey=true
+      await page.keyboard.down('Shift');
       // Start marquee from top-left area
       await page.mouse.move(box.x + 50, box.y + 50);
-      await page.mouse.down({ button: 'left' });
+      await page.mouse.down();
       // Drag across to cover new shapes
       await page.mouse.move(box.x + 350, box.y + 350);
       await page.mouse.up();
+      await page.keyboard.up('Shift');
 
       await page.waitForTimeout(200);
 

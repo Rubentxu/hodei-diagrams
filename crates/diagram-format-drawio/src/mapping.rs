@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use diagram_core::geometry::CellGeometry;
+use diagram_core::geometry::{CellGeometry, Size};
 use diagram_core::id::{EdgeId, GroupId, VertexId};
 use diagram_core::label::Label;
 use diagram_core::style::StyleMap;
@@ -182,10 +182,29 @@ impl DrawioMapping {
             model.store.insert_page(Page::new(Default::default()));
         }
 
-        // Set page names and backgrounds from diagram names (pages_mut() returns pages in insertion order)
+        // Set page names, backgrounds, and size from diagram (pages_mut() returns pages in insertion order)
         for (page, diagram) in model.store.pages_mut().zip(raw.diagrams.iter()) {
             page.name = diagram.name.as_ref().map(|n| Label::new(n.as_str()));
             page.background = diagram.background.clone();
+            // PAGE_SIZE: propagate pageWidth/pageHeight from mxGraphModel if present
+            let page_width = diagram
+                .graph_model
+                .iter()
+                .find(|(k, _)| k.to_lowercase() == "pagewidth")
+                .and_then(|(_, v)| v.parse::<f64>().ok())
+                .unwrap_or(1.0)
+                .max(1.0);
+            let page_height = diagram
+                .graph_model
+                .iter()
+                .find(|(k, _)| k.to_lowercase() == "pageheight")
+                .and_then(|(_, v)| v.parse::<f64>().ok())
+                .unwrap_or(1.0)
+                .max(1.0);
+            page.size = Size {
+                width: page_width,
+                height: page_height,
+            };
             // MATH-002: propagate math flag from graph_model (case-insensitive lookup)
             let math_enabled = diagram
                 .graph_model
