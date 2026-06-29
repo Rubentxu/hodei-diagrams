@@ -283,6 +283,34 @@ export class DiagramEngineSession {
     }
   }
 
+  /**
+   * Zero-copy scene buffer: serializes the scene as postcard bytes into a
+   * pre-allocated slab in WASM linear memory. Returns `{ptr, len}` so the
+   * caller can create a `Uint8Array` view without any JSON round-trip.
+   *
+   * The caller is responsible for creating the view immediately after
+   * this call returns — the pointer is invalidated by any subsequent WASM
+   * call that might grow memory.
+   *
+   * If the WASM module does not export `write_scene_to_buffer` (older
+   * builds), returns `{ptr: 0, len: 0}` to signal "use JSON fallback".
+   */
+  writeSceneBuffer(): Result<{ ptr: number; len: number }, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      if (typeof this.wasm.write_scene_to_buffer !== 'function') {
+        return ok({ ptr: 0, len: 0 });
+      }
+      const handle = this.handle as number;
+      const len = this.wasm.write_scene_to_buffer(handle);
+      const ptr = this.wasm.get_scene_buffer_ptr(handle);
+      return ok({ ptr, len });
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   /** Render a single page by flat index. Returns SVG string. */
   renderPage(pageIdx: number): Result<string, EngineError> {
     const g = this.guard();
