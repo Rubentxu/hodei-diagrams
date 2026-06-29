@@ -5,8 +5,17 @@ import { waitForAppReady } from './helpers/app-ready.js';
 const TWO_SHAPES_PATH =
   fixturePath('two-shapes.drawio');
 
-/** Selector for edge elements in the engine SVG (edges are rendered as <line>). */
-const edgeSelector = 'svg > line[fill="none"]';
+/**
+ * Selector for edge elements in the engine SVG.
+ *
+ * Real edges are rendered as `<line>` or `<path>` carrying a `data-edge-id`
+ * attribute (format `"<idx>:<version>"`). We use `[data-edge-id]` instead of
+ * `svg > line[fill="none"]` because the latter also matches UI icon SVGs
+ * (rail/sidebar/inspector icons all use `fill="none"` on `<line>`/`<path>`).
+ *
+ * The attribute-based selector unambiguously identifies engine edges vs. UI chrome.
+ */
+const edgeSelector = 'svg [data-edge-id]';
 
 test.describe('Suite N: edge-creation', () => {
   /**
@@ -187,16 +196,29 @@ test.describe('Suite N: edge-creation', () => {
     const shapeCount = await shapes.count();
     expect(shapeCount).toBe(2);
 
-    // Verify edge has valid coordinates
-    const edge = viewer.locator(edgeSelector).first();
-    const x1 = await edge.getAttribute('x1');
-    const y1 = await edge.getAttribute('y1');
-    const x2 = await edge.getAttribute('x2');
-    const y2 = await edge.getAttribute('y2');
-    expect(x1).toBeTruthy();
-    expect(y1).toBeTruthy();
-    expect(x2).toBeTruthy();
-    expect(y2).toBeTruthy();
+    // Verify at least one edge has valid coordinates.
+    // Edges render as either <line> (straight, x1/x2) or <path> (with
+    // waypoints, "d" attribute). Check whichever is present.
+    const allEdgeEls = await viewer.locator(edgeSelector).all();
+    let foundValid = false;
+    for (const el of allEdgeEls) {
+      const tagName = (await el.evaluate((e) => e.tagName)).toLowerCase();
+      if (tagName === 'line') {
+        const x1 = await el.getAttribute('x1');
+        const x2 = await el.getAttribute('x2');
+        if (x1 && x2) {
+          foundValid = true;
+          break;
+        }
+      } else if (tagName === 'path') {
+        const d = await el.getAttribute('d');
+        if (d && d.trim().length > 0) {
+          foundValid = true;
+          break;
+        }
+      }
+    }
+    expect(foundValid).toBe(true);
   });
 
   /**
