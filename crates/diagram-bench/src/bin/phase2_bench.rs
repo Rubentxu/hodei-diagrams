@@ -13,9 +13,11 @@ use std::time::{Duration, Instant};
 
 use diagram_commands::Editor;
 use diagram_core::DiagramModel;
+use diagram_core::StableIdExt;
 use diagram_format_drawio::DrawioMapping;
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::SceneBuilder;
+use serde_json::json;
 
 fn fixtures_dir() -> std::path::PathBuf {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -197,6 +199,73 @@ fn bench_full_pipeline(name: &str, xml: &str, iters: u32, warmup: u32) {
     });
 }
 
+fn bench_flush_commands_postcard(name: &str, xml: &str, iters: u32, warmup: u32) {
+    println!("[{name}] command dispatch — postcard Vec<Command>");
+    // Find a real vertex id from the imported model so the bench command
+    // can be applied without VertexNotFound errors. We're measuring
+    // deserialization + apply speed, not validation.
+    let raw = diagram_format_drawio::parse_drawio(xml).expect("parse");
+    let (model, _id_map) = DrawioMapping::new().to_domain(&raw).expect("to_domain");
+    let real_vid = {
+        let vids: Vec<_> = model.store.vertices_with_ids().map(|(id, _)| id).collect();
+        vids.first()
+            .copied()
+            .unwrap_or(diagram_core::VertexId::default())
+    };
+    // Pre-encode a single ChangeStyle command against the real vertex.
+    let payload = postcard::to_allocvec(&vec![diagram_commands::Command::ChangeStyle(
+        diagram_commands::ChangeStylePayload::new(real_vid, {
+            let mut s = diagram_core::StyleMap::new();
+            s.insert("fillColor", diagram_core::StyleValue::from("#ff0000"));
+            s
+        }),
+    )])
+    .expect("postcard encode");
+
+    run_bench("  flush_commands_postcard", iters, warmup, || {
+        let (model2, _) = DrawioMapping::new()
+            .to_domain(&diagram_format_drawio::parse_drawio(xml).expect("parse"))
+            .expect("to_domain");
+        let mut editor = Editor::new(model2);
+        let cmds: Vec<diagram_commands::Command> =
+            postcard::from_bytes(&payload).expect("postcard decode");
+        let _ = editor.execute_batch(cmds);
+    });
+}
+
+fn bench_flush_commands_json(name: &str, xml: &str, iters: u32, warmup: u32) {
+    println!("[{name}] command dispatch — JSON array");
+    // Find a real vertex id (same lookup as postcard bench).
+    let raw = diagram_format_drawio::parse_drawio(xml).expect("parse");
+    let (model, _id_map) = DrawioMapping::new().to_domain(&raw).expect("to_domain");
+    let real_vid = {
+        let vids: Vec<_> = model.store.vertices_with_ids().map(|(id, _)| id).collect();
+        vids.first()
+            .copied()
+            .unwrap_or(diagram_core::VertexId::default())
+    };
+    let payload = {
+        let (idx, version) = real_vid.stable_id_parts();
+        json!([{
+            "ChangeStyle": {
+                "id": { "idx": idx, "version": version },
+                "style": { "fillColor": "#ff0000" }
+            }
+        }])
+        .to_string()
+    };
+
+    run_bench("  flush_commands_json", iters, warmup, || {
+        let (model2, _) = DrawioMapping::new()
+            .to_domain(&diagram_format_drawio::parse_drawio(xml).expect("parse"))
+            .expect("to_domain");
+        let mut editor = Editor::new(model2);
+        let cmds: Vec<diagram_commands::Command> =
+            serde_json::from_str(&payload).expect("json decode");
+        let _ = editor.execute_batch(cmds);
+    });
+}
+
 struct Args {
     iters: u32,
     warmup: u32,
@@ -251,6 +320,8 @@ fn run_fixture_suite(label: &str, fixture: &str, args: &Args) {
     bench_render_svg(label, &editor, args.iters, args.warmup);
     bench_render_svg_buffer(label, &editor, args.iters, args.warmup);
     bench_full_pipeline(label, &xml, args.iters, args.warmup);
+    bench_flush_commands_postcard(label, &xml, args.iters, args.warmup);
+    bench_flush_commands_json(label, &xml, args.iters, args.warmup);
 }
 
 fn main() {

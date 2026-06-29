@@ -1167,3 +1167,62 @@ fn anchor_to_dto_parts(anchor: &Anchor) -> (String, f64, f64) {
         Anchor::Normalized { nx, ny } => ("normalized".to_string(), *nx, *ny),
     }
 }
+
+// ─── Zero-copy command buffer (Phase 2 / P2-3 Phase B) ─────────────────────
+//
+// JS writes postcard-encoded `Vec<Command>` bytes to a pre-allocated
+// slab in WASM linear memory. Rust deserializes via postcard and applies
+// as a single atomic transaction. JS reads via Uint8Array view (no copy,
+// no JSON.parse on the Rust side).
+//
+// Safety contract: never hold a view across a WASM call.
+
+/// Get the raw pointer to the command buffer data. JS writes via
+/// `new Uint8Array(wasm.memory.buffer, ptr, capacity)`.
+#[wasm_bindgen]
+pub fn command_buffer_ptr(handle: u32) -> usize {
+    with_engine(handle, |e| e.buffers.command.as_ptr() as usize).unwrap_or(0)
+}
+
+/// Get the current capacity of the command buffer in bytes.
+#[wasm_bindgen]
+pub fn command_buffer_capacity(handle: u32) -> usize {
+    with_engine(handle, |e| e.buffers.command.capacity()).unwrap_or(0)
+}
+
+/// Read commands from the command buffer (offset 0..written_len), apply
+/// them as a single atomic transaction, and clear the buffer.
+///
+/// Returns an error if the bytes are not a valid postcard `Vec<Command>`.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `Postcard: <error>` if deserialization fails
+/// - `Apply: <error>` if any command fails (transaction rolled back)
+#[wasm_bindgen]
+pub fn flush_commands(handle: u32, written_len: usize) -> Result<(), JsValue> {
+    with_engine_mut(handle, |e| {
+        // Read the bytes JS wrote into the buffer
+        let bytes = e.buffers.command.as_bytes();
+        if written_len > bytes.len() {
+            return Err(Box::leak(
+                format!("BufferLen: written={written_len} > cap={}", bytes.len()).into_boxed_str(),
+            ) as &str);
+        }
+        let payload = &bytes[..written_len];
+
+        // Deserialize the postcard-encoded Vec<Command>
+        let cmds: Vec<Command> = postcard::from_bytes(payload)
+            .map_err(|e| Box::leak(format!("Postcard: {e}").into_boxed_str()) as &str)?;
+
+        // Apply as a single atomic batch (one undo reverses the whole batch).
+        e.editor
+            .execute_batch(cmds)
+            .map_err(|err| Box::leak(format!("Apply: {err}").into_boxed_str()) as &str)?;
+        e.buffers.command.clear();
+        Ok(())
+    })
+    .and_then(|r| r)
+    .map_err(JsValue::from_str)
+}

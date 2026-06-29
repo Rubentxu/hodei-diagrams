@@ -54,6 +54,34 @@ impl Editor {
         Ok(())
     }
 
+    /// Execute a batch of commands atomically.
+    ///
+    /// On success, all commands are applied and pushed to history as a
+    /// single entry — one undo reverses the entire batch.
+    /// On any error, the commands that were already applied are rolled
+    /// back, and the model is unchanged.
+    pub fn execute_batch(&mut self, mut cmds: Vec<Command>) -> CommandResult<()> {
+        // Apply commands one by one, tracking how many succeeded.
+        // We use an index-based loop + split_at so we can both apply
+        // commands and roll them back on error without conflicting borrows.
+        let mut applied = 0;
+        while applied < cmds.len() {
+            let (to_apply, rest) = cmds.split_at_mut(applied + 1);
+            let cmd = &mut to_apply[applied];
+            if let Err(err) = cmd.apply(&mut self.model) {
+                // Roll back everything we just applied, in reverse order.
+                for j in (0..applied).rev() {
+                    let _ = cmds[j].undo(&mut self.model);
+                }
+                return Err(err);
+            }
+            applied += 1;
+            let _ = rest; // keep the borrow alive
+        }
+        self.history.push(cmds);
+        Ok(())
+    }
+
     /// Connect two vertices with an edge, using the specified routing algorithm.
     ///
     /// On success, returns the inserted edge ID.
