@@ -1604,6 +1604,19 @@ async function bootstrap(): Promise<void> {
       if (!result || !result.ok) return [];
       return result.value;
     },
+    /** Fetch a fresh scene directly from the WASM engine, bypassing
+     *  the editor's in-memory `#sceneCache`. Useful for diagnostics
+     *  where the cache and the live engine may diverge. */
+    fetchSceneFresh: () => {
+      if (!activeSession) return null;
+      const r = activeSession.fetchSceneJson();
+      if (!r.ok) return null;
+      try {
+        return JSON.parse(r.value);
+      } catch {
+        return null;
+      }
+    },
     getSession: () => activeSession,
     manualSaveVersion,
   };
