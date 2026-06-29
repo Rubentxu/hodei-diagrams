@@ -1,0 +1,28 @@
+[package]
+name = "diagram-bench"
+version = "0.71.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+# Phase 2 optimization benchmarks. Test-only crate; never ships.
+# Builds against the same code paths as `diagram-wasm` (the production
+# boundary) but in native mode so we can use std::time::Instant directly
+# and print per-call timing without WASM round-trips.
+[dependencies]
+diagram-core = { path = "../diagram-core" }
+diagram-format-drawio = { path = "../diagram-format-drawio" }
+diagram-commands = { path = "../diagram-commands" }
+diagram-scene = { path = "../diagram-scene" }
+diagram-render-svg = { path = "../diagram-render-svg" }
+serde_json = "1"
+
+[dev-dependencies]
+# Keep the same fixture sources as the rest of the workspace.
+# We just read .drawio text directly via include_str!().
+
+[[bin]]
+name = "phase2-bench"
+path = "src/bin/phase2_bench.rs"

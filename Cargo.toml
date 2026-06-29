@@ -12,10 +12,11 @@ members = [
     "crates/diagram-layout",
     "crates/diagram-render-wgpu",
     "crates/diagram-stencils",
+    "crates/diagram-bench",
 ]
 
 [workspace.package]
-version = "0.69.0"
+version = "0.71.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
