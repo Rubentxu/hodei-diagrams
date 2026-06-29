@@ -12,6 +12,7 @@ import type {
 } from './types.js';
 import { ok, err, slotmapIdToField, EMPTY_METADATA } from './types.js';
 import type { WasmModule } from './types.js';
+import { decodeSceneFromBytes } from './postcard-decoder.js';
 
 export class DiagramEngineSession {
   private readonly wasm: WasmModule;
@@ -281,6 +282,54 @@ export class DiagramEngineSession {
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * Zero-copy scene read: deserialize the scene from the WASM scene buffer
+   * using the TypeScript postcard decoder — no intermediate JSON string.
+   *
+   * Returns the decoded `Scene` (same structure as `getScene()`) on success,
+   * or falls back to the JSON path if the buffer is unavailable or decoding fails.
+   *
+   * This is the fast path for the browser: WASM → postcard bytes → typed Scene
+   * avoids the `JSON.parse()` overhead that dominates in V8.
+   *
+   * NOTE: caller must NOT hold the returned `bytes` view across any subsequent
+   * WASM call — the view is invalidated if memory grows. Decode immediately.
+   */
+  getScenePostcard(): Result<ScenePage[], EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+
+    // Step 1: read scene bytes (zero-copy view, invalidated by next WASM call)
+    const sceneBytes = this.readSceneBuffer();
+    if (sceneBytes.byteLength === 0) {
+      return this.getScene();
+    }
+
+    // Step 2: decode scene BEFORE any other WASM call (memory could grow)
+    const scene = decodeSceneFromBytes(sceneBytes);
+    if (scene === null) {
+      return this.getScene();
+    }
+
+    // Step 3: now safe to call writeSvgBuffer for each page
+    const pages: PageRender[] = scene.pages.map((page) => {
+      const pageId = page.page_id.idx as PageToken;
+      // writeSvgBuffer is safe here — separate slab from scene buffer
+      const svgBytes = this.readSvgBuffer(page.page_id.idx);
+      const svg = svgBytes.byteLength > 0
+        ? new TextDecoder().decode(svgBytes)
+        : '';
+      this.svgCache.set(pageId, svg);
+      return {
+        pageId,
+        slotmapId: page.page_id,
+        name: page.name,
+        svg,
+      };
+    });
+    return ok(pages as unknown as ScenePage[]);
   }
 
   /**
