@@ -154,9 +154,9 @@ After v0.69.0, the remaining backlog was triaged in aggregate:
 - v0.74.0: Phase D (browser validation — 3.32× confirmed in browser)
 - v0.75.0: Phase B (command buffer JS→Rust, `flush_commands` + `execute_batch` atomic)
 - v0.76.0: TS postcard decoder (`PostcardDecoder` — 17 VisualElement variants, typed Scene read)
-- v0.77.0: **P0 complete** (2026-06-29, `a21155c`) — split scene decode from SVG rendering: `decodeSceneBuffer()` pure decode API + fair JSON vs postcard scene timing in perf-baseline. P1–P5 pending.
+- v0.77.0: **P0 + P1 + P2 complete** (2026-06-29, `a21155c` + `3620a15` + `8bf2e74`) — split scene decode + wire zero-copy into refresh paths + SVG cache invalidation. P3–P5 pending.
 
-Next phase: **v0.77.0 P1** — Wire active-page SVG buffer into product refresh paths
+Next phase: **v0.77.0 P3** — Pragmatic draw.io parity polish
 
 ### Test counts (post-audit)
 - Rust: ~700+ unit/integration tests, all passing (`just verify` clean)
@@ -189,8 +189,8 @@ The next work stays on the proven path:
 | Phase | Focus | Exit gate | Status |
 |-------|-------|-----------|--------|
 | P0 | Split scene postcard decode from SVG rendering | fair JSON scene vs postcard scene browser measurement | ✅ Complete (2026-06-29, `a21155c`) |
-| P1 | Wire active-page SVG buffer into product refresh paths | common active-page refreshes avoid `renderAllPages()` where safe | 🔲 Pending |
-| P2 | Add active-page SVG cache + invalidation | import, command, undo/redo, and page changes cannot produce stale SVG | 🔲 Pending |
+| P1 | Wire active-page SVG buffer into product refresh paths | common active-page refreshes avoid `renderAllPages()` where safe | ✅ Complete (2026-06-29, `3620a15`) |
+| P2 | Add active-page SVG cache + invalidation | import, command, undo/redo, and page changes cannot produce stale SVG | ✅ Complete (2026-06-29, `8bf2e74`) |
 | P3 | Pragmatic draw.io parity polish | Copy/export SVG and unsupported menu behavior are honest and tested | 🔲 Pending |
 | P4 | Add 1k/5k/10k synthetic performance evidence | browser timings recorded before any future GPU reconsideration | 🔲 Pending |
 | P5 | Hardening | `just verify`, `just web-typecheck`, and focused Playwright suites pass | 🔲 Pending |
