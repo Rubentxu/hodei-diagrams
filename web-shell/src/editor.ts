@@ -1178,7 +1178,7 @@ export class Editor {
   undoCmd(): void {
     const r = this.#session.undo();
     if (!r.ok) {
-      this.#onError(r.error);
+      this.#onError((r as { error: unknown }).error as string);
       return;
     }
     this.#replay();

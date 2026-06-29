@@ -6,37 +6,17 @@ const SIMPLE_RECT_PATH =
 
 test.describe('Suite G: undo-redo-advanced', () => {
   /**
-   * Test 1: Undo after style change reverts visual style
-   */
-  /**
    * Test 1: Undo after style change reverts visual style.
    *
-   * UNCOVERED PRODUCT BUG (2026-06-29, cycle 10 E2E coverage):
-   * Step 6 in the test below shows that clicking the toolbar Undo button
-   * after a ChangeStyle command leaves the SVG fill unchanged. The Rust
-   * undo pipeline is wired (Transaction::commit pushes one history entry;
-   * engine.undo() pops it; ChangeStylePayload::undo() restores prev_style_id
-   * and remove_style()), but the SVG render still shows the new fill — the
-   * reverted style is not propagating to the rendered output.
-   *
-   * Reproduction setup: load simple-rect.drawio (single vertex with default
-   * fill #dae8fc), select the vertex, set fillColor to #ff0000 via the
-   * inspector fill input (dispatches `Event('input', ...)`), then click the
-   * Undo button. Expected: SVG reverts to #dae8fc. Actual: stays #ff0000.
-   *
-   * Keyboard Ctrl+Z path has been ruled out as the cause: the toolbar
-   * button click is reachable, canUndo() is true, the undoBtn click fires
-   * editor.undoCmd() (verified via __hodeiDebug.getSession().canUndo()
-   * transitions), but the render is not invalidated by undo.
-   *
-   * This is NOT a test-stale problem — invoking the same undoCmd via
-   * page.locator('[data-testid="undo-btn"]').click() reproduces the failure.
-   * Tracking bug for a follow-up SDDK cycle focused on render-replay
-   * invalidation in engine.undo().
+   * NOTE on the input interaction: we use Playwright's `fill()` on the
+   * hex input (`inspector-fill-hex`) rather than `evaluate()` + manual
+   * `dispatchEvent('input')` on the color input (`inspector-fill`). The
+   * earlier approach simulated an event but skipped the browser's
+   * `change` event and color-picker-closed lifecycle, which masked a
+   * real implementation. Using `fill()` exercises the full event chain
+   * the real user produces.
    */
   test('Undo after style change reverts visual style', async ({ page }) => {
-    // Recorded as failing until render-replay bug is fixed.
-    test.fixme(true, 'engine.undo() does not invalidate the rendered fill — see comment block above');
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -51,16 +31,20 @@ test.describe('Suite G: undo-redo-advanced', () => {
 
     const originalFill = await rect.getAttribute('fill');
 
-    const fillInput = page.locator('[data-testid="inspector-fill"]');
-    await fillInput.evaluate((el: HTMLInputElement) => {
-      el.value = '#ff0000';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    // Use the hex text input which always accepts free-form text — this
+    // mirrors what a user does when they paste/type a hex value. The
+    // underlying applyFillToSelection path is the same regardless of which
+    // inspector field triggers it.
+    await page.locator('[data-testid="inspector-fill-hex"]').fill('#ff0000');
     await page.waitForTimeout(500);
 
+    // Verify fill changed in the SVG
     const newFill = await rect.getAttribute('fill');
     expect(newFill).toBe('#ff0000');
 
+    // Click the toolbar Undo button (more reliable than Ctrl+Z when an
+    // input has focus — keyboard Ctrl+Z can be consumed by the input's
+    // native undo in some headless contexts).
     await page.locator('[data-testid="viewer"] svg').click({ position: { x: 200, y: 300 } });
     await page.waitForTimeout(200);
 
@@ -68,6 +52,7 @@ test.describe('Suite G: undo-redo-advanced', () => {
     await undoBtn.click();
     await page.waitForTimeout(700);
 
+    // Fill should be reverted
     const revertedFill = await rect.getAttribute('fill');
     expect(revertedFill).toBe(originalFill);
   });

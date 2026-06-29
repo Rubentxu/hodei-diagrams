@@ -246,6 +246,20 @@ export class DiagramEngineSession {
     }
   }
 
+  /** Get the full scene JSON string directly from the WASM engine.
+   *  Bypasses any in-memory cache in the editor (e.g. `#sceneCache`)
+   *  so callers can inspect what the engine actually holds. Used by
+   *  `__hodeiDebug.fetchSceneFresh` for E2E diagnostics. */
+  fetchSceneJson(): Result<string, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      return ok(this.wasm.get_scene(this.handle as number));
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   /** Get the full scene snapshot as typed pages. */
   getScene(): Result<ScenePage[], EngineError> {
     const g = this.guard();
