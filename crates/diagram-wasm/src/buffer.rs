@@ -35,7 +35,7 @@ const SCENE_BUFFER_INITIAL: usize = 2 * 1024 * 1024;
 const SVG_BUFFER_INITIAL: usize = 4 * 1024 * 1024;
 
 /// Default initial capacity for the command input buffer (1 MB).
-const COMMAND_BUFFER_INITIAL: usize = 1 * 1024 * 1024;
+const COMMAND_BUFFER_INITIAL: usize = 1024 * 1024;
 
 /// A growable byte buffer that lives in WASM linear memory.
 ///
@@ -63,7 +63,7 @@ impl BridgeBuffer {
         let needed = data.len();
         if self.buf.capacity() < needed {
             // Grow geometrically: at least double, or fit needed
-            let new_cap = self.buf.capacity().max(needed).max(needed * 2);
+            let new_cap = self.buf.capacity().max(needed) * 2;
             self.buf.reserve(new_cap - self.buf.len());
         }
         self.buf.clear();
@@ -89,17 +89,20 @@ impl BridgeBuffer {
     }
 
     /// Whether the buffer currently holds any data.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Get the buffer contents as a byte slice (for Rust-side reading,
     /// e.g. command buffer parsing).
+    #[allow(dead_code)]
     pub fn as_bytes(&self) -> &[u8] {
         &self.buf[..self.len]
     }
 
     /// Clear the buffer (set len to 0, keep capacity).
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.len = 0;
         self.buf.clear();
@@ -107,6 +110,7 @@ impl BridgeBuffer {
 }
 
 /// Manages the three bridge buffers for a single WASM engine instance.
+#[allow(dead_code)]
 pub struct BufferManager {
     /// Scene output: Rust writes postcard-encoded Scene, JS reads.
     pub scene: BridgeBuffer,
