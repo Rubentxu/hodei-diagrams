@@ -138,10 +138,19 @@ fn bench_import_full(name: &str, xml: &str, iters: u32, warmup: u32) {
 
 fn bench_get_scene(name: &str, editor: &Editor, iters: u32, warmup: u32) {
     println!("[{name}] scene build + serialize (model → JSON)");
-    run_bench("  get_scene", iters, warmup, || {
+    run_bench("  get_scene_json", iters, warmup, || {
         let scene = build_scene(editor);
         let json = serde_json::to_string(&scene).expect("serialize");
         std::hint::black_box(json.len());
+    });
+}
+
+fn bench_get_scene_postcard(name: &str, editor: &Editor, iters: u32, warmup: u32) {
+    println!("[{name}] scene build + serialize (model → postcard bytes)");
+    run_bench("  get_scene_postcard", iters, warmup, || {
+        let scene = build_scene(editor);
+        let bytes = postcard::to_allocvec(&scene).expect("postcard serialize");
+        std::hint::black_box(bytes.len());
     });
 }
 
@@ -218,6 +227,7 @@ fn run_fixture_suite(label: &str, fixture: &str, args: &Args) {
     bench_mapping(label, &xml, args.iters, args.warmup);
     bench_import_full(label, &xml, args.iters, args.warmup);
     bench_get_scene(label, &editor, args.iters, args.warmup);
+    bench_get_scene_postcard(label, &editor, args.iters, args.warmup);
     bench_render_svg(label, &editor, args.iters, args.warmup);
     bench_full_pipeline(label, &xml, args.iters, args.warmup);
 }

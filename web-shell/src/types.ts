@@ -30,6 +30,13 @@ export type WasmModule = {
   get_scene(_h: number): string;
   render_svg(_h: number, _pageIdx: bigint): string;
   render_pages(_h: number): string;
+  // ─── Zero-copy scene buffer (Phase 2 / P2-3) ────────────────────────────
+  // These write/read a pre-allocated slab in WASM linear memory.
+  // JS reads via: new Uint8Array(wasm.memory.buffer, ptr, len)
+  write_scene_to_buffer(_h: number): number;
+  get_scene_buffer_ptr(_h: number): number;
+  get_scene_buffer_len(_h: number): number;
+  get_scene_buffer_capacity(_h: number): number;
   import_drawio(_h: number, _xml: string): void;
   export_drawio(_h: number): string;
   export_drawio_fresh_engine(_h: number): string;

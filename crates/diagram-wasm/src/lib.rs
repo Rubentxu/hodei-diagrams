@@ -27,6 +27,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod buffer;
 mod commands;
 mod engine;
 mod export;
@@ -49,7 +50,10 @@ pub use import::import_drawio;
 pub use layout::{apply_layout, route_all_edges};
 pub use metadata::{get_metadata, set_metadata};
 pub use render::{render_pages, render_svg};
-pub use scene::get_scene;
+pub use scene::{
+    get_scene, get_scene_buffer_capacity, get_scene_buffer_len, get_scene_buffer_ptr,
+    write_scene_to_buffer,
+};
 pub use stencil::{PathCommandDto, parse_stencil_library_xml, parse_stencil_xml};
 pub use types::{
     AnchorDto, AnchorEnd, AnchorNormalizedDto, EdgeAnchorsDto, anchor_dto_auto,
