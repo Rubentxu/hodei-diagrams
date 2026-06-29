@@ -31,6 +31,8 @@ type PerfSession = {
   executeCommand(cmdJson: string): { ok: boolean };
   // getScene returns Result<ScenePage[]> — value is the array directly
   getScene(): { ok: boolean; value?: unknown[]; error?: unknown };
+  // decodeSceneBuffer: pure scene decode (postcard bytes → typed Scene, no SVG)
+  decodeSceneBuffer(): { ok: boolean; value?: unknown[]; error?: unknown };
   renderPage(pageIdx: number): { ok: boolean; value?: string };
   renderAllPages(): { ok: boolean; value?: unknown[] };
   // Phase 2 P2-3: zero-copy buffer path — writeSceneBuffer/writeSvgBuffer
@@ -102,6 +104,17 @@ test.describe('Phase 2 — perf baseline', () => {
         const t5 = t();
         log('small.get_scene', t5 - t4);
 
+        // Fair comparison: JSON scene vs postcard scene decode (small fixture)
+        const tSmallJsonStart = t();
+        session.getScene();
+        const tSmallJsonEnd = t();
+        log('small.json_scene_read', tSmallJsonEnd - tSmallJsonStart);
+
+        const tSmallPostcardStart = t();
+        session.decodeSceneBuffer();
+        const tSmallPostcardEnd = t();
+        log('small.postcard_scene_decode', tSmallPostcardEnd - tSmallPostcardStart);
+
         // renderPage: in production the editor passes `page_id.idx` (slotmap key).
         // We must mirror that — `renderPage(0)` here would be wrong.
         const scenesAfterImport = (session.getScene().ok && session.getScene().value
@@ -169,6 +182,22 @@ test.describe('Phase 2 — perf baseline', () => {
           pageArr.slice(0, 3).map((p) => (p as { page_id: { idx: number } }).page_id),
         )}`);
         log(`large.get_scene (pages=${pageCount})`, t23 - t22);
+
+        // ── Fair comparison: JSON scene vs postcard scene decode (no SVG) ──
+        // Both measurements exclude SVG side effects.
+        // JSON path: WASM get_scene + JSON.parse (no SVG)
+        const tJsonStart = t();
+        const jsonResult = session.getScene();
+        const tJsonEnd = t();
+        const jsonPages = jsonResult.ok && jsonResult.value ? (jsonResult.value as unknown[]).length : 0;
+        log(`large.json_scene_read (pages=${jsonPages})`, tJsonEnd - tJsonStart);
+
+        // Postcard path: readSceneBuffer + decodeSceneFromBytes (no SVG)
+        const tPostcardStart = t();
+        const postcardResult = session.decodeSceneBuffer();
+        const tPostcardEnd = t();
+        const postcardPages = postcardResult.ok && postcardResult.value ? (postcardResult.value as unknown[]).length : 0;
+        log(`large.postcard_scene_decode (pages=${postcardPages})`, tPostcardEnd - tPostcardStart);
 
         const t24 = t();
         let totalSvgBytes = 0;
