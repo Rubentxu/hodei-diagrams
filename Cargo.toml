@@ -12,6 +12,7 @@ members = [
     "crates/diagram-layout",
     "crates/diagram-render-wgpu",
     "crates/diagram-stencils",
+    "crates/diagram-bench",
 ]
 
 [workspace.package]
