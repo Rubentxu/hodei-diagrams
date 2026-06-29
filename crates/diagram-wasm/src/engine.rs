@@ -1,5 +1,6 @@
 //! Engine pool: manages a static slab of `WasmEngine` instances.
 
+use crate::buffer::BufferManager;
 use diagram_commands::Editor;
 use diagram_core::DiagramModel;
 use diagram_scene::{
@@ -21,6 +22,8 @@ pub struct WasmEngine {
     pub(crate) editor: Editor,
     /// Loaded stencil libraries keyed by library name.
     pub(crate) stencil_libraries: HashMap<String, Vec<Stencil>>,
+    /// Zero-copy bridge buffers for high-frequency data exchange.
+    pub(crate) buffers: BufferManager,
 }
 
 impl WasmEngine {
@@ -29,6 +32,7 @@ impl WasmEngine {
         Self {
             editor: Editor::new(DiagramModel::default()),
             stencil_libraries: HashMap::new(),
+            buffers: BufferManager::new(),
         }
     }
 }
