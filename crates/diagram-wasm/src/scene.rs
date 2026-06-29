@@ -142,8 +142,7 @@ pub fn write_scene_to_buffer(handle: u32) -> Result<usize, JsValue> {
 /// memory. Do not cache the pointer across WASM calls.
 #[wasm_bindgen]
 pub fn get_scene_buffer_ptr(handle: u32) -> usize {
-    with_engine(handle, |e| e.buffers.scene.as_ptr() as usize)
-        .unwrap_or(0)
+    with_engine(handle, |e| e.buffers.scene.as_ptr() as usize).unwrap_or(0)
 }
 
 /// Get the current data length of the scene buffer.
@@ -152,8 +151,7 @@ pub fn get_scene_buffer_ptr(handle: u32) -> usize {
 /// call, NOT the buffer capacity.
 #[wasm_bindgen]
 pub fn get_scene_buffer_len(handle: u32) -> usize {
-    with_engine(handle, |e| e.buffers.scene.len())
-        .unwrap_or(0)
+    with_engine(handle, |e| e.buffers.scene.len()).unwrap_or(0)
 }
 
 /// Get the current capacity of the scene buffer in bytes.
@@ -162,6 +160,5 @@ pub fn get_scene_buffer_len(handle: u32) -> usize {
 /// would occur (which changes the ptr).
 #[wasm_bindgen]
 pub fn get_scene_buffer_capacity(handle: u32) -> usize {
-    with_engine(handle, |e| e.buffers.scene.capacity())
-        .unwrap_or(0)
+    with_engine(handle, |e| e.buffers.scene.capacity()).unwrap_or(0)
 }
