@@ -49,7 +49,9 @@ pub use export::{export_drawio, export_drawio_fresh_engine};
 pub use import::import_drawio;
 pub use layout::{apply_layout, route_all_edges};
 pub use metadata::{get_metadata, set_metadata};
-pub use render::{get_svg_buffer_len, get_svg_buffer_ptr, render_pages, render_svg, write_svg_to_buffer};
+pub use render::{
+    get_svg_buffer_len, get_svg_buffer_ptr, render_pages, render_svg, write_svg_to_buffer,
+};
 pub use scene::{
     get_scene, get_scene_buffer_capacity, get_scene_buffer_len, get_scene_buffer_ptr,
     write_scene_to_buffer,

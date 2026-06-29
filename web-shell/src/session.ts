@@ -312,6 +312,25 @@ export class DiagramEngineSession {
   }
 
   /**
+   * Read the scene buffer as a `Uint8Array` view into WASM linear memory.
+   *
+   * Convenience wrapper that pairs `writeSceneBuffer` with
+   * `new Uint8Array(wasm.memory.buffer, ptr, len)`. The returned view is
+   * zero-copy — it shares the same backing memory as the WASM slab.
+   *
+   * If the WASM module is older, returns an empty `Uint8Array` (0 length).
+   * Use the buffer's `length` to detect the fallback.
+   */
+  readSceneBuffer(): Uint8Array {
+    const r = this.writeSceneBuffer();
+    if (!r.ok) return new Uint8Array(0);
+    if (r.value.len === 0) return new Uint8Array(0);
+    const mem = (this.wasm as unknown as { memory?: WebAssembly.Memory }).memory;
+    if (!mem) return new Uint8Array(0);
+    return new Uint8Array(mem.buffer, r.value.ptr, r.value.len);
+  }
+
+  /**
    * Zero-copy SVG buffer: renders the page to a pre-allocated slab in
    * WASM linear memory. Returns `{ptr, len}` for `Uint8Array` view creation.
    *
@@ -336,6 +355,22 @@ export class DiagramEngineSession {
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * Read the SVG buffer as a `Uint8Array` view into WASM linear memory.
+   *
+   * Convenience wrapper that pairs `writeSvgBuffer` with
+   * `new Uint8Array(wasm.memory.buffer, ptr, len)`. Use `TextDecoder` on
+   * the returned view to get the SVG string.
+   */
+  readSvgBuffer(pageIdx: number): Uint8Array {
+    const r = this.writeSvgBuffer(pageIdx);
+    if (!r.ok) return new Uint8Array(0);
+    if (r.value.len === 0) return new Uint8Array(0);
+    const mem = (this.wasm as unknown as { memory?: WebAssembly.Memory }).memory;
+    if (!mem) return new Uint8Array(0);
+    return new Uint8Array(mem.buffer, r.value.ptr, r.value.len);
   }
 
   /** Render a single page by flat index. Returns SVG string. */
