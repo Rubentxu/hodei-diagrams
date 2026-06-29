@@ -311,6 +311,33 @@ export class DiagramEngineSession {
     }
   }
 
+  /**
+   * Zero-copy SVG buffer: renders the page to a pre-allocated slab in
+   * WASM linear memory. Returns `{ptr, len}` for `Uint8Array` view creation.
+   *
+   * Same safety contract as `writeSceneBuffer` — never hold a view across
+   * a WASM call. Decode with `new TextDecoder().decode(new Uint8Array(...))`
+   * to get the SVG string without any String round-trip.
+   *
+   * If the WASM module does not export `write_svg_to_buffer` (older builds),
+   * returns `{ptr: 0, len: 0}` to signal "use String fallback".
+   */
+  writeSvgBuffer(pageIdx: number): Result<{ ptr: number; len: number }, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      if (typeof this.wasm.write_svg_to_buffer !== 'function') {
+        return ok({ ptr: 0, len: 0 });
+      }
+      const handle = this.handle as number;
+      const len = this.wasm.write_svg_to_buffer(handle, BigInt(pageIdx));
+      const ptr = this.wasm.get_svg_buffer_ptr(handle);
+      return ok({ ptr, len });
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   /** Render a single page by flat index. Returns SVG string. */
   renderPage(pageIdx: number): Result<string, EngineError> {
     const g = this.guard();
