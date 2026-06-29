@@ -67,6 +67,13 @@ interface ConnectState {
   sourceClientY: number;
   /** Source shape bounds for normalized anchor computation. */
   sourceBounds: { x: number; y: number; width: number; height: number };
+  /**
+   * Document-level pointermove handler that updates the preview line endpoint
+   * as the cursor moves between the source click and the target click. Added
+   * when entering connect mode on the first click so click-click flows
+   * (no drag) still get cursor tracking. Removed when leaving connect state.
+   */
+  previewMoveHandler?: (e: PointerEvent) => void;
 }
 
 /** Drag tracking for connect mode. */
@@ -2695,6 +2702,29 @@ export class Editor {
         sourceBounds: geom,
       };
 
+      // Show preview line immediately so click-click flows (without drag)
+      // also get visual feedback. The line's endpoint starts at the source
+      // shape's center and will follow the cursor on pointermove.
+      this.#showPreviewLine(this.#connectState.sourceX, this.#connectState.sourceY);
+
+      // Track cursor at document level so the preview line tracks the cursor
+      // even when the user does a static click-click (no drag) on shapes.
+      // The handler is removed when #connectState is cleared.
+      const previewMoveHandler = (ev: PointerEvent) => {
+        const previewSvg = this.#previewLine;
+        if (previewSvg) {
+          const line = previewSvg.querySelector('line');
+          if (line) {
+            const pos = this.#clientToDoc(ev.clientX, ev.clientY);
+            line.setAttribute('x2', String(pos.x));
+            line.setAttribute('y2', String(pos.y));
+          }
+        }
+      };
+      document.addEventListener('pointermove', previewMoveHandler);
+      // Stash the handler so #clearConnectState can clean it up.
+      this.#connectState.previewMoveHandler = previewMoveHandler;
+
       // Start drag tracking on document
       this.#startConnectDrag(hit, geom, e.clientX, e.clientY);
       return;
@@ -2723,12 +2753,29 @@ export class Editor {
       this.#replay();
     }
 
-    this.#connectState = null;
+    this.#clearConnectState();
   }
 
   /**
    * Start drag tracking for connect mode.
-   * Sets up document-level pointermove/pointerup to handle drag outside the viewer.
+   *
+   * Registers a global `pointermove` listener that updates the preview line
+   * AND activates the drag-flow `upHandler` only after the cursor has moved
+   * more than `DRAG_THRESHOLD_PX` pixels from the source click position.
+   *
+   * Why: Playwright `click()` (and similar atomic click strategies) fires
+   * `pointerdown` followed immediately by `pointerup` for the same click.
+   * If we registered `pointerup` eagerly here, the first click's release
+   * would hit the upHandler while the cursor was still over the source shape,
+   * triggering the self-cancel branch and nulling `#connectState` before
+   * the user could click the target. That bug broke click-to-connect (the
+   * common "click two shapes to wire them" UX).
+   *
+   * By deferring pointerup registration until real cursor motion, a static
+   * click-click flow (no drag) lets both clicks reach `#onConnectClick`,
+   * which correctly handles the second click as "create edge with auto
+   * anchors". A real drag activates the upHandler as soon as motion exceeds
+   * the threshold, preserving the drag-to-anchor UX.
    */
   #startConnectDrag(
     sourceId: SlotmapId,
@@ -2741,8 +2788,18 @@ export class Editor {
     const sourceCenterY = sourceBounds.y + sourceBounds.height / 2;
     this.#showPreviewLine(sourceCenterX, sourceCenterY);
 
+    const DRAG_THRESHOLD_PX = 5;
+    let dragActivated = false;
+
+    const activateUpHandler = (): void => {
+      if (dragActivated) return;
+      dragActivated = true;
+      document.addEventListener('pointerup', upHandler);
+      document.addEventListener('pointercancel', upHandler);
+    };
+
     const moveHandler = (e: PointerEvent) => {
-      // Update preview line end
+      // Update preview line end first (preview always tracks the cursor)
       const previewSvg = this.#previewLine;
       if (previewSvg) {
         const line = previewSvg.querySelector('line');
@@ -2751,6 +2808,14 @@ export class Editor {
           line.setAttribute('x2', String(pos.x));
           line.setAttribute('y2', String(pos.y));
         }
+      }
+
+      // Activate the drag upHandler only after the cursor has moved enough
+      // to count as a real drag (not just a click's micro-jitter).
+      const dx = e.clientX - clientX;
+      const dy = e.clientY - clientY;
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
+        activateUpHandler();
       }
     };
 
@@ -2814,14 +2879,13 @@ export class Editor {
         this.#replay();
       }
 
-      this.#connectState = null;
+      this.#clearConnectState();
       this.#connectDrag = null;
     };
 
     this.#connectDrag = { sourceId, sourceBounds, startClientX: clientX, startClientY: clientY, moveHandler, upHandler };
+    // Register pointermove only; pointerup is wired lazily after drag threshold.
     document.addEventListener('pointermove', moveHandler);
-    document.addEventListener('pointerup', upHandler);
-    document.addEventListener('pointercancel', upHandler);
   }
 
   /** Cancel connect drag tracking without canceling the connect state. */
@@ -2838,7 +2902,22 @@ export class Editor {
   /** Cancel connect mode and clean up preview. */
   #cancelConnect(): void {
     this.#cancelConnectDrag();
-    this.#connectState = null;
+    this.#clearConnectState();
+  }
+
+  /**
+   * Reset connect-mode FSM: removes the document-level preview-move handler
+   * (if any), hides the preview SVG overlay, and clears #connectState.
+   * Safe to call when state is already null.
+   */
+  #clearConnectState(): void {
+    if (this.#connectState) {
+      if (this.#connectState.previewMoveHandler) {
+        document.removeEventListener('pointermove', this.#connectState.previewMoveHandler);
+      }
+      this.#connectState = null;
+    }
+    this.#hidePreviewLine();
   }
 
   /** Create an SVG overlay for the dashed preview line. */
