@@ -1045,9 +1045,17 @@ async function bootstrap(): Promise<void> {
   /** Re-render page tabs after any add/rename/delete operation. */
   function refreshPageTabs(): void {
     if (!activeSession) return;
-    const renderResult = activeSession.renderAllPages();
-    if (!renderResult.ok) return;
-    activePages = renderResult.value;
+    const sceneResult = activeSession.decodeSceneBuffer();
+    if (!sceneResult.ok) return;
+    const pages = sceneResult.value;
+    // Build minimal PageRender[] — svg is empty since populatePageTabs doesn't need it.
+    // Callers use activeSession.getPage(token) for SVG when needed.
+    activePages = pages.map((page) => ({
+      pageId: page.page_id.idx as PageToken,
+      slotmapId: page.page_id,
+      name: page.name,
+      svg: '',
+    }));
     const idx = Math.min(activeEditorIdx, activePages.length - 1);
     populatePageTabs(ui.pageTabContainer, activePages, idx, {
       onSelect: handlePageSelect,

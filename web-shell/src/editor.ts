@@ -1129,7 +1129,7 @@ export class Editor {
 
   /** Refresh scene cache from engine. Call after import or page switch. */
   refreshScene(): void {
-    const sceneResult = this.#session.getScene();
+    const sceneResult = this.#session.decodeSceneBuffer();
     if (sceneResult.ok) {
       this.#sceneCache = sceneResult.value;
       if (this.#sceneCache.length > 0) {
@@ -1842,7 +1842,7 @@ export class Editor {
   /** Refresh scene cache and re-render. Called after commands. */
   #replay(): void {
     // Refresh scene cache
-    const sceneResult = this.#session.getScene();
+    const sceneResult = this.#session.decodeSceneBuffer();
     if (!sceneResult.ok) {
       this.#onError(sceneResult.error);
       return;

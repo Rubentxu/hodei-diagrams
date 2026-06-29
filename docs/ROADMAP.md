@@ -5,11 +5,13 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.76.0 — Phase 2 P2-3 Phase B completo (WASM + TS decoder).**
+**v0.76.0 — Phase 2 P2-3 completo y renderer strategy cerrada.**
 Phase A (scene buffer, v0.72.0) + Phase C (SVG buffer, v0.73.0) + Phase D (3.32× browser validation, v0.74.0) + Phase B (command buffer zero-copy JS→Rust, v0.75.0) + TS postcard decoder (v0.76.0) cierran el ciclo completo zero-copy:
 - **WASM→JS**: `readSceneBuffer()` + `PostcardDecoder` (todas las variantes de VisualElement) → typed Scene sin JSON parse
 - **JS→WASM**: `flushCommands()` + `postcard::from_bytes<Vec<Command>>` → atomic batch dispatch
 - Benchmark: 3.32× en browser para scene reads, ~2% diferencia native (to_domain domina)
+
+**ADR-0076 + ADR-0077:** WebGPU/WebGL full evolution queda diferida. SVG + zero-copy bridge es el path canónico; v0.77 conecta ese path al loop real del editor y cierra paridad draw.io con decisiones pragmáticas y medidas.
 
 E2E Coverage Campaign: **472/472 tests green** (v0.69.0). Zero regressions.
 
@@ -21,7 +23,7 @@ E2E Coverage Campaign: **472/472 tests green** (v0.69.0). Zero regressions.
 | `diagram-compat-testkit` | Testing | ✅ |
 | `diagram-scene` | Proyección | ✅ (PathElement + endArrow/startArrow) |
 | `diagram-render-svg` | Render SVG | ✅ (data-edge-id + arrow markers) |
-| `diagram-render-wgpu` | Render WebGPU | ✅ |
+| `diagram-render-wgpu` | Render WebGPU | ⏸ experimental / deferred by ADR-0076 |
 | `diagram-wasm` | WASM Bridge | ✅ (20 exports) |
 | `diagram-routing` | Routing | ✅ (engine + bend editing + normalization) |
 | `diagram-layout` | Layout | ✅ (5 engines + UI) |
@@ -144,7 +146,7 @@ After v0.69.0, the remaining backlog was triaged in aggregate:
 
 **Campaign final result**: 472/472 E2E tests green (excluding 8 intentional skips documented in their test bodies). Zero regression across the audit period.
 
-### Phase 2 — Zero-Copy WASM Bridge (v0.70.0–v0.76.0)
+### Phase 2 — Zero-Copy WASM Bridge (v0.70.0–v0.77.0)
 - v0.70.0: perf-baseline spec captured
 - v0.71.0: N=20 native bench — engine 6× faster natively than in browser
 - v0.72.0: Phase A (scene buffer, Rust→JS zero-copy, 3.8× native speedup)
@@ -152,8 +154,9 @@ After v0.69.0, the remaining backlog was triaged in aggregate:
 - v0.74.0: Phase D (browser validation — 3.32× confirmed in browser)
 - v0.75.0: Phase B (command buffer JS→Rust, `flush_commands` + `execute_batch` atomic)
 - v0.76.0: TS postcard decoder (`PostcardDecoder` — 17 VisualElement variants, typed Scene read)
+- v0.77.0: **P0 complete** (2026-06-29, `a21155c`) — split scene decode from SVG rendering: `decodeSceneBuffer()` pure decode API + fair JSON vs postcard scene timing in perf-baseline. P1–P5 pending.
 
-Next phase: **Nivel 4 (WebGPU)** — scene → instance projection para las 17 variantes de VisualElement.
+Next phase: **v0.77.0 P1** — Wire active-page SVG buffer into product refresh paths
 
 ### Test counts (post-audit)
 - Rust: ~700+ unit/integration tests, all passing (`just verify` clean)
@@ -170,9 +173,36 @@ Next phase: **Nivel 4 (WebGPU)** — scene → instance projection para las 17 v
 
 ---
 
-## 🎯 Next: Nivel 4 (WebGPU)
+## 🎯 Active Track: v0.77.0 — Pragmatic performance + draw.io parity closure
 
-`ShapeInstance` POD types listos en `crates/diagram-render-wgpu/src/buffers.rs`. Necesita la proyección scene → instance para las 17 variantes de VisualElement. En revisión de detalle (punto 1 pendiente).
+Decision: **do not pursue WebGPU/WebGL full parity now** (ADR-0076). Close the next milestone by improving the proven SVG + Rust/WASM path (ADR-0077).
+
+The next work stays on the proven path:
+
+- SVG renderer as canonical visual output
+- Rust engine commands as source of truth
+- WASM zero-copy bridge where benchmarks prove value
+- E2E visual evidence for user-facing parity
+
+### v0.77 plan
+
+| Phase | Focus | Exit gate | Status |
+|-------|-------|-----------|--------|
+| P0 | Split scene postcard decode from SVG rendering | fair JSON scene vs postcard scene browser measurement | ✅ Complete (2026-06-29, `a21155c`) |
+| P1 | Wire active-page SVG buffer into product refresh paths | common active-page refreshes avoid `renderAllPages()` where safe | 🔲 Pending |
+| P2 | Add active-page SVG cache + invalidation | import, command, undo/redo, and page changes cannot produce stale SVG | 🔲 Pending |
+| P3 | Pragmatic draw.io parity polish | Copy/export SVG and unsupported menu behavior are honest and tested | 🔲 Pending |
+| P4 | Add 1k/5k/10k synthetic performance evidence | browser timings recorded before any future GPU reconsideration | 🔲 Pending |
+| P5 | Hardening | `just verify`, `just web-typecheck`, and focused Playwright suites pass | 🔲 Pending |
+
+Planning artifacts:
+
+- `docs/adr/0077-pragmatic-performance-and-drawio-parity.md`
+- `sddk/pragmatic-parity-performance-v0.77/proposal.md`
+- `sddk/pragmatic-parity-performance-v0.77/spec.md`
+- `sddk/pragmatic-parity-performance-v0.77/tasks.md`
+
+WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bottleneck on 1k/5k/10k-shape fixtures.
 
 ## 🎯 Original: draw.io Parity Completa (CLOSED)
 
@@ -222,6 +252,8 @@ Análisis exhaustivo de features restantes, ordenadas por impacto:
 | 0073 | Phase 2 Performance Methodology — perf-baseline spec | Perf |
 | 0074 | Zero-Copy WASM Bridge Design (scene/SVG/command buffers + postcard) | Perf |
 | 0075 | E2E Test Strategy — visual evidence required | Testing |
+| 0076 | Defer WebGPU/WebGL Evolution as Primary Renderer | Rendering |
+| 0077 | Pragmatic Performance and Draw.io Parity Closure | Perf / Rendering |
 
 ## Reglas de Actualización
 
