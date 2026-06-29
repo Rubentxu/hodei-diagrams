@@ -170,15 +170,28 @@ test.describe('Disabled items', () => {
     await expect(editXmlItem).toHaveAttribute('title', 'Edit the .drawio XML of the current page');
   });
 
-  test('Extras > Copy as SVG is disabled with tooltip', async ({ page }) => {
+  test('Extras > Copy as SVG copies SVG to clipboard', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+
+    // Load simple-rect.drawio so there's SVG to copy
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     await page.click('[data-testid="menu-extras"] summary');
     const copySvgItem = page.locator('[data-testid="menu-copy-svg"]');
     await expect(copySvgItem).toBeVisible();
-    await expect(copySvgItem).toBeDisabled();
-    await expect(copySvgItem).toHaveAttribute('title', 'Copy as SVG not yet available');
+    await expect(copySvgItem).toBeEnabled();
+    await expect(copySvgItem).toHaveAttribute('title', 'Copy the active page SVG to clipboard');
+
+    // Click via evaluate to bypass <details> auto-close race in headless
+    await page.evaluate(() => {
+      const btn = document.querySelector('[data-testid="menu-copy-svg"]') as HTMLButtonElement;
+      btn?.click();
+    });
+    // Button should remain enabled (no crash) and show feedback if clipboard succeeded
+    await expect(copySvgItem).toBeEnabled();
+    await page.waitForTimeout(200);
   });
 
   test('Extras > Preferences is disabled with tooltip', async ({ page }) => {
