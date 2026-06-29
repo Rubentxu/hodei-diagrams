@@ -1,6 +1,6 @@
 //! Scene export: build and serialize scene from engine model.
 
-use crate::engine::{WasmStencilProvider, with_engine};
+use crate::engine::{WasmStencilProvider, with_engine, with_engine_mut};
 use diagram_scene::SceneBuilder;
 use wasm_bindgen::prelude::*;
 
@@ -82,4 +82,86 @@ pub fn get_scene(handle: u32) -> Result<String, JsValue> {
     })
     .and_then(|r| r)
     .map_err(JsValue::from_str)
+}
+
+// ─── Zero-copy scene buffer (Phase 2 / P2-3) ──────────────────────────────────
+//
+// These functions write the scene as postcard-encoded bytes to a
+// pre-allocated buffer in WASM linear memory. JS reads the bytes
+// directly via `Uint8Array(wasm.memory.buffer, ptr, len)` — zero copy,
+// no JSON.stringify, no UTF-8 round-trip.
+//
+// Safety contract: JS must re-fetch ptr after each call to
+// `write_scene_to_buffer` because the buffer may have been reallocated
+// (growing) and the old ptr would be stale.
+
+/// Serialize the scene as postcard bytes into the engine's scene buffer.
+///
+/// Returns the number of bytes written. JS then calls
+/// `get_scene_buffer_ptr` to get the pointer and creates a
+/// `Uint8Array` view to read the data.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `SceneError: <detail>` if scene building fails
+/// - `Postcard: <error>` if postcard serialization fails
+#[wasm_bindgen]
+pub fn write_scene_to_buffer(handle: u32) -> Result<usize, JsValue> {
+    with_engine_mut(handle, |e| {
+        // Build scene (borrows e.editor immutably)
+        let provider = WasmStencilProvider::new(e.stencil_libraries.clone());
+        let scene = SceneBuilder::new()
+            .with_stencil_provider(Box::new(provider))
+            .build(e.editor.model())
+            .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
+
+        // Serialize to postcard bytes
+        let bytes = postcard::to_allocvec(&scene)
+            .map_err(|e| Box::leak(format!("Postcard: {e}").into_boxed_str()) as &str)?;
+
+        // Write to the scene buffer (borrows e.buffers mutably — OK, different field)
+        let written = e.buffers.scene.write(&bytes);
+        Ok(written)
+    })
+    .and_then(|r| r)
+    .map_err(JsValue::from_str)
+}
+
+/// Get the raw pointer to the scene buffer data.
+///
+/// JS uses this to create a `Uint8Array` view into WASM linear memory:
+/// ```ignore
+/// const ptr = wasm.get_scene_buffer_ptr(handle);
+/// const len = wasm.get_scene_buffer_len(handle);
+/// const bytes = new Uint8Array(wasm.memory.buffer, ptr, len);
+/// ```
+///
+/// **IMPORTANT**: This pointer is only valid until the next call to
+/// `write_scene_to_buffer` or any other function that might grow WASM
+/// memory. Do not cache the pointer across WASM calls.
+#[wasm_bindgen]
+pub fn get_scene_buffer_ptr(handle: u32) -> usize {
+    with_engine(handle, |e| e.buffers.scene.as_ptr() as usize)
+        .unwrap_or(0)
+}
+
+/// Get the current data length of the scene buffer.
+///
+/// This is the number of valid bytes after the last `write_scene_to_buffer`
+/// call, NOT the buffer capacity.
+#[wasm_bindgen]
+pub fn get_scene_buffer_len(handle: u32) -> usize {
+    with_engine(handle, |e| e.buffers.scene.len())
+        .unwrap_or(0)
+}
+
+/// Get the current capacity of the scene buffer in bytes.
+///
+/// Useful for JS to know the maximum scene size before reallocation
+/// would occur (which changes the ptr).
+#[wasm_bindgen]
+pub fn get_scene_buffer_capacity(handle: u32) -> usize {
+    with_engine(handle, |e| e.buffers.scene.capacity())
+        .unwrap_or(0)
 }
