@@ -4,6 +4,7 @@ use crate::engine::{with_engine, with_engine_mut};
 use diagram_commands::{Command, RoutingKind, Transaction};
 use diagram_core::geometry::CellGeometry;
 use diagram_core::{Group, PageId, VertexId};
+use diagram_scene::ResolvedStyle;
 use diagram_scene::resolver::StyleResolver;
 use wasm_bindgen::prelude::*;
 
@@ -437,6 +438,53 @@ mod tests {
             Some("foo")
         );
     }
+
+    /// Verify `serialize_resolved_style(&ResolvedStyle::default())` produces a
+    /// valid JSON object with all-null typed fields and an empty `remaining`
+    /// map. This is what `get_resolved_style` MUST produce for style-less
+    /// vertices (vertices with `style_id: None`) instead of throwing
+    /// `VertexHasNoStyle`. The TS UI depends on this when the user selects
+    /// a vertex loaded from a minimal `.drawio` fixture (e.g.
+    /// `simple-rect.drawio` which has `<mxCell id="2" vertex="1"><mxGeometry/></mxCell>`).
+    #[test]
+    fn serialize_default_style_produces_all_null_fields() {
+        let s = ResolvedStyle::default();
+        let json = serialize_resolved_style(&s);
+        let parsed: serde_json::Value = serde_json::from_str(&json)
+            .expect("default ResolvedStyle should serialize to valid JSON");
+        for field in [
+            "fill_color",
+            "stroke_color",
+            "stroke_width",
+            "rounded",
+            "dashed",
+            "font_color",
+            "font_size",
+            "font_family",
+            "opacity",
+            "shadow",
+            "glass",
+            "gradient",
+            "end_arrow",
+            "start_arrow",
+        ] {
+            assert!(
+                parsed[field].is_null(),
+                "{field} should be null in default ResolvedStyle JSON, got: {}",
+                parsed[field]
+            );
+        }
+        assert!(
+            parsed["remaining"].is_object(),
+            "remaining should be an empty object, got: {}",
+            parsed["remaining"]
+        );
+        assert_eq!(
+            parsed["remaining"].as_object().unwrap().len(),
+            0,
+            "default remaining should have no entries"
+        );
+    }
 }
 
 /// Disconnect an edge (remove it from the model).
@@ -468,6 +516,12 @@ pub fn disconnect_edge(handle: u32, edge_id: u32) -> Result<(), JsValue> {
     }
 }
 
+/// Serialize a `ResolvedStyle` to a JSON string. On serialization failure
+/// returns a stable, static error string the WASM bridge can surface.
+fn serialize_resolved_style(style: &ResolvedStyle) -> String {
+    serde_json::to_string(style).unwrap_or_else(|e| format!("Serialize: {e}"))
+}
+
 /// Get the resolved style for a vertex.
 ///
 /// `handle` is the engine handle (u32).
@@ -476,10 +530,17 @@ pub fn disconnect_edge(handle: u32, edge_id: u32) -> Result<(), JsValue> {
 /// Returns a JSON string of the resolved `ResolvedStyle` with typed effect fields,
 /// or an error string if the vertex is not found.
 ///
+/// If the vertex has no style assigned (`style_id: None`), returns the default
+/// `ResolvedStyle` (all-null typed fields) — draw.io treats absence of style
+/// as "use defaults" rather than an error. Returning `VertexHasNoStyle` here
+/// surfaced a spurious error banner every time a user selected a bare vertex
+/// loaded from a minimal `.drawio` fixture (e.g. `simple-rect.drawio`).
+///
 /// # Errors
 ///
 /// - `InvalidHandle` if the engine handle is invalid
 /// - `VertexNotFound` if the vertex ID does not exist in the model
+/// - `StyleNotFound` if the vertex has a `style_id` pointing to a missing style
 #[wasm_bindgen]
 pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValue> {
     let result = with_engine(handle, |e| {
@@ -499,12 +560,15 @@ pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValu
             }
         };
 
-        // Get the style via style_id
+        // No style assigned: return the default ResolvedStyle (all-null typed
+        // fields). draw.io treats absence of style as "use defaults" rather than
+        // an error; the TS UI relies on this when selecting bare vertices
+        // loaded from minimal `.drawio` fixtures (e.g. `simple-rect.drawio`).
+        // Returning an error here surfaced a spurious `VertexHasNoStyle`
+        // banner every time a user selected such a shape.
         let style_id = match vertex.style_id {
             Some(sid) => sid,
-            None => {
-                return Err("VertexHasNoStyle");
-            }
+            None => return Ok(serialize_resolved_style(&ResolvedStyle::default())),
         };
 
         // Look up the StyleMap
@@ -520,10 +584,7 @@ pub fn get_resolved_style(handle: u32, vertex_id: u32) -> Result<JsValue, JsValu
         let resolved = resolver.resolve(style);
 
         // Serialize to JSON
-        match serde_json::to_string(&resolved) {
-            Ok(json) => Ok(json),
-            Err(e) => Err(Box::leak(format!("Serialize: {e}").into_boxed_str()) as &str),
-        }
+        Ok(serialize_resolved_style(&resolved))
     });
 
     // Flatten the nested Result: Result<Result<String, &str>, &'static str>
