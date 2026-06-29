@@ -285,19 +285,19 @@ export class DiagramEngineSession {
   }
 
   /**
-   * Zero-copy scene read: deserialize the scene from the WASM scene buffer
-   * using the TypeScript postcard decoder — no intermediate JSON string.
+   * Pure scene decode: deserialize the scene from the WASM scene buffer
+   * using the TypeScript postcard decoder — no intermediate JSON string, no SVG.
    *
-   * Returns the decoded `Scene` (same structure as `getScene()`) on success,
-   * or falls back to the JSON path if the buffer is unavailable or decoding fails.
+   * Returns the decoded `ScenePage[]` on success, or falls back to the JSON
+   * path if the buffer is unavailable or decoding fails.
    *
-   * This is the fast path for the browser: WASM → postcard bytes → typed Scene
-   * avoids the `JSON.parse()` overhead that dominates in V8.
+   * This is the fast path for benchmarking scene decode in isolation:
+   * WASM → postcard bytes → typed Scene (no SVG side effects).
    *
    * NOTE: caller must NOT hold the returned `bytes` view across any subsequent
    * WASM call — the view is invalidated if memory grows. Decode immediately.
    */
-  getScenePostcard(): Result<ScenePage[], EngineError> {
+  decodeSceneBuffer(): Result<ScenePage[], EngineError> {
     const g = this.guard();
     if (!g.ok) return g;
 
@@ -313,10 +313,30 @@ export class DiagramEngineSession {
       return this.getScene();
     }
 
-    // Step 3: now safe to call writeSvgBuffer for each page
-    const pages: PageRender[] = scene.pages.map((page) => {
+    return ok(scene.pages as unknown as ScenePage[]);
+  }
+
+  /**
+   * Scene decode + SVG fetch: deserializes the scene from the WASM scene buffer
+   * (via the postcard decoder) and then fetches the SVG buffer for each page.
+   *
+   * This is the combined path for callers that need both the decoded scene
+   * structure AND the rendered SVG. For decode-only benchmarking, use
+   * `decodeSceneBuffer()` instead.
+   *
+   * Returns `PageRender[]` with SVG strings filled in.
+   */
+  getScenePostcard(): Result<PageRender[], EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+
+    // Decode scene first (no SVG side effects in this phase)
+    const sceneResult = this.decodeSceneBuffer();
+    if (!sceneResult.ok) return sceneResult;
+
+    // Now safe to call readSvgBuffer for each page
+    const pages: PageRender[] = sceneResult.value.map((page) => {
       const pageId = page.page_id.idx as PageToken;
-      // writeSvgBuffer is safe here — separate slab from scene buffer
       const svgBytes = this.readSvgBuffer(page.page_id.idx);
       const svg = svgBytes.byteLength > 0
         ? new TextDecoder().decode(svgBytes)
@@ -329,7 +349,7 @@ export class DiagramEngineSession {
         svg,
       };
     });
-    return ok(pages as unknown as ScenePage[]);
+    return ok(pages);
   }
 
   /**
