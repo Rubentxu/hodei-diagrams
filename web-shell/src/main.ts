@@ -64,6 +64,7 @@ function setGridVisible(visible: boolean): void {
 // ─── Presentation mode state ──────────────────────────────────────────────────
 let isPresentationMode = false;
 let exitHintTimer: ReturnType<typeof setTimeout> | null = null;
+let copySvgTimer: ReturnType<typeof setTimeout> | null = null;
 
 function togglePresentationMode(): void {
   const el = document.getElementById('app');
@@ -605,6 +606,26 @@ async function bootstrap(): Promise<void> {
       handleImport(newXml);
       return true;
     });
+  });
+
+  // ─── 13.6. Wire Extras > Copy as SVG ─────────────────────────────────────
+  const menuCopySvg = document.querySelector('[data-testid="menu-copy-svg"]');
+  menuCopySvg?.addEventListener('click', async () => {
+    if (!activeSession || activePages.length === 0) return;
+    const pageIdx = activeEditorIdx ?? 0;
+    const page = activePages[pageIdx];
+    if (!page) return;
+    const svg = activeSession.getPage(page.pageId);
+    if (!svg) return;
+    try {
+      await navigator.clipboard.writeText(svg);
+      const original = menuCopySvg.textContent;
+      menuCopySvg.textContent = 'Copied!';
+      if (copySvgTimer !== null) clearTimeout(copySvgTimer);
+      copySvgTimer = setTimeout(() => { menuCopySvg.textContent = original; }, 1500);
+    } catch (err) {
+      console.warn('[copy-svg] Clipboard write failed:', err);
+    }
   });
 
   // ─── Insert > Math Formula ─────────────────────────────────────────────────

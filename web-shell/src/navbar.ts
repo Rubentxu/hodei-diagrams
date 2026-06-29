@@ -551,8 +551,8 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   copySvgItem.className = 'menu-item';
   copySvgItem.textContent = 'Copy as SVG';
   copySvgItem.setAttribute('data-testid', 'menu-copy-svg');
-  copySvgItem.disabled = true;
-  copySvgItem.title = 'Copy as SVG not yet available';
+  copySvgItem.disabled = false;
+  copySvgItem.title = 'Copy the active page SVG to clipboard';
   extrasList.appendChild(copySvgItem);
 
   const preferencesItem = document.createElement('button');
