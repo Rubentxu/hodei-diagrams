@@ -42,6 +42,12 @@ export type WasmModule = {
   write_svg_to_buffer(_h: number, _pageIdx: bigint): number;
   get_svg_buffer_ptr(_h: number): number;
   get_svg_buffer_len(_h: number): number;
+  // ─── Zero-copy command buffer (Phase 2 / P2-3 Phase B) ───────────────
+  // Command dispatch path: write postcard-encoded Vec<Command> to buffer
+  // and flush to apply as an atomic batch.
+  command_buffer_ptr(_h: number): number;
+  command_buffer_capacity(_h: number): number;
+  flush_commands(_h: number, _written_len: number): void;
   import_drawio(_h: number, _xml: string): void;
   export_drawio(_h: number): string;
   export_drawio_fresh_engine(_h: number): string;

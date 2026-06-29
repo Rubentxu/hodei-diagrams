@@ -373,6 +373,64 @@ export class DiagramEngineSession {
     return new Uint8Array(mem.buffer, r.value.ptr, r.value.len);
   }
 
+  /**
+   * Zero-copy command dispatch: writes postcard-encoded `Vec<Command>`
+   * bytes to the engine's command buffer, then calls `flush_commands` to
+   * apply them as an atomic batch.
+   *
+   * The caller is responsible for:
+   *  1. Getting the buffer ptr+capacity via `getCommandBufferPtr()` /
+   *     `getCommandBufferCapacity()`.
+   *  2. Encoding the commands as postcard (e.g. via
+   *     `postcard::to_allocvec` in a WebAssembly module) and writing
+   *     them into the buffer via `DataView.setUint8(...)`.
+   *  3. Calling `flushCommands(written_len)` to apply.
+   *
+   * Returns the buffer ptr+capacity so the caller can build a
+   * `Uint8Array` view. Same "never hold a view across a WASM call"
+   * contract as `writeSceneBuffer`.
+   *
+   * If the WASM module is older, returns `{ptr: 0, capacity: 0}` to
+   * signal "use `executeTransaction` with JSON instead".
+   */
+  getCommandBuffer(): Result<{ ptr: number; capacity: number }, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      if (typeof this.wasm.command_buffer_ptr !== 'function') {
+        return ok({ ptr: 0, capacity: 0 });
+      }
+      const handle = this.handle as number;
+      const ptr = this.wasm.command_buffer_ptr(handle);
+      const capacity = this.wasm.command_buffer_capacity(handle);
+      return ok({ ptr, capacity });
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Apply the bytes written to the command buffer (via
+   * `getCommandBuffer()` + a postcard encoder in JS) as an atomic batch.
+   * Returns Ok on success, or an error if deserialization or any command
+   * application fails (the engine rolls back applied commands on error).
+   *
+   * The buffer is cleared on success.
+   */
+  flushCommands(written_len: number): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      if (typeof this.wasm.flush_commands !== 'function') {
+        return err('flush_commands not available');
+      }
+      this.wasm.flush_commands(this.handle as number, written_len);
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   /** Render a single page by flat index. Returns SVG string. */
   renderPage(pageIdx: number): Result<string, EngineError> {
     const g = this.guard();
