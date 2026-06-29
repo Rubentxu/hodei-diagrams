@@ -7,6 +7,14 @@ const SIMPLE_RECT_PATH =
 const INVALID_PATH =
   fixturePath('invalid.drawio');
 
+type SvgCacheSession = {
+  importDrawio(xml: string): { ok: boolean; error?: string };
+  executeCommand(cmdJson: string): { ok: boolean; error?: string };
+  getScene(): { ok: boolean; value?: unknown[]; error?: string };
+  renderPage(pageIdx: number): { ok: boolean; value?: string; error?: string };
+  getPage(token: number): string | null;
+};
+
 test.describe('viewer-only web shell', () => {
   test('viewer page mounts with Open button and viewer container', async ({ page }) => {
     await page.goto('/');
@@ -69,5 +77,66 @@ test.describe('viewer-only web shell', () => {
     const box = await viewer.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThan(700); // approx 760
+  });
+
+  test('SVG cache invalidates after command mutation', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Access session via page.evaluate to reach browser window
+    const debug = await page.evaluate(async () => {
+      const hodeiDebug = (window as unknown as {
+        __hodeiDebug: { getSession: () => SvgCacheSession };
+      }).__hodeiDebug;
+
+      if (!hodeiDebug) return { error: 'no hodeiDebug', ok: false, svgBefore: '', svgAfter: '' };
+
+      const session = hodeiDebug.getSession();
+      if (!session) return { error: 'no session', ok: false, svgBefore: '', svgAfter: '' };
+
+      // Get the page token (slotmap index) from the scene
+      const sceneResult = session.getScene();
+      if (!sceneResult.ok) return { error: 'sceneResult failed: ' + String(sceneResult.error), ok: false, svgBefore: '', svgAfter: '' };
+      const pages = sceneResult.value as { page_id: { idx: number; version: number } }[];
+      const pageToken = pages[0]?.page_id.idx ?? 0;
+
+      // Render the page to populate the SVG cache
+      const renderResult = session.renderPage(pageToken);
+      if (!renderResult.ok) return { error: 'renderResult failed: ' + String(renderResult.error), ok: false, svgBefore: '', svgAfter: '' };
+      const svgBefore = renderResult.value ?? '';
+
+      // Execute a command that mutates the scene (AddVertex)
+      // Note: CellGeometry requires rotation, flip_h, flip_v fields
+      const cmd = JSON.stringify({
+        AddVertex: {
+          vertex: {
+            geometry: { x: 300, y: 200, width: 80, height: 40, relative: false, rotation: 0.0, flip_h: false, flip_v: false },
+            label: { text: 'cache-test-vertex' },
+            page_id: { idx: pageToken, version: 0 },
+            parent: null,
+            style_id: null,
+            z_order: 0,
+            locked: false,
+            visible: true,
+          },
+        },
+      });
+      const cmdResult = session.executeCommand(cmd);
+      if (!cmdResult.ok) return { error: 'cmdResult failed: ' + String(cmdResult.error), ok: false, svgBefore, svgAfter: '' };
+
+      // Re-render the page — the SVG should reflect the mutation
+      const renderAfterResult = session.renderPage(pageToken);
+      if (!renderAfterResult.ok) return { error: 'renderAfterResult failed: ' + String(renderAfterResult.error), ok: false, svgBefore, svgAfter: '' };
+      const svgAfter = renderAfterResult.value ?? '';
+
+      return { ok: true, svgBefore, svgAfter };
+    });
+
+    expect(debug.ok).toBe(true);
+    // SVG must have changed after the mutation
+    expect(debug.svgAfter).not.toBe(debug.svgBefore);
   });
 });

@@ -61,6 +61,7 @@ export class DiagramEngineSession {
     if (!g.ok) return g;
     try {
       this.wasm.import_drawio(this.handle as number, xml);
+      this.svgCache.clear();
       return ok(undefined);
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
@@ -145,6 +146,7 @@ export class DiagramEngineSession {
     if (!g.ok) return g;
     try {
       this.wasm.execute_command(this.handle as number, cmdJson);
+      this.svgCache.clear();
       this.#onStateChange?.();
       return ok(undefined);
     } catch (e) {
@@ -163,6 +165,7 @@ export class DiagramEngineSession {
       for (const cmd of cmdJsons) {
         this.wasm.execute_command(this.handle as number, cmd);
       }
+      this.svgCache.clear();
       this.#onStateChange?.();
       return ok(undefined);
     } catch (e) {
@@ -186,6 +189,7 @@ export class DiagramEngineSession {
       const commands = cmdJsons.map((s) => JSON.parse(s));
       const json = JSON.stringify(commands);
       this.wasm.execute_transaction(this.handle as number, json);
+      this.svgCache.clear();
       this.#onStateChange?.();
       return ok(undefined);
     } catch (e) {
@@ -209,6 +213,8 @@ export class DiagramEngineSession {
     if (!g.ok) return g;
     try {
       this.wasm.undo(this.handle as number);
+      this.svgCache.clear();
+      this.#onStateChange?.();
       return ok(undefined);
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
@@ -221,6 +227,8 @@ export class DiagramEngineSession {
     if (!g.ok) return g;
     try {
       this.wasm.redo(this.handle as number);
+      this.svgCache.clear();
+      this.#onStateChange?.();
       return ok(undefined);
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
@@ -506,6 +514,8 @@ export class DiagramEngineSession {
     if (!g.ok) return g;
     try {
       const svg = this.wasm.render_svg(this.handle as number, BigInt(pageIdx));
+      // Keep cache in sync so getPage() stays reliable
+      this.svgCache.set(pageIdx as PageToken, svg);
       return ok(svg);
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
