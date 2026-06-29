@@ -157,10 +157,30 @@ fn bench_get_scene_postcard(name: &str, editor: &Editor, iters: u32, warmup: u32
 fn bench_render_svg(name: &str, editor: &Editor, iters: u32, warmup: u32) {
     println!("[{name}] SvgRenderer::render (scene → SVG string, all pages)");
     let scene = build_scene(editor);
-    run_bench("  render_svg", iters, warmup, || {
+    run_bench("  render_svg_string", iters, warmup, || {
         let svgs = render_all_pages(&scene);
         let total: usize = svgs.iter().map(|s| s.len()).sum();
         std::hint::black_box(total);
+    });
+}
+
+fn bench_render_svg_buffer(name: &str, editor: &Editor, iters: u32, warmup: u32) {
+    println!("[{name}] SvgRenderer::render (scene → buffer write, all pages)");
+    // Simulates the zero-copy SVG buffer path: render each page then
+    // "write" the bytes to a pre-allocated slab (Vec::clear + extend_from_slice).
+    let scene = build_scene(editor);
+    let mut svg_buf: Vec<u8> = Vec::with_capacity(2 * 1024 * 1024);
+    run_bench("  render_svg_buffer", iters, warmup, || {
+        svg_buf.clear();
+        for page in &scene.pages {
+            // use the synchronous render path (the actual WASM render_svg_to_buffer
+            // does this exact same work: builds scene, finds page, renders to String)
+            let svg = SvgRenderer::new()
+                .render(&scene, page.page_id)
+                .expect("render");
+            svg_buf.extend_from_slice(svg.as_bytes());
+        }
+        std::hint::black_box(svg_buf.len());
     });
 }
 
@@ -229,6 +249,7 @@ fn run_fixture_suite(label: &str, fixture: &str, args: &Args) {
     bench_get_scene(label, &editor, args.iters, args.warmup);
     bench_get_scene_postcard(label, &editor, args.iters, args.warmup);
     bench_render_svg(label, &editor, args.iters, args.warmup);
+    bench_render_svg_buffer(label, &editor, args.iters, args.warmup);
     bench_full_pipeline(label, &xml, args.iters, args.warmup);
 }
 
