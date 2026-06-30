@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""
+.githooks/pre-commit — guard rail for cycle 18's networkidle cleanup.
+
+If any staged e2e spec adds the legacy 2-line pattern
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+this hook aborts the commit and points the developer at the canonical
+helper (waitForAppReady).
+
+It does NOT block the mid-test pattern (page.reload + networkidle),
+which is a different concern and is left to a future helper.
+
+Install once per clone:
+    git config core.hooksPath .githooks
+"""
+import re
+import subprocess
+import sys
+
+PATTERN = re.compile(
+    r'^\+[^+]\s*await page\.goto\([^)]*\);\s*\n'
+    r'\s*\+[^+]\s*await page\.waitForLoadState\([\'"]networkidle[\'"]\)',
+    re.MULTILINE,
+)
+
+
+def main() -> int:
+    # Collect the staged diff for e2e spec files (added or modified only).
+    diff_proc = subprocess.run(
+        ['git', 'diff', '--cached', '--diff-filter=AM',
+         '--unified=0', '--', 'web-shell/tests/e2e/*.spec.ts'],
+        capture_output=True, text=True,
+    )
+    diff_output = diff_proc.stdout
+
+    if not diff_output:
+        return 0
+
+    match = PATTERN.search(diff_output)
+    if match is None:
+        return 0
+
+    print("pre-commit: blocked. New e2e spec uses the legacy goto+networkidle pattern.",
+          file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  Replacement: import { waitForAppReady } from './helpers/app-ready.js'",
+          file=sys.stderr)
+    print("  and call it instead:", file=sys.stderr)
+    print("      await waitForAppReady(page);", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  See web-shell/tests/e2e/helpers/app-ready.ts for the canonical helper",
+          file=sys.stderr)
+    print("  and ADR-0075 for why 'networkidle' is flaky in SPAs.", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  Hunk where the pattern was matched:", file=sys.stderr)
+    for line in diff_output.splitlines()[:40]:
+        if line.startswith('@@') or line.startswith('+') or line.startswith('-'):
+            print("    " + line, file=sys.stderr)
+        elif line.startswith('diff --git'):
+            print("    " + line, file=sys.stderr)
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
