@@ -10,6 +10,8 @@ import type { DiagramEngineSession } from './session.js';
 import type { Editor } from './editor.js';
 import type { SlotmapId } from './types.js';
 
+export type DiagnosticStatus = 'idle' | 'clean' | 'error';
+
 export interface NavbarControls {
   container: HTMLElement;
   fileInput: HTMLInputElement;
@@ -17,6 +19,8 @@ export interface NavbarControls {
   redoBtn: HTMLButtonElement;
   saveBtn: HTMLButtonElement;
   zoomDisplay: HTMLSpanElement;
+  inspectorToggleBtn: HTMLButtonElement;
+  setDiagnosticsStatus: (_state: DiagnosticStatus, _message?: string) => void;
   toolbar: ToolbarControls;
 }
 
@@ -35,9 +39,10 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   // ─── Brand ───────────────────────────────────────────────────────────────
   const brand = document.createElement('span');
   brand.className = 'navbar-brand';
-  brand.innerHTML = ICONS.BRAND;
   brand.setAttribute('data-testid', 'navbar-brand');
   brand.setAttribute('aria-label', 'Hodei Diagrams');
+  // Icon + product name for engineering workbench identity
+  brand.innerHTML = ICONS.BRAND + `<span class="navbar-brand-name">Hodei</span>`;
   container.appendChild(brand);
 
   // ─── Menu bar ────────────────────────────────────────────────────────────
@@ -655,6 +660,50 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   saveBtn.setAttribute('data-testid', 'save-btn');
   quickControls.appendChild(saveBtn);
 
+  // Diagnostics pill — engineering quality gate (hidden when idle)
+  const diagnosticsPill = document.createElement('div');
+  diagnosticsPill.className = 'diagnostics-pill';
+  diagnosticsPill.setAttribute('data-testid', 'diagnostics-pill');
+  diagnosticsPill.hidden = true;
+  quickControls.appendChild(diagnosticsPill);
+
+  // Inspector toggle (tablet only — hidden on desktop via CSS, floats on mobile)
+  const inspectorToggleBtn = document.createElement('button');
+  inspectorToggleBtn.className = 'quick-btn mobile-panel-toggle mobile-panel-toggle--inspector';
+  inspectorToggleBtn.textContent = '⊞';
+  inspectorToggleBtn.title = 'Toggle inspector';
+  inspectorToggleBtn.setAttribute('aria-label', 'Toggle inspector panel');
+  inspectorToggleBtn.setAttribute('data-testid', 'inspector-toggle');
+  inspectorToggleBtn.style.display = 'none';
+  inspectorToggleBtn.addEventListener('click', () => {
+    const appEl = document.querySelector('#app') as HTMLElement | null;
+    if (appEl) {
+      const isCollapsed = appEl.classList.toggle('inspector-collapsed');
+      inspectorToggleBtn.textContent = isCollapsed ? '⊞' : '⊟';
+      inspectorToggleBtn.title = isCollapsed ? 'Show inspector' : 'Hide inspector';
+      try {
+        localStorage.setItem('hodei:inspector-collapsed', String(isCollapsed));
+      } catch {
+        // localStorage may be unavailable
+      }
+    }
+  });
+  document.body.appendChild(inspectorToggleBtn);
+
+  // Restore inspector collapsed state
+  try {
+    if (localStorage.getItem('hodei:inspector-collapsed') === 'true') {
+      const appEl = document.querySelector('#app') as HTMLElement | null;
+      if (appEl) {
+        appEl.classList.add('inspector-collapsed');
+        inspectorToggleBtn.textContent = '⊞';
+        inspectorToggleBtn.title = 'Show inspector';
+      }
+    }
+  } catch {
+    // localStorage may be unavailable
+  }
+
   navbarTopRow.appendChild(quickControls);
 
   // ─── Toolbar (Zone 1.5) ───────────────────────────────────────────────────
@@ -863,6 +912,25 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     redoBtn,
     saveBtn,
     zoomDisplay,
+    inspectorToggleBtn,
+    setDiagnosticsStatus: (state: DiagnosticStatus, message?: string) => {
+      diagnosticsPill.hidden = state === 'idle';
+      if (state === 'idle') return;
+      diagnosticsPill.dataset['state'] = state;
+      if (state === 'clean') {
+        const icon = ICONS.CLEAN
+          .replace(/width="16" height="16"/, 'width="12" height="12"')
+          .replace(/stroke="currentColor"/, 'stroke="var(--success)"');
+        diagnosticsPill.innerHTML = icon + ' <span>.drawio compatible</span>';
+        diagnosticsPill.title = message ?? 'Diagram is fully compatible';
+      } else if (state === 'error') {
+        const icon = ICONS.ERROR
+          .replace(/width="16" height="16"/, 'width="12" height="12"')
+          .replace(/stroke="currentColor"/, 'stroke="var(--danger)"');
+        diagnosticsPill.innerHTML = icon + ' <span>' + (message ?? 'Compatibility issue') + '</span>';
+        diagnosticsPill.title = message ?? 'Check the error banner for details';
+      }
+    },
     toolbar: toolbarControls,
   };
 }

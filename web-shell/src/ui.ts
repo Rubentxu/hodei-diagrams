@@ -7,12 +7,13 @@
 
 import type { PageRender } from './types.js';
 import type { DiagramEngineSession } from './session.js';
-import { buildNavbar, type ToolbarControls } from './navbar.js';
+import { buildNavbar, type ToolbarControls, type NavbarControls } from './navbar.js';
 import { buildSidebar } from './sidebar.js';
 import { buildRail, type RailCallbacks } from './rail.js';
 import type { StencilLibraryManager } from './stencil-library-manager.js';
 import { buildHud, type HudControls } from './hud.js';
 import { ICONS } from './icon.js';
+import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 
 export type DiagnosticState = 'idle' | 'clean' | 'error';
 
@@ -26,6 +27,8 @@ export interface UiElements {
   redoButton: HTMLButtonElement;
   saveButton: HTMLButtonElement;
   zoomDisplay: HTMLSpanElement;
+  inspectorToggleBtn: HTMLButtonElement;
+  setDiagnosticsStatus: NavbarControls['setDiagnosticsStatus'];
 
   // Zone 2: Sidebar
   rectToolButton: HTMLButtonElement;
@@ -251,6 +254,8 @@ export function buildEmptyUi(
     redoButton: navbar.redoBtn,
     saveButton: navbar.saveBtn,
     zoomDisplay: navbar.zoomDisplay,
+    inspectorToggleBtn: navbar.inspectorToggleBtn,
+    setDiagnosticsStatus: navbar.setDiagnosticsStatus,
 
     // Zone 2
     rectToolButton: sidebar.rectToolBtn,
@@ -312,6 +317,9 @@ export interface PageTabCallbacks {
   onSelect: (_pageId: number) => void;
   onRename: (_pageId: number, _newName: string) => void;
   onDelete: (_pageId: number) => void;
+  // IP-D: page tab right-click menu (rename/duplicate/reorder)
+  onDuplicate: (_pageId: number) => void;
+  onMove: (_pageId: number, _direction: 'left' | 'right') => void;
 }
 
 /** Update page tabs in the bottom bar. */
@@ -353,6 +361,16 @@ export function populatePageTabs(
       });
       tab.appendChild(closeBtn);
     }
+
+    // IP-D: Right-click on page tab opens context menu.
+    // Stash the page index on the element so the global handler can look
+    // up the page from the pages array at click time.
+    tab.setAttribute('data-page-index', String(i));
+    tab.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      tabRightClickHandler(e as MouseEvent, i, pages.length, tab, callbacks);
+    });
 
     container.appendChild(tab);
   }
@@ -397,6 +415,72 @@ function startRename(
   });
 
   input.addEventListener('blur', commit);
+}
+
+/**
+ * IP-D: Right-click handler on a page tab. Shows context menu with
+ * Rename / Duplicate / Delete / Move Left / Move Right.
+ *
+ * @param e The contextmenu MouseEvent (already preventDefault'd)
+ * @param pageIndex Index of the tab in the pages array
+ * @param totalPages Total pages count (used to determine Move disabled state)
+ * @param tab The tab element (used as the anchor for the context menu)
+ * @param callbacks PageTabCallbacks
+ */
+function tabRightClickHandler(
+  e: MouseEvent,
+  pageIndex: number,
+  totalPages: number,
+  tab: HTMLElement,
+  callbacks: PageTabCallbacks,
+): void {
+  const pageId = parseInt(tab.getAttribute('data-page-index') || '-1', 10);
+  void pageIndex; // kept for potential future use (e.g., debug)
+
+  // Open the inline rename input: we need the tab's name element to swap it.
+  // The simplest approach: trigger a synthetic dblclick on the name to
+  // start the rename flow. But we don't have a direct reference here. So
+  // we expose a quick "Rename" action that reuses the existing startRename
+  // by re-fetching the tab's name button.
+  const items: ContextMenuItem[] = [];
+
+  // Rename — find the tab name button and trigger its dblclick handler
+  items.push({
+    label: 'Rename',
+    action: () => {
+      const nameBtn = tab.querySelector<HTMLButtonElement>('.page-tab-name');
+      if (nameBtn) nameBtn.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    },
+  });
+
+  items.push({
+    label: 'Duplicate',
+    action: () => callbacks.onDuplicate(pageId),
+  });
+
+  items.push({ separator: true, label: '', action: () => {} });
+
+  items.push({
+    label: 'Move Left',
+    action: () => callbacks.onMove(pageId, 'left'),
+    disabled: pageIndex === 0,
+  });
+
+  items.push({
+    label: 'Move Right',
+    action: () => callbacks.onMove(pageId, 'right'),
+    disabled: pageIndex === totalPages - 1,
+  });
+
+  items.push({ separator: true, label: '', action: () => {} });
+
+  items.push({
+    label: 'Delete',
+    action: () => callbacks.onDelete(pageId),
+    disabled: totalPages <= 1,
+  });
+
+  showContextMenu(e.clientX, e.clientY, items);
 }
 
 // ─── Error Display ────────────────────────────────────────────────────────────
