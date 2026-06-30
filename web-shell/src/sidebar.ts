@@ -220,9 +220,27 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
       el.style.display = query ? 'none' : '';
     });
 
-    // Show/hide "More Shapes" button
-    const moreBtn = container.querySelector<HTMLElement>('.more-shapes-btn');
-    if (moreBtn) moreBtn.style.display = query ? 'none' : '';
+    // Open "More Shapes" accordion if query matches future category names
+    const futureTitles = container.querySelectorAll<HTMLElement>('.more-shapes-content .category-title');
+    let hasFutureMatch = false;
+    futureTitles.forEach((el) => {
+      const match = el.textContent?.toLowerCase().includes(query);
+      if (match) hasFutureMatch = true;
+    });
+
+    const moreShapesDetails = container.querySelector('.more-shapes-accordion') as HTMLDetailsElement | null;
+    if (query && hasFutureMatch) {
+      if (moreShapesDetails) moreShapesDetails.open = true;
+    } else if (!query) {
+      // Restore to localStorage preference
+      if (moreShapesDetails) {
+        try {
+          moreShapesDetails.open = localStorage.getItem('hodei:more-shapes-open') === 'true';
+        } catch {
+          moreShapesDetails.open = false;
+        }
+      }
+    }
 
     // Filter shape buttons
     const allShapeBtns = container.querySelectorAll<HTMLElement>('.shape-btn');
@@ -414,11 +432,19 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
           btn.appendChild(label);
 
           // Click to add shape at canvas center (future: drag-and-drop)
-          btn.addEventListener('click', () => {
-            // Dispatch a custom event that main.ts can listen to for adding the shape
+          btn.addEventListener('click', (e) => {
+            // IP-C: Pass modifier state to the stencil-shape-activate handler
+            // so main.ts can branch on Shift/Alt for ignore-default, bottom-left,
+            // replace-selected, insert-and-connect.
+            const me = e as MouseEvent;
             const event = new CustomEvent('stencil-shape-activate', {
               bubbles: true,
-              detail: { library: libName, name: shape.name },
+              detail: {
+                library: libName,
+                name: shape.name,
+                shiftKey: me.shiftKey,
+                altKey: me.altKey,
+              },
             });
             container.dispatchEvent(event);
           });
@@ -439,7 +465,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
     // Note: unsubscribe is intentionally not called — manager lives for the session lifetime
   }
 
-  // ─── Future categories (grayed out with lock) ───────────────────────────
+  // ─── Future categories → collapsible "More Shapes" accordion ─────────────
   // Warn once if duplicate keys exist (Databases and Database map to same icon)
   const seenCats = new Set<string>();
   for (const cat of FUTURE_CATEGORIES) {
@@ -448,6 +474,29 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
     }
     seenCats.add(cat);
   }
+
+  // Accordion wrapper (closed by default)
+  const moreShapesDetails = document.createElement('details');
+  moreShapesDetails.className = 'more-shapes-accordion';
+
+  // Accordion header
+  const moreShapesSummary = document.createElement('summary');
+  moreShapesSummary.className = 'more-shapes-btn';
+
+  const moreShapesLabel = document.createElement('span');
+  moreShapesLabel.textContent = '+ More Shapes';
+  moreShapesSummary.appendChild(moreShapesLabel);
+
+  const moreShapesChevron = document.createElement('span');
+  moreShapesChevron.className = 'more-shapes-chevron';
+  moreShapesChevron.textContent = '▼';
+  moreShapesSummary.appendChild(moreShapesChevron);
+
+  moreShapesDetails.appendChild(moreShapesSummary);
+
+  // Accordion content: all future categories in a scrollable list
+  const moreShapesContent = document.createElement('div');
+  moreShapesContent.className = 'more-shapes-content';
 
   for (const cat of FUTURE_CATEGORIES) {
     const catEl = document.createElement('div');
@@ -482,20 +531,47 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
 
     const msg = document.createElement('div');
     msg.className = 'category-coming-soon';
-    msg.textContent = 'Soon';
+    msg.textContent = 'Available soon';
     catEl.appendChild(msg);
 
-    container.appendChild(catEl);
+    moreShapesContent.appendChild(catEl);
   }
 
-  // ─── More Shapes button ──────────────────────────────────────────────────
-  const moreBtn = document.createElement('button');
-  moreBtn.className = 'more-shapes-btn';
-  moreBtn.textContent = '+ More Shapes';
-  container.appendChild(moreBtn);
+  moreShapesDetails.appendChild(moreShapesContent);
+  container.appendChild(moreShapesDetails);
 
-  // Wire "+ More Shapes" to hidden file input
-  moreBtn.addEventListener('click', () => {
+  // Wire accordion open/close + chevron rotation + localStorage
+  function updateMoreShapesState(open: boolean) {
+    moreShapesDetails.open = open;
+    moreShapesChevron.textContent = open ? '▲' : '▼';
+    try {
+      localStorage.setItem('hodei:more-shapes-open', String(open));
+    } catch {
+      // localStorage unavailable
+    }
+  }
+
+  moreShapesSummary.addEventListener('click', (e) => {
+    e.preventDefault();
+    updateMoreShapesState(!moreShapesDetails.open);
+  });
+
+  // Restore persisted state
+  try {
+    if (localStorage.getItem('hodei:more-shapes-open') === 'true') {
+      updateMoreShapesState(true);
+    }
+  } catch {
+    // localStorage unavailable
+  }
+
+  // ─── Load custom stencils link ─────────────────────────────────────────
+  const loadStencilsLink = document.createElement('button');
+  loadStencilsLink.className = 'load-stencils-btn';
+  loadStencilsLink.textContent = 'Load stencils from file…';
+  container.appendChild(loadStencilsLink);
+
+  loadStencilsLink.addEventListener('click', () => {
     hiddenFileInput.value = '';
     hiddenFileInput.click();
   });

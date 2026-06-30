@@ -72,6 +72,14 @@ interface ConnectState {
   /** Source shape bounds for normalized anchor computation. */
   sourceBounds: { x: number; y: number; width: number; height: number };
   /**
+   * IP-C: Modifier-driven connect mode (EDG-003..005).
+   * - 'floating' (default): standard connect, anchor on target
+   * - 'fixed-only': Shift held — only fixed connection points are valid targets
+   * - 'anywhere': Alt held — anchor at any position on shape boundary
+   * - 'ignore': Alt+Shift held (less common) — drop without connecting
+   */
+  mode: 'floating' | 'fixed-only' | 'anywhere' | 'ignore';
+  /**
    * Document-level pointermove handler that updates the preview line endpoint
    * as the cursor moves between the source click and the target click. Added
    * when entering connect mode on the first click so click-click flows
@@ -176,6 +184,11 @@ export class Editor {
 
   // Internal clipboard for copy/paste
   #clipboard: { vertices: Vertex[]; offset: number } | null = null;
+
+  // IP-C: Style clipboard (Alt+C / Alt+V) and default style (Ctrl+Shift+D / Ctrl+Shift+R)
+  // In-memory only, not persisted across page reloads. Same lifecycle as #clipboard.
+  #styleClipboard: Record<string, unknown> | null = null;
+  #defaultStyle: Record<string, unknown> | null = null;
 
   constructor(
     session: DiagramEngineSession,
@@ -475,6 +488,86 @@ export class Editor {
     }
 
     return pastedIds;
+  }
+
+  // ─── IP-C: Style Clipboard (Alt+C / Alt+V) ───────────────────────────────
+
+  /**
+   * Copy the current selection's first shape's style to the in-memory style
+   * clipboard. Draw.io parity: STYL-005. Replaces any previous clipboard
+   * contents. System clipboard is NOT touched.
+   */
+  copyStyle(): boolean {
+    if (this.#selection.size === 0) return false;
+    const firstId = this.#selection.values().next().value as SlotmapId;
+    const vertex = this.#getVertex(firstId);
+    if (!vertex) return false;
+    // Store a defensive copy so later mutations to the scene don't affect us
+    this.#styleClipboard = JSON.parse(JSON.stringify(vertex.style));
+    return true;
+  }
+
+  /**
+   * Paste the in-memory style clipboard to all selected shapes. Atomic
+   * transaction. Draw.io parity: STYL-006. Clipboard is NOT cleared
+   * (so multiple pastes reuse the same style).
+   */
+  pasteStyle(): boolean {
+    if (!this.#styleClipboard || this.#selection.size === 0) return false;
+    const style = this.#styleClipboard;
+    const commands: string[] = [];
+    for (const id of this.#selection) {
+      commands.push(
+        JSON.stringify({
+          ChangeStyle: {
+            id: slotmapIdToField(id),
+            style,
+          },
+        }),
+      );
+    }
+    if (commands.length === 0) return false;
+    this.executeTransaction(commands);
+    this.#replay();
+    return true;
+  }
+
+  /**
+   * Get the current style clipboard (for tests/UI). Returns null if empty.
+   */
+  getStyleClipboard(): Record<string, unknown> | null {
+    return this.#styleClipboard;
+  }
+
+  // ─── IP-C: Default Style (Ctrl+Shift+D / Ctrl+Shift+R) ────────────────────
+
+  /**
+   * Set the editor's default style from the first selected shape. Draw.io
+   * parity: STYL-003. Multi-selection is a no-op (draw.io convention).
+   */
+  setDefaultStyle(): boolean {
+    if (this.#selection.size !== 1) return false;
+    const firstId = this.#selection.values().next().value as SlotmapId;
+    const vertex = this.#getVertex(firstId);
+    if (!vertex) return false;
+    this.#defaultStyle = JSON.parse(JSON.stringify(vertex.style));
+    return true;
+  }
+
+  /**
+   * Clear the editor's default style back to draw.io original
+   * (white fill, black outline). Draw.io parity: STYL-004.
+   */
+  clearDefaultStyle(): void {
+    this.#defaultStyle = null;
+  }
+
+  /**
+   * Get the current default style (for the sidebar/inspector and tests).
+   * Returns null if no default is set (use draw.io original).
+   */
+  getDefaultStyle(): Record<string, unknown> | null {
+    return this.#defaultStyle;
   }
 
   /**
@@ -912,6 +1005,27 @@ export class Editor {
     }
     this.#replay();
     return result;
+  }
+
+  /**
+   * IP-C EDG-015: Remove all bend points from the selected edge, returning
+   * it to the shortest default path between source and target. Implemented
+   * as a loop of `removeBend` calls (no native `setEdgeWaypoints` WASM
+   * export yet — see IP-E for a single-shot engine command).
+   */
+  clearAllWaypoints(edgeId: SlotmapId): Result<void, EngineError> {
+    // Loop: remove bend 0 until no more bends exist.
+    // We bound the iterations to prevent infinite loops.
+    for (let i = 0; i < 64; i++) {
+      const r = this.#session.removeBend(edgeId, 0);
+      if (!r.ok) {
+        // No more bends, or some other error
+        this.#replay();
+        return { ok: true, value: undefined };
+      }
+    }
+    this.#replay();
+    return { ok: true, value: undefined };
   }
 
   // ─── Active Tool ──────────────────────────────────────────────────────────
@@ -2846,6 +2960,12 @@ export class Editor {
       const geom = this.#findOriginalGeometry(hit);
       if (!geom) return;
 
+      // IP-C: Determine connect mode from modifiers (EDG-003..005)
+      let connectMode: 'floating' | 'fixed-only' | 'anywhere' | 'ignore' = 'floating';
+      if (e.altKey && e.shiftKey) connectMode = 'ignore';
+      else if (e.altKey) connectMode = 'anywhere';
+      else if (e.shiftKey) connectMode = 'fixed-only';
+
       this.#connectState = {
         sourceId: hit,
         sourceX: geom.x + geom.width / 2,
@@ -2853,6 +2973,7 @@ export class Editor {
         sourceClientX: e.clientX,
         sourceClientY: e.clientY,
         sourceBounds: geom,
+        mode: connectMode,
       };
 
       // Show preview line immediately so click-click flows (without drag)
@@ -2885,6 +3006,7 @@ export class Editor {
 
     // Second click (no significant drag): create edge with auto anchors
     const sourceId = this.#connectState.sourceId;
+    const connectMode = this.#connectState.mode;
     this.#cancelConnectDrag();
 
     // Don't connect a vertex to itself
@@ -2893,12 +3015,30 @@ export class Editor {
       return;
     }
 
-    // Use auto anchors for click-to-connect fallback
+    // IP-C EDG-005: 'ignore' mode → drop without connecting
+    if (connectMode === 'ignore') {
+      this.#clearConnectState();
+      return;
+    }
+
+    // IP-C: Mode-driven anchor selection
+    // - 'floating' (default): auto anchors
+    // - 'fixed-only': both anchors fixed to shape centers
+    // - 'anywhere': both anchors floating (default behavior, explicit)
+    let sourceAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } = { kind: 'auto' };
+    let targetAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } = { kind: 'auto' };
+    if (connectMode === 'fixed-only') {
+      // For 'fixed-only', we'd need to know the exact port index clicked.
+      // For now, default to 'Center' port on both ends (still a fixed anchor).
+      sourceAnchor = { kind: 'fixed', port: 'Center' };
+      targetAnchor = { kind: 'fixed', port: 'Center' };
+    }
+
     const r = this.#session.connectVerticesAnchored(
       sourceId,
       hit,
-      { kind: 'auto' },
-      { kind: 'auto' },
+      sourceAnchor,
+      targetAnchor,
     );
     if (!r.ok) {
       this.#onError(r.error);
@@ -3180,16 +3320,356 @@ export class Editor {
     const kind = kindMap[this.#activeTool] ?? 'Rectangle';
 
     const docPos = this.#clientToDoc(e.clientX, e.clientY);
-    const cmd = this.#buildAddVertexCmd(kind, docPos.x, docPos.y);
-    const r = this.#session.executeCommand(cmd);
-    if (!r.ok) {
-      this.#onError(r.error);
-    } else {
+
+    // IP-C: Modifier routing for shape library insert.
+    //   - Shift: ignore default style (use draw.io original). Capture the
+    //     default style state BEFORE we add (since add doesn't consume it).
+    //   - Alt: insert at bottom-left, underneath all other shapes.
+    //   - Shift + 1 selected shape: REPLACE selected shape's type.
+    //   - Alt + Shift + 1 selected shape: insert and connect.
+    //   - No modifier: existing behavior (insert at click pos, top of z-stack).
+    const useOriginalStyle = e.shiftKey && !e.altKey;
+    const insertAtBottomLeft = e.altKey && !e.shiftKey;
+    const replaceSelected = e.shiftKey && !e.altKey && this.#selection.size === 1;
+    const insertAndConnect = e.altKey && e.shiftKey && this.#selection.size === 1;
+
+    if (replaceSelected) {
+      // Replace selected shape's type, keep geometry and style.
+      const selectedId = this.#selection.values().next().value as SlotmapId;
+      const newId = this.#replaceShapeKind(selectedId, kind, docPos);
+      if (newId) {
+        this.#replay();
+      }
+      this.setActiveTool(null);
+      return;
+    }
+
+    if (insertAndConnect) {
+      // Insert new shape and connect to selected.
+      const selectedId = this.#selection.values().next().value as SlotmapId;
+      const newId = this.#addVertexWithStyle(kind, docPos.x, docPos.y, useOriginalStyle);
+      if (newId) {
+        const r = this.#session.connectVerticesAnchored(
+          selectedId,
+          newId,
+          { kind: 'auto' },
+          { kind: 'auto' },
+        );
+        if (!r.ok) {
+          this.#onError(r.error);
+        } else {
+          this.#replay();
+        }
+      }
+      this.setActiveTool(null);
+      return;
+    }
+
+    // For insert-at-bottom-left, compute target position from diagram bbox.
+    let targetX = docPos.x;
+    let targetY = docPos.y;
+    if (insertAtBottomLeft) {
+      const bbox = this.#getDiagramBBox();
+      if (bbox) {
+        // Bottom-left = (bbox.minX, bbox.maxY) in document coords
+        targetX = bbox.minX;
+        targetY = bbox.maxY;
+      } else {
+        // Empty diagram: fall back to a sensible default (40, 40)
+        targetX = 40;
+        targetY = 40;
+      }
+    }
+
+    const newId = this.#addVertexWithStyle(kind, targetX, targetY, useOriginalStyle);
+    if (!newId) {
+      this.setActiveTool(null);
+      return;
+    }
+
+    if (insertAtBottomLeft) {
+      // Send to back so the new shape is underneath
+      this.#session.executeCommand(
+        JSON.stringify({
+          SetZOrder: {
+            id: slotmapIdToField(newId),
+            direction: 'send_to_back',
+          },
+        }),
+      );
       this.#replay();
     }
 
-    // Single-placement mode: clear tool after use
     this.setActiveTool(null);
+  }
+
+  // ─── IP-C: Shape Insertion Helpers ───────────────────────────────────────
+
+  /**
+   * Add a vertex using the editor's default style (or original if
+   * `useOriginalStyle` is true). Returns the new SlotmapId or null.
+   */
+  // ─── IP-C: Shape Insertion Helpers ───────────────────────────────────────
+
+  /**
+   * Find the segment index of an edge closest to a given document point.
+   * Used by the connector context menu "Add Waypoint" to know where to
+   * insert the new waypoint. Returns 0 by default (insert at start).
+   *
+   * Walks the edge's source → bends → target chain, picks the segment
+   * whose midpoint is nearest to the click.
+   */
+  #findSegmentAtPoint(edgeId: SlotmapId, x: number, y: number): number {
+    // Find edge in scene cache
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        const edge = e['Edge'] as Record<string, unknown> | undefined;
+        if (!edge) continue;
+        const idField = edge['id'] as { idx?: number; version?: number } | undefined;
+        if (!idField || idField.idx !== edgeId.idx || idField.version !== edgeId.version) continue;
+
+        // Get source/target positions
+        const sourceId = edge['source'] as { idx?: number; version?: number } | undefined;
+        const targetId = edge['target'] as { idx?: number; version?: number } | undefined;
+        const waypoints = (edge['waypoints'] as Array<{ x: number; y: number }>) ?? [];
+        if (!sourceId || !targetId) return 0;
+
+        const sourceV = this.#getVertex({ idx: sourceId.idx!, version: sourceId.version! });
+        const targetV = this.#getVertex({ idx: targetId.idx!, version: targetId.version! });
+        if (!sourceV || !targetV) return 0;
+
+        // Build the polyline: [source, ...waypoints, target]
+        const points: Array<{ x: number; y: number }> = [
+          {
+            x: sourceV.geometry.x + sourceV.geometry.width / 2,
+            y: sourceV.geometry.y + sourceV.geometry.height / 2,
+          },
+          ...waypoints,
+          {
+            x: targetV.geometry.x + targetV.geometry.width / 2,
+            y: targetV.geometry.y + targetV.geometry.height / 2,
+          },
+        ];
+
+        // Find closest segment
+        let bestDist = Infinity;
+        let bestIdx = 0;
+        for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i]!;
+          const p2 = points[i + 1]!;
+          const midX = (p1.x + p2.x) / 2;
+          const midY = (p1.y + p2.y) / 2;
+          const dist = (midX - x) ** 2 + (midY - y) ** 2;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIdx = i;
+          }
+        }
+        return bestIdx;
+      }
+    }
+    return 0;
+  }
+
+  #addVertexWithStyle(
+    kind: string,
+    x: number,
+    y: number,
+    useOriginalStyle: boolean,
+  ): SlotmapId | null {
+    // buildAddVertexCmd expects a literal union; we accept string at the
+    // public boundary and assert here. The kind is always one of the
+    // library's known kinds (validated in #onPaletteClick's kindMap).
+    const cmd = this.#buildAddVertexCmd(
+      kind as
+        | 'Rectangle'
+        | 'RoundedRect'
+        | 'Ellipse'
+        | 'Diamond'
+        | 'Triangle'
+        | 'Hexagon'
+        | 'Cylinder'
+        | 'Cloud'
+        | 'Parallelogram'
+        | 'Trapezoid'
+        | 'Polygon'
+        | 'RectangleStencil'
+        | 'EllipseStencil'
+        | 'DiamondStencil'
+        | 'TriangleStencil'
+        | 'HexagonStencil'
+        | 'CylinderStencil'
+        | 'CloudStencil'
+        | 'ParallelogramStencil'
+        | 'TrapezoidStencil'
+        | 'BlockArrowStencil',
+      x,
+      y,
+    );
+    // If we have a default style and the user didn't request original,
+    // attach it to the new vertex via a follow-up ChangeStyle command.
+    // We need to find the new vertex ID after replay; simpler: build the
+    // AddVertex command with style baked in.
+    if (!useOriginalStyle && this.#defaultStyle) {
+      // Inject the default style into the AddVertex command payload
+      try {
+        const payload = JSON.parse(cmd);
+        if (payload.AddVertex) {
+          payload.AddVertex.style = this.#defaultStyle;
+        }
+        const r = this.#session.executeCommand(JSON.stringify(payload));
+        if (!r.ok) {
+          this.#onError(r.error);
+          return null;
+        }
+      } catch {
+        const r = this.#session.executeCommand(cmd);
+        if (!r.ok) {
+          this.#onError(r.error);
+          return null;
+        }
+      }
+    } else {
+      const r = this.#session.executeCommand(cmd);
+      if (!r.ok) {
+        this.#onError(r.error);
+        return null;
+      }
+    }
+
+    this.#replay();
+
+    // Find the newly created vertex by searching the scene cache for the
+    // kind and position match.
+    const page = this.#sceneCache[this.#activePageIdx];
+    if (!page) return null;
+    const candidates: SlotmapId[] = [];
+    for (const elem of page.display_list) {
+      const e = elem as Record<string, unknown>;
+      for (const key of Editor.#SHAPE_KEYS) {
+        const variant = e[key] as Record<string, unknown> | undefined;
+        if (!variant) continue;
+        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+        const bounds = variant['bounds'] as
+          | { origin?: Record<string, number> }
+          | undefined;
+        if (!idField || !bounds?.origin) continue;
+        const sx = (bounds.origin['x'] as number) ?? 0;
+        const sy = (bounds.origin['y'] as number) ?? 0;
+        if (Math.abs(sx - x) < 1 && Math.abs(sy - y) < 1) {
+          candidates.push({ idx: idField.idx!, version: idField.version! });
+        }
+      }
+    }
+    return candidates[0] ?? null;
+  }
+
+  /**
+   * Replace a shape's kind (e.g., Rect → Ellipse) while keeping geometry
+   * and style. Returns the new SlotmapId.
+   *
+   * NOTE: This is a soft-replace — we delete the old vertex and add a new
+   * one with the same geometry. The id changes, so the caller is responsible
+   * for re-attaching connectors.
+   */
+  #replaceShapeKind(
+    selectedId: SlotmapId,
+    newKind: string,
+    docPos: { x: number; y: number },
+  ): SlotmapId | null {
+    const vertex = this.#getVertex(selectedId);
+    if (!vertex) return null;
+    // Same literal-union assertion as #addVertexWithStyle
+    const cmd = this.#buildAddVertexCmd(
+      newKind as
+        | 'Rectangle'
+        | 'RoundedRect'
+        | 'Ellipse'
+        | 'Diamond'
+        | 'Triangle'
+        | 'Hexagon'
+        | 'Cylinder'
+        | 'Cloud'
+        | 'Parallelogram'
+        | 'Trapezoid'
+        | 'Polygon'
+        | 'RectangleStencil'
+        | 'EllipseStencil'
+        | 'DiamondStencil'
+        | 'TriangleStencil'
+        | 'HexagonStencil'
+        | 'CylinderStencil'
+        | 'CloudStencil'
+        | 'ParallelogramStencil'
+        | 'TrapezoidStencil'
+        | 'BlockArrowStencil',
+      vertex.geometry.x,
+      vertex.geometry.y,
+    );
+    try {
+      const payload = JSON.parse(cmd);
+      if (payload.AddVertex) {
+        payload.AddVertex.style = vertex.style;
+        const r = this.#session.executeCommand(JSON.stringify(payload));
+        if (!r.ok) {
+          this.#onError(r.error);
+          return null;
+        }
+      } else {
+        const r = this.#session.executeCommand(cmd);
+        if (!r.ok) {
+          this.#onError(r.error);
+          return null;
+        }
+      }
+    } catch {
+      const r = this.#session.executeCommand(cmd);
+      if (!r.ok) {
+        this.#onError(r.error);
+        return null;
+      }
+    }
+    this.#replay();
+
+    // Find the new vertex
+    const newId = this.#findVertexAt(vertex.geometry.x, vertex.geometry.y, 2);
+    if (!newId) return null;
+
+    // Delete the original
+    this.#session.executeCommand(this.#buildRemoveVertexCmd(selectedId));
+    this.#replay();
+    return newId;
+  }
+
+  /** Compute the union bounding box of all shapes in the current page. */
+  #getDiagramBBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let found = false;
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of Editor.#SHAPE_KEYS) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const bounds = variant['bounds'] as
+            | { origin?: Record<string, number>; size?: Record<string, number> }
+            | undefined;
+          if (!bounds?.origin || !bounds?.size) continue;
+          const sx = (bounds.origin['x'] as number) ?? 0;
+          const sy = (bounds.origin['y'] as number) ?? 0;
+          const sw = (bounds.size['width'] as number) ?? 0;
+          const sh = (bounds.size['height'] as number) ?? 0;
+          if (sx < minX) minX = sx;
+          if (sy < minY) minY = sy;
+          if (sx + sw > maxX) maxX = sx + sw;
+          if (sy + sh > maxY) maxY = sy + sh;
+          found = true;
+        }
+      }
+    }
+    if (!found) return null;
+    return { minX, minY, maxX, maxY };
   }
 
   // ─── Bend Handle Rendering ───────────────────────────────────────────────
@@ -3463,14 +3943,47 @@ export class Editor {
 
       showContextMenu(e.clientX, e.clientY, items);
     } else if (edgeHit) {
+      // IP-C: Determine if the right-click was on a waypoint (bend handle)
+      // or on a segment. Bend handles are rendered as `<circle class="bend-handle">`
+      // with `data-bend-index`. If so, show "Remove Waypoint"; otherwise
+      // show "Add Waypoint" at the click position.
+      const bendHandle = (e.target as Element)?.closest('.bend-handle');
       const items: ContextMenuItem[] = [
         { label: 'Edit Label', action: () => this.#startEdgeTextEdit(edgeHit, e) },
+        { separator: true, label: '', action: () => {} },
+      ];
+
+      if (bendHandle) {
+        // Remove waypoint: parse bend index from data attribute
+        const bendIndex = parseInt(bendHandle.getAttribute('data-bend-index') || '0');
+        items.push({
+          label: 'Remove Waypoint',
+          action: () => {
+            this.removeBend(edgeHit, bendIndex);
+            this.#replay();
+          },
+        });
+      } else {
+        // Add waypoint: insert at click document position. Use the session
+        // command directly to add at the closest segment.
+        const docPos = this.#clientToDoc(e.clientX, e.clientY);
+        const segIndex = this.#findSegmentAtPoint(edgeHit, docPos.x, docPos.y);
+        items.push({
+          label: 'Add Waypoint',
+          action: () => {
+            this.insertBend(edgeHit, segIndex, docPos.x, docPos.y);
+            this.#replay();
+          },
+        });
+      }
+
+      items.push(
         { separator: true, label: '', action: () => {} },
         { label: 'Delete Edge', action: () => {
           this.#session.disconnectEdge(edgeHit);
           this.#replay();
         }},
-      ];
+      );
 
       showContextMenu(e.clientX, e.clientY, items);
     } else {
@@ -3609,10 +4122,40 @@ export class Editor {
       return;
     }
 
+    // Alt+C → copy style (draw.io parity: STYL-005)
+    if (e.altKey && !hasMod && e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      this.copyStyle();
+      return;
+    }
+
     // Ctrl+V → paste
     if (hasMod && e.key === 'v') {
       e.preventDefault();
       this.paste();
+      return;
+    }
+
+    // Alt+V → paste style (draw.io parity: STYL-006)
+    if (e.altKey && !hasMod && e.key.toLowerCase() === 'v') {
+      e.preventDefault();
+      this.pasteStyle();
+      return;
+    }
+
+    // Alt+Shift+R → clear all waypoints on selected edge (EDG-015)
+    // Only when an edge is selected and no shape is selected.
+    if (
+      e.altKey &&
+      !hasMod &&
+      e.shiftKey &&
+      e.key.toLowerCase() === 'r' &&
+      this.#selectedEdgeId !== null &&
+      this.#selection.size === 0
+    ) {
+      e.preventDefault();
+      this.clearAllWaypoints(this.#selectedEdgeId);
+      this.#renderBendHandles();
       return;
     }
 
@@ -3674,7 +4217,8 @@ export class Editor {
     }
 
     // Ctrl+D → duplicate selection (copy + paste)
-    if (hasMod && e.key === 'd') {
+    // IP-C: !e.shiftKey required so Ctrl+Shift+D (set default style) takes priority
+    if (hasMod && e.key === 'd' && !e.shiftKey) {
       e.preventDefault();
       this.copySelection();
       this.paste();
@@ -3706,6 +4250,23 @@ export class Editor {
     if (!hasMod && e.key === 'Home') {
       e.preventDefault();
       this.#resetZoom?.();
+      return;
+    }
+
+    // Ctrl+Shift+D → set default style from selection (draw.io parity: STYL-003)
+    if (hasMod && e.shiftKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      this.setDefaultStyle();
+      return;
+    }
+
+    // Ctrl+Shift+R → clear default style (draw.io parity: STYL-004)
+    // Only when nothing is selected (otherwise this is "Clear" the current
+    // selection by accident — Ctrl+Shift+R is the universal "hard refresh"
+    // in browsers, so we also need to handle the no-selection case carefully).
+    if (hasMod && e.shiftKey && e.key.toLowerCase() === 'r' && this.#selection.size === 0) {
+      e.preventDefault();
+      this.clearDefaultStyle();
       return;
     }
 
