@@ -163,6 +163,7 @@ export function buildEmptyUi(
 
   const errorMessage = document.createElement('span');
   errorMessage.className = 'error-message';
+  errorMessage.setAttribute('data-testid', 'error-message');
 
   const dismissButton = document.createElement('button');
   dismissButton.className = 'dismiss-btn';
