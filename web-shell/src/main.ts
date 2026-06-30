@@ -965,14 +965,22 @@ async function bootstrap(): Promise<void> {
   // Dynamic stencil library shape activation (click-to-add)
   ui.sidebar.addEventListener('stencil-shape-activate', (e) => {
     if (!activeSession) return;
-    const event = e as CustomEvent<{ library: string; name: string }>;
-    const { library, name } = event.detail;
+    const event = e as CustomEvent<{
+      library: string;
+      name: string;
+      shiftKey: boolean;
+      altKey: boolean;
+    }>;
+    const { library, name, shiftKey, altKey } = event.detail;
     const pageId = activeEditor?.getActivePageSlotId() ?? undefined;
     const result = activeSession.addStencilVertex(library, name, 400, 300, pageId);
     if (result.ok) {
       // Re-render the scene to show the newly added vertex
       activeEditor?.refreshScene();
       activeEditor?.triggerReplay();
+      // Note: full modifier routing (bottom-left, replace, insert-and-connect)
+      // for dynamic stencils is a follow-up. Basic shape tools (rect, ellipse,
+      // etc.) get the full routing in Editor.#onPaletteClick.
     }
   });
 
@@ -1002,6 +1010,7 @@ async function bootstrap(): Promise<void> {
     if (!importResult.ok) {
       showError(ui.errorBanner, ui.errorMessage, 'Import failed: ' + importResult.error);
       ui.setDiagnostics('error', 'Import failed: ' + importResult.error);
+      ui.setDiagnosticsStatus('error', 'Import failed');
       return;
     }
 
@@ -1009,11 +1018,13 @@ async function bootstrap(): Promise<void> {
     if (!renderResult.ok) {
       showError(ui.errorBanner, ui.errorMessage, 'Render failed: ' + renderResult.error);
       ui.setDiagnostics('error', 'Render failed: ' + renderResult.error);
+      ui.setDiagnosticsStatus('error', 'Render failed');
       return;
     }
 
     // Successful import — show clean diagnostics badge
     ui.setDiagnostics('clean');
+    ui.setDiagnosticsStatus('clean');
 
     activePages = renderResult.value;
     // Point the editor at page 0 BEFORE refreshScene so the cache
@@ -1549,8 +1560,10 @@ async function bootstrap(): Promise<void> {
     if (!result) return;
     if (!result.ok) {
       ui.setDiagnostics('error', `Layout (${kind}) failed: ${result.error}`);
+      ui.setDiagnosticsStatus('error', 'Layout failed');
     } else {
       ui.setDiagnostics('clean');
+      ui.setDiagnosticsStatus('clean');
     }
   }
 
@@ -1587,8 +1600,10 @@ async function bootstrap(): Promise<void> {
     const result = activeEditor.routeAllEdges();
     if (!result.ok) {
       ui.setDiagnostics('error', `Re-route Edges failed: ${result.error}`);
+      ui.setDiagnosticsStatus('error', 'Re-route failed');
     } else {
       ui.setDiagnostics('clean');
+      ui.setDiagnosticsStatus('clean');
     }
   });
 
