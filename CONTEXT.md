@@ -62,6 +62,14 @@ _Avoid_: Random layout, iterative without convergence guarantee
 The circular layout algorithm (ADR-0069), ported from `mxCircleLayout.js`. Places all page vertices at equal angular intervals on a computed circle. O(n), deterministic, closed-form — no iteration.
 _Avoid_: Organic-style force-directed (that uses OrganicLayout)
 
+**GridLayout**:
+The Hodei-original grid placement algorithm. Two-pass cumulative-offset placement (column widths accumulate from `col_max_w`, row heights from `row_max_h`) so that heterogeneous vertex sizes never overlap. Deterministic, single-pass, no draw.io equivalent.
+_Avoid_: Per-vertex cell formulas that ignore width/height heterogeneity
+
+**HierarchicalLayout**:
+The Sugiyama 4-stage pipeline layout (ADR-0045). Cycle removal → layer assignment → crossing reduction → coordinate assignment. Mutates the engine model in-place (no `TreeLayoutResult`), reached via the dedicated `apply_hierarchical_layout` WASM export rather than `apply_layout`.
+_Avoid_: Treating HierarchicalLayout as one option among many — its mutates-in-place contract is part of the type, not an accident
+
 **mxCircleLayout**:
 The upstream draw.io JavaScript layout algorithm that CircularLayout ports. Used as the behavioral reference for the O(n) closed-form circular arrangement.
 _Avoid_: Internal implementation detail as specification
@@ -82,6 +90,14 @@ _Avoid_: Creating a separate CircularLayoutResult (that would add connascence wi
 Shared utility that computes group bounding boxes from vertex center positions. Called by tree (adjust_parents), organic, and circular layouts. Takes `(store, page_id, positions: &HashMap<VertexId, (f64, f64)>, group_padding)`.
 _Avoid_: Implementing group bbox logic inside each layout algorithm
 
+**LayoutDirection**:
+Which way a hierarchical or grid layout flows. `TopToBottom` (default, layers stack downward) and `LeftToRight` (layers stack rightward, coordinates are swapped by `write_back`). Only `HierarchicalLayout` honors the field end-to-end; the other layouts read it but currently ignore it.
+_Avoid_: Treating direction as a per-algorithm concept — it is a single `LayoutConfig.direction` field consumed differently per algorithm
+
+**LayoutConfig**:
+Configuration struct for the layout pipeline. Fields: `direction` (default `TopToBottom`), `intra_cell_spacing` (default 30.0), `inter_rank_spacing` (default 100.0), `max_iterations` (default 8). Uses `#[serde(default)]` on every field so an empty JSON `{}` is a valid input — that forgiveness lets the WASM boundary accept callers that have no knobs to set.
+_Avoid_: Required-but-undocumented fields that fail deserialization silently when JS sends `{}` (the v0.77 incident with `direction`)
+
 ## Flagged Ambiguities
 
 - **Editor vs Engine**: In this project, the editor is not the product core. The canonical term for the core product is **Diagram Engine**.
@@ -91,6 +107,7 @@ _Avoid_: Implementing group bbox logic inside each layout algorithm
 - **Bridge Convenience vs Performance**: In this project, the `WASM Boundary` favors small commands, input events, and shared buffers over convenience-oriented object passing. Ease at the boundary must not create a permanent throughput bottleneck.
 - **Redux Ideas vs Literal Redux**: In this project, Redux-like clarity is welcome at the `Command Flow` level, but the Diagram Engine is not a frontend-style reducer store. Internal state may stay mutable and optimized in Rust.
 - **Render Technology vs Product Value**: In this project, render technology is not the product contract. A `Render Backend` serves the Diagram Engine and can evolve from SVG to WebGPU without changing the engine's semantics.
+- **Menu Failure vs Visible Failure**: In this project, a WASM operation that returns `Err` must surface a visible diagnostics message — menu handlers that wrap engine calls are not allowed to discard the `Result`. The v0.77 layout bug stayed hidden for one full milestone because `editor.applyLayout()` returned `void` and the menu handler ignored the failure.
 
 ## Example Dialogue
 
