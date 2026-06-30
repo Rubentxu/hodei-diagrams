@@ -93,6 +93,8 @@ describe('ui', () => {
       onSelect: vi.fn(),
       onRename: vi.fn(),
       onDelete: vi.fn(),
+      onDuplicate: vi.fn(),
+      onMove: vi.fn(),
     };
 
     populatePageTabs(container, pages, 1, callbacks);
@@ -121,6 +123,8 @@ describe('ui', () => {
       onSelect: vi.fn(),
       onRename: vi.fn(),
       onDelete: vi.fn(),
+      onDuplicate: vi.fn(),
+      onMove: vi.fn(),
     };
 
     populatePageTabs(container, pages, 0, callbacks);

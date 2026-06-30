@@ -28,37 +28,29 @@ test.describe('Suite K: accessibility-keyboard', () => {
   });
 
   /**
-   * Test 2: Ctrl+G toggles grid
+   * Test 2 (IP-D): Ctrl+G no longer toggles grid (now means Group).
+   * Verify that pressing Ctrl+G with no selection does NOT toggle grid.
    */
-  test('Ctrl+G toggles grid', async ({ page }) => {
+  test('IP-D: Ctrl+G no longer toggles grid (now means Group)', async ({ page }) => {
     await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // Initially grid may or may not be visible (depends on localStorage)
     const canvasContainer = page.locator('[data-testid="canvas-container"]');
-    const gridInitiallyVisible = await canvasContainer.evaluate(
+    const gridBefore = await canvasContainer.evaluate(
       (el) => el.classList.contains('show-grid'),
     );
 
-    // Press Ctrl+G
+    // Press Ctrl+G — with 0 selection this is a no-op (no group)
     await page.keyboard.press('Control+g');
     await page.waitForTimeout(100);
 
-    // Grid should toggle
-    const gridAfterToggle = await canvasContainer.evaluate(
+    // Grid should be unchanged
+    const gridAfter = await canvasContainer.evaluate(
       (el) => el.classList.contains('show-grid'),
     );
-    expect(gridAfterToggle).toBe(!gridInitiallyVisible);
-
-    // Toggle back
-    await page.keyboard.press('Control+g');
-    await page.waitForTimeout(100);
-    const gridAfterSecondToggle = await canvasContainer.evaluate(
-      (el) => el.classList.contains('show-grid'),
-    );
-    expect(gridAfterSecondToggle).toBe(gridInitiallyVisible);
+    expect(gridAfter).toBe(gridBefore);
   });
 
   /**

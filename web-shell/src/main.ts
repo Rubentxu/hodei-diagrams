@@ -113,6 +113,11 @@ function toggleShortcutsOverlay(): void {
         <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Del</kbd> Delete</div>
         <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Z</kbd> Undo</div>
         <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Y</kbd> Redo</div>
+        <div style="margin-top: 4px; font-size: 11px; color: var(--text-dim);">— Edit —</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+G</kbd> Group</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Shift+U</kbd> Ungroup</div>
+        <div><kbd style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">Ctrl+Shift+G</kbd> Toggle snap</div>
+        <div style="font-size: 11px; color: var(--text-dim);">Grid: View &gt; Grid (no shortcut)</div>
       </div>
       <button id="close-shortcuts" style="
         margin-top: 16px; width: 100%; padding: 8px; background: var(--accent);
@@ -659,15 +664,11 @@ async function bootstrap(): Promise<void> {
   // ─── 14.7. App-level keyboard shortcuts ─────────────────────────────────
   // Cycle 16: previously duplicated editor-level shortcuts (Ctrl+Z/Y) here,
   // which caused a single keypress to fire undoCmd twice (editor.ts also
-  // registers a keydown handler on document at attach() time). Now this
-  // listener only handles app-level shortcuts: Ctrl+G grid, Ctrl+Shift+P
-  // presentation mode, Escape from presentation. Editor-level shortcuts
-  // (undo/redo/copy/paste/select-all/cut/delete/F2) live in editor.ts.
+  // registers a keydown handler on document at attach() time).
+  // IP-D (ADR-0080): Ctrl+G grid toggle moved to View > Grid menu only;
+  // Ctrl+G now means "Group" in the editor. Ctrl+Shift+P is presentation mode.
+  // Escape from presentation. Editor-level shortcuts live in editor.ts.
   document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
-      e.preventDefault();
-      toggleGrid();
-    }
     // Ctrl+Shift+P for presentation mode
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
       e.preventDefault();
@@ -836,6 +837,8 @@ async function bootstrap(): Promise<void> {
       onSelect: handlePageSelect,
       onRename: handlePageRename,
       onDelete: handlePageDelete,
+      onDuplicate: handlePageDuplicate,
+      onMove: handlePageMove,
     });
     ui.hud.setPage(1, activePages.length);
     ui.hud.setMode('Edit');
@@ -1043,6 +1046,8 @@ async function bootstrap(): Promise<void> {
         onSelect: handlePageSelect,
         onRename: handlePageRename,
         onDelete: handlePageDelete,
+        onDuplicate: handlePageDuplicate,
+        onMove: handlePageMove,
       });
     }
 
@@ -1104,6 +1109,8 @@ async function bootstrap(): Promise<void> {
       onSelect: handlePageSelect,
       onRename: handlePageRename,
       onDelete: handlePageDelete,
+      onDuplicate: handlePageDuplicate,
+      onMove: handlePageMove,
     });
     // Update HUD page info
     ui.hud.setPage(idx + 1, activePages.length);
@@ -1215,6 +1222,43 @@ async function bootstrap(): Promise<void> {
     ui.zoomDisplay.textContent = '100%';
     ui.hud.setZoom(100);
     ui.canvasContainer.style.setProperty('--zoom', '1');
+  }
+
+  /** IP-D: Duplicate the current page. Wraps the editor's duplicateActivePage. */
+  function handlePageDuplicate(_pageIdNum: number): void {
+    if (!activeEditor) return;
+    const ok = activeEditor.duplicateActivePage();
+    if (!ok) {
+      showError(ui.errorBanner, ui.errorMessage, 'Duplicate page failed');
+      return;
+    }
+    // The editor switched to the new page; refresh the tab bar.
+    refreshPageTabs();
+    if (activeEditor.activePageIdx !== undefined) {
+      activeEditorIdx = activeEditor.activePageIdx;
+    }
+    const newPage = activePages[activeEditorIdx];
+    if (newPage) {
+      const svg = activeSession?.getPage(newPage.pageId);
+      if (svg) mountSvg(ui.viewer, svg);
+      refreshMathOverlay();
+    }
+    ui.hud.setPage(activeEditorIdx + 1, activePages.length);
+  }
+
+  /** IP-D: Move the current page left or right. Best-effort in IP-D. */
+  function handlePageMove(_pageIdNum: number, direction: 'left' | 'right'): void {
+    if (!activeEditor) return;
+    const ok = activeEditor.moveActivePage(direction);
+    if (!ok) {
+      showError(
+        ui.errorBanner,
+        ui.errorMessage,
+        'Move page is best-effort only in IP-D — proper reorder is deferred to IP-E.',
+      );
+      return;
+    }
+    refreshPageTabs();
   }
 
   // ─── 8. Wire file input (from navbar File > Open) ─────────────────────────
