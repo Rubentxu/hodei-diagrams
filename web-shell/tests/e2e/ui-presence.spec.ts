@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -7,8 +8,7 @@ const SIMPLE_RECT_PATH =
 test.describe('Slice A: Product Presence UI', () => {
   test.describe('Zone 0: Left Rail', () => {
     test('rail is visible with 6 tool buttons', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const rail = page.locator('[data-testid="rail"]');
       await expect(rail).toBeVisible();
@@ -23,24 +23,21 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('rail separator is visible between tools and Help section', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const separator = page.locator('[data-testid="rail-separator"]');
       await expect(separator).toBeVisible();
     });
 
     test('select tool is active by default', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const selectBtn = page.locator('[data-testid="rail-select-btn"]');
       await expect(selectBtn).toHaveClass(/active/);
     });
 
     test('tool buttons have tooltips', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await expect(page.locator('[data-testid="rail-select-btn"]')).toHaveAttribute('title', 'Select (V)');
       await expect(page.locator('[data-testid="rail-shapes-btn"]')).toHaveAttribute('title', 'Shapes (R)');
@@ -51,8 +48,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('only one rail tool is active at a time', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Click each tool and verify only that one is active
       for (const btn of [
@@ -84,8 +80,7 @@ test.describe('Slice A: Product Presence UI', () => {
 
   test.describe('Zone 1: Top Bar', () => {
     test('navbar brand "Hodei" is visible', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const brand = page.locator('[data-testid="navbar-brand"]');
       await expect(brand).toBeVisible();
@@ -95,8 +90,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('menu items have hover states', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Menu dropdowns work
       await page.locator('[data-testid="menu-file"] summary').hover();
@@ -104,8 +98,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('quick controls grouped with separators', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Undo/redo/zoom/save buttons present
       await expect(page.locator('[data-testid="undo-btn"]')).toBeVisible();
@@ -117,8 +110,7 @@ test.describe('Slice A: Product Presence UI', () => {
 
   test.describe('Zone 2: Sidebar', () => {
     test('search bar has search icon', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Search input exists with placeholder
       const search = page.locator('[data-testid="sidebar-search"]');
@@ -127,8 +119,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('category headers have chevron indicators', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // General category has a chevron
       const chevrons = page.locator('.category-chevron');
@@ -136,8 +127,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('future categories show lock icon and "Soon"', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Disabled categories have coming-soon div (not the count badge span) with text "Soon"
       const comingSoon = page.locator('.shape-category.disabled div.category-coming-soon');
@@ -146,8 +136,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('three shape buttons visible in General category', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await expect(page.locator('[data-testid="rect-tool-btn"]')).toBeVisible();
       await expect(page.locator('[data-testid="rounded-rect-tool-btn"]')).toBeVisible();
@@ -157,8 +146,7 @@ test.describe('Slice A: Product Presence UI', () => {
 
   test.describe('Zone 4: Inspector', () => {
     test('empty state shows guidance message with icon', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Style pane has the empty state visible by default
       const stylePane = page.locator('[data-testid="inspector-pane-style"]');
@@ -169,8 +157,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('Arrange tab empty state shows icon, guidance, and actionable hint', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Click Arrange tab
       await page.locator('[data-testid="inspector-tab-arrange"]').click();
@@ -185,8 +172,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('Text tab empty state shows icon, guidance, and actionable hint', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Click Text tab
       await page.locator('[data-testid="inspector-tab-text"]').click();
@@ -201,8 +187,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('effect-section testids are preserved (shadow/glass/gradient structurally unchanged)', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Verify all effect-section testids still resolve
       await expect(page.locator('[data-testid="inspector-shadow-section"]')).toBeAttached();
@@ -220,16 +205,14 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('style tab has section headers', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const sections = page.locator('.inspector-section-title');
       expect(await sections.count()).toBeGreaterThan(0);
     });
 
     test('inspector tabs have clear active state', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const styleTab = page.locator('[data-testid="inspector-tab-style"]');
       await expect(styleTab).toHaveClass(/active/);
@@ -238,8 +221,7 @@ test.describe('Slice A: Product Presence UI', () => {
 
   test.describe('Zone 5: Bottom Bar', () => {
     test('page tabs have accent underline when active', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -250,24 +232,21 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('diagnostics area is present', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const diagnostics = page.locator('[data-testid="error-banner"]');
       await expect(diagnostics).toBeAttached();
     });
 
     test('diagnostics badge hidden on fresh load (idle state)', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const badge = page.locator('[data-testid="diagnostics-badge"]');
       await expect(badge).toBeHidden();
     });
 
     test('diagnostics badge shows clean state after successful import', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -279,8 +258,7 @@ test.describe('Slice A: Product Presence UI', () => {
     });
 
     test('page-tab-add affordance is visible', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const addBtn = page.locator('[data-testid="page-tab-add"]');
       await expect(addBtn).toBeVisible();
@@ -290,8 +268,7 @@ test.describe('Slice A: Product Presence UI', () => {
 
   test.describe('CSS Grid Layout', () => {
     test('app uses 4-column grid with rail', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const app = page.locator('[data-testid="app-grid"]');
       await expect(app).toBeVisible();
@@ -304,8 +281,7 @@ test.describe('Slice A: Product Presence UI', () => {
 
     test('canvas fills remaining space', async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 768 });
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const viewer = page.locator('[data-testid="viewer"]');
       const box = await viewer.boundingBox();

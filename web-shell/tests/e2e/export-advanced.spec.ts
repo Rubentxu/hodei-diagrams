@@ -97,8 +97,7 @@ test.describe('Suite H: export-advanced', () => {
    * Test 4: Export SVG from second page → output changes to second page content
    */
   test('Export SVG from second page → output reflects second page content', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_PAGE_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -153,8 +152,7 @@ test.describe('Suite H: export-advanced', () => {
    * Test 6: Export PNG → downloaded file is a valid PNG
    */
   test('Export PNG → downloaded file is a valid PNG', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -180,8 +178,7 @@ test.describe('Suite H: export-advanced', () => {
    * Test 7: PNG export menu item is enabled and has correct tooltip
    */
   test('PNG export menu item is enabled and has correct tooltip', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.locator('[data-testid="menu-file"] summary').click();
     await page.waitForTimeout(100);

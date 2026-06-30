@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -13,8 +14,7 @@ test.describe('Suite: inspector-shadow', () => {
    * Test 1: Shadow section exists and has required controls
    */
   test('Shadow section has all required controls', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -42,8 +42,7 @@ test.describe('Suite: inspector-shadow', () => {
    * Test 2: Shadow section is disabled when no shape selected
    */
   test('No selection → shadow section disabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -61,8 +60,7 @@ test.describe('Suite: inspector-shadow', () => {
    * Test 3: Shadow toggle is unchecked initially
    */
   test('Shadow toggle unchecked initially', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -82,8 +80,7 @@ test.describe('Suite: inspector-shadow', () => {
    * Test 4: Shadow section body is hidden when toggle is off
    */
   test('Shadow body hidden when toggle is off', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

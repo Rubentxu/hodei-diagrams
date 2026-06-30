@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -13,8 +14,7 @@ test.describe('Suite: inspector-glass', () => {
    * Test 1: Glass section exists and has required controls
    */
   test('Glass section has all required controls', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -39,8 +39,7 @@ test.describe('Suite: inspector-glass', () => {
    * Test 2: Glass section is disabled when no shape selected
    */
   test('No selection → glass section disabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -58,8 +57,7 @@ test.describe('Suite: inspector-glass', () => {
    * Test 3: Glass toggle is unchecked initially
    */
   test('Glass toggle unchecked initially', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -79,8 +77,7 @@ test.describe('Suite: inspector-glass', () => {
    * Test 4: Glass section body is hidden when toggle is off
    */
   test('Glass body hidden when toggle is off', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -100,8 +97,7 @@ test.describe('Suite: inspector-glass', () => {
    * Test 5: Glass section body is visible when toggle is on
    */
   test('Glass body visible when toggle is on', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -131,8 +127,7 @@ test.describe('Suite: inspector-glass', () => {
    * Test 6: Glass opacity slider updates value display
    */
   test('Glass opacity slider updates value display', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

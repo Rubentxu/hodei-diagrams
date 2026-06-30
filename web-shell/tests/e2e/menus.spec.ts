@@ -9,6 +9,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -16,8 +17,7 @@ const SIMPLE_RECT_PATH =
 
 test.describe('Arrange menu', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
   });
 
   test('Arrange menu is present in menubar', async ({ page }) => {
@@ -27,8 +27,7 @@ test.describe('Arrange menu', () => {
   });
 
   test('Arrange > To Front dispatches BringToFront command', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Dismiss any pre-existing error banner from previous fixtures/tests
     const dismissBtn = page.locator('[data-testid="dismiss-error"]');
@@ -72,8 +71,7 @@ test.describe('Arrange menu', () => {
   });
 
   test('Arrange > Align submenu has 6 items', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Open Arrange menu
     await page.click('[data-testid="menu-arrange"] summary');
@@ -92,8 +90,7 @@ test.describe('Arrange menu', () => {
   });
 
   test('Arrange > Distribute has 2 items', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-arrange"] summary');
     await page.hover('[data-testid="menu-arrange-distribute"]');
@@ -104,8 +101,7 @@ test.describe('Arrange menu', () => {
   });
 
   test('Arrange > Rotate has 2 items', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-arrange"] summary');
     await page.hover('[data-testid="menu-arrange-rotate"]');
@@ -116,8 +112,7 @@ test.describe('Arrange menu', () => {
   });
 
   test('Arrange > Flip has 2 items', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-arrange"] summary');
     await page.hover('[data-testid="menu-arrange-flip"]');
@@ -130,13 +125,11 @@ test.describe('Arrange menu', () => {
 
 test.describe('Disabled items', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
   });
 
   test('Arrange > Group is enabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-arrange"] summary');
     const groupItem = page.locator('[data-testid="menu-group"]');
@@ -146,8 +139,7 @@ test.describe('Disabled items', () => {
   });
 
   test('Arrange > Ungroup is enabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-arrange"] summary');
     const ungroupItem = page.locator('[data-testid="menu-ungroup"]');
@@ -160,8 +152,7 @@ test.describe('Disabled items', () => {
   });
 
   test('Extras > Edit XML is enabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-extras"] summary');
     const editXmlItem = page.locator('[data-testid="menu-edit-xml"]');
@@ -171,8 +162,7 @@ test.describe('Disabled items', () => {
   });
 
   test('Extras > Copy as SVG copies SVG to clipboard', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load simple-rect.drawio so there's SVG to copy
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -195,8 +185,7 @@ test.describe('Disabled items', () => {
   });
 
   test('Extras > Preferences is disabled with tooltip', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-extras"] summary');
     const preferencesItem = page.locator('[data-testid="menu-preferences"]');
@@ -206,8 +195,7 @@ test.describe('Disabled items', () => {
   });
 
   test('Clicking disabled item does not dispatch command (no-op)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Spy on console.error to detect command dispatch attempts
     const errors: string[] = [];
@@ -227,8 +215,7 @@ test.describe('Disabled items', () => {
 
 test.describe('Help menu', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
   });
 
   test('Help > Keyboard Shortcuts opens overlay', async ({ page }) => {
@@ -241,8 +228,7 @@ test.describe('Help menu', () => {
   });
 
   test('Help > Keyboard Shortcuts toggles overlay (close on second click)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // First open: Help menu → Keyboard Shortcuts
     await page.click('[data-testid="menu-help"] summary');
@@ -271,8 +257,7 @@ test.describe('Help menu', () => {
   });
 
   test('Help > About opens dialog with app metadata', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.click('[data-testid="menu-help"] summary');
     await page.click('[data-testid="menu-about"]');
@@ -286,8 +271,7 @@ test.describe('Help menu', () => {
   });
 
   test('About dialog Close button removes it', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Open dialog
     await page.click('[data-testid="menu-help"] summary');
@@ -308,13 +292,11 @@ test.describe('Help menu', () => {
 
 test.describe('Z-order dispatch shape (CellTarget JSON)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
   });
 
   test('5.5.1: To Front dispatches BringToFront with Vertex CellTarget', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const dismissBtn = page.locator('[data-testid="dismiss-error"]');
     if (await dismissBtn.isVisible().catch(() => false)) {
@@ -351,8 +333,7 @@ test.describe('Z-order dispatch shape (CellTarget JSON)', () => {
   });
 
   test('5.5.2: To Back dispatches SendToBack with Vertex CellTarget', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const dismissBtn = page.locator('[data-testid="dismiss-error"]');
     if (await dismissBtn.isVisible().catch(() => false)) {
@@ -380,8 +361,7 @@ test.describe('Z-order dispatch shape (CellTarget JSON)', () => {
   });
 
   test('5.5.3: Forward dispatches BringForward', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const dismissBtn = page.locator('[data-testid="dismiss-error"]');
     if (await dismissBtn.isVisible().catch(() => false)) {
@@ -409,8 +389,7 @@ test.describe('Z-order dispatch shape (CellTarget JSON)', () => {
   });
 
   test('5.5.4: Backward dispatches SendBackward', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const dismissBtn = page.locator('[data-testid="dismiss-error"]');
     if (await dismissBtn.isVisible().catch(() => false)) {
@@ -440,8 +419,7 @@ test.describe('Z-order dispatch shape (CellTarget JSON)', () => {
 
 test.describe('Multi-selection atomicity', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     // Clear IndexedDB
     await page.evaluate(() => {
       indexedDB.deleteDatabase('hodei-diagrams');
@@ -450,8 +428,7 @@ test.describe('Multi-selection atomicity', () => {
   });
 
   test('6.6.1: BringToFront on 2 selected shapes produces 1 undo entry', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const dismissBtn = page.locator('[data-testid="dismiss-error"]');
     if (await dismissBtn.isVisible().catch(() => false)) {

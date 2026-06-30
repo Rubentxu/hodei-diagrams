@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const TWO_SHAPES_PATH =
@@ -21,8 +22,7 @@ async function clickArrangeTab(page: Page): Promise<void> {
 test.describe('Phase 7 — Snap/Align', () => {
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForTimeout(500);
   });
 

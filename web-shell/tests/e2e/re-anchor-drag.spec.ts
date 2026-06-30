@@ -10,6 +10,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const TWO_SHAPES =
@@ -17,8 +18,7 @@ const TWO_SHAPES =
 
 test.describe('Phase B: re-anchor-drag', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
   });
 
   // ─────────────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -16,8 +17,7 @@ const SIMPLE_RECT_PATH =
 test.describe('Version History', () => {
   // ─── Task 3.7.1: isolate storage state per test ────────────────────────────
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     // Non-blocking IndexedDB cleanup
     await page.evaluate(() => {
       indexedDB.deleteDatabase('hodei-diagrams');
@@ -27,8 +27,7 @@ test.describe('Version History', () => {
 
   // ─── Task 3.7.2: creates from-scratch diagram and saves version ─────────────────
   test('creates from-scratch diagram and saves version', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Open a simple diagram first to have something to save
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -72,8 +71,7 @@ test.describe('Version History', () => {
 
   // ─── Task 3.7.3: survives page reload ─────────────────────────────────────────
   test('survives page reload — timeline persists in IndexedDB', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load diagram and save a version
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -105,8 +103,7 @@ test.describe('Version History', () => {
 
   // ─── Task 3.7.4: auto-save fires after 31s idle ──────────────────────────────
   test('auto-save fires after idle window', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load diagram
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -133,8 +130,7 @@ test.describe('Version History', () => {
 
   // ─── Task 3.7.5: restore replaces model with older snapshot ────────────────────
   test('restore replaces model with older snapshot', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load diagram and save v1 (1 rectangle)
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -193,8 +189,7 @@ test.describe('Version History', () => {
 
   // ─── Task 3.7.6: delete removes version ────────────────────────────────────────
   test('delete removes version from timeline', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load diagram and save 2 versions
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);

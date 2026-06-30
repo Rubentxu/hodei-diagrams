@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -11,8 +12,7 @@ test.describe('Suite L: performance', () => {
    * Test 1: Load aws-admision.drawio (4MB) completes and renders within 3 seconds
    */
   test('Load aws-admision.drawio (4MB) completes and renders within 3 seconds', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const start = Date.now();
 
@@ -31,8 +31,7 @@ test.describe('Suite L: performance', () => {
    * Test 2: Create 20 shapes within a bounded time and app stays responsive
    */
   test('Create 20 shapes within a bounded time and app stays responsive', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -71,8 +70,7 @@ test.describe('Suite L: performance', () => {
    * Test 3: Zoom to 200% updates within 500ms
    */
   test('Zoom to 200% updates within 500ms', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -107,8 +105,7 @@ test.describe('Suite L: performance', () => {
    * Test 4: Pan interaction completes without visible crash and transform updates quickly
    */
   test('Pan interaction completes without crash and transform updates quickly', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

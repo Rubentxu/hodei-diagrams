@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -9,8 +10,7 @@ test.describe('Suite: toolbar', () => {
    * Test 1: Toolbar renders all 7 buttons
    */
   test('Toolbar renders all 7 buttons', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -32,8 +32,7 @@ test.describe('Suite: toolbar', () => {
    * Test 2: Toolbar buttons are disabled without selection
    */
   test('Toolbar buttons are disabled without selection', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -52,8 +51,7 @@ test.describe('Suite: toolbar', () => {
    * Test 3: Toolbar buttons are enabled with selection
    */
   test('Toolbar buttons are enabled with selection', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -79,8 +77,7 @@ test.describe('Suite: toolbar', () => {
    * Test 4: Fill color changes SVG fill
    */
   test('Fill color changes SVG fill attribute', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -110,8 +107,7 @@ test.describe('Suite: toolbar', () => {
    * Test 5: Stroke color changes SVG stroke
    */
   test('Stroke color changes SVG stroke attribute', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -141,8 +137,7 @@ test.describe('Suite: toolbar', () => {
    * Test 6: Bold toggle adds --active class and changes style
    */
   test('Bold toggle adds active class when enabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -170,8 +165,7 @@ test.describe('Suite: toolbar', () => {
    * Test 7: Italic toggle adds --active class
    */
   test('Italic toggle adds active class when enabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -199,8 +193,7 @@ test.describe('Suite: toolbar', () => {
    * Test 8: Delete button removes shape from canvas
    */
   test('Delete button removes shape from canvas', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -229,8 +222,7 @@ test.describe('Suite: toolbar', () => {
    * Test 9: To Front button brings shape to front
    */
   test('To Front button changes z-order', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -254,8 +246,7 @@ test.describe('Suite: toolbar', () => {
    * Test 10: To Back button sends shape to back
    */
   test('To Back button changes z-order', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

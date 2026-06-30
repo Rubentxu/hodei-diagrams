@@ -24,14 +24,14 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const EDGE_LABEL_PATH = fixturePath('two-shapes-with-edge-label.drawio');
 
 test.describe('Suite LABEL: edge label rendering (ADR-0075)', () => {
   test('LABEL-001: edge label renders as <text data-edge-label>', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', EDGE_LABEL_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -50,8 +50,7 @@ test.describe('Suite LABEL: edge label rendering (ADR-0075)', () => {
   });
 
   test('LABEL-002: default label anchor is the edge midpoint', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', EDGE_LABEL_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 

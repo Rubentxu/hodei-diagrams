@@ -80,8 +80,7 @@ test.describe('viewer-only web shell', () => {
   });
 
   test('SVG cache invalidates after command mutation', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

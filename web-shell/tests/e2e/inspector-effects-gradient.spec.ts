@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -13,8 +14,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 1: Gradient section exists and has required controls
    */
   test('Gradient section has all required controls', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -42,8 +42,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 2: Gradient section is disabled when no shape selected
    */
   test('No selection → gradient section disabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -61,8 +60,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 3: Gradient toggle is unchecked initially
    */
   test('Gradient toggle unchecked initially', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -82,8 +80,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 4: Gradient section body is hidden when toggle is off
    */
   test('Gradient body hidden when toggle is off', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -103,8 +100,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 5: Gradient section body is visible when toggle is on
    */
   test('Gradient body visible when toggle is on', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -134,8 +130,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 6: Gradient type selector shows linear and radial options
    */
   test('Gradient type selector has linear and radial options', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -169,8 +164,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 7: Gradient angle slider updates value display
    */
   test('Gradient angle slider updates value display', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -205,8 +199,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 8: Gradient angle row hidden when radial is selected
    */
   test('Gradient angle row hidden when radial selected', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -244,8 +237,7 @@ test.describe('Suite: inspector-gradient', () => {
    * Test 9: Gradient color stops have correct default values
    */
   test('Gradient color stops have correct default values', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

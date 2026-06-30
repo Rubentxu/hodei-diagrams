@@ -17,13 +17,13 @@
 
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 const SIMPLE_RECT_PATH = fixturePath('simple-rect.drawio');
 
 test.describe('Suite EXML: Edit XML dialog (PR #111, ADR-0075)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
   });

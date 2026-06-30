@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -12,8 +13,7 @@ test.describe('Suite F: text-editing', () => {
    * SVG elements, so we use dispatchEvent('dblclick') instead.
    */
   test('Double click on shape enters inline edit mode', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -39,8 +39,7 @@ test.describe('Suite F: text-editing', () => {
    * Test 2: Enter commits text change and exits edit mode.
    */
   test('Enter commits text change', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -71,8 +70,7 @@ test.describe('Suite F: text-editing', () => {
    * The input overlay closes and no EditVertexLabel command is dispatched.
    */
   test('Escape cancels text edit', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -104,8 +102,7 @@ test.describe('Suite F: text-editing', () => {
    * Test 4: Blur (click outside) commits text change.
    */
   test('Click outside commits text change', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -138,8 +135,7 @@ test.describe('Suite F: text-editing', () => {
    * Test 5: Empty text can be committed (no crash).
    */
   test('Empty label allowed', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -168,8 +164,7 @@ test.describe('Suite F: text-editing', () => {
    * After committing with Enter, the shape still has the label in the DOM.
    */
   test('Edited text persists after re-render', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

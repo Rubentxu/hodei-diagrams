@@ -8,6 +8,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -17,8 +18,7 @@ const MULTI_SHAPES_PATH =
 
 test.describe('Editor: feature coverage audit', () => {
   test('Arrange > Bring to Front reorders vertices (visual ordering)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -41,8 +41,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Arrange > Send to Back reorders vertices', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -60,8 +59,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Arrange > Group creates a group from 2+ selected shapes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -79,8 +77,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Arrange > Layouts: Hierarchical layout runs without error', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -108,8 +105,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Edit > Properties dialog opens and has expected tabs', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
 
@@ -125,8 +121,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Insert > Math Formula opens dialog and inserts vertex', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
 
@@ -153,8 +148,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Extras > Edit XML opens a dialog with the current .drawio XML', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
 
@@ -173,8 +167,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Inspector Style tab is interactive: change fill color updates the shape', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -206,8 +199,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Selecting 2+ shapes enables Group button in toolbar', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -223,8 +215,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Right-click on empty canvas shows context menu with Paste / Select All', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
 
@@ -245,8 +236,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Add page via + button increases page count in HUD', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
 
@@ -261,8 +251,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Delete a page removes it', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
 
@@ -290,8 +279,7 @@ test.describe('Editor: feature coverage audit', () => {
   });
 
   test('Ctrl+0 resets zoom to 100%', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
 

@@ -18,6 +18,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 type PerfSession = {
   importDrawio(xml: string): { ok: boolean };
@@ -54,8 +55,7 @@ test.describe('Phase 4 — scale performance', () => {
       }
     });
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.evaluate(() => {
       (window as unknown as { __perf: Measurement[] }).__perf = [];
     });
@@ -152,8 +152,7 @@ test.describe('Phase 4 — scale performance', () => {
   });
 
   test('fixture sizes sanity', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     for (const fix of SCALE_FIXTURES) {
       const resp = await page.request.get(`/fixtures/${fix.name}.drawio`);
