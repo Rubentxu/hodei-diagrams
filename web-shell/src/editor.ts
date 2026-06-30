@@ -770,40 +770,61 @@ export class Editor {
    * After moving vertices, edges retain their old waypoints. This function recomputes
    * orthogonal routes for all edges on the first page and commits the results as a
    * single atomic transaction (one undo reverts all).
+   *
+   * Errors are surfaced through `#onError` (which funnels into the diagnostics
+   * surface). Returns `Result<void, EngineError>` for callers that want to
+   * propagate explicitly.
    */
-  routeAllEdges(): void {
-    this.#session.routeAllEdges();
+  routeAllEdges(): Result<void, EngineError> {
+    const result = this.#session.routeAllEdges();
+    if (!result.ok) {
+      this.#onError(result.error);
+      return result;
+    }
+    this.#replay();
+    return result;
   }
 
   /**
    * Insert a Z-bend into an edge at a click position on the given segment.
-   * @param edgeId The edge's SlotmapId
-   * @param segmentIndex The waypoint segment index
-   * @param x Click X coordinate in document space
-   * @param y Click Y coordinate in document space
+   *
+   * Errors from `session.insertBend` are surfaced via `#onError`. Returns
+   * `Result<void, EngineError>` for callers that want to propagate explicitly.
    */
-  insertBend(edgeId: SlotmapId, segmentIndex: number, x: number, y: number): void {
-    this.#session.insertBend(edgeId, segmentIndex, x, y);
+  insertBend(edgeId: SlotmapId, segmentIndex: number, x: number, y: number): Result<void, EngineError> {
+    const result = this.#session.insertBend(edgeId, segmentIndex, x, y);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return result;
+    }
+    this.#replay();
+    return result;
   }
 
   /**
-   * Move an existing bend point to a new position.
-   * @param edgeId The edge's SlotmapId
-   * @param bendIndex The waypoint index of the bend to move
-   * @param x New X coordinate in document space
-   * @param y New Y coordinate in document space
+   * Move an existing bend point to a new position. Returns `Result<void, EngineError>`.
    */
-  moveBend(edgeId: SlotmapId, bendIndex: number, x: number, y: number): void {
-    this.#session.moveBend(edgeId, bendIndex, x, y);
+  moveBend(edgeId: SlotmapId, bendIndex: number, x: number, y: number): Result<void, EngineError> {
+    const result = this.#session.moveBend(edgeId, bendIndex, x, y);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return result;
+    }
+    this.#replay();
+    return result;
   }
 
   /**
-   * Remove a bend point from an edge.
-   * @param edgeId The edge's SlotmapId
-   * @param bendIndex The waypoint index of the bend to remove
+   * Remove a bend point from an edge. Returns `Result<void, EngineError>`.
    */
-  removeBend(edgeId: SlotmapId, bendIndex: number): void {
-    this.#session.removeBend(edgeId, bendIndex);
+  removeBend(edgeId: SlotmapId, bendIndex: number): Result<void, EngineError> {
+    const result = this.#session.removeBend(edgeId, bendIndex);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return result;
+    }
+    this.#replay();
+    return result;
   }
 
   // ─── Active Tool ──────────────────────────────────────────────────────────
@@ -1239,7 +1260,10 @@ export class Editor {
         }),
       );
     }
-    this.#session.executeTransaction(commands);
+    // Use this.executeTransaction (the editor wrapper) instead of
+    // session.executeTransaction, so the Result is properly funneled
+    // through #onError → diagnostics instead of silently discarded.
+    this.executeTransaction(commands);
     this.#replay();
   }
 
@@ -1257,7 +1281,7 @@ export class Editor {
         }),
       );
     }
-    this.#session.executeTransaction(commands);
+    this.executeTransaction(commands);
     this.#replay();
   }
 
@@ -1308,7 +1332,7 @@ export class Editor {
     }
 
     if (commands.length === 0) return;
-    this.#session.executeTransaction(commands);
+    this.executeTransaction(commands);
     this.#replay();
   }
 
@@ -1362,7 +1386,7 @@ export class Editor {
     }
 
     if (commands.length === 0) return;
-    this.#session.executeTransaction(commands);
+    this.executeTransaction(commands);
     this.#replay();
   }
 
@@ -1418,7 +1442,7 @@ export class Editor {
     }
 
     if (commands.length === 0) return;
-    this.#session.executeTransaction(commands);
+    this.executeTransaction(commands);
     this.#replay();
   }
 

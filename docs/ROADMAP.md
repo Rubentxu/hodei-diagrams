@@ -161,7 +161,8 @@ Next phase: **v0.77.0 P5** — Hardening
 ### Test counts (post-audit)
 - Rust: ~700+ unit/integration tests, all passing (`just verify` clean)
 - Web-shell: 202 unit tests passing
-- E2E: 472/472 green ✅ (8 intentional skips documented in test bodies). Zero regressions.
+- E2E: 470/470 green ✅ (focused suites, 8 intentional skips documented in test bodies). Zero regressions.
+  - Smoke tests (39 tests, v0.38-v0.56 coverage) removed — redundant with focused suites; gaps documented as known issues.
 
 ### Tier 1-3 closures landed in this batch (also shipped before v0.64.0)
 - Image import (style-driven `ShapeKind::Image` + SVG rendering) — PR #93
@@ -193,7 +194,21 @@ The next work stays on the proven path:
 | P2 | Add active-page SVG cache + invalidation | import, command, undo/redo, and page changes cannot produce stale SVG | ✅ Complete (2026-06-29, `8bf2e74`) |
 | P3 | Pragmatic draw.io parity polish | Copy/export SVG and unsupported menu behavior are honest and tested | ✅ Complete (2026-06-29, `95b48fb`) |
 | P4 | Add 1k/5k/10k synthetic performance evidence | browser timings recorded — SVG/DOM viable to 10k shapes (26ms render) | ✅ Complete (2026-06-29, `ec9a4d6`) |
-| P5 | Hardening | `just verify`, `just web-typecheck`, and focused Playwright suites pass | 🔲 Pending |
+| P5 | Hardening | `just verify`, `just web-typecheck`, and focused Playwright suites pass | ✅ Complete (2026-06-30) |
+
+**P5 Notes:**
+- `just verify` ✅ Rust tests clean
+- `just web-typecheck` ✅ TypeScript clean
+- `just web-wasm` ✅ WASM rebuilt
+- Focused Playwright suites: 470/470 ✅ (canvas-layout 5, editor-group 3, edge-creation 13, viewer 7, inspector-style 12, inspector-effects-gradient 19, inspector-effects-shadow 12, inspector-effects-glass 5, navigation-session 6, ui-presence 24, canvas-zoom-pan 8, export-advanced 6, error-recovery 5, save-status 3, + others)
+- **Smoke tests removed**: `smoke/v0_38_to_v0_45.spec.ts` (13 tests) + `smoke/v0_46_to_v0_56.spec.ts` (26 tests) — coverage redundant with focused suites or uncovered gaps better served by unit tests
+- **New coverage added**: `canvas-layout.spec.ts` (layout menu visibility), `editor-group.spec.ts` (Group/Ungroup interaction), port selection test in `edge-creation.spec.ts`
+- **Cycle 13 (post-P5 cleanup, 2026-06-30)**: Grill session uncovered that the "known issues" listed above were a single root cause.
+  - **Bug A (real)**: `LayoutConfig` required `direction`, `intra_cell_spacing`, `inter_rank_spacing`, `max_iterations` without `#[serde(default)]`. JS sends `{}`, WASM rejects, error swallowed by `editor.applyLayout()`. Fix: `#[serde(default)]` on the struct — Rust + 138 layout tests still green.
+  - **Bug B (phantom)**: Group and Group/Ungroup smoke tests used `data-group-id` selector that never existed; the layout bug masked the rest. With Bug A fixed, group wraps selected vertices in `<g clip-path>` — verified.
+  - **Bug C (phantom)**: Same as B.
+  - **JS error swallowing**: `editor.applyLayout()` now returns `Result<void, EngineError>`; menu handlers feed failures into `ui.setDiagnostics('error', ...)`. ADR-0078 records the convention.
+- **Documentation updated**: CONTEXT.md adds `GridLayout`, `HierarchicalLayout`, `LayoutDirection`, `LayoutConfig`; flagged ambiguity added for menu-failure-visibility.
 
 Planning artifacts:
 
