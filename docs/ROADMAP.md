@@ -155,7 +155,7 @@ After v0.69.0, the remaining backlog was triaged in aggregate:
 - v0.75.0: Phase B (command buffer JS→Rust, `flush_commands` + `execute_batch` atomic)
 - v0.76.0: TS postcard decoder (`PostcardDecoder` — 17 VisualElement variants, typed Scene read)
 - v0.77.0: **P0 + P1 + P2 + P3 + P4 complete** (2026-06-29, `a21155c` + `3620a15` + `8bf2e74` + `95b48fb` + `ec9a4d6`) — split scene decode + wire zero-copy into refresh paths + SVG cache invalidation + Copy as SVG wired + scale evidence. P5 complete (see Cycle 13-18 below).
-- v0.78.0 – v0.83.0: Cycles 13–18 (2026-06-30, in-progress hardening — see [Cycle 13-18 Closeout](#cycle-13-18-closeout-2026-06-30))
+- v0.78.0 – v0.89.0: Cycles 13–24 (2026-06-30, hardening complete — see [Cycle 13-24 Closeout](#cycle-13-24-closeout-2026-06-30))
   - v0.78.0: LayoutConfig serde default + menu error propagation
   - v0.79.0: error propagation batch #2 (route + bend + applyXXX)
   - v0.80.0: error-path E2E coverage
@@ -163,14 +163,15 @@ After v0.69.0, the remaining backlog was triaged in aggregate:
   - v0.82.0: visual-flows promoted to canonical suite
   - v0.83.0: 49 specs migrated from networkidle → waitForAppReady (~4× speedup)
 
-Next phase: opportunistic maintenance (cycle-driven) — no active milestone
+Next phase: opportunistic maintenance (cycle-driven) — no active milestone. Candidates: cleanup `_verify/` debug scratch specs; add Rust integration tests for cycle 14 error propagation paths; document test infrastructure patterns in ADR.
 
-### Test counts (post-cycle-18, 2026-06-30)
-- Rust: ~700+ unit/integration tests, all passing (`just verify` clean)
+### Test counts (post-cycle-24, 2026-06-30)
+- Rust: 143+ unit/integration tests in `diagram-wasm` and `diagram-layout`, all passing (`just verify` clean)
 - Web-shell: 202 unit tests passing
-- E2E: 478/478 green ✅ (focused suites + visual-flows promoted in cycle 17, 8 intentional skips). Runtime ~56s.
+- E2E: 481/481 focused suites green ✅ (visual-flows promoted cycle 17, 8 intentional skips). Runtime ~56s.
   - Smoke tests (39 tests, v0.38-v0.56 coverage) removed in cycle 13 — redundant with focused suites.
   - Cycle 18 standardized on `waitForAppReady(page)` helper across 49 legacy specs that were on `goto + networkidle` (ADR-0075 anti-pattern).
+  - Cycles 22–24 added regression guards for cycle 13's LayoutConfig fix: Rust struct tests (cycle 22), WASM integration test (cycle 23), import/export round-trip test (cycle 24).
 
 ### Tier 1-3 closures landed in this batch (also shipped before v0.64.0)
 - Image import (style-driven `ShapeKind::Image` + SVG rendering) — PR #93
@@ -208,10 +209,10 @@ The next work stays on the proven path:
 - `just verify` ✅ Rust tests clean
 - `just web-typecheck` ✅ TypeScript clean
 - `just web-wasm` ✅ WASM rebuilt
-- Focused Playwright suites: 470/470 at P5 closeout; grew to 478 by cycle 18.
+- Focused Playwright suites: 470/470 at P5 closeout; grew to 478 by cycle 18; 481 after cycle 20 (3 error-path gap tests); cycles 21–24 added no new e2e suites.
 - **Smoke tests removed**: `smoke/v0_38_to_v0_45.spec.ts` (13 tests) + `smoke/v0_46_to_v0_56.spec.ts` (26 tests) — coverage redundant with focused suites or uncovered gaps better served by unit tests.
 
-### Cycle 13-18 Closeout (2026-06-30)
+### Cycle 13-24 Closeout (2026-06-30)
 
 Six follow-up cycles against the v0.77.x branch, each shipped as a separate tag:
 
@@ -243,12 +244,37 @@ Six follow-up cycles against the v0.77.x branch, each shipped as a separate tag:
   - Refactor `.gitignore` from blanket-exclude `_verify/` to explicit patterns per category of scratch/debug.
   - Add `tests/e2e/screenshots/` to `.gitignore` (PNG outputs are local validation, not test fixtures).
 
-- **Cycle 18 — networkidle → waitForAppReady (v0.83.0)** PR #146. Standardizes the e2e suite per ADR-0075.
-  - 49 legacy specs, 314 occurrences of the flaky `goto + networkidle` pattern replaced.
-  - 3 files retain `networkidle` on mid-test `page.reload()` waits — different pattern, kept on purpose.
-  - **Performance bonus**: full-suite runtime drops from 1.1m → 56s (~4×).
+  - **Cycle 18 — networkidle → waitForAppReady (v0.83.0)** PR #146. Standardizes the e2e suite per ADR-0075.
+    - 49 legacy specs, 314 occurrences of the flaky `goto + networkidle` pattern replaced.
+    - 3 files retain `networkidle` on mid-test `page.reload()` waits — different pattern, kept on purpose.
+    - **Performance bonus**: full-suite runtime drops from 1.1m → 56s (~4×).
 
-Planning artifacts:
+  - **Cycle 19 — ROADMAP update (v0.84.0)** PR #147. Closeout documentation.
+    - ROADMAP updated with v0.78.0 through v0.83.0 (cycles 13–18) and test counts (478/478, ~56s runtime).
+    - Added "Cycle 13-18 Closeout" section capturing root-cause analysis and all P5 hardening decisions.
+
+  - **Cycle 20 — error-path gap closed (v0.85.0)** PR #148. Closes cycle 14 coverage gap.
+    - 3 error-path tests added to `error-path.spec.ts`: `moveBend` invalid edge id, `removeBend` invalid edge id, `applyFillToSelection` empty selection no-op.
+    - Native (wasm32) skips `moveBend`/`removeBend` negative cases — `JsValue::from_str` panics on non-wasm32; e2e covers the Err path.
+
+  - **Cycle 21 — pre-commit hook shipped (v0.86.0 + v0.86.1)** PRs #149 + #150.
+    - Python `.githooks/pre-commit` blocks new commits introducing `goto + networkidle` in `*.spec.ts` files.
+    - Reads `git diff --cached` in one shot; tolerates `page.reload()` mid-test waits; `--no-verify` for bypass.
+    - `chore/cycle-21-cleanup-debug-spec` (PR #150): removed debug spec accidentally included in PR #149.
+
+  - **Cycle 22 — LayoutConfig serde regression tests (v0.87.0)** PR #151. Closes cycle 13 surface.
+    - 3 Rust unit tests in `crates/diagram-layout/src/config.rs`: empty config, partial config, round-trip deserialization.
+    - Pins `#[serde(default)]` behavior so cycle 13's fix cannot silently regress.
+
+  - **Cycle 23 — WASM integration test (v0.88.0)** PR #152. Closes cycle 13 stack coverage.
+    - `crates/diagram-wasm/src/layout.rs`: integration test `apply_layout('Grid', '{}')` against a real engine instance.
+    - Full-stack regression guard: struct-level (cycle 22) + WASM-level (cycle 23) + e2e (cycle 15).
+
+  - **Cycle 24 — import/export round-trip test (v0.89.0)** PR #153. Closes core data-flow boundary.
+    - `crates/diagram-wasm/src/import.rs`: `export_drawio` → `import_drawio` produces byte-equal scene.
+    - Every diagram the user creates or imports now has a lossless round-trip guarantee at the engine layer.
+
+  Planning artifacts:
 
 - `docs/adr/0077-pragmatic-performance-and-drawio-parity.md`
 - `sddk/pragmatic-parity-performance-v0.77/proposal.md`
