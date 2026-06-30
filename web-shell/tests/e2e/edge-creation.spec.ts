@@ -437,4 +437,40 @@ test.describe('Suite N: edge-creation', () => {
     // Viewer should still be functional (no crash)
     await expect(viewer.locator('svg')).toBeVisible();
   });
+
+  /**
+   * Port selection: clicking a shape side starts an edge from that port.
+   * Verifies: no crash, no error banner after port-based edge initiation.
+   */
+  test('Clicking shape side starts edge from that side without crash', async ({ page }) => {
+    await waitForAppReady(page);
+    await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
+    await expect(page.locator('[data-testid="viewer"] svg')).toBeVisible();
+
+    const viewer = page.locator('[data-testid="viewer"]');
+    const vertex = viewer.locator('[data-vertex-id]').first();
+
+    // Select the shape
+    await vertex.click();
+    await page.waitForTimeout(300);
+
+    // Click connector tool
+    await page.click('[data-testid="rail-connector-btn"]');
+    await page.waitForTimeout(200);
+
+    // Click on the right side of the shape to start an edge from the right port
+    const box = await vertex.boundingBox();
+    if (box) {
+      // Click at the horizontal midpoint, near the right edge
+      await page.mouse.click(box.x + box.width - 5, box.y + box.height / 2);
+      await page.waitForTimeout(300);
+    }
+
+    // No crash — verify no error message
+    const errorMsg = await page.locator('[data-testid="error-message"]').textContent().catch(() => '');
+    expect(errorMsg).toBe('');
+
+    // Viewer should still be functional
+    await expect(viewer.locator('svg').first()).toBeVisible();
+  });
 });
