@@ -55,6 +55,8 @@ interface MarqueeState {
   originY: number;
   currentX: number;
   currentY: number;
+  /** 'select' replaces/adds to selection, 'deselect' removes from selection. */
+  mode: 'select' | 'deselect';
 }
 
 /** Connect-mode FSM state (drag-based edge creation with anchor resolution). */
@@ -278,6 +280,91 @@ export class Editor {
   selectInRect(rect: { x: number; y: number; width: number; height: number }): void {
     const intersecting = this.#getIntersectingIds(rect);
     this.#applySelection(new Set(intersecting));
+  }
+
+  /**
+   * Remove all currently-selected shapes whose bounds intersect the given rect.
+   * Implements draw.io Alt+Shift+drag deselect box (SEL-006).
+   */
+  deselectInRect(rect: { x: number; y: number; width: number; height: number }): void {
+    const intersecting = this.#getIntersectingIds(rect);
+    const next = new Set(this.#selection);
+    for (const id of intersecting) {
+      next.delete(id);
+    }
+    this.#applySelection(next);
+  }
+
+  /**
+   * Get all shape SlotmapIds at a given document-space point, in z-order
+   * (top of stack first). Used by Alt+click underneath to cycle through
+   * overlapping shapes (SEL-014).
+   */
+  #getIdsAtPoint(x: number, y: number): SlotmapId[] {
+    const result: SlotmapId[] = [];
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of Editor.#SHAPE_KEYS) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField) continue;
+          const bounds = variant['bounds'] as
+            | { origin?: Record<string, number>; size?: Record<string, number> }
+            | undefined;
+          if (!bounds?.origin || !bounds?.size) continue;
+          const sx = (bounds.origin['x'] as number) ?? 0;
+          const sy = (bounds.origin['y'] as number) ?? 0;
+          const sw = (bounds.size['width'] as number) ?? 0;
+          const sh = (bounds.size['height'] as number) ?? 0;
+          if (x >= sx && x <= sx + sw && y >= sy && y <= sy + sh) {
+            result.push({ idx: idField.idx!, version: idField.version! });
+          }
+        }
+      }
+    }
+    return result; // z-order: top of stack first
+  }
+
+  /**
+   * Get the IDs of all shapes on the active page in DOM/z-order (top first).
+   * Used by Tab/Shift+Tab to cycle selection (SEL-012).
+   */
+  #getAllShapeIdsZOrder(): SlotmapId[] {
+    const result: SlotmapId[] = [];
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        for (const key of Editor.#SHAPE_KEYS) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField) continue;
+          result.push({ idx: idField.idx!, version: idField.version! });
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Get the IDs of all edges on the active page.
+   * Used by Ctrl+E "select all connectors" (SEL-009).
+   */
+  #getAllEdgeIds(): SlotmapId[] {
+    const result: SlotmapId[] = [];
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        const edge = e['Edge'] as Record<string, unknown> | undefined;
+        if (!edge) continue;
+        const idField = edge['id'] as { idx?: number; version?: number } | undefined;
+        if (!idField) continue;
+        result.push({ idx: idField.idx!, version: idField.version! });
+      }
+    }
+    return result;
   }
 
   // ─── Batch Operations ──────────────────────────────────────────────────────
@@ -2032,9 +2119,9 @@ export class Editor {
   // ─── Marquee Selection ────────────────────────────────────────────────────
 
   /** Start marquee selection at document coordinates (x, y). */
-  #startMarquee(x: number, y: number): void {
+  #startMarquee(x: number, y: number, mode: 'select' | 'deselect' = 'select'): void {
     this.#cancelMarquee();
-    this.#marquee = { originX: x, originY: y, currentX: x, currentY: y };
+    this.#marquee = { originX: x, originY: y, currentX: x, currentY: y, mode };
   }
 
   /** Update marquee endpoint. */
@@ -2049,9 +2136,14 @@ export class Editor {
   #endMarquee(): void {
     if (!this.#marquee) return;
     const rect = this.#normalizeMarqueeRect();
+    const mode = this.#marquee.mode;
     this.#cancelMarquee();
     if (rect.width > 5 || rect.height > 5) {
-      this.selectInRect(rect);
+      if (mode === 'deselect') {
+        this.deselectInRect(rect);
+      } else {
+        this.selectInRect(rect);
+      }
     }
   }
 
@@ -2227,10 +2319,24 @@ export class Editor {
         this.#clearEdgeSelection();
       }
 
-      if (e.shiftKey) {
+      if (e.altKey && e.shiftKey) {
+        // Alt+Shift+click on empty: deselect box (SEL-006)
+        const docPos = this.#clientToDoc(e.clientX, e.clientY);
+        this.#startMarquee(docPos.x, docPos.y, 'deselect');
+        this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+        this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+        this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+      } else if (e.altKey) {
+        // Alt+click on empty: force selection box (SEL-004)
+        const docPos = this.#clientToDoc(e.clientX, e.clientY);
+        this.#startMarquee(docPos.x, docPos.y, 'select');
+        this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+        this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+        this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+      } else if (e.shiftKey) {
         // Shift+click on empty: start marquee
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
-        this.#startMarquee(docPos.x, docPos.y);
+        this.#startMarquee(docPos.x, docPos.y, 'select');
         // Add move/up listeners for marquee
         this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
@@ -2243,7 +2349,22 @@ export class Editor {
     }
 
     // Hit a shape
-    if (e.shiftKey) {
+    if (e.altKey && !e.shiftKey) {
+      // Alt+click on shape: select underneath in z-stack (SEL-014)
+      // Find all shapes at the click point, cycle to the next-lower one
+      const docPos = this.#clientToDoc(e.clientX, e.clientY);
+      const stackAtPoint = this.#getIdsAtPoint(docPos.x, docPos.y);
+      if (stackAtPoint.length > 1) {
+        // Find current selection in stack; pick the next-lower one
+        const currentIdx = stackAtPoint.findIndex((id) => this.isSelected(id));
+        const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % stackAtPoint.length;
+        const next = stackAtPoint[nextIdx]!;
+        this.selectOnly(next);
+        return;
+      }
+      // Only one shape at point: just select it
+      this.selectOnly(hit);
+    } else if (e.shiftKey) {
       // Shift+click: toggle in selection
       this.toggleSelection(hit);
     } else if (e.ctrlKey || e.metaKey) {
@@ -3426,9 +3547,58 @@ export class Editor {
     }
 
     // Ctrl+A → select all
-    if (hasMod && e.key === 'a') {
+    if (hasMod && e.key.toLowerCase() === 'a' && !e.shiftKey) {
       e.preventDefault();
       this.selectAll();
+      return;
+    }
+
+    // Ctrl+Shift+A → deselect all (draw.io parity, SEL-011)
+    if (hasMod && e.shiftKey && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      this.clearSelection();
+      return;
+    }
+
+    // Ctrl+E → select all connectors (draw.io parity, SEL-009)
+    if (hasMod && !e.shiftKey && e.key === 'e') {
+      e.preventDefault();
+      const edgeIds = this.#getAllEdgeIds();
+      this.#applySelection(new Set(edgeIds));
+      return;
+    }
+
+    // Ctrl+I → select all shapes (draw.io parity, SEL-010)
+    // On macOS, Cmd+E maps to shapes and Cmd+I to connectors (draw.io parity).
+    // We use Cmd/Ctrl+I for shapes to match the Windows draw.io convention.
+    if (hasMod && !e.shiftKey && e.key === 'i') {
+      e.preventDefault();
+      const shapeIds = this.#getAllShapeIdsZOrder();
+      this.#applySelection(new Set(shapeIds));
+      return;
+    }
+
+    // Tab / Shift+Tab → cycle selection in z-order (SEL-012)
+    if (e.key === 'Tab' && !hasMod) {
+      e.preventDefault();
+      const allIds = this.#getAllShapeIdsZOrder();
+      if (allIds.length === 0) return;
+      if (this.#selection.size === 0) {
+        this.selectOnly(allIds[0]!);
+        return;
+      }
+      // Find current selection's position in z-order
+      const currentId = this.#selection.values().next().value as SlotmapId;
+      const currentIdx = allIds.findIndex(
+        (id) => id.idx === currentId.idx && id.version === currentId.version,
+      );
+      let nextIdx: number;
+      if (e.shiftKey) {
+        nextIdx = currentIdx <= 0 ? allIds.length - 1 : currentIdx - 1;
+      } else {
+        nextIdx = currentIdx === -1 || currentIdx === allIds.length - 1 ? 0 : currentIdx + 1;
+      }
+      this.selectOnly(allIds[nextIdx]!);
       return;
     }
 
