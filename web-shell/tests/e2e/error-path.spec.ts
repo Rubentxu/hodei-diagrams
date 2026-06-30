@@ -83,6 +83,82 @@ test.describe('Suite E: error-path', () => {
   });
 
   /**
+   * moveBend with an invalid EdgeId: cycle 14 added Result<, EngineError>
+   * return to moveBend; verify the failure surfaces.
+   */
+  test('moveBend with invalid edge id returns Err', async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
+    await expect(page.locator('[data-testid="viewer"] svg')).toBeVisible();
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const editor = (window as any).__hodeiDebug?.getEditor?.();
+      if (!editor) return { error: 'no debug api' };
+      return editor.moveBend({ idx: 9999, version: 99 }, 0, 0, 0);
+    });
+
+    expect(result.ok).toBe(false);
+    expect(typeof result.error).toBe('string');
+  });
+
+  /**
+   * removeBend with an invalid EdgeId: cycle 14 added Result<, EngineError>
+   * return to removeBend; verify the failure surfaces.
+   */
+  test('removeBend with invalid edge id returns Err', async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
+    await expect(page.locator('[data-testid="viewer"] svg')).toBeVisible();
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const editor = (window as any).__hodeiDebug?.getEditor?.();
+      if (!editor) return { error: 'no debug api' };
+      return editor.removeBend({ idx: 9999, version: 99 }, 0);
+    });
+
+    expect(result.ok).toBe(false);
+    expect(typeof result.error).toBe('string');
+  });
+
+  /**
+   * Cycle 14 also added applyFillToSelection / applyStrokeToSelection /
+   * applyShadowToSelection / applyGlassToSelection / applyGradientToSelection.
+   * They were switched from `this.#session.executeTransaction(commands)`
+   * to `this.executeTransaction(commands)`, which is the wrapper that
+   * checks the Result. With an empty selection the methods are no-ops —
+   * they return void without calling executeTransaction. This test
+   * documents the no-op behavior (no error) so a future regression that
+   * incorrectly tries to dispatch would surface immediately.
+   */
+  test('applyFillToSelection with empty selection → silent no-op, no error', async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
+    await expect(page.locator('[data-testid="viewer"] svg')).toBeVisible();
+    await page.waitForTimeout(500);
+    await dismissErrorBanner(page);
+
+    const surfaceState = await page.evaluate(() => {
+      const editor = (window as any).__hodeiDebug?.getEditor?.();
+      if (!editor) return { ran: false, errText: '' };
+
+      // Ensure selection is empty by walking the editor's setSelection machinery.
+      // editor.clearSelection() is the supported public API.
+      editor.clearSelection();
+
+      editor.applyFillToSelection('#ff0000');
+
+      const em = document.querySelector('[data-testid="error-message"]') as HTMLElement | null;
+      return {
+        ran: true,
+        errText: (em?.textContent ?? '').trim(),
+      };
+    });
+
+    expect(surfaceState.ran).toBe(true);
+    // No error message should appear.
+    expect(surfaceState.errText).toBe('');
+  });
+
+  /**
    * End-to-end test of the menu handler's failure-mode plumbing:
    * when editor.applyLayout returns Err, the menu wrapper (runLayout in
    * main.ts) routes the failure to ui.setDiagnostics, which sets
