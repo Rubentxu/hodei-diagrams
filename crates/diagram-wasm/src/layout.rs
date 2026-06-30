@@ -546,3 +546,68 @@ pub fn remove_bend(handle: u32, edge_idx: u32, bend_index: u32) -> Result<(), Js
     .map_err(|_| JsValue::from_str("InvalidHandle"))?
     .map_err(JsValue::from_str)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::{create_engine, dispose_engine};
+    use crate::import::import_drawio;
+    use crate::scene::get_scene;
+
+    /// Regression guard for the cycle 13 root-cause fix.
+    ///
+    /// Cycle 13's fix was `#[serde(default)]` on `LayoutConfig` so that the
+    /// WASM boundary accepts the JSON `{}` that the JS shell always sends.
+    /// Before that, an empty config would fail with "missing field
+    /// direction", `apply_layout` would return Err, the editor would
+    /// discard it (it returned `void`), and the menu handler wouldn't
+    /// surface anything to the user.
+    ///
+    /// The cycle 22 unit tests cover LayoutConfig serde defaults in
+    /// isolation. This test exercises the WASM function end-to-end
+    /// against a real engine: parse the empty config, dispatch to the
+    /// layout algorithm, commit the transaction. If a future refactor
+    /// drops the per-field defaults or the struct-level #[serde(default)],
+    /// this test fails before the JS side ever sees the bug.
+    #[test]
+    fn apply_layout_accepts_empty_json_config_with_real_engine() {
+        let handle = create_engine().expect("create_engine returns a valid handle");
+
+        // Load a small diagram so the layout algorithm has something to lay out.
+        // The fixture has 4 vertices in a 2x2 grid; Grid layout runs
+        // successfully on at least 4 vertices and rearranges them.
+        let xml = include_str!("../../../web-shell/public/fixtures/multi-shapes.drawio");
+        import_drawio(handle, xml).expect("importing the fixture should succeed");
+
+        // The actual cycle-13 fix surface: empty config '{}' must deserialize
+        // and dispatch through the layout pipeline without Err.
+        let result = apply_layout(handle, "\"Grid\"", "{}");
+        assert!(
+            result.is_ok(),
+            "apply_layout(Grid, '{{}}') returned Err: {:?}",
+            result.err().map(|e| e.as_string())
+        );
+
+        // Sanity: the engine still responds to get_scene after the layout.
+        // If apply_layout silently corrupted the engine state (e.g.
+        // because the empty config gave GridLayoutConfig::default()
+        // invalid values), get_scene would fail or return an empty page.
+        let scene_json = get_scene(handle).expect("get_scene still works");
+        assert!(
+            !scene_json.is_empty(),
+            "scene JSON should not be empty after import + layout"
+        );
+        assert!(
+            scene_json.contains("\"display_list\""),
+            "scene JSON should contain a display_list field, got: {scene_json}"
+        );
+
+        let _ = dispose_engine(handle);
+    }
+
+    // Negative case (unknown kind) is covered by cycle 15's error-path
+    // e2e spec at web-shell/tests/e2e/error-path.spec.ts. It exercises
+    // the actual JS-bound surface and would be infeasible here without
+    // a `wasm-bindgen-test` harness (the `Result<(), JsValue>` return
+    // type uses `JsValue::from_str`, which panics on native targets).
+}
