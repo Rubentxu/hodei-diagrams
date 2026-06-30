@@ -1569,7 +1569,14 @@ async function bootstrap(): Promise<void> {
   // ─── 13.7.6. Wire Arrange > Re-route Edges ───────────────────────────────────
   const menuRerouteEdges = document.querySelector('[data-testid="menu-reroute-edges"]');
   menuRerouteEdges?.addEventListener('click', () => {
-    activeEditor?.routeAllEdges();
+    // ADR-0078: routeAllEdges returns Result — surface failures via diagnostics.
+    if (!activeEditor) return;
+    const result = activeEditor.routeAllEdges();
+    if (!result.ok) {
+      ui.setDiagnostics('error', `Re-route Edges failed: ${result.error}`);
+    } else {
+      ui.setDiagnostics('clean');
+    }
   });
 
   // ─── 13.8. Wire Help > Keyboard Shortcuts ───────────────────────────────────
