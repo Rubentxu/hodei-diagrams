@@ -78,11 +78,13 @@ test.describe('Suite L: performance', () => {
     const zoomDisplay = page.locator('[data-testid="zoom-display"]');
     const canvasContainer = page.locator('[data-testid="canvas-container"]');
 
-    // Zoom in via wheel scroll (each delta is 0.1, so 10 scroll steps = ~200%)
+    // Zoom in via Ctrl+wheel (draw.io parity: plain wheel pans)
     const start = Date.now();
     for (let i = 0; i < 10; i++) {
       await canvasContainer.hover({ position: { x: 400, y: 200 } });
-      await page.mouse.wheel(0, -10); // scroll up = zoom in
+      await canvasContainer.evaluate((el) => {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+      });
     }
     await page.waitForTimeout(200); // Wait for render
 

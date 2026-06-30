@@ -172,21 +172,33 @@ export function setupZoomPan(
     container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom } }));
   }
 
-  // ─── Mouse wheel → zoom ───────────────────────────────────────────────────
+  // ─── Wheel: pan by default, Ctrl/Cmd+wheel = zoom, Shift+wheel = horizontal ──
   container.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom(zoom + delta);
-    // Dispatch a custom event so the UI can update the zoom display
-    container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom } }));
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + wheel → zoom
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      setZoom(zoom + delta);
+      container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom } }));
+    } else if (e.shiftKey) {
+      // Shift + wheel → horizontal pan
+      panX -= e.deltaY / zoom;
+      applyTransform();
+    } else {
+      // Plain wheel → vertical pan (draw.io parity)
+      panY -= e.deltaY / zoom;
+      applyTransform();
+    }
   }, { passive: false });
 
-  // ─── Middle-click drag → pan ──────────────────────────────────────────────
+  // ─── Pan: middle-click drag, right-click drag, Space+drag ──────────────────
   let isPanning = false;
   let panStartX = 0;
   let panStartY = 0;
   let panOriginX = 0;
   let panOriginY = 0;
+  let spacePressed = false;
+  let rightClickMoved = false;
 
   function startPan(clientX: number, clientY: number): void {
     isPanning = true;
@@ -209,9 +221,36 @@ export function setupZoomPan(
     container.classList.remove('panning');
   }
 
-  // Middle mouse button
+  // Track Space key for Space+drag pan
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.code === 'Space' && !e.repeat) {
+      // Don't activate when typing in an input
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+      spacePressed = true;
+      container.style.cursor = 'grab';
+    }
+  });
+
+  document.addEventListener('keyup', (e: KeyboardEvent) => {
+    if (e.code === 'Space') {
+      spacePressed = false;
+      container.style.cursor = '';
+    }
+  });
+
+  // Middle mouse button OR right-click OR Space+drag → pan
   container.addEventListener('mousedown', (e: MouseEvent) => {
     if (e.button === 1) {
+      // Middle-click → pan
+      e.preventDefault();
+      startPan(e.clientX, e.clientY);
+    } else if (e.button === 2) {
+      // Right-click → potential pan (start tracking)
+      rightClickMoved = false;
+      startPan(e.clientX, e.clientY);
+    } else if (e.button === 0 && spacePressed) {
+      // Left-click with Space held → pan
       e.preventDefault();
       startPan(e.clientX, e.clientY);
     }
@@ -219,6 +258,7 @@ export function setupZoomPan(
 
   container.addEventListener('mousemove', (e: MouseEvent) => {
     if (isPanning) {
+      if (e.buttons === 2 || (e.buttons & 2)) rightClickMoved = true;
       doPan(e.clientX, e.clientY);
     }
   });
@@ -227,6 +267,19 @@ export function setupZoomPan(
   window.addEventListener('mouseup', (e: MouseEvent) => {
     if (e.button === 1 && isPanning) {
       endPan();
+    } else if (e.button === 2 && isPanning) {
+      endPan();
+    } else if (e.button === 0 && isPanning && spacePressed) {
+      endPan();
+    }
+  });
+
+  // Suppress context menu if right-click was used for panning
+  container.addEventListener('contextmenu', (e: MouseEvent) => {
+    if (rightClickMoved) {
+      e.preventDefault();
+      e.stopPropagation();
+      rightClickMoved = false;
     }
   });
 
