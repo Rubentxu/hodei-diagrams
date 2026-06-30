@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -9,8 +10,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
    * Test 1: Tab order reaches navbar, rail, sidebar, canvas, inspector
    */
   test('Tab order reaches navbar, rail, sidebar, canvas, inspector', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Start from top of page
     await page.keyboard.press('Tab');
@@ -31,8 +31,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
    * Test 2: Ctrl+G toggles grid
    */
   test('Ctrl+G toggles grid', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -66,8 +65,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
    * Test 3: Ctrl+Shift+P toggles presentation mode
    */
   test('Ctrl+Shift+P toggles presentation mode', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.keyboard.press('Control+Shift+P');
     await expect(page.locator('body')).toHaveClass(/presentation-mode/);
@@ -81,8 +79,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
    * Test 4: Delete removes selected shape
    */
   test('Delete removes selected shape', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -108,8 +105,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
    * Test 5: Ctrl+Z / Ctrl+Y still work with keyboard focus away from canvas
    */
   test('Ctrl+Z / Ctrl+Y still work with keyboard focus away from canvas', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -142,8 +138,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
    * Test 6: Buttons/inputs relevant to UI have aria-labels or accessible names
    */
   test('Buttons/inputs have accessible names or aria-labels', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Check key interactive elements have accessible names
     const saveBtn = page.locator('[data-testid="save-btn"]');
@@ -175,8 +170,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
    * Test 7: Escape closes properties dialog and exits presentation mode
    */
   test('Escape closes properties dialog', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Open properties dialog
     await page.locator('[data-testid="menu-file"] summary').click();
@@ -192,8 +186,7 @@ test.describe('Suite K: accessibility-keyboard', () => {
   });
 
   test('Escape exits presentation mode', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Enter presentation mode
     await page.keyboard.press('Control+Shift+P');

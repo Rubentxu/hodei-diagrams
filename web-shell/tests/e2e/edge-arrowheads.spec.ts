@@ -24,6 +24,7 @@
 
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 const TWO_SHAPES_PATH = fixturePath('two-shapes-with-edge.drawio');
 const TWO_SHAPES_BLOCK_PATH = fixturePath('two-shapes-endArrow-block.drawio');
@@ -42,8 +43,7 @@ async function loadFixture(
   page: import('@playwright/test').Page,
   path: string,
 ): Promise<void> {
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await waitForAppReady(page);
   await page.setInputFiles('[data-testid="file-input"]', path);
   await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
   // Wait for the engine edge to render

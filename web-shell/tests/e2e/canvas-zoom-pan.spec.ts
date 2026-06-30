@@ -37,8 +37,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
    * Test 2: HUD shows zoom percentage after zooming
    */
   test('HUD shows zoom percentage after zooming', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -63,8 +62,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
    * Test 3: Middle-click drag on canvas → CSS translate changes
    */
   test('Middle-click drag on canvas → CSS translate changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -148,8 +146,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
    * Test 6: Zoom to 200% → shapes appear larger
    */
   test('Zoom to 200% → shapes appear larger', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -179,8 +176,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
    * Test 7: Zoom out to 50% → shapes appear smaller
    */
   test('Zoom out to 50% → shapes appear smaller', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -213,8 +209,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
    * Test 9: Zoom + pan combined: zoom in, then pan → both transforms applied
    */
   test('Zoom + pan combined: zoom in, then pan → both transforms applied', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

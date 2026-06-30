@@ -161,8 +161,7 @@ test.describe('Suite J: error-recovery', () => {
    * Test 8: Presentation mode escape exits cleanly after an error
    */
   test('Presentation mode escape exits cleanly after error', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Enter presentation mode
     await page.keyboard.press('Control+Shift+P');

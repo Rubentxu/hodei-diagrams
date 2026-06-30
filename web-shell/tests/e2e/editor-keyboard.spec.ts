@@ -6,6 +6,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -15,8 +16,7 @@ const MULTI_SHAPES_PATH =
 
 test.describe('Editor: keyboard shortcuts', () => {
   test('Ctrl+A selects all shapes in the current page', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -43,8 +43,7 @@ test.describe('Editor: keyboard shortcuts', () => {
   });
 
   test('Edit > Select All menu item selects all shapes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -64,8 +63,7 @@ test.describe('Editor: keyboard shortcuts', () => {
   });
 
   test('Escape clears the current selection', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -87,8 +85,7 @@ test.describe('Editor: keyboard shortcuts', () => {
   });
 
   test('Delete key removes selected shape (programmatic selection via Ctrl+A)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -107,8 +104,7 @@ test.describe('Editor: keyboard shortcuts', () => {
   });
 
   test('Ctrl+Z undoes the last delete', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

@@ -24,6 +24,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const OVERLAPPING_FIXTURE = fixturePath('two-shapes-overlapping-different-z.drawio');
@@ -38,8 +39,7 @@ async function vertexDomOrder(page: import('@playwright/test').Page): Promise<st
 
 test.describe('Suite ZORDER: layers / z-order (ADR-0075)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', OVERLAPPING_FIXTURE);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
   });

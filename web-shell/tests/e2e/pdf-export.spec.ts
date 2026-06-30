@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -9,8 +10,7 @@ test.describe('Slice D: PDF Export', () => {
    * Test 1: PDF menu item is visible in Export submenu
    */
   test('PDF menu item is visible in Export submenu', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.locator('[data-testid="menu-file"] summary').click();
     await page.waitForTimeout(100);
@@ -27,8 +27,7 @@ test.describe('Slice D: PDF Export', () => {
    * Test 2: Clicking PDF menu item triggers window.print()
    */
   test('Clicking PDF menu item triggers window.print()', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Intercept window.print using evaluate before clicking
     await page.evaluate(() => {
@@ -54,8 +53,7 @@ test.describe('Slice D: PDF Export', () => {
    * Test 3: @media print CSS hides UI elements
    */
   test('@media print CSS hides navbar, sidebar, rail, inspector, hud, bottom-bar', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load a diagram to have content visible
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -100,8 +98,7 @@ test.describe('Slice D: PDF Export', () => {
    * Test 4: @media print CSS sets canvas to display:block and transform:none
    */
   test('@media print CSS expands canvas and removes transform', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -144,8 +141,7 @@ test.describe('Slice D: PDF Export', () => {
    * Test 5: @media print CSS sets white background
    */
   test('@media print CSS sets white background', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const printRules = await page.evaluate(() => {
       const sheets = document.styleSheets;

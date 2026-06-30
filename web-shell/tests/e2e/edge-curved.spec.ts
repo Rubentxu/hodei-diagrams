@@ -19,6 +19,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const EDGE_CURVED_PATH = fixturePath('edge-curved-with-bends.drawio');
@@ -26,8 +27,7 @@ const EDGE_STRAIGHT_PATH = fixturePath('edge-straight-with-bends.drawio');
 
 test.describe('Suite CURVED: curved edge rendering (ADR-0075)', () => {
   test('CURVED-001: edgeStyle=curvedEdgeStyle emits path with C (cubic Bezier) commands', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', EDGE_CURVED_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -46,8 +46,7 @@ test.describe('Suite CURVED: curved edge rendering (ADR-0075)', () => {
   });
 
   test('CURVED-002: edgeStyle=orthogonalEdgeStyle emits path with L (line) commands only', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', EDGE_STRAIGHT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 

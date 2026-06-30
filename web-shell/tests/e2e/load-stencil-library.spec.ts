@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath, testFixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -19,8 +20,7 @@ test.describe('Stencil Library File Picker', () => {
    * data-testid values).
    */
   test('Auto-load General and Flowchart categories in sidebar', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Wait for stencil libraries to auto-load (they are fetched asynchronously)
     await page.waitForTimeout(1500);
@@ -42,8 +42,7 @@ test.describe('Stencil Library File Picker', () => {
    * Test 2: Load custom-stencil.xml via file picker (library name "custom-stencil")
    */
   test('Load custom-stencil.xml via file picker → new Custom-stencil category appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Wait for initial stencil libraries to load
     await page.waitForTimeout(1500);
@@ -72,8 +71,7 @@ test.describe('Stencil Library File Picker', () => {
    * Test 3: Click a custom stencil shape button → vertex added to canvas
    */
   test('Click custom stencil shape button → shape added to canvas', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load a diagram first so we have an active page
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -108,8 +106,7 @@ test.describe('Stencil Library File Picker', () => {
    * Test 4: Re-load same library replaces existing category (no duplicate)
    */
   test('Reload same library → category replaced, not duplicated', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForTimeout(1500);
 
     // Load custom.xml first time

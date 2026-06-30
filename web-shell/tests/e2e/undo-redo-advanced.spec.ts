@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -17,8 +18,7 @@ test.describe('Suite G: undo-redo-advanced', () => {
    * the real user produces.
    */
   test('Undo after style change reverts visual style', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -61,8 +61,7 @@ test.describe('Suite G: undo-redo-advanced', () => {
    * Test 2: Redo after undo restores style
    */
   test('Redo after undo restores style', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -98,8 +97,7 @@ test.describe('Suite G: undo-redo-advanced', () => {
    * Test 3: Undo after creating 3 shapes removes them in reverse order
    */
   test('Undo after creating 3 shapes removes them in reverse order', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -140,8 +138,7 @@ test.describe('Suite G: undo-redo-advanced', () => {
    * Test 4: Redo restores shapes in correct order
    */
   test('Redo restores shapes in correct order', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -184,8 +181,7 @@ test.describe('Suite G: undo-redo-advanced', () => {
     * undo the previously created shape.
     */
   test('Ctrl+Z inside text input does not trigger app undo', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -221,8 +217,7 @@ test.describe('Suite G: undo-redo-advanced', () => {
    * Test 6: Undo/redo buttons update enabled state after each action
    */
   test('Undo/redo buttons update enabled state after each action', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

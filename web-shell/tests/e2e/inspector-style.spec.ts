@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -9,8 +10,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 1: Change fill color → SVG fill attribute changes
    */
   test('Change fill color → SVG fill changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -46,8 +46,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 2: Change stroke color → SVG stroke attribute changes
    */
   test('Change stroke color → SVG stroke changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -74,8 +73,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 3: Change stroke width → stroke-width attribute changes
    */
   test('Change stroke width → stroke-width changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -102,8 +100,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 4: Toggle dashed → stroke-dasharray present when dashed, absent when not
    */
   test('Toggle dashed → stroke-dasharray present when dashed, absent when not', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -138,8 +135,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 5: Toggle rounded → rect element gets rx/ry attributes (becomes rounded rect)
    */
   test('Toggle rounded → shape renders with rx/ry attributes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -168,8 +164,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 6: Change font family → text element font-family changes
    */
   test('Change font family → text element font-family changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -200,8 +195,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 7: Change font size → font-size changes
    */
   test('Change font size → font-size changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -233,8 +227,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 8: Change font color → text fill changes
    */
   test('Change font color → text fill changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -266,8 +259,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 9: Toggle bold → font-weight changes
    */
   test('Toggle bold → font-weight changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -298,8 +290,7 @@ test.describe('Suite E: inspector-style', () => {
    * Test 10: Toggle italic → font-style changes
    */
   test('Toggle italic → font-style changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -331,8 +322,7 @@ test.describe('Suite E: inspector-style', () => {
    * and changes to controls should not affect any shape.
    */
   test('No selection → inspector shows no-selection message', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -352,8 +342,7 @@ test.describe('Suite E: inspector-style', () => {
    * should be applied.
    */
   test('Rapid changes debounced → final value wins', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

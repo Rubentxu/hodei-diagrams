@@ -22,6 +22,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
+import { waitForAppReady } from './helpers/app-ready.js';
 
 const SIMPLE_RECT = fixturePath('simple-rect.drawio');
 const AWS_ADMISION = fixturePath('aws-admision.drawio');
@@ -61,8 +62,7 @@ test.describe('Phase 2 — perf baseline', () => {
       }
     });
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.evaluate(() => {
       (window as unknown as { __perf: Measurement[] }).__perf = [];
     });
@@ -281,8 +281,7 @@ test.describe('Phase 2 — perf baseline', () => {
   });
 
   test('fixture sizes SSoT report', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     const resp = await page.request.get('/fixtures/simple-rect.drawio');
     const xml = await resp.text();
     const resp2 = await page.request.get('/fixtures/aws-admision.drawio');

@@ -8,6 +8,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -16,8 +17,7 @@ const SIMPLE_RECT_PATH =
 test.describe('Save-Status Display', () => {
   // ─── Setup ───────────────────────────────────────────────────────────────
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     // IndexedDB cleanup per test isolation pattern
     await page.evaluate(() => {
       indexedDB.deleteDatabase('hodei-diagrams');
@@ -27,8 +27,7 @@ test.describe('Save-Status Display', () => {
 
   // ─── Task 5.2.1: Save-status is 'Saved' on first mount ──────────────────
   test('HUD mounted → save-status shows "Saved"', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="hud-save-status"]', { timeout: 5000 });
 
     const saveStatus = page.locator('[data-testid="hud-save-status"]');
@@ -38,8 +37,7 @@ test.describe('Save-Status Display', () => {
 
   // ─── Task 5.2.2: Add shape → Unsaved changes ────────────────────────────
   test('make a change → within 100ms status shows "Unsaved changes"', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     // Open a diagram first so the canvas is ready
@@ -60,8 +58,7 @@ test.describe('Save-Status Display', () => {
 
   // ─── Task 5.2.3: Manual save → Saving... → Saved ───────────────────────
   test('manual save → status shows "Saving..." then "Saved"', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -88,8 +85,7 @@ test.describe('Save-Status Display', () => {
 
   // ─── Task 5.2.4: Auto-save after 30s idle → Auto-saved → Saved ─────────
   test('auto-save after idle → shows "Auto-saved" then reverts to "Saved"', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -120,8 +116,7 @@ test.describe('Save-Status Display', () => {
 
   // ─── Task 5.2.5: New command during auto-saved window cancels revert ─────
   test('command during auto-saved window → stays "Unsaved changes"', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -153,8 +148,7 @@ test.describe('Save-Status Display', () => {
 
   // ─── Task 5.2.6: Undo from "Unsaved" → stays "Unsaved" ─────────────────
   test('undo from "Unsaved changes" → stays "Unsaved changes" (not "Saved")', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
@@ -177,8 +171,7 @@ test.describe('Save-Status Display', () => {
 
   // ─── Task 5.2.7: data-testid uniqueness ─────────────────────────────────
   test('no duplicate data-testid values in HUD', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="hud"]', { timeout: 5000 });
 
     // Collect all data-testid attributes in the HUD
@@ -206,8 +199,7 @@ test.describe('Save-Status Display', () => {
 
 test.describe('WASM Init Loading', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.evaluate(() => {
       indexedDB.deleteDatabase('hodei-diagrams');
       indexedDB.deleteDatabase('version-store');
@@ -236,8 +228,7 @@ test.describe('WASM Init Loading', () => {
 
   // ─── Task 5.3.2: Loading overlay removed on successful init ───────────────
   test('WASM init success → loading overlay removed after mount', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // After mount, overlay should be gone
     const overlay = page.locator('[data-testid="loading-overlay"]');
@@ -247,8 +238,7 @@ test.describe('WASM Init Loading', () => {
 
 test.describe('Stencil Library Loading', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.evaluate(() => {
       indexedDB.deleteDatabase('hodei-diagrams');
       indexedDB.deleteDatabase('version-store');
@@ -257,8 +247,7 @@ test.describe('Stencil Library Loading', () => {
 
   // ─── Task 5.4.1: Stencil load < 100ms → no indicator shown ──────────────
   test('fast stencil load → no loading indicator visible', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="hud"]', { timeout: 5000 });
 
     // Loading item should be hidden within 200ms post-mount
@@ -301,8 +290,7 @@ test.describe('Stencil Library Loading', () => {
     // Abort the stencil fetch
     await page.route(/\/fixtures\/general\.xml$/, (route) => route.abort());
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await page.waitForSelector('[data-testid="hud"]', { timeout: 5000 });
 
     // Loading indicator should not be visible

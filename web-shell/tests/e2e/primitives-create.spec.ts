@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -9,8 +10,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 1: Create rectangle from sidebar → shape appears with data-vertex-id
    */
   test('Create rectangle from sidebar → shape appears with data-vertex-id', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load a diagram first so we have an active page
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -41,8 +41,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 2: Create rectangle from palette → shape appears
    */
   test('Create rectangle from palette → shape appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -66,8 +65,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 3: Create ellipse from sidebar
    */
   test('Create ellipse from sidebar → ellipse appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -91,8 +89,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 4: Create ellipse from palette (same as sidebar in this UI)
    */
   test('Create ellipse from palette → ellipse appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -115,8 +112,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 5: Create rounded rect from sidebar (style has rounded=1)
    */
   test('Create rounded rect from sidebar → shape appears with rounded style', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -140,8 +136,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 6: Verify created rect has correct dimensions (120×80)
    */
   test('Verify created rect has correct dimensions (120×80)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -176,8 +171,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Note: The engine creates ellipse with width=80 and height=80 based on code
    */
   test('Verify created ellipse has correct dimensions', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -203,8 +197,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 8: Create 3 shapes → all appear
    */
   test('Create 3 shapes → all appear', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -236,8 +229,7 @@ test.describe('Suite A: Primitives creation', () => {
    * Test 9: Sidebar deselects tool after placing shape (single-placement mode)
    */
   test('Sidebar deselects tool after placing shape (single-placement mode)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -262,8 +254,7 @@ test.describe('Suite A: Primitives creation', () => {
    * verifies the error handling works when trying to create without an active editor
    */
   test('Create shape before any diagram loaded → shows error or handles gracefully', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Don't load any diagram - try to create a shape directly
     // The editor might not be initialized yet, so we check error handling

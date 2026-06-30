@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 import fs from 'fs';
 import os from 'os';
@@ -16,8 +17,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Select shape, press R → shape rotates 90°
    */
   test('Press R → shape rotates 90° clockwise', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -42,8 +42,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Press R twice → cumulative 180°
    */
   test('Press R twice → cumulative 180° rotation', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -67,8 +66,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Undo rotation → original rotation restored
    */
   test('Ctrl+Z undoes rotation → original rotation restored', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -99,8 +97,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Redo rotation → back to rotated state
    */
   test('Ctrl+Y redoes rotation → back to rotated state', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -127,8 +124,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Press H → shape flips horizontally, SVG has scale(-1 1)
    */
   test('Press H → shape flips horizontally (scale -1 1)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -150,8 +146,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Press V → shape flips vertically, SVG has scale(1 -1)
    */
   test('Press V → shape flips vertically (scale 1 -1)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -173,8 +168,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Shift+R → 15° fine adjustment
    */
   test('Shift+R → 15° fine rotation adjustment', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -209,8 +203,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Combined rotation + flip → both transforms applied
    */
   test('Rotate then flip → both transforms applied in SVG', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -237,8 +230,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Import .drawio with rotation attr → renders rotated
    */
   test('Import rotated-rect.drawio → shape renders with rotation', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', ROTATED_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -255,8 +247,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Selection of multiple shapes → all rotate (batch)
    */
   test('Select multiple shapes → all rotate together', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -286,8 +277,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Round-trip — rotate shape, export, reimport, verify rotation preserved
    */
   test('Rotate shape, export, reimport → rotation preserved', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -328,8 +318,7 @@ test.describe('Rotation and Flip (ADR-0057)', () => {
    * Test: Keyboard shortcut does NOT fire when typing in input field
    */
   test('R key does NOT rotate when focus is on input element', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

@@ -67,8 +67,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 3: Click target shape → edge created (line element appears)
    */
   test('Click target shape → edge created (line element appears)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -98,8 +97,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 4: Click empty canvas in connect mode → cancel (no edge created)
    */
   test('Click empty canvas in connect mode → cancel', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -134,8 +132,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 5: ESC in connect mode → cancel
    */
   test('ESC in connect mode → cancel', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -171,8 +168,7 @@ test.describe('Suite N: edge-creation', () => {
    * in Playwright. This test verifies the edge was created and both shapes are present.
    */
   test('Edge persists after creation, both shapes remain', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -225,8 +221,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 7: Delete source shape → edge removed
    */
   test('Delete source shape → edge removed', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -261,8 +256,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 8: Undo edge creation → edge gone
    */
   test('Undo edge creation → edge gone', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -296,8 +290,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 9: Redo edge creation → edge back
    */
   test('Redo edge creation → edge back', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -335,8 +328,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 10: Click same shape twice → no self-loop (edge not created)
    */
   test('Click same shape twice → no self-loop', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -371,8 +363,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 11: All shapes can be connected (connect shape1→shape2 and shape2→shape1)
    */
   test('All shapes can be connected (bidirectional edges)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -409,8 +400,7 @@ test.describe('Suite N: edge-creation', () => {
    * Test 12: Click same shape twice without moving → no edge, no crash
    */
   test('Click same shape twice without moving → no edge, no crash', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

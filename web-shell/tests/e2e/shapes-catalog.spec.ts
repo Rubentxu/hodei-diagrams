@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -13,8 +14,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Load fixture with all 11 shapes and verify they render
    */
   test('Import all-shapes.drawio fixture → all shapes render with data-vertex-id', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load the all-shapes fixture
     await page.setInputFiles('[data-testid="file-input"]', ALL_SHAPES_PATH);
@@ -32,8 +32,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create diamond from sidebar
    */
   test('Create diamond from sidebar → diamond appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -57,8 +56,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create triangle from sidebar
    */
   test('Create triangle from sidebar → triangle appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -81,8 +79,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create hexagon from sidebar
    */
   test('Create hexagon from sidebar → hexagon appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -105,8 +102,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create cylinder from sidebar
    */
   test('Create cylinder from sidebar → cylinder appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -129,8 +125,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create cloud from sidebar
    */
   test('Create cloud from sidebar → cloud appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -153,8 +148,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create parallelogram from sidebar
    */
   test('Create parallelogram from sidebar → parallelogram appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -177,8 +171,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create trapezoid from sidebar
    */
   test('Create trapezoid from sidebar → trapezoid appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -201,8 +194,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create polygon from sidebar
    */
   test('Create polygon from sidebar → polygon appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -225,8 +217,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Import diamond fixture and verify multiple diamonds render
    */
   test('Import multi-shapes-diamond.drawio → multiple diamonds render', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load the diamond fixture
     await page.setInputFiles('[data-testid="file-input"]', DIAMOND_PATH);
@@ -244,8 +235,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Verify all 11 shapes render as SVG elements (polygon/path elements)
    */
   test('All shapes render as valid SVG elements', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', ALL_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -272,8 +262,7 @@ test.describe('Shape Catalog - Extended Shapes (ADR-0052, ADR-0053)', () => {
    * Test: Create all 11 shapes sequentially
    */
   test('Create all 11 shapes sequentially → all appear', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

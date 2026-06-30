@@ -6,6 +6,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -15,8 +16,7 @@ const MULTI_SHAPES_PATH =
 
 test.describe('Editor: real feature coverage', () => {
   test('Selecting a shape via click updates the inspector Style pane', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -36,8 +36,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Edit > Delete removes the selected shape', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -61,8 +60,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Edit > Undo restores the deleted shape', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -88,8 +86,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('View > Grid menu toggle hides/shows grid', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const canvasContainer = page.locator('[data-testid="canvas-container"]');
     expect(await canvasContainer.evaluate((el) => el.classList.contains('show-grid'))).toBe(true);
@@ -112,8 +109,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('View > Snap menu toggle enables/disables snap', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Open View > Snap menu (force-click because <details> closes on inside-click)
     await page.locator('summary:has-text("View")').first().click();
@@ -127,8 +123,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Ctrl+G toggles the grid (keyboard shortcut)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const canvasContainer = page.locator('[data-testid="canvas-container"]');
     expect(await canvasContainer.evaluate((el) => el.classList.contains('show-grid'))).toBe(true);
@@ -145,8 +140,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Ctrl+Shift+G toggles the snap (keyboard shortcut)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const hudSnap = page.locator('[data-testid="hud-snap"]');
     expect(await hudSnap.textContent()).toBe('Off');
@@ -161,8 +155,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Multi-select via Shift+click selects multiple shapes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', MULTI_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -185,8 +178,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Loading a file preserves the grid overlay', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForTimeout(1500);
@@ -198,8 +190,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Save button is enabled after the bootstrap empty canvas is ready', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     // Wait for the bootstrap empty-page to be rendered
     await page.waitForSelector('[data-testid="canvas-container"] svg', { timeout: 10_000 });
     await page.waitForTimeout(500);
@@ -209,8 +200,7 @@ test.describe('Editor: real feature coverage', () => {
   });
 
   test('Math Mode menu item toggles math overlay', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Open View menu
     await page.locator('summary:has-text("View")').first().click();

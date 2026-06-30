@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const _SIMPLE_RECT_PATH =
@@ -6,8 +7,7 @@ const _SIMPLE_RECT_PATH =
 
 test.describe('Presentation Mode Fullscreen', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
   });
 
   test('Ctrl+Shift+P enters presentation mode with fullscreen', async ({ page }) => {

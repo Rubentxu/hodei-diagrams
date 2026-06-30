@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -9,8 +10,7 @@ test.describe('Suite D: shape-interaction', () => {
    * Test 1: Import simple-rect, click rect → rect gets .selected class
    */
   test('Import simple-rect, click rect → rect gets .selected class', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -35,8 +35,7 @@ test.describe('Suite D: shape-interaction', () => {
    * within the viewer's parent container).
    */
   test('Click on different area → selection lost (class removed)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -62,8 +61,7 @@ test.describe('Suite D: shape-interaction', () => {
    * Test 3: Drag selected shape → shape position changes (check SVG x/y)
    */
   test('Drag selected shape → shape position changes (check SVG x/y)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -91,8 +89,7 @@ test.describe('Suite D: shape-interaction', () => {
    * Test 4: Click without drag (< 3px movement) → no MoveVertex command
    */
   test('Click without drag (< 3px movement) → no MoveVertex command', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -113,8 +110,7 @@ test.describe('Suite D: shape-interaction', () => {
    * Test 5: HUD shows "Rect" or shape type when selected
    */
   test('HUD shows "Rect" or shape type when selected', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -139,8 +135,7 @@ test.describe('Suite D: shape-interaction', () => {
    * Test 6: Delete selected shape → shape removed from SVG
    */
   test('Delete selected shape → shape removed from SVG', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -168,8 +163,7 @@ test.describe('Suite D: shape-interaction', () => {
    * Test 7: Ctrl+Z after delete → shape reappears
    */
   test('Ctrl+Z after delete → shape reappears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

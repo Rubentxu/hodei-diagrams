@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -6,8 +7,7 @@ const SIMPLE_RECT_PATH =
 
 test.describe('G5 smoke test: getScene() in browser', () => {
   test('getScene() returns valid scene JSON with page and display_list', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Import a diagram first
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);

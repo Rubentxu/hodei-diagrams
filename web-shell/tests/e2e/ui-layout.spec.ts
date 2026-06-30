@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -6,8 +7,7 @@ const SIMPLE_RECT_PATH =
 
 test.describe('5-zone UI layout', () => {
   test('all 5 zones are present on initial load', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Verify each zone exists with its data-testid
     await expect(page.locator('[data-testid="navbar"]')).toBeVisible();
@@ -21,8 +21,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('navbar has menu bar and quick controls', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Menu triggers
     await expect(page.locator('[data-testid="menu-file"]')).toBeVisible();
@@ -37,8 +36,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('sidebar has shape categories', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // General shape buttons
     await expect(page.locator('[data-testid="rect-tool-btn"]')).toBeVisible();
@@ -53,8 +51,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('inspector has three tabs with Style active', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Tab bar
     await expect(page.locator('[data-testid="inspector-tab-style"]')).toBeVisible();
@@ -66,8 +63,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('style tab shows controls when shape is selected', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Import a diagram
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -86,8 +82,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('bottom bar has page tabs after import', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -99,8 +94,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('error banner in bottom bar works', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Error banner should exist but be hidden
     const errorBanner = page.locator('[data-testid="error-banner"]');
@@ -118,8 +112,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('zoom display updates on wheel events', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -140,8 +133,7 @@ test.describe('5-zone UI layout', () => {
   });
 
   test('editor features work in new layout', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Import
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);

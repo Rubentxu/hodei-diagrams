@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -7,16 +8,14 @@ const SIMPLE_RECT_PATH =
 test.describe('Slice B: Professional Density UI', () => {
   test.describe('HUD / Status Strip', () => {
     test('HUD is visible between canvas and bottom bar', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const hud = page.locator('[data-testid="hud"]');
       await expect(hud).toBeVisible();
     });
 
     test('HUD shows initial state: no selection, page 1/1, zoom 100%, Edit mode', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const hud = page.locator('[data-testid="hud"]');
       await expect(hud).toBeVisible();
@@ -39,8 +38,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('HUD updates page count after import', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -50,8 +48,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('HUD zoom reset button resets zoom to 100%', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Import a diagram
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -80,8 +77,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('HUD uses monospace font', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const hud = page.locator('[data-testid="hud"]');
       const fontFamily = await hud.evaluate((el) =>
@@ -94,8 +90,7 @@ test.describe('Slice B: Professional Density UI', () => {
   test.describe('Grid Overlay', () => {
     // Reset grid state before each test to prevent pollution from parallel tests
     test.beforeEach(async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
       // Ensure grid is hidden regardless of localStorage from previous tests
       const canvas = page.locator('[data-testid="canvas-container"]');
       const hasGrid = await canvas.evaluate((el) => el.classList.contains('show-grid'));
@@ -149,8 +144,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('grid visibility persists in localStorage', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const canvas = page.locator('[data-testid="canvas-container"]');
       const gridMenu = page.locator('[data-testid="menu-view"]');
@@ -171,8 +165,7 @@ test.describe('Slice B: Professional Density UI', () => {
 
   test.describe('Compact Inspector', () => {
     test('inspector has compact control spacing', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Import a shape to show inspector fields
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -195,8 +188,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('Bold/Italic are button toggles with active state', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -226,8 +218,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('font family dropdown is compact width', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -249,8 +240,7 @@ test.describe('Slice B: Professional Density UI', () => {
 
   test.describe('Sidebar Density', () => {
     test('shape buttons are 40x40 with compact labels', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const rectBtn = page.locator('[data-testid="rect-tool-btn"]');
       await expect(rectBtn).toBeVisible();
@@ -264,8 +254,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('search bar is 28px height', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const search = page.locator('[data-testid="sidebar-search"]');
       await expect(search).toBeVisible();
@@ -274,8 +263,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('category headers use 10px uppercase font', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const catTitle = page.locator('.category-title').first();
       await expect(catTitle).toBeVisible();
@@ -295,8 +283,7 @@ test.describe('Slice B: Professional Density UI', () => {
   test.describe('grid perceptibility (B1)', () => {
     // Ensure clean grid state before each test
     test.beforeEach(async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
       const canvas = page.locator('[data-testid="canvas-container"]');
       const hasGrid = await canvas.evaluate((el) => el.classList.contains('show-grid'));
       if (hasGrid) {
@@ -363,8 +350,7 @@ test.describe('Slice B: Professional Density UI', () => {
   test.describe('HUD B1 readouts', () => {
     // Reset snap and grid state before each test
     test.beforeEach(async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
       await page.waitForTimeout(300);
       // Ensure snap is OFF (Ctrl+Shift+G toggles snap)
       const hudSnap = page.locator('[data-testid="hud-snap"]');
@@ -472,8 +458,7 @@ test.describe('Slice B: Professional Density UI', () => {
     test('9 HUD items present — wraps to multiple lines at 800px narrow viewport', async ({ page }) => {
       // Set narrow viewport to verify 9 items wrap to multiple lines
       await page.setViewportSize({ width: 800, height: 600 });
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Count hud-item children
       const itemCount = await page.locator('[data-testid="hud"] > .hud-item').count();
@@ -493,8 +478,7 @@ test.describe('Slice B: Professional Density UI', () => {
 
   test.describe('Design Token Normalization', () => {
     test('motion transitions use CSS custom properties', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Check that --motion-fast, --motion-normal are defined
       const hasMotionFast = await page.evaluate(() => {
@@ -513,8 +497,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('hud-h token is defined and used', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       const hasHudH = await page.evaluate(() => {
         const value = getComputedStyle(document.documentElement)
@@ -525,8 +508,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('spacing tokens follow DESIGN.md scale', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Check xs=4, sm=8, md=12, lg=16
       const xs = await page.evaluate(() =>
@@ -554,8 +536,7 @@ test.describe('Slice B: Professional Density UI', () => {
     const BANNED_GLYPHS = ['⇤', '⇔', '⇥', '⇑', '⇕', '⇓', '→═←', '↑═↓', '↔', '↕', '⬜'];
 
     test('SVG icons present in arrange buttons, no Unicode glyphs', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Import a diagram to enable arrange buttons
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -598,8 +579,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('Arrange buttons have slate-styled CSS (not browser default)', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -627,8 +607,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('Position inputs populate from single-shape selection', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -666,8 +645,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('Position X input commit dispatches MoveVertex', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -696,8 +674,7 @@ test.describe('Slice B: Professional Density UI', () => {
     });
 
     test('Rotate button is write-only — no rotation field shows current degrees', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });

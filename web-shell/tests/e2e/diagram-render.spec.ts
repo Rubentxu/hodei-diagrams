@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -13,8 +14,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 1: Load simple-rect.drawio → SVG present in viewer
    */
   test('Load simple-rect.drawio → SVG present in viewer', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -28,8 +28,7 @@ test.describe('Suite B: diagram-render', () => {
    * Note: aws-admision.drawio is not present in fixtures; this test is skipped.
    */
   test('Load aws-admision.drawio (4MB, 21 cells) → no crash, SVG present', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     const awsPath = fixturePath('aws-admision.drawio');
     await page.setInputFiles('[data-testid="file-input"]', awsPath);
@@ -45,8 +44,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 3: Verify rect elements in simple-rect have data-vertex-id attribute
    */
   test('Verify rect elements in simple-rect have data-vertex-id attribute', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -65,8 +63,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 4: Verify shapes with style fillColor produce correct SVG fill attribute
    */
   test('Verify shapes with style fillColor produce correct SVG fill attribute', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -85,8 +82,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 5: Load two-page.drawio → page tabs show 2 pages
    */
   test('Load two-page.drawio → page tabs show 2 pages', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_PAGE_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -100,8 +96,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 6: Load two-page → first page rendered by default
    */
   test('Load two-page → first page rendered by default', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_PAGE_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -122,8 +117,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 7: Switch to second page → SVG changes
    */
   test('Switch to second page → SVG changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', TWO_PAGE_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
@@ -152,8 +146,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 8: Load invalid.drawio → error toast appears
    */
   test('Load invalid.drawio → error banner appears', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', INVALID_PATH);
 
@@ -173,8 +166,7 @@ test.describe('Suite B: diagram-render', () => {
    * Test 10: Re-load same file → previous content replaced (no duplicates)
    */
   test('Re-load same file → previous content replaced (no duplicates)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
 
     // Load the file first time
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);

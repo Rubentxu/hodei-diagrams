@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
 
 const SIMPLE_RECT_PATH =
@@ -7,8 +8,7 @@ const SIMPLE_RECT_PATH =
 test.describe('Slice C: Platform Surface UI', () => {
   test.describe('Presentation Mode', () => {
     test('Ctrl+Shift+P enters presentation mode', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Press Ctrl+Shift+P
       await page.keyboard.press('Control+Shift+P');
@@ -29,8 +29,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('Escape exits presentation mode', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Enter presentation mode
       await page.keyboard.press('Control+Shift+P');
@@ -48,8 +47,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('View > Present menu item enters presentation mode', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open View menu
       await page.locator('[data-testid="menu-view"] summary').click();
@@ -63,8 +61,7 @@ test.describe('Slice C: Platform Surface UI', () => {
 
   test.describe('Export SVG', () => {
     test('File > Export > SVG menu item exists and is not disabled', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open File menu
       await page.locator('[data-testid="menu-file"] summary').click();
@@ -87,8 +84,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('Export SVG is wired and functional after loading a diagram', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Load a diagram
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -110,8 +106,7 @@ test.describe('Slice C: Platform Surface UI', () => {
 
   test.describe('Properties Dialog', () => {
     test('File > Properties opens dialog', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open File menu
       await page.locator('[data-testid="menu-file"] summary').click();
@@ -125,8 +120,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('Properties dialog has title, author, description fields', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open dialog
       await page.locator('[data-testid="menu-file"] summary').click();
@@ -139,8 +133,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('Properties dialog has Cancel and Save buttons', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open dialog
       await page.locator('[data-testid="menu-file"] summary').click();
@@ -151,8 +144,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('Cancel closes dialog without saving', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open dialog
       await page.locator('[data-testid="menu-file"] summary').click();
@@ -169,8 +161,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('Dialog does not have v2 footnote', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open dialog
       await page.locator('[data-testid="menu-file"] summary').click();
@@ -181,8 +172,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('Escape closes dialog', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Open dialog
       await page.locator('[data-testid="menu-file"] summary').click();
@@ -206,8 +196,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('future categories have icons', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Find a disabled category
       const disabledCategory = page.locator('.shape-category.disabled').first();
@@ -219,8 +208,7 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
 
     test('category icons are displayed', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await waitForAppReady(page);
 
       // Count categories with icons
       const icons = page.locator('.category-icon');
