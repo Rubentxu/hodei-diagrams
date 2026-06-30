@@ -652,14 +652,15 @@ just all
 
 ### 13.5 Reglas del Ciclo Rápido (INVARIANTES)
 
-1. **`just check`** es el primer paso del loop diario — nunca `cargo build` primero
-2. **`just test`** usa `cargo nextest` si está instalado (hasta 3× más rápido), fallback a `cargo test`
-3. **`just verify`** antes de cada commit — incluye fmt, clippy, check, test
-4. **`just all`** antes de cada PR — la verificación es local y exhaustiva
-5. **`cargo watch`** para hot reload local (re-construye + corre tests en cada cambio)
-6. **`sccache`** solo para dev/test; **nunca** activar en release builds
-7. **No activar `lto` en release** sin medición real de impacto
-8. **Web-shell se verifica vía `just`**, no npm directo — `just web-*` envuelve los comandos para mantener el path de verificación único
+ 1. **`just check`** es el primer paso del loop diario — nunca `cargo build` primero
+ 2. **`just test`** usa `cargo nextest` si está instalado (hasta 3× más rápido), fallback a `cargo test`
+ 3. **`just verify`** antes de cada commit — incluye fmt, clippy, check, test
+ 4. **`just all`** antes de cada PR — la verificación es local y exhaustiva
+ 5. **`cargo watch`** para hot reload local (re-construye + corre tests en cada cambio)
+ 6. **`sccache`** solo para dev/test; **nunca** activar en release builds
+ 7. **No activar `lto` en release** sin medición real de impacto
+ 8. **Web-shell se verifica vía `just`**, no npm directo — `just web-*` envuelve los comandos para mantener el path de verificación único
+ 9. **Git hooks en `.githooks/`** (cycle 21): el `pre-commit` bloquea re-introducir el patrón legacy `goto + networkidle` (ADR-0075 anti-pattern). Activar una vez por clone con `git config core.hooksPath .githooks`. Ver `.githooks/README.md` para detalle. `--no-verify` para saltarlo puntualmente.
 
 ### 13.6 Perfiles de Compilación Optimizados para Dev
 
