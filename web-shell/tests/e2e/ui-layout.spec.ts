@@ -121,10 +121,12 @@ test.describe('5-zone UI layout', () => {
     const zoomDisplay = page.locator('[data-testid="zoom-display"]');
     await expect(zoomDisplay).toHaveText('100%');
 
-    // Scroll wheel on canvas container
+    // Ctrl+wheel on canvas container (draw.io parity: plain wheel pans)
     const canvas = page.locator('[data-testid="canvas-container"]');
     await canvas.hover();
-    await page.mouse.wheel(0, -10); // scroll up = zoom in
+    await canvas.evaluate((el) => {
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+    });
     await page.waitForTimeout(100);
 
     // Zoom should have changed

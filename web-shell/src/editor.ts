@@ -3532,6 +3532,13 @@ export class Editor {
       return;
     }
 
+    // Home → reset view (zoom=1, pan=0,0) — draw.io parity
+    if (!hasMod && e.key === 'Home') {
+      e.preventDefault();
+      this.#resetZoom?.();
+      return;
+    }
+
     // Arrow keys → nudge selected shapes (1px, Shift = 10px)
     if (this.#selection.size > 0 && !hasMod) {
       const step = e.shiftKey ? 10 : 1;

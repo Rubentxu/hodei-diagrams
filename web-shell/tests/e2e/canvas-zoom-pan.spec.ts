@@ -35,6 +35,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
 
   /**
    * Test 2: HUD shows zoom percentage after zooming
+   * Note: Per draw.io parity, plain wheel = pan; Ctrl+wheel = zoom.
    */
   test('HUD shows zoom percentage after zooming', async ({ page }) => {
     await waitForAppReady(page);
@@ -48,9 +49,11 @@ test.describe('Suite C: canvas-zoom-pan', () => {
     // Initial zoom should be 100%
     await expect(zoomDisplay).toHaveText('100%');
 
-    // Zoom in
+    // Zoom in via Ctrl+wheel (draw.io parity: plain wheel pans)
     await canvas.hover({ position: { x: 400, y: 200 } });
-    await page.mouse.wheel(0, -10); // scroll up
+    await canvas.evaluate((el) => {
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+    });
     await page.waitForTimeout(200);
 
     // HUD should show a different zoom percentage
@@ -144,6 +147,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
 
   /**
    * Test 6: Zoom to 200% → shapes appear larger
+   * Note: Per draw.io parity, Ctrl+wheel = zoom.
    */
   test('Zoom to 200% → shapes appear larger', async ({ page }) => {
     await waitForAppReady(page);
@@ -159,10 +163,12 @@ test.describe('Suite C: canvas-zoom-pan', () => {
     const boxBefore = await shape.boundingBox();
     expect(boxBefore).not.toBeNull();
 
-    // Zoom in multiple times to reach 200%
+    // Zoom in via Ctrl+wheel to reach ~200%
     await canvas.hover({ position: { x: 400, y: 200 } });
     for (let i = 0; i < 10; i++) {
-      await page.mouse.wheel(0, -10);
+      await canvas.evaluate((el) => {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+      });
       await page.waitForTimeout(30);
     }
     await page.waitForTimeout(200);
@@ -174,6 +180,7 @@ test.describe('Suite C: canvas-zoom-pan', () => {
 
   /**
    * Test 7: Zoom out to 50% → shapes appear smaller
+   * Note: Per draw.io parity, Ctrl+wheel = zoom.
    */
   test('Zoom out to 50% → shapes appear smaller', async ({ page }) => {
     await waitForAppReady(page);
@@ -183,10 +190,12 @@ test.describe('Suite C: canvas-zoom-pan', () => {
 
     const canvas = page.locator('[data-testid="canvas-container"]');
 
-    // Zoom out multiple times to reach ~50%
+    // Zoom out via Ctrl+wheel to reach ~50%
     await canvas.hover({ position: { x: 400, y: 200 } });
     for (let i = 0; i < 5; i++) {
-      await page.mouse.wheel(0, 10); // scroll down = zoom out
+      await canvas.evaluate((el) => {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaY: 10, ctrlKey: true, bubbles: true, cancelable: true }));
+      });
       await page.waitForTimeout(30);
     }
     await page.waitForTimeout(200);

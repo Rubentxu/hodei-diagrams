@@ -54,10 +54,12 @@ test.describe('Slice B: Professional Density UI', () => {
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-      // Zoom in with wheel
+      // Zoom in with Ctrl+wheel (draw.io parity: plain wheel pans)
       const canvas = page.locator('[data-testid="canvas-container"]');
       await canvas.hover({ position: { x: 600, y: 200 } });
-      await page.mouse.wheel(0, -10); // scroll up = zoom in
+      await canvas.evaluate((el) => {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+      });
       await page.waitForTimeout(200);
 
       // Verify zoom changed
