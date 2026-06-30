@@ -656,7 +656,13 @@ async function bootstrap(): Promise<void> {
     runMathOverlay(svgEl as SVGElement, mathEnabled);
   }
 
-  // ─── 14.7. Ctrl+G keyboard shortcut for grid toggle ──────────────────────
+  // ─── 14.7. App-level keyboard shortcuts ─────────────────────────────────
+  // Cycle 16: previously duplicated editor-level shortcuts (Ctrl+Z/Y) here,
+  // which caused a single keypress to fire undoCmd twice (editor.ts also
+  // registers a keydown handler on document at attach() time). Now this
+  // listener only handles app-level shortcuts: Ctrl+G grid, Ctrl+Shift+P
+  // presentation mode, Escape from presentation. Editor-level shortcuts
+  // (undo/redo/copy/paste/select-all/cut/delete/F2) live in editor.ts.
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
       e.preventDefault();
@@ -970,10 +976,15 @@ async function bootstrap(): Promise<void> {
     }
   });
 
-  // Re-render when session state changes
+  // Re-render when session state changes. Cycle 16: page-level mutations
+  // (page add/delete, undo/redo of such commands) need page-tab refresh
+  // in addition to the scene refresh the editor does. The cost is one
+  // decodeSceneBuffer per state change — bounded, since state changes
+  // are user-initiated.
   activeSession.setOnStateChange(() => {
     activeEditor?.triggerReplay();
     onStateChange();
+    refreshPageTabs();
   });
 
   activeEditor.refreshScene();
@@ -1215,13 +1226,15 @@ async function bootstrap(): Promise<void> {
   });
 
   // ─── 11. Wire Undo/Redo buttons ───────────────────────────────────────────
+  // Cycle 16: page-tab refresh is handled by setOnStateChange, so the
+  // button handlers only need to invoke undo/redo and let the state
+  // change propagate. updateUndoRedoButtons is called inside
+  // onStateChange, so it's covered there too.
   ui.undoButton.addEventListener('click', () => {
     activeEditor?.undoCmd();
-    updateUndoRedoButtons(ui.undoButton, ui.redoButton);
   });
   ui.redoButton.addEventListener('click', () => {
     activeEditor?.redoCmd();
-    updateUndoRedoButtons(ui.undoButton, ui.redoButton);
   });
 
   // ─── 11.5. Wire Add Page button ──────────────────────────────────────────
