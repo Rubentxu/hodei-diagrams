@@ -1667,6 +1667,12 @@ async function bootstrap(): Promise<void> {
       }
     },
     getSession: () => activeSession,
+    /**
+     * Expose the active editor for E2E tests that need to invoke methods
+     * and assert on the `Result`. Avoid using this from production code —
+     * tests only.
+     */
+    getEditor: () => activeEditor ?? null,
     manualSaveVersion,
   };
 
