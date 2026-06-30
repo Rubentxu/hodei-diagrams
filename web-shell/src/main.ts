@@ -1528,29 +1528,42 @@ async function bootstrap(): Promise<void> {
   });
 
   // ─── 13.7.5. Wire Arrange > Layout ───────────────────────────────────────
+  // Apply a layout via menu. Errors must be surfaced via diagnostics, otherwise
+  // failures (e.g. invalid layout kind, no-vertices, was deserialization) get
+  // silently swallowed. Bug uncovered in v0.78 review of LayoutConfig serde gap.
+  function runLayout(kind: string, config: object = {}): void {
+    const result = activeEditor?.applyLayout(kind, config);
+    if (!result) return;
+    if (!result.ok) {
+      ui.setDiagnostics('error', `Layout (${kind}) failed: ${result.error}`);
+    } else {
+      ui.setDiagnostics('clean');
+    }
+  }
+
   const menuLayoutTree = document.querySelector('[data-testid="menu-layout-tree"]');
   menuLayoutTree?.addEventListener('click', () => {
-    activeEditor?.applyLayout('Tree', {});
+    runLayout('Tree', {});
   });
 
   const menuLayoutHierarchical = document.querySelector('[data-testid="menu-layout-hierarchical"]');
   menuLayoutHierarchical?.addEventListener('click', () => {
-    activeEditor?.applyLayout('Hierarchical', {});
+    runLayout('Hierarchical', {});
   });
 
   const menuLayoutOrganic = document.querySelector('[data-testid="menu-layout-organic"]');
   menuLayoutOrganic?.addEventListener('click', () => {
-    activeEditor?.applyLayout('Organic', {});
+    runLayout('Organic', {});
   });
 
   const menuLayoutCircular = document.querySelector('[data-testid="menu-layout-circular"]');
   menuLayoutCircular?.addEventListener('click', () => {
-    activeEditor?.applyLayout('Circular', {});
+    runLayout('Circular', {});
   });
 
   const menuLayoutGrid = document.querySelector('[data-testid="menu-layout-grid"]');
   menuLayoutGrid?.addEventListener('click', () => {
-    activeEditor?.applyLayout('Grid', {});
+    runLayout('Grid', {});
   });
 
   // ─── 13.7.6. Wire Arrange > Re-route Edges ───────────────────────────────────

@@ -6,6 +6,8 @@ import type {
   Vertex,
   GlassConfig,
   GradientConfig,
+  EngineError,
+  Result,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
@@ -747,13 +749,19 @@ export class Editor {
    * @param kind Layout kind: "Organic", "Tree", "Hierarchical", "Circular", "Grid"
    * @param config Optional layout-specific configuration
    */
-  applyLayout(kind: string, config: object = {}): void {
+  /**
+   * Apply a layout algorithm to the current page.
+   * @param kind Layout kind: "Organic", "Tree", "Hierarchical", "Circular", "Grid"
+   * @param config Optional layout-specific configuration
+   * @returns `Result<void, EngineError>` — propagates WASM errors instead of swallowing them.
+   *          Callers must surface failures via diagnostics, otherwise they get hidden in the UI.
+   */
+  applyLayout(kind: string, config: object = {}): Result<void, EngineError> {
     // HierarchicalLayout uses a separate WASM export because it mutates the store in-place
     if (kind === 'Hierarchical') {
-      this.#session.applyHierarchicalLayout(config);
-    } else {
-      this.#session.applyLayout(kind, config);
+      return this.#session.applyHierarchicalLayout(config);
     }
+    return this.#session.applyLayout(kind, config);
   }
 
   /**

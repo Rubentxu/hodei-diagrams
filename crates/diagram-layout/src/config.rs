@@ -176,7 +176,13 @@ pub enum Direction {
 ///
 /// Controls spacing, direction, and iteration limits. Sensible defaults
 /// are provided that match the upstream draw.io layout behaviour.
+///
+/// All fields use `#[serde(default)]` so an empty JSON config (`{}`) is
+/// valid and falls back to the same `Default::default()` values. This makes
+/// the WASM boundary forgiving — callers can pass `{}` when they have no
+/// knobs to set, and existing hand-written configs keep working.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LayoutConfig {
     /// The direction of the layout flow.
     pub direction: Direction,
