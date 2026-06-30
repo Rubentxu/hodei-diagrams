@@ -7,5 +7,17 @@ test-results/
 coverage/
 *.log
 
-# Local scratch / verification-only Playwright specs (not shipped with repo)
-tests/e2e/_verify/
+# Visual-flows screenshot output. PNGs are local validation only — they
+# captured by spec tests, not part of the committed test assets.
+tests/e2e/screenshots/
+
+# Local scratch Playwright specs in _verify/ — debug/capture/inspect
+# helpers, not shipped with the canonical suite. visual-flows.spec.ts was
+# promoted out of _verify/ in v0.82.0 (cycle 17); the rest stays.
+tests/e2e/_verify/bootstrap.spec.ts
+tests/e2e/_verify/capture-*
+tests/e2e/_verify/debug-*
+tests/e2e/_verify/inspect-*
+tests/e2e/_verify/visual-features.spec.ts
+tests/e2e/_verify/visual-smoke.spec.ts
+tests/e2e/_verify/screenshots/
