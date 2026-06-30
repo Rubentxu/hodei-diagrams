@@ -219,6 +219,53 @@ mod tests {
         assert_eq!(cfg.max_iterations, 8);
     }
 
+    /// Regression guard for cycle 13's fix: `apply_layout` WASM function
+    /// accepts the JSON `{}` because the JS shell always sends an empty
+    /// config object. If someone removes `#[serde(default)]` from the
+    /// struct, the WASM deserialization fails with "missing field
+    /// direction" and the layout silently no-ops — which is exactly the
+    /// bug cycle 13 spent six cycles chasing. This test pins the
+    /// behavior so a future refactor can't silently regress it.
+    #[test]
+    fn empty_json_object_round_trips_to_default_layout_config() {
+        let cfg: LayoutConfig = serde_json::from_str("{}")
+            .expect("empty object must deserialize via #[serde(default)]");
+
+        assert_eq!(cfg.direction, Direction::TopToBottom);
+        assert!((cfg.intra_cell_spacing - 30.0).abs() < 1e-9);
+        assert!((cfg.inter_rank_spacing - 100.0).abs() < 1e-9);
+        assert_eq!(cfg.max_iterations, 8);
+    }
+
+    /// Partial JSON: only some fields provided, the rest default. Mirrors
+    /// what a future caller might do — pass `{ "direction": "LeftToRight" }`
+    /// and let the rest fall back to sensible defaults.
+    #[test]
+    fn partial_json_uses_defaults_for_missing_fields() {
+        let cfg: LayoutConfig = serde_json::from_str(r#"{"direction":"LeftToRight"}"#)
+            .expect("partial object must deserialize via per-field #[serde(default)]");
+
+        assert_eq!(cfg.direction, Direction::LeftToRight);
+        assert!((cfg.intra_cell_spacing - 30.0).abs() < 1e-9);
+        assert!((cfg.inter_rank_spacing - 100.0).abs() < 1e-9);
+        assert_eq!(cfg.max_iterations, 8);
+    }
+
+    /// Round-trip: deserialize → serialize → deserialize yields the same value.
+    /// Catches asymmetric serde annotations (e.g. default-only-on-read).
+    #[test]
+    fn layout_config_round_trips_through_serde() {
+        let original = LayoutConfig {
+            direction: Direction::LeftToRight,
+            intra_cell_spacing: 42.5,
+            inter_rank_spacing: 99.0,
+            max_iterations: 3,
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let round_tripped: LayoutConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(round_tripped, original);
+    }
+
     #[test]
     fn direction_equality() {
         assert_eq!(Direction::TopToBottom, Direction::TopToBottom);
