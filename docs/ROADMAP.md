@@ -304,7 +304,7 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
 | PR | Scope | Branch | Status |
 |----|-------|--------|--------|
 | PR1 | Engine foundation (LayerId, Layer, ModelStore.layers, layer_id on Vertex/Edge/Group) | `feat/ip-f-layer-foundation` | ✅ PR ready; verify PASS+debt-verify PASS |
-| PR2 | Commands + History (AddLayer, RemoveLayer, RenameLayer, SetLayerVisible, SetLayerLocked, MoveShapeToLayer + undo) | Planned | ⏳ |
+| PR2 | Commands + History (AddLayer, RemoveLayer, RenameLayer, SetLayerVisible, SetLayerLocked, MoveShapeToLayer + undo/redo) | `feat/ip-f-layer-commands-history` | ✅ PR ready; verify PASS after 2 bounded debt fixes |
 | PR3 | .drawio round-trip (pass-1 layer branch in parser, writer emits `parent="0"`, 3-layer golden fixture) | Planned | ⏳ |
 | PR4 | Scene projection (SceneBuilder filters hidden layers) | Planned | ⏳ |
 | PR5 | Web-shell UI (Layer panel + Z-Order rename + ≥8 E2E) | Planned | ⏳ |

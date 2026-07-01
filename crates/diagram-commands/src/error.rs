@@ -1,7 +1,7 @@
 //! Error types for the diagram-commands crate.
 
 use diagram_core::CoreError;
-use diagram_core::{EdgeId, GroupId, PageId, StyleId, VertexId};
+use diagram_core::{EdgeId, GroupId, LayerId, PageId, StyleId, VertexId};
 use thiserror::Error;
 
 /// Errors that can occur while applying or undoing commands.
@@ -26,6 +26,10 @@ pub enum CommandError {
     /// A page was not found when applying a command.
     #[error("page `{0}` not found")]
     PageNotFound(PageId),
+
+    /// A layer was not found when applying a command.
+    #[error("layer `{0}` not found")]
+    LayerNotFound(LayerId),
 
     /// A style was not found when applying a command.
     #[error("style `{0}` not found")]

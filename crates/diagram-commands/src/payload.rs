@@ -470,6 +470,12 @@ impl SendBackwardPayload {
 /// Captured state for undo of a group removal.
 type OrphanedChildren = Vec<(VertexId, Option<GroupId>)>;
 
+/// Captured state for undo of a layer removal (layer + shape ids).
+/// Shape prev-layer-id was tracked but never used — undo always restores to the
+/// re-inserted layer's live id (which may differ from the removed id due to
+/// slotmap reuse). Kept as simple id vectors for clarity.
+type RemovedLayer = (Layer, Vec<VertexId>, Vec<EdgeId>);
+
 /// Captured state for undo of a page removal (page + all its cells).
 #[allow(clippy::type_complexity)]
 type RemovedPage = (
@@ -2410,6 +2416,521 @@ impl SetDefaultStylePayload {
         }
         let prev = self.prev_style.take();
         model.set_default_style(prev);
+        self.applied = false;
+        Ok(())
+    }
+}
+
+// ─── IP-F: Layer Command Payloads ────────────────────────────────────────────
+
+/// IP-F: Payload for adding a named layer to a page.
+///
+/// The new layer starts visible and unlocked. The default layer (name: None)
+/// for a page is created by the engine when a page is first inserted.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddLayerPayload {
+    /// The page to add the layer to.
+    pub page_id: PageId,
+    /// The name for the new layer. `None` creates a default layer (discouraged —
+    /// use page's auto-created default instead).
+    pub name: Option<Label>,
+    /// The assigned layer ID, populated by `apply`. Used by `undo`.
+    #[serde(skip)]
+    pub inserted_id: Option<LayerId>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl AddLayerPayload {
+    /// Create a new payload for adding a named layer.
+    pub fn new(page_id: PageId, name: Option<Label>) -> Self {
+        Self {
+            page_id,
+            name,
+            inserted_id: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the add-layer operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let mut layer = Layer::default();
+        layer.page_id = self.page_id;
+        layer.name = self.name.clone();
+        // visible: true, locked: false by default
+        let id = model.store.insert_layer(layer);
+        self.inserted_id = Some(id);
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the add-layer operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let id = self.inserted_id.take().ok_or(CommandError::NotApplied)?;
+        model.store.remove_layer(id);
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-F: Payload for removing a layer.
+///
+/// Shapes on the removed layer are moved to the page's default layer.
+/// The default layer itself cannot be removed (this is a no-op).
+///
+/// # Undo/Redo State
+///
+/// `self.layer_id` is the input id (set at construction). After undo re-inserts
+/// the layer, `self.live_layer_id` tracks the slotmap's actual assigned id (which
+/// may differ due to key reuse). Redo uses `live_layer_id` to find the correct
+/// layer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoveLayerPayload {
+    /// The layer to remove.
+    pub layer_id: LayerId,
+    /// The live layer id after undo. Used by redo to find the re-inserted layer.
+    /// Populated by `undo`; `apply` falls back to `layer_id` if this is `None`.
+    #[serde(skip)]
+    live_layer_id: Option<LayerId>,
+    /// The removed layer and the shape ids that were on it. Populated by `apply`.
+    #[serde(skip)]
+    pub removed: Option<RemovedLayer>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl RemoveLayerPayload {
+    /// Create a new payload for removing a layer.
+    pub fn new(layer_id: LayerId) -> Self {
+        Self {
+            layer_id,
+            live_layer_id: None,
+            removed: None,
+            applied: false,
+        }
+    }
+
+    /// Find the default layer ID for a given page.
+    fn find_default_layer_id(store: &diagram_core::ModelStore, page_id: PageId) -> Option<LayerId> {
+        store
+            .layers_with_ids()
+            .find(|(_, l)| l.page_id == page_id && l.name.is_none())
+            .map(|(id, _)| id)
+    }
+
+    /// Apply the remove-layer operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        // Resolve the live layer id: undo populates live_layer_id; first apply uses layer_id.
+        let live_id = self.live_layer_id.unwrap_or(self.layer_id);
+
+        // Get the layer or error
+        let layer = model
+            .store
+            .layer(live_id)
+            .cloned()
+            .ok_or(CommandError::LayerNotFound(live_id))?;
+
+        // No-op if this is the default layer
+        if layer.is_default() {
+            self.applied = true;
+            return Ok(());
+        }
+
+        let page_id = layer.page_id;
+
+        // Find the default layer for this page
+        let default_layer_id = Self::find_default_layer_id(&model.store, page_id)
+            .ok_or(CommandError::LayerNotFound(live_id))?;
+
+        // Collect vertex ids on this layer
+        let vertex_ids: Vec<VertexId> = model
+            .store
+            .vertices_with_ids()
+            .filter(|(_, v)| v.layer_id == Some(live_id))
+            .map(|(vid, _)| vid)
+            .collect();
+
+        // Collect edge ids on this layer
+        let edge_ids: Vec<EdgeId> = model
+            .store
+            .edges_with_ids()
+            .filter(|(_, e)| e.layer_id == Some(live_id))
+            .map(|(eid, _)| eid)
+            .collect();
+
+        // Now update vertices (no longer iterating)
+        for &vid in &vertex_ids {
+            if let Some(v) = model.store.vertex_mut(vid) {
+                v.layer_id = Some(default_layer_id);
+            }
+        }
+
+        // Now update edges
+        for &eid in &edge_ids {
+            if let Some(e) = model.store.edge_mut(eid) {
+                e.layer_id = Some(default_layer_id);
+            }
+        }
+
+        // Remove the layer
+        model.store.remove_layer(live_id);
+
+        self.removed = Some((layer, vertex_ids, edge_ids));
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the remove-layer operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let (layer, vertex_ids, edge_ids) = self.removed.take().ok_or(CommandError::NotApplied)?;
+
+        // Re-insert the layer. Slotmap may reuse the removed slot or allocate a new key,
+        // so we MUST capture the returned id — the stored layer always has this id.
+        let mut reinserted = layer.clone();
+        reinserted.id = self.layer_id;
+        let new_id = model.store.insert_layer(reinserted);
+
+        // Track the live id so redo can find the correct layer.
+        self.live_layer_id = Some(new_id);
+
+        // Restore vertex layer_ids to the re-inserted layer's actual id.
+        for vid in vertex_ids {
+            if let Some(v) = model.store.vertex_mut(vid) {
+                v.layer_id = Some(new_id);
+            }
+        }
+
+        // Restore edge layer_ids
+        for eid in edge_ids {
+            if let Some(e) = model.store.edge_mut(eid) {
+                e.layer_id = Some(new_id);
+            }
+        }
+
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-F: Payload for renaming a layer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenameLayerPayload {
+    /// The layer to rename.
+    pub layer_id: LayerId,
+    /// The new name.
+    pub name: Label,
+    /// The previous name. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_name: Option<Label>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl RenameLayerPayload {
+    /// Create a new payload for renaming a layer.
+    pub fn new(layer_id: LayerId, name: Label) -> Self {
+        Self {
+            layer_id,
+            name,
+            prev_name: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the rename-layer operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let layer = model
+            .store
+            .layer_mut(self.layer_id)
+            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+
+        // Capture previous name
+        self.prev_name = layer.name.clone();
+
+        // Apply new name
+        layer.name = Some(self.name.clone());
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the rename-layer operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_name.take();
+        let layer = model
+            .store
+            .layer_mut(self.layer_id)
+            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+        layer.name = prev;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-F: Payload for toggling layer visibility.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetLayerVisiblePayload {
+    /// The layer to modify.
+    pub layer_id: LayerId,
+    /// The new visibility state.
+    pub visible: bool,
+    /// The previous visibility state. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_visible: Option<bool>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetLayerVisiblePayload {
+    /// Create a new payload for setting layer visibility.
+    pub fn new(layer_id: LayerId, visible: bool) -> Self {
+        Self {
+            layer_id,
+            visible,
+            prev_visible: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-layer-visibility operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let layer = model
+            .store
+            .layer_mut(self.layer_id)
+            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+
+        // Capture previous visibility
+        self.prev_visible = Some(layer.visible);
+
+        // Apply new visibility
+        layer.visible = self.visible;
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the set-layer-visibility operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_visible.take();
+        let layer = model
+            .store
+            .layer_mut(self.layer_id)
+            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+        layer.visible = prev.unwrap_or(true);
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-F: Payload for toggling layer locked state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetLayerLockedPayload {
+    /// The layer to modify.
+    pub layer_id: LayerId,
+    /// The new locked state.
+    pub locked: bool,
+    /// The previous locked state. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_locked: Option<bool>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetLayerLockedPayload {
+    /// Create a new payload for setting layer locked state.
+    pub fn new(layer_id: LayerId, locked: bool) -> Self {
+        Self {
+            layer_id,
+            locked,
+            prev_locked: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-layer-locked operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let layer = model
+            .store
+            .layer_mut(self.layer_id)
+            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+
+        // Capture previous locked state
+        self.prev_locked = Some(layer.locked);
+
+        // Apply new locked state
+        layer.locked = self.locked;
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the set-layer-locked operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_locked.take();
+        let layer = model
+            .store
+            .layer_mut(self.layer_id)
+            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+        layer.locked = prev.unwrap_or(false);
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-F: Payload for moving shapes to a different layer.
+/// Moves both vertices and their connecting edges to the target layer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoveShapeToLayerPayload {
+    /// The IDs of the vertices to move.
+    pub vertex_ids: Vec<VertexId>,
+    /// The IDs of the edges to move.
+    pub edge_ids: Vec<EdgeId>,
+    /// The target layer. `None` means the page's default layer.
+    pub layer_id: Option<LayerId>,
+    /// The previous layer IDs for each shape, populated by `apply`.
+    #[serde(skip)]
+    pub prev_vertex_layer_ids: Option<Vec<(VertexId, Option<LayerId>)>>,
+    /// The previous layer IDs for each edge, populated by `apply`.
+    #[serde(skip)]
+    pub prev_edge_layer_ids: Option<Vec<(EdgeId, Option<LayerId>)>>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl MoveShapeToLayerPayload {
+    /// Create a new payload for moving shapes to a layer.
+    pub fn new(vertex_ids: Vec<VertexId>, layer_id: Option<LayerId>) -> Self {
+        Self {
+            vertex_ids,
+            edge_ids: Vec::new(),
+            layer_id,
+            prev_vertex_layer_ids: None,
+            prev_edge_layer_ids: None,
+            applied: false,
+        }
+    }
+
+    /// Create a new payload for moving shapes (vertices AND edges) to a layer.
+    pub fn with_edges(
+        vertex_ids: Vec<VertexId>,
+        edge_ids: Vec<EdgeId>,
+        layer_id: Option<LayerId>,
+    ) -> Self {
+        Self {
+            vertex_ids,
+            edge_ids,
+            layer_id,
+            prev_vertex_layer_ids: None,
+            prev_edge_layer_ids: None,
+            applied: false,
+        }
+    }
+
+    /// Find the default layer ID for a given page, based on any existing shape's page.
+    fn find_default_layer_for_shapes(
+        store: &diagram_core::ModelStore,
+        vertex_ids: &[VertexId],
+    ) -> Option<LayerId> {
+        // Get the page_id from the first vertex
+        let page_id = vertex_ids
+            .iter()
+            .find_map(|vid| store.vertex(*vid).and_then(|v| v.page_id))?;
+
+        // Find the default layer (name: None) for that page
+        store
+            .layers_with_ids()
+            .find(|(_, l)| l.page_id == page_id && l.name.is_none())
+            .map(|(id, _)| id)
+    }
+
+    /// Apply the move-shape-to-layer operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        // Resolve target layer: if None, find the default layer
+        let target_layer_id = match self.layer_id {
+            Some(id) => {
+                // Verify the layer exists
+                if model.store.layer(id).is_none() {
+                    return Err(CommandError::LayerNotFound(id));
+                }
+                id
+            }
+            None => Self::find_default_layer_for_shapes(&model.store, &self.vertex_ids)
+                .ok_or(CommandError::LayerNotFound(LayerId::default()))?,
+        };
+
+        // Capture previous layer_ids for vertices and update
+        let mut prev_vids: Vec<(VertexId, Option<LayerId>)> = Vec::new();
+        for vid in &self.vertex_ids {
+            let vertex = model
+                .store
+                .vertex_mut(*vid)
+                .ok_or(CommandError::VertexNotFound(*vid))?;
+            prev_vids.push((*vid, vertex.layer_id));
+            vertex.layer_id = Some(target_layer_id);
+        }
+        self.prev_vertex_layer_ids = Some(prev_vids);
+
+        // Capture previous layer_ids for edges and update
+        let mut prev_eids: Vec<(EdgeId, Option<LayerId>)> = Vec::new();
+        for eid in &self.edge_ids {
+            let edge = model
+                .store
+                .edge_mut(*eid)
+                .ok_or(CommandError::EdgeNotFound(*eid))?;
+            prev_eids.push((*eid, edge.layer_id));
+            edge.layer_id = Some(target_layer_id);
+        }
+        self.prev_edge_layer_ids = Some(prev_eids);
+
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the move-shape-to-layer operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+
+        // Restore vertex layer_ids
+        if let Some(prev_vids) = self.prev_vertex_layer_ids.take() {
+            for (vid, prev_layer_id) in prev_vids {
+                if let Some(vertex) = model.store.vertex_mut(vid) {
+                    vertex.layer_id = prev_layer_id;
+                }
+            }
+        }
+
+        // Restore edge layer_ids
+        if let Some(prev_eids) = self.prev_edge_layer_ids.take() {
+            for (eid, prev_layer_id) in prev_eids {
+                if let Some(edge) = model.store.edge_mut(eid) {
+                    edge.layer_id = prev_layer_id;
+                }
+            }
+        }
+
         self.applied = false;
         Ok(())
     }
