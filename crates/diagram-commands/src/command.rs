@@ -197,7 +197,7 @@ mod tests {
     use diagram_core::label::Label;
     use diagram_core::page::Page;
     use diagram_core::style::{StyleMap, StyleValue};
-    use diagram_core::{Edge, EdgeId, Group, PageId, Vertex, VertexId};
+    use diagram_core::{Edge, EdgeId, Group, GroupId, PageId, Vertex, VertexId};
 
     use super::*;
     use crate::RoutingKind;
@@ -207,10 +207,6 @@ mod tests {
         let mut model = DiagramModel::new();
         let page = Page::new(PageId::default());
         let pid = model.store.insert_page(page);
-        // Fix up the page's id field to match the slotmap key
-        if let Some(p) = model.store.page_mut(pid) {
-            p.id = pid;
-        }
         (model, pid)
     }
 
@@ -954,38 +950,308 @@ mod tests {
 
     // ─── IP-E: DuplicatePage + ReorderPage scaffolds ──────────────────────
 
-    #[test]
-    fn apply_duplicate_page_returns_not_implemented() {
-        let (mut model, pid) = make_model_with_page();
-        let mut cmd = Command::DuplicatePage(DuplicatePagePayload::new(pid, None));
-        let result = cmd.apply(&mut model);
-        assert!(matches!(
-            result,
-            Err(crate::error::CommandError::NotImplemented(_))
-        ));
-        // Model is unchanged
-        assert_eq!(model.store.page_count(), 1);
+    // ─── IP-D/IP-E follow-up: DuplicatePage full implementation ─────────────
+
+    fn add_vertex_at(
+        model: &mut DiagramModel,
+        pid: PageId,
+        x: f64,
+        y: f64,
+    ) -> (VertexId, diagram_core::Vertex) {
+        let v = Vertex {
+            page_id: Some(pid),
+            geometry: Some(CellGeometry {
+                x,
+                y,
+                width: 80.0,
+                height: 40.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let id = model.store.insert_vertex(v.clone());
+        (id, v)
+    }
+
+    fn add_edge_between_v(
+        model: &mut DiagramModel,
+        v1_id: VertexId,
+        v2_id: VertexId,
+        page_id: PageId,
+    ) -> EdgeId {
+        let edge = Edge {
+            source: v1_id,
+            target: v2_id,
+            page_id: Some(page_id),
+            ..Default::default()
+        };
+        model.store.insert_edge(edge)
+    }
+
+    fn add_group_with_vertex(model: &mut DiagramModel, v_id: VertexId, page_id: PageId) -> GroupId {
+        let g = Group {
+            page_id: Some(page_id),
+            ..Default::default()
+        };
+        let id = model.store.insert_group(g);
+        if let Some(v) = model.store.vertex_mut(v_id) {
+            v.parent = Some(id);
+        }
+        id
     }
 
     #[test]
-    fn apply_reorder_page_returns_not_implemented() {
-        let (mut model, _pid) = make_model_with_page();
-        // Add a second page so we can try to reorder
-        let new_page = Page::default();
-        let new_pid = model.store.insert_page(new_page);
-        let pid_to_move = model.store.pages_with_ids().next().unwrap().0;
-        let mut cmd = Command::ReorderPage(ReorderPagePayload::new(
-            pid_to_move,
-            ReorderDirection::Right,
-        ));
-        let result = cmd.apply(&mut model);
-        assert!(matches!(
-            result,
-            Err(crate::error::CommandError::NotImplemented(_))
-        ));
-        // Model is unchanged: 2 pages still in original order
+    fn apply_duplicate_page_creates_copy_with_new_ids() {
+        let (mut model, pid) = make_model_with_page();
+        let (v1_id, _) = add_vertex_at(&mut model, pid, 10.0, 10.0);
+        let (v2_id, _) = add_vertex_at(&mut model, pid, 100.0, 10.0);
+        add_edge_between_v(&mut model, v1_id, v2_id, pid);
+
+        let mut cmd = Command::DuplicatePage(DuplicatePagePayload::new(pid, None));
+        cmd.apply(&mut model).unwrap();
+
+        // The new page exists
         assert_eq!(model.store.page_count(), 2);
-        let _ = new_pid; // suppress unused warning
+        let new_pid = model
+            .store
+            .pages_with_ids()
+            .nth(1)
+            .map(|(k, _)| k)
+            .expect("new page should exist");
+
+        // The new page has 2 vertices with new IDs and same geometry
+        let new_vertices: Vec<_> = model
+            .store
+            .vertices_with_ids()
+            .filter(|(_, v)| v.page_id == Some(new_pid))
+            .collect();
+        assert_eq!(new_vertices.len(), 2);
+
+        // Old IDs are not the new IDs
+        let new_ids: std::collections::HashSet<_> = new_vertices.iter().map(|(k, _)| *k).collect();
+        assert!(!new_ids.contains(&v1_id));
+        assert!(!new_ids.contains(&v2_id));
+
+        // The old vertices are unchanged
+        assert!(model.store.vertex(v1_id).is_some());
+        assert!(model.store.vertex(v2_id).is_some());
+    }
+
+    #[test]
+    fn apply_duplicate_page_with_vertices_creates_copy() {
+        let (mut model, pid) = make_model_with_page();
+        let (_v1_id, _) = add_vertex_at(&mut model, pid, 10.0, 10.0);
+        let (_v2_id, _) = add_vertex_at(&mut model, pid, 200.0, 200.0);
+
+        let mut cmd = Command::DuplicatePage(DuplicatePagePayload::new(pid, None));
+        cmd.apply(&mut model).unwrap();
+
+        let new_pid = model.store.pages_with_ids().nth(1).unwrap().0;
+        let new_vertices: Vec<_> = model
+            .store
+            .vertices_with_ids()
+            .filter(|(_, v)| v.page_id == Some(new_pid))
+            .collect();
+        assert_eq!(new_vertices.len(), 2);
+
+        // Geometries match the originals
+        for (_, v) in &new_vertices {
+            let geo = v.geometry.as_ref().expect("vertex has geometry");
+            assert_eq!(geo.width, 80.0);
+            assert_eq!(geo.height, 40.0);
+        }
+    }
+
+    #[test]
+    fn apply_duplicate_page_with_edges_rewrites_references() {
+        let (mut model, pid) = make_model_with_page();
+        let (v1_id, _) = add_vertex_at(&mut model, pid, 10.0, 10.0);
+        let (v2_id, _) = add_vertex_at(&mut model, pid, 100.0, 10.0);
+        let old_edge_id = add_edge_between_v(&mut model, v1_id, v2_id, pid);
+
+        let mut cmd = Command::DuplicatePage(DuplicatePagePayload::new(pid, None));
+        cmd.apply(&mut model).unwrap();
+
+        let new_pid = model.store.pages_with_ids().nth(1).unwrap().0;
+
+        // Find the duplicated edge
+        let new_edges: Vec<_> = model
+            .store
+            .edges_with_ids()
+            .filter(|(_, e)| e.page_id == Some(new_pid))
+            .collect();
+        assert_eq!(new_edges.len(), 1);
+
+        let (_, new_edge) = &new_edges[0];
+        // The new edge's source/target are the NEW vertex IDs, not the old ones
+        assert_ne!(new_edge.source, v1_id);
+        assert_ne!(new_edge.target, v2_id);
+
+        // The new vertices referenced by the new edge exist
+        assert!(model.store.vertex(new_edge.source).is_some());
+        assert!(model.store.vertex(new_edge.target).is_some());
+
+        // The old edge is unchanged
+        let old_edge = model.store.edge(old_edge_id).unwrap();
+        assert_eq!(old_edge.source, v1_id);
+        assert_eq!(old_edge.target, v2_id);
+    }
+
+    #[test]
+    fn apply_duplicate_page_with_groups_rewrites_memberships() {
+        let (mut model, pid) = make_model_with_page();
+        let (v1_id, _) = add_vertex_at(&mut model, pid, 10.0, 10.0);
+        let (_v2_id, _) = add_vertex_at(&mut model, pid, 100.0, 10.0);
+        let old_gid = add_group_with_vertex(&mut model, v1_id, pid);
+        // v2 has no parent (top-level)
+
+        let mut cmd = Command::DuplicatePage(DuplicatePagePayload::new(pid, None));
+        cmd.apply(&mut model).unwrap();
+
+        let new_pid = model.store.pages_with_ids().nth(1).unwrap().0;
+        // Find duplicated vertices on the new page
+        let new_vertices: Vec<_> = model
+            .store
+            .vertices_with_ids()
+            .filter(|(_, v)| v.page_id == Some(new_pid))
+            .collect();
+        assert_eq!(new_vertices.len(), 2);
+
+        // The vertex that was in a group has a NEW group_id (not old_gid)
+        for (_, v) in &new_vertices {
+            if let Some(new_gid) = v.parent {
+                assert_ne!(new_gid, old_gid);
+            }
+        }
+
+        // A new group was created (the new gid_map should have old_gid -> new_gid)
+        // The new_gid is now the parent of one of the new vertices
+        // (we just verify it's NOT the old one)
+    }
+
+    #[test]
+    fn apply_duplicate_page_undo_removes_all_copied_cells() {
+        let (mut model, pid) = make_model_with_page();
+        let (v1_id, _) = add_vertex_at(&mut model, pid, 10.0, 10.0);
+        let (v2_id, _) = add_vertex_at(&mut model, pid, 100.0, 10.0);
+        add_edge_between_v(&mut model, v1_id, v2_id, pid);
+
+        let mut cmd = Command::DuplicatePage(DuplicatePagePayload::new(pid, None));
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.page_count(), 2);
+
+        // Undo removes the new page (cascade removes all cloned cells)
+        cmd.undo(&mut model).unwrap();
+        assert_eq!(model.store.page_count(), 1);
+
+        // Only the original vertices remain
+        assert!(model.store.vertex(v1_id).is_some());
+        assert!(model.store.vertex(v2_id).is_some());
+
+        // The edge count is 1 (the original)
+        assert_eq!(model.store.len_edge(), 1);
+    }
+
+    // ─── IP-D/IP-E follow-up: ReorderPage full implementation ──────────────
+
+    fn add_three_pages(model: &mut DiagramModel) -> Vec<PageId> {
+        let mut pids = Vec::new();
+        for i in 0..3 {
+            let p = Page {
+                name: Some(diagram_core::label::Label::new(format!("Page{}", i))),
+                ..Default::default()
+            };
+            pids.push(model.store.insert_page(p));
+        }
+        pids
+    }
+
+    #[test]
+    fn apply_reorder_page_left_moves_page_back() {
+        let (mut model, _) = make_model_with_page();
+        // Replace the default page with 3 pages for a clear test
+        // (the make_model_with_page already inserted one; add two more)
+        let first_pid = model.store.pages_with_ids().next().unwrap().0;
+        let _ = model.store.remove_page(first_pid);
+        let pids = add_three_pages(&mut model);
+        // pids: [Page0, Page1, Page2]
+        // Move Page1 left → order should be [Page1, Page0, Page2]
+
+        let mut cmd =
+            Command::ReorderPage(ReorderPagePayload::new(pids[1], ReorderDirection::Left));
+        cmd.apply(&mut model).unwrap();
+
+        let new_order: Vec<PageId> = model.pages_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(new_order, vec![pids[1], pids[0], pids[2]]);
+    }
+
+    #[test]
+    fn apply_reorder_page_right_moves_page_forward() {
+        let (mut model, _) = make_model_with_page();
+        let first_pid = model.store.pages_with_ids().next().unwrap().0;
+        let _ = model.store.remove_page(first_pid);
+        let pids = add_three_pages(&mut model);
+
+        let mut cmd =
+            Command::ReorderPage(ReorderPagePayload::new(pids[1], ReorderDirection::Right));
+        cmd.apply(&mut model).unwrap();
+
+        let new_order: Vec<PageId> = model.pages_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(new_order, vec![pids[0], pids[2], pids[1]]);
+    }
+
+    #[test]
+    fn apply_reorder_page_at_first_left_noop() {
+        let (mut model, _) = make_model_with_page();
+        let first_pid = model.store.pages_with_ids().next().unwrap().0;
+        let _ = model.store.remove_page(first_pid);
+        let pids = add_three_pages(&mut model);
+
+        // Move Page0 (first) left → boundary, no-op
+        let mut cmd =
+            Command::ReorderPage(ReorderPagePayload::new(pids[0], ReorderDirection::Left));
+        cmd.apply(&mut model).unwrap();
+
+        // Order unchanged
+        let new_order: Vec<PageId> = model.pages_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(new_order, vec![pids[0], pids[1], pids[2]]);
+    }
+
+    #[test]
+    fn apply_reorder_page_at_last_right_noop() {
+        let (mut model, _) = make_model_with_page();
+        let first_pid = model.store.pages_with_ids().next().unwrap().0;
+        let _ = model.store.remove_page(first_pid);
+        let pids = add_three_pages(&mut model);
+
+        // Move Page2 (last) right → boundary, no-op
+        let mut cmd =
+            Command::ReorderPage(ReorderPagePayload::new(pids[2], ReorderDirection::Right));
+        cmd.apply(&mut model).unwrap();
+
+        let new_order: Vec<PageId> = model.pages_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(new_order, vec![pids[0], pids[1], pids[2]]);
+    }
+
+    #[test]
+    fn apply_reorder_page_undo_restores_order() {
+        let (mut model, _) = make_model_with_page();
+        let first_pid = model.store.pages_with_ids().next().unwrap().0;
+        let _ = model.store.remove_page(first_pid);
+        let pids = add_three_pages(&mut model);
+
+        // Apply a reorder
+        let mut cmd =
+            Command::ReorderPage(ReorderPagePayload::new(pids[1], ReorderDirection::Left));
+        cmd.apply(&mut model).unwrap();
+
+        let after_apply: Vec<PageId> = model.pages_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(after_apply, vec![pids[1], pids[0], pids[2]]);
+
+        // Undo restores the original order
+        cmd.undo(&mut model).unwrap();
+        let after_undo: Vec<PageId> = model.pages_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(after_undo, vec![pids[0], pids[1], pids[2]]);
     }
 
     // ─── RemoveEdge ────────────────────────────────────────────────────────────

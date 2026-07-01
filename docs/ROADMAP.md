@@ -257,6 +257,65 @@ Planning artifacts:
 
 WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bottleneck on 1k/5k/10k-shape fixtures.
 
+## 🎯 Active Track: Interaction Parity Campaign (2026-07-01)
+
+**Strategy**: Close UX/behavior gaps vs draw.io using measured evidence and ADR-driven decisions.
+
+### Milestones Delivered (Merged to main)
+
+- **IP-A (Pan/Zoom)**: `feat/interaction-parity-pan-zoom` (PR #154).
+  - Plain wheel = vertical pan, `Shift+wheel` = horizontal pan, `Ctrl/Cmd+wheel` = zoom.
+  - `Space+drag` pan, right-click drag pan, `Home` reset view.
+  - E2E: `tests/e2e/navigation-modifiers.spec.ts`.
+- **IP-B (Selection Modifiers)**: `feat/interaction-parity-selection-modifiers` (PR #155).
+  - `Alt+drag` force selection box, `Alt+Shift+drag` deselect box, `Alt+click` cycle z-stack.
+  - `Tab`/`Shift+Tab` cycle selection, `Ctrl+Shift+A` deselect all.
+  - `Ctrl+E` select connectors, `Ctrl+I` select shapes.
+  - E2E: `tests/e2e/selection-modifiers.spec.ts`.
+- **IP-C (Connector Style)**: `feat/interaction-parity-ip-c-connector-style` (PR #156).
+  - Style clipboard (`Alt+C`/`Alt+V`), default style editor cache.
+  - `clearAllWaypoints()` + `Alt+Shift+R`.
+  - Connector context menu (Add/Remove Waypoint), shape library modifier routing.
+  - E2E: `style-shortcuts.spec.ts`, `shape-library-modifiers.spec.ts`, `connector-modifiers.spec.ts`.
+- **IP-D (Binding & Context)**: `feat/interaction-parity-ip-d-binding-context` (PR #157).
+  - Resolved keyboard collisions: `Ctrl+G` (Group), `Ctrl+Shift+U` (Ungroup), Grid (menu only).
+  - Page tab context menu (Rename, Duplicate, Move Left/Right, Delete).
+  - Shape/Edge context menu extensions (Edit Link, Lock/Unlock).
+  - E2E: `binding-collision.spec.ts`, `page-tab-menu.spec.ts`, `context-menu-extended.spec.ts`.
+- **IP-E (Engine Gaps)**: `feat/interaction-parity-ip-e-engine` (PR #158, reduced scope).
+  - Engine: `DiagramModel.default_style`, `SetDefaultStylePayload`, `ReverseEdgePayload`, `FlipEdgePayload`.
+  - `DuplicatePage`/`ReorderPage` scaffolds (NotImplemented).
+  - TS wiring for style cache and edge reverse/flip.
+  - E2E: `tests/e2e/engine-gaps.spec.ts`.
+- **Housekeeping**: `housekeeping/impeccable-and-p3-fixes` (PR #159).
+  - HUD semantic hierarchy, responsive breakpoints, focus-visible.
+  - Fixed UI platform / connector modifiers specs.
+  - `Cargo.lock` formatting.
+
+### Current Milestone (In Progress)
+
+- **IP-D/IP-E Follow-up (DuplicatePage + ReorderPage)**: `feat/interaction-parity-ip-de-followup` — Ready for PR.
+  - **Status**: Code complete, verified, archive report written.
+  - **Deliverables**:
+    - Rust: `DuplicatePagePayload` (full impl, undo cascade), `ReorderPagePayload` (full impl, `page_order` model support).
+    - TS: `Editor.duplicateActivePage()` and `moveActivePage()` wired to engine commands.
+    - Scene: `SceneBuilder` uses `model.pages_in_order()` to reflect `page_order` in render.
+  - **Verification**: `just verify` ✅, full Playwright 514 pass (4 pre-existing failures).
+  - **Archive**: `sddk/interaction-parity-ip-de-followup-duplicate-reorder/archive-report.md`.
+
+### Remaining Work
+
+- **IP-F (Layer Model)** (Deferred per ADR-0081).
+  - Scope: full `diagram-core` layer model (ZOrder, LayerId), layer panel UI, export/import.
+  - Rationale: larger scope, defers to post-campaign.
+
+### Strategy Artifacts
+
+- `docs/adr/0079-drawio-interaction-parity-strategy.md`
+- `docs/adr/0080-keyboard-shortcut-collision-resolution.md`
+- `docs/adr/0081-layer-model-gap-deferred.md`
+- `docs/drawio-user-interaction-workflows.md`
+
 ## 🎯 Original: draw.io Parity Completa (CLOSED)
 
 Análisis exhaustivo de features restantes, ordenadas por impacto:
@@ -307,6 +366,10 @@ Análisis exhaustivo de features restantes, ordenadas por impacto:
 | 0075 | E2E Test Strategy — visual evidence required | Testing |
 | 0076 | Defer WebGPU/WebGL Evolution as Primary Renderer | Rendering |
 | 0077 | Pragmatic Performance and Draw.io Parity Closure | Perf / Rendering |
+| 0078 | Error Path Visibility Convention | UI |
+| 0079 | Draw.io Interaction Parity Strategy | UX / Interaction |
+| 0080 | Keyboard Shortcut Collision Resolution | UX / Interaction |
+| 0081 | Layer Model Gap Deferred | UX / Interaction |
 
 ## Reglas de Actualización
 

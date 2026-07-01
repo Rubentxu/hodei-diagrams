@@ -53,7 +53,11 @@ impl ModelStore {
 
     /// Insert a page, returning its engine-assigned ID.
     pub fn insert_page(&mut self, page: Page) -> PageId {
-        self.pages.insert(page)
+        let id = self.pages.insert(page);
+        if let Some(stored_page) = self.pages.get_mut(id) {
+            stored_page.id = id;
+        }
+        id
     }
 
     /// Look up a vertex by its engine ID.
@@ -603,8 +607,8 @@ mod tests {
         let page2 = Page::new(store.page(pid).unwrap().id);
         let old = store.replace_page(pid, page2.clone());
         assert!(old.is_some());
-        // Compare pages by id field only (Page doesn't implement PartialEq)
-        assert_eq!(old.unwrap().id, page.id);
+        // insert_page() normalizes Page.id to the assigned slotmap key
+        assert_eq!(old.unwrap().id, pid);
         assert_eq!(store.page(pid).unwrap().id, page2.id);
     }
 

@@ -13,10 +13,6 @@ fn make_model_with_page() -> (DiagramModel, PageId) {
     let mut model = DiagramModel::new();
     let page = Page::new(PageId::default());
     let pid = model.store.insert_page(page);
-    // Fix up the page's id field to match the slotmap key
-    if let Some(p) = model.store.page_mut(pid) {
-        p.id = pid;
-    }
     (model, pid)
 }
 

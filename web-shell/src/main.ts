@@ -1093,17 +1093,9 @@ async function bootstrap(): Promise<void> {
   /** Re-render page tabs after any add/rename/delete operation. */
   function refreshPageTabs(): void {
     if (!activeSession) return;
-    const sceneResult = activeSession.decodeSceneBuffer();
-    if (!sceneResult.ok) return;
-    const pages = sceneResult.value;
-    // Build minimal PageRender[] — svg is empty since populatePageTabs doesn't need it.
-    // Callers use activeSession.getPage(token) for SVG when needed.
-    activePages = pages.map((page) => ({
-      pageId: page.page_id.idx as PageToken,
-      slotmapId: page.page_id,
-      name: page.name,
-      svg: '',
-    }));
+    const renderResult = activeSession.renderAllPages();
+    if (!renderResult.ok) return;
+    activePages = renderResult.value;
     const idx = Math.min(activeEditorIdx, activePages.length - 1);
     populatePageTabs(ui.pageTabContainer, activePages, idx, {
       onSelect: handlePageSelect,
@@ -1225,8 +1217,14 @@ async function bootstrap(): Promise<void> {
   }
 
   /** IP-D: Duplicate the current page. Wraps the editor's duplicateActivePage. */
-  function handlePageDuplicate(_pageIdNum: number): void {
+  function handlePageDuplicate(pageIdNum: number): void {
     if (!activeEditor) return;
+    const targetIdx = activePages.findIndex((p) => p.pageId === (pageIdNum as PageToken));
+    if (targetIdx >= 0) {
+      activeEditorIdx = targetIdx;
+      activeEditor.activePageIdx = targetIdx;
+      activeEditor.refreshScene();
+    }
     const ok = activeEditor.duplicateActivePage();
     if (!ok) {
       showError(ui.errorBanner, ui.errorMessage, 'Duplicate page failed');
@@ -1246,18 +1244,21 @@ async function bootstrap(): Promise<void> {
     ui.hud.setPage(activeEditorIdx + 1, activePages.length);
   }
 
-  /** IP-D: Move the current page left or right. Best-effort in IP-D. */
-  function handlePageMove(_pageIdNum: number, direction: 'left' | 'right'): void {
+  /** Move the selected page left or right using the engine reorder command. */
+  function handlePageMove(pageIdNum: number, direction: 'left' | 'right'): void {
     if (!activeEditor) return;
+    const targetIdx = activePages.findIndex((p) => p.pageId === (pageIdNum as PageToken));
+    if (targetIdx >= 0) {
+      activeEditorIdx = targetIdx;
+      activeEditor.activePageIdx = targetIdx;
+      activeEditor.refreshScene();
+    }
     const ok = activeEditor.moveActivePage(direction);
     if (!ok) {
-      showError(
-        ui.errorBanner,
-        ui.errorMessage,
-        'Move page is best-effort only in IP-D — proper reorder is deferred to IP-E.',
-      );
+      showError(ui.errorBanner, ui.errorMessage, 'Move page failed');
       return;
     }
+    activeEditorIdx = activeEditor.activePageIdx;
     refreshPageTabs();
   }
 

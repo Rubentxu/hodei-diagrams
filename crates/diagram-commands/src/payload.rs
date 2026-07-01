@@ -1414,17 +1414,29 @@ pub enum ReorderDirection {
     Right,
 }
 
-/// IP-E: Payload for duplicating a page. Scaffolded for the catalog; the
-/// full implementation is deferred to a follow-up cycle because it
-/// requires rewriting `page_id` references on all cells of the source
-/// page (since the new page has new IDs). The `apply` method returns
-/// `NotImplemented` to signal this clearly.
+/// IP-D/IP-E follow-up: Payload for duplicating a page. Full engine
+/// implementation. Clones the source page (vertices, edges, groups) with
+/// rewritten `page_id` references and ID remapping. draw.io parity for
+/// PAGE-004.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DuplicatePagePayload {
     /// The ID of the source page to duplicate.
     pub source_page_id: PageId,
     /// The new name (None → "<source name> (copy)").
     pub new_name: Option<String>,
+    /// The new page's ID, populated by `apply`.
+    #[serde(skip)]
+    pub inserted_page_id: Option<PageId>,
+    /// Old → new vertex ID map, populated by `apply`. Used by `undo` to
+    /// clean up cross-references in the new page's cells.
+    #[serde(skip)]
+    pub vid_map: HashMap<VertexId, VertexId>,
+    /// Old → new group ID map, populated by `apply`.
+    #[serde(skip)]
+    pub gid_map: HashMap<GroupId, GroupId>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    pub applied: bool,
 }
 
 impl DuplicatePagePayload {
@@ -1433,62 +1445,225 @@ impl DuplicatePagePayload {
         Self {
             source_page_id,
             new_name,
+            inserted_page_id: None,
+            vid_map: HashMap::new(),
+            gid_map: HashMap::new(),
+            applied: false,
         }
     }
 
     /// Apply the duplicate-page operation.
     ///
-    /// Not implemented in IP-E. A follow-up cycle will implement the full
-    /// cascade (insert new page + clone all cells with rewritten `page_id`
-    /// references). The TS layer falls back to the IP-D UI-loop approach
-    /// for now.
-    pub fn apply(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
-        Err(CommandError::NotImplemented(
-            "DuplicatePage is deferred to a follow-up cycle. The TS layer \
-             uses the IP-D UI-loop fallback."
-                .to_string(),
-        ))
+    /// Snapshots the source page's cells, inserts a new page, clones each
+    /// cell with `page_id` rewritten to the new page, and fixes up
+    /// cross-references (edges' `source`/`target`, vertices' `parent`).
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        // 1. Snapshot the source page's cells. We use `vertices_with_ids`
+        //    etc. to get stable snapshots; the slotmap's `iter()` is
+        //    snapshot-safe.
+        let source_vertices: Vec<(VertexId, diagram_core::Vertex)> = model
+            .store
+            .vertices_with_ids()
+            .filter(|(_, v)| v.page_id == Some(self.source_page_id))
+            .map(|(k, v)| (k, v.clone()))
+            .collect();
+        let source_edges: Vec<(EdgeId, diagram_core::Edge)> = model
+            .store
+            .edges_with_ids()
+            .filter(|(_, e)| e.page_id == Some(self.source_page_id))
+            .map(|(k, e)| (k, e.clone()))
+            .collect();
+        let source_groups: Vec<(GroupId, diagram_core::Group)> = model
+            .store
+            .groups_with_ids()
+            .filter(|(_, g)| g.page_id == Some(self.source_page_id))
+            .map(|(k, g)| (k, g.clone()))
+            .collect();
+
+        // 2. Compute the new page's name.
+        let source_page = model
+            .store
+            .page(self.source_page_id)
+            .cloned()
+            .ok_or(CommandError::PageNotFound(self.source_page_id))?;
+        let new_name = self
+            .new_name
+            .clone()
+            .unwrap_or_else(|| match &source_page.name {
+                Some(label) => format!("{} (copy)", label.as_str()),
+                None => "Page (copy)".to_string(),
+            });
+
+        // 3. Insert the new page. Get the assigned PageId.
+        let mut new_page = diagram_core::Page::new(diagram_core::id::PageId::default());
+        new_page.name = Some(diagram_core::label::Label::new(new_name));
+        new_page.size = source_page.size;
+        new_page.background = source_page.background.clone();
+        new_page.math_enabled = source_page.math_enabled;
+        let new_page_id = model.store.insert_page(new_page);
+
+        // 4. Clone vertices. Build vid_map as we insert.
+        self.vid_map.clear();
+        for (old_vid, mut vertex) in source_vertices {
+            vertex.page_id = Some(new_page_id);
+            let new_vid = model.store.insert_vertex(vertex);
+            self.vid_map.insert(old_vid, new_vid);
+        }
+
+        // 5. Clone groups. Build gid_map.
+        self.gid_map.clear();
+        for (old_gid, mut group) in source_groups {
+            group.page_id = Some(new_page_id);
+            let new_gid = model.store.insert_group(group);
+            self.gid_map.insert(old_gid, new_gid);
+        }
+
+        // 6. Clone edges. Rewrite source/target via vid_map.
+        for (_old_eid, mut edge) in source_edges {
+            edge.page_id = Some(new_page_id);
+            if let Some(&new_src) = self.vid_map.get(&edge.source) {
+                edge.source = new_src;
+            }
+            if let Some(&new_tgt) = self.vid_map.get(&edge.target) {
+                edge.target = new_tgt;
+            }
+            model.store.insert_edge(edge);
+        }
+
+        // 7. Fix up parent references on the cloned vertices. The
+        //    `parent` of a cloned vertex is currently the old group's id;
+        //    remap via gid_map. The slotmap is borrowed mutably to write;
+        //    we collect the fixup pairs first.
+        let parent_fixups: Vec<(VertexId, GroupId)> = model
+            .store
+            .vertices_with_ids()
+            .filter_map(|(vid, v)| {
+                v.parent
+                    .and_then(|old_gid| self.gid_map.get(&old_gid).map(|&new_gid| (vid, new_gid)))
+            })
+            .collect();
+        for (vid, new_gid) in parent_fixups {
+            if let Some(vertex_mut) = model.store.vertex_mut(vid) {
+                vertex_mut.parent = Some(new_gid);
+            }
+        }
+
+        self.inserted_page_id = Some(new_page_id);
+        self.applied = true;
+        Ok(())
     }
 
-    /// Undo is a no-op because `apply` never succeeded.
-    pub fn undo(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
+    /// Undo the duplicate-page operation.
+    ///
+    /// Cascade-deletes the new page. The slotmap's `remove_page` cleans
+    /// up all cloned cells (vertices, edges, groups) with the matching
+    /// `page_id`.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let new_pid = self
+            .inserted_page_id
+            .take()
+            .ok_or(CommandError::NotApplied)?;
+        model.store.remove_page(new_pid);
+        self.vid_map.clear();
+        self.gid_map.clear();
+        self.applied = false;
         Ok(())
     }
 }
 
-/// IP-E: Payload for reordering a page. Scaffolded for the catalog; the
-/// full implementation is deferred to a follow-up cycle because the
-/// slotmap does not support swapping without changing IDs, and reordering
-/// would require rewriting `page_id` references on all cells.
+/// IP-D/IP-E follow-up: Payload for reordering a page. Full engine
+/// implementation. Uses `DiagramModel::page_order` (Option<Vec<PageId>>)
+/// to swap the page with its left/right neighbor in the display order.
+/// The slotmap identity of cells is unchanged; only the display order
+/// changes. draw.io parity for PAGE-005.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReorderPagePayload {
     /// The ID of the page to reorder.
     pub id: PageId,
     /// The direction to move the page.
     pub direction: ReorderDirection,
+    /// The previous `page_order` (or `None`). Populated by `apply`.
+    #[serde(skip)]
+    pub prev_page_order: Option<Vec<PageId>>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    pub applied: bool,
 }
 
 impl ReorderPagePayload {
     /// Create a new payload for reordering a page.
     pub fn new(id: PageId, direction: ReorderDirection) -> Self {
-        Self { id, direction }
+        Self {
+            id,
+            direction,
+            prev_page_order: None,
+            applied: false,
+        }
     }
 
     /// Apply the reorder-page operation.
     ///
-    /// Not implemented in IP-E. A follow-up cycle will implement the full
-    /// operation (either via a `page_order: Vec<PageId>` field on
-    /// `DiagramModel`, or via remove + reinsert with rewritten
-    /// `page_id` references). The TS layer surfaces a diagnostic and the
-    /// page tab menu's "Move" items are no-ops.
-    pub fn apply(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
-        Err(CommandError::NotImplemented(
-            "ReorderPage is deferred to a follow-up cycle.".to_string(),
-        ))
+    /// Computes the current page order (using `page_order` if set, else
+    /// slotmap order). Finds the current page's index. Swaps with neighbor
+    /// (current ± 1) if not at boundary. Sets `page_order` to the new
+    /// order. At boundary, `apply` succeeds without changes (the command
+    /// is a no-op success — the TS layer does not show a diagnostic).
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        // 1. Save the current page_order for undo.
+        self.prev_page_order = model.page_order().cloned();
+
+        // 2. Build the current page order (use page_order if set, else slotmap).
+        let mut order: Vec<PageId> = model.pages_in_order().iter().map(|(k, _)| *k).collect();
+
+        // 3. Find the current index.
+        let current_idx = order
+            .iter()
+            .position(|p| *p == self.id)
+            .ok_or(CommandError::PageNotFound(self.id))?;
+
+        // 4. Compute the target index. Boundary cases are no-ops (success).
+        let target_idx = match self.direction {
+            ReorderDirection::Left => current_idx.checked_sub(1),
+            ReorderDirection::Right => {
+                if current_idx + 1 < order.len() {
+                    Some(current_idx + 1)
+                } else {
+                    None
+                }
+            }
+        };
+        let target_idx = match target_idx {
+            Some(idx) => idx,
+            None => {
+                // Boundary: no change. The command is a no-op success.
+                self.applied = true;
+                return Ok(());
+            }
+        };
+
+        // 5. Swap.
+        order.swap(current_idx, target_idx);
+
+        // 6. Set the new order.
+        model.set_page_order(Some(order));
+        self.applied = true;
+        Ok(())
     }
 
-    /// Undo is a no-op because `apply` never succeeded.
-    pub fn undo(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
+    /// Undo the reorder-page operation.
+    ///
+    /// Restores the previous `page_order` (or removes it if there was
+    /// none). The boundary no-op case is symmetric: undo restores the
+    /// unchanged value.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        model.set_page_order(self.prev_page_order.take());
+        self.applied = false;
         Ok(())
     }
 }
