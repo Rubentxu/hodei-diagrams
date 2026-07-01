@@ -2574,6 +2574,44 @@ mod tests {
         assert_eq!(model.store.len_layer(), 2);
     }
 
+    #[test]
+    fn redo_remove_layer_succeeds_after_slotmap_version_bump() {
+        // Regression test: apply -> undo -> redo must succeed even if slotmap
+        // issues a new key on re-insert during undo.
+        // See debt-report-pr2 C1.
+        let (mut model, pid, default_lid) = make_page_with_default_layer();
+        let layer_id = insert_named_layer(&mut model, pid, "Bg");
+
+        // Add a shape to the named layer
+        let v = {
+            let v = Vertex {
+                label: Some(Label::new("V")),
+                page_id: Some(pid),
+                layer_id: Some(layer_id),
+                ..Default::default()
+            };
+            model.store.insert_vertex(v)
+        };
+
+        let mut cmd = Command::RemoveLayer(RemoveLayerPayload::new(layer_id));
+
+        // Apply: removes layer, moves shape to default
+        cmd.apply(&mut model).unwrap();
+        assert_eq!(model.store.vertex(v).unwrap().layer_id, Some(default_lid));
+        assert_eq!(model.store.len_layer(), 1); // only default remains
+
+        // Undo: re-inserts layer (slotmap may bump version)
+        cmd.undo(&mut model).unwrap();
+        let layer_count_after_undo = model.store.len_layer();
+        assert_eq!(layer_count_after_undo, 2); // named layer restored
+
+        // Redo: must succeed — live_layer_id tracks the re-inserted layer's actual id
+        cmd.apply(&mut model).unwrap();
+        // After redo, shape is back on default, named layer is gone
+        assert_eq!(model.store.vertex(v).unwrap().layer_id, Some(default_lid));
+        assert_eq!(model.store.len_layer(), 1);
+    }
+
     // ─── RenameLayer ─────────────────────────────────────────────────────────
 
     #[test]
