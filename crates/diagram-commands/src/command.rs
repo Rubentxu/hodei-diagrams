@@ -2402,17 +2402,21 @@ mod tests {
         let page = Page::new(PageId::default());
         let pid = model.store.insert_page(page);
         // Insert the default layer for this page
-        let mut default_layer = Layer::default();
-        default_layer.page_id = pid;
+        let default_layer = Layer {
+            page_id: pid,
+            ..Default::default()
+        };
         let lid = model.store.insert_layer(default_layer);
         (model, pid, lid)
     }
 
     // Helper: create a named layer on a page (does not create default layer).
     fn insert_named_layer(model: &mut DiagramModel, pid: PageId, name: &str) -> LayerId {
-        let mut layer = Layer::default();
-        layer.page_id = pid;
-        layer.name = Some(Label::new(name));
+        let layer = Layer {
+            page_id: pid,
+            name: Some(Label::new(name)),
+            ..Default::default()
+        };
         model.store.insert_layer(layer)
     }
 

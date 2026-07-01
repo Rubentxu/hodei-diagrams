@@ -8,13 +8,13 @@
 //! See `docs/adr/0009-rust-native-model-with-drawio-mapping.md` and
 //! `docs/adr/0024-preserve-unknown-when-safe-degrade-explicitly.md`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use diagram_core::geometry::{CellGeometry, Size};
-use diagram_core::id::{EdgeId, GroupId, VertexId};
+use diagram_core::id::{EdgeId, GroupId, LayerId, VertexId};
 use diagram_core::label::Label;
 use diagram_core::style::StyleMap;
-use diagram_core::{DiagramModel, Edge, Group, Page, Vertex};
+use diagram_core::{DiagramModel, Edge, Group, Layer, Page, Vertex};
 
 use crate::error::{Diagnostic, FormatResult};
 use crate::raw::{RawDrawioCell, RawDrawioDiagram, RawDrawioDocument};
@@ -31,6 +31,8 @@ pub struct IdMap {
     pub edges: BTreeMap<String, EdgeId>,
     /// Maps raw group ID string → engine GroupId.
     pub groups: BTreeMap<String, GroupId>,
+    /// Maps raw layer cell ID string → engine LayerId.
+    pub layers: BTreeMap<String, LayerId>,
 }
 
 impl IdMap {
@@ -52,6 +54,11 @@ impl IdMap {
     /// Look up the internal [`GroupId`] for a raw cell ID.
     pub fn get_internal_group(&self, raw_id: &str) -> Option<GroupId> {
         self.groups.get(raw_id).copied()
+    }
+
+    /// Look up the internal [`LayerId`] for a raw cell ID.
+    pub fn get_internal_layer(&self, raw_id: &str) -> Option<LayerId> {
+        self.layers.get(raw_id).copied()
     }
 
     /// Look up the raw cell ID string for an internal [`VertexId`].
@@ -78,14 +85,25 @@ impl IdMap {
             .map(|(k, _)| k.clone())
     }
 
-    /// Total number of entries across all three maps.
-    pub fn len(&self) -> usize {
-        self.vertices.len() + self.edges.len() + self.groups.len()
+    /// Look up the raw cell ID string for an internal [`LayerId`].
+    pub fn get_external_layer(&self, lid: LayerId) -> Option<String> {
+        self.layers
+            .iter()
+            .find(|(_, l)| **l == lid)
+            .map(|(k, _)| k.clone())
     }
 
-    /// Returns `true` if all three maps are empty.
+    /// Total number of entries across all four maps.
+    pub fn len(&self) -> usize {
+        self.vertices.len() + self.edges.len() + self.groups.len() + self.layers.len()
+    }
+
+    /// Returns `true` if all four maps are empty.
     pub fn is_empty(&self) -> bool {
-        self.vertices.is_empty() && self.edges.is_empty() && self.groups.is_empty()
+        self.vertices.is_empty()
+            && self.edges.is_empty()
+            && self.groups.is_empty()
+            && self.layers.is_empty()
     }
 
     /// Look up any cell reference by its raw ID string.
@@ -99,6 +117,9 @@ impl IdMap {
         if let Some(&gid) = self.groups.get(raw_id) {
             return Some(CellRef::Group(gid));
         }
+        if let Some(&lid) = self.layers.get(raw_id) {
+            return Some(CellRef::Layer(lid));
+        }
         None
     }
 }
@@ -106,11 +127,11 @@ impl IdMap {
 /// Synthesize an [`IdMap`] from a [`DiagramModel`] for use when exporting a fresh engine
 /// (one that has no import-time ID mapping).
 ///
-/// Walks vertices, edges, and groups in stable slotmap insertion order, assigning
+/// Walks vertices, edges, groups, and layers in stable slotmap insertion order, assigning
 /// sequential string IDs: `"v0"`, `"v1"`, … for vertices, `"e0"`, `"e1"`, … for edges,
-/// `"g0"`, `"g1"`, … for groups.
+/// `"g0"`, `"g1"`, … for groups, `"l0"`, `"l1"`, … for layers.
 ///
-/// Returns an empty [`IdMap`] if the model has no vertices, edges, or groups.
+/// Returns an empty [`IdMap`] if the model has no vertices, edges, groups, or layers.
 pub fn synthesize_id_map(model: &DiagramModel) -> IdMap {
     let mut id_map = IdMap::new();
 
@@ -129,6 +150,11 @@ pub fn synthesize_id_map(model: &DiagramModel) -> IdMap {
         id_map.groups.insert(key, gid);
     }
 
+    for (l_idx, (lid, _layer)) in model.store.layers_with_ids().enumerate() {
+        let key = format!("l{l_idx}");
+        id_map.layers.insert(key, lid);
+    }
+
     id_map
 }
 
@@ -141,6 +167,22 @@ pub(crate) enum CellRef {
     Edge(EdgeId),
     /// The cell is a group.
     Group(GroupId),
+    /// The cell is a layer.
+    Layer(LayerId),
+}
+
+/// Returns `true` if the cell is a draw.io layer cell.
+///
+/// A layer cell in draw.io has `vertex=1` and its style contains `layer=1`.
+/// These cells act as containers for shapes within a layer.
+fn is_layer_cell(cell: &RawDrawioCell) -> bool {
+    if !cell.vertex || cell.edge {
+        return false;
+    }
+    cell.style
+        .as_ref()
+        .map(|s| s.contains("layer=1"))
+        .unwrap_or(false)
 }
 
 /// Stateless mapper from raw `.drawio` documents to the diagram-core domain
@@ -236,7 +278,21 @@ impl DrawioMapping {
                     .as_ref()
                     .map(|s| s.contains("swimlane"))
                     .unwrap_or(false);
-                if cell.vertex && !cell.edge && !is_swimlane {
+                // Layer cells carry vertex=1 and style containing "layer=1"
+                let is_layer = is_layer_cell(cell);
+                if is_layer {
+                    // Layer cell — insert into layers store
+                    let page_id = page_id.expect("layer cell must belong to a page");
+                    let layer = Layer {
+                        id: Default::default(), // Will be overwritten by insert_layer
+                        page_id,
+                        name: cell.value.as_ref().map(|v| Label::new(v.as_str())),
+                        visible: cell.extra.get("visible").map(|v| v != "0").unwrap_or(true),
+                        locked: cell.extra.get("locked").map(|v| v == "1").unwrap_or(false),
+                    };
+                    let lid = model.store.insert_layer(layer);
+                    id_map.layers.insert(cell.id.clone(), lid);
+                } else if cell.vertex && !cell.edge && !is_swimlane {
                     let vid = model.store.insert_vertex(Vertex {
                         page_id,
                         ..Default::default()
@@ -249,7 +305,7 @@ impl DrawioMapping {
                     });
                     id_map.edges.insert(cell.id.clone(), eid);
                 } else {
-                    // Group container (neither vertex nor edge)
+                    // Group container (neither vertex nor edge, not a layer)
                     let gid = model.store.insert_group(Group {
                         page_id,
                         ..Default::default()
@@ -263,6 +319,13 @@ impl DrawioMapping {
         let mut style_cache: BTreeMap<String, diagram_core::id::StyleId> = BTreeMap::new();
 
         for diagram in &raw.diagrams {
+            // Build parent_map for transitive layer resolution (shape → group → layer)
+            let parent_map: BTreeMap<String, String> = diagram
+                .cells
+                .iter()
+                .filter_map(|c| c.parent.clone().map(|p| (c.id.clone(), p)))
+                .collect();
+
             for cell in &diagram.cells {
                 let cell_ref = match id_map.get_cell_ref(&cell.id) {
                     Some(r) => r,
@@ -309,6 +372,8 @@ impl DrawioMapping {
                     CellRef::Vertex(vid) => {
                         let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                         let parent = resolve_parent(&cell.parent, &id_map, diags);
+                        // Resolve layer_id from parent chain transitively (shape → group → layer)
+                        let layer_id = resolve_layer(&cell.parent, &id_map, &parent_map);
                         // Preserve page_id set during pass 1
                         let page_id = model.store.vertex(vid).and_then(|v| v.page_id);
                         // z_order from XML child index; locked/visible from extra attributes
@@ -321,7 +386,7 @@ impl DrawioMapping {
                             style_id,
                             parent,
                             page_id,
-                            layer_id: None,
+                            layer_id,
                             z_order,
                             locked,
                             visible,
@@ -331,6 +396,8 @@ impl DrawioMapping {
                     CellRef::Group(gid) => {
                         let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                         let parent = resolve_parent(&cell.parent, &id_map, diags);
+                        // Resolve layer_id from parent chain transitively (shape → group → layer)
+                        let layer_id = resolve_layer(&cell.parent, &id_map, &parent_map);
                         // Preserve page_id set during pass 1
                         let page_id = model.store.group(gid).and_then(|g| g.page_id);
                         // z_order from XML child index; locked/visible from extra attributes
@@ -343,7 +410,7 @@ impl DrawioMapping {
                             style_id,
                             parent,
                             page_id,
-                            layer_id: None,
+                            layer_id,
                             z_order,
                             locked,
                             visible,
@@ -366,6 +433,8 @@ impl DrawioMapping {
                                 let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                                 // Preserve page_id set during pass 1
                                 let page_id = model.store.edge(eid).and_then(|e| e.page_id);
+                                // Resolve layer_id from parent chain transitively (shape → group → layer)
+                                let layer_id = resolve_layer(&cell.parent, &id_map, &parent_map);
                                 // z_order from XML child index; locked/visible from extra attributes
                                 let z_order = z_orders.get(&cell.id).copied().unwrap_or(0);
                                 let locked =
@@ -391,7 +460,7 @@ impl DrawioMapping {
                                         })
                                         .unwrap_or_default(),
                                     page_id,
-                                    layer_id: None,
+                                    layer_id,
                                     z_order,
                                     locked,
                                     visible,
@@ -427,6 +496,17 @@ impl DrawioMapping {
                             }
                         }
                     }
+                    CellRef::Layer(lid) => {
+                        // Update layer properties from the cell
+                        let layer = model.store.layer_mut(lid);
+                        if let Some(layer) = layer {
+                            layer.name = cell.value.as_ref().map(|v| Label::new(v.as_str()));
+                            layer.visible =
+                                cell.extra.get("visible").map(|v| v != "0").unwrap_or(true);
+                            layer.locked =
+                                cell.extra.get("locked").map(|v| v == "1").unwrap_or(false);
+                        }
+                    }
                 }
             }
         }
@@ -458,6 +538,54 @@ impl DrawioMapping {
             };
 
             let mut cells = Vec::new();
+
+            // Collect layer cells for this page
+            // Layers are emitted as vertex cells with style="layer=1"
+            for (lid, layer) in model.store.layers_with_ids() {
+                if layer.page_id != page_id {
+                    continue;
+                }
+                // Skip the default layer (has no name) - it's implicit in draw.io
+                if layer.name.is_none() {
+                    continue;
+                }
+                let raw_id = match id_map.get_external_layer(lid) {
+                    Some(id) => id,
+                    None => {
+                        diags.push(Diagnostic {
+                            location: format!("layer {:?}", lid),
+                            message: "layer has no corresponding raw ID in IdMap".to_owned(),
+                        });
+                        continue;
+                    }
+                };
+
+                // Build style: emit "layer=1" for layer cells
+                let style = Some("layer=1".to_owned());
+
+                // Build extra: emit locked/visible when non-default
+                let mut extra = BTreeMap::new();
+                if layer.locked {
+                    extra.insert("locked".to_owned(), "1".to_owned());
+                }
+                if !layer.visible {
+                    extra.insert("visible".to_owned(), "0".to_owned());
+                }
+
+                let cell = RawDrawioCell {
+                    id: raw_id,
+                    value: layer.name.as_ref().map(|l| l.text.as_str().to_owned()),
+                    style,
+                    vertex: true,
+                    edge: false,
+                    parent: Some("1".to_owned()), // Layers are direct children of root
+                    source: None,
+                    target: None,
+                    geometry: None,
+                    extra,
+                };
+                cells.push((0, cell)); // z_order 0 for layer cells (emitted first)
+            }
 
             // Collect vertices for this page
             for (vid, vertex) in model.store.vertices_with_ids() {
@@ -504,7 +632,13 @@ impl DrawioMapping {
                     }
                 });
 
-                let parent = vertex.parent.and_then(|gid| id_map.get_external_group(gid));
+                // Parent resolution: if layer_id is set, use the layer's raw id as parent
+                // (the layer cell is the container in draw.io format)
+                let parent = if let Some(lid) = vertex.layer_id {
+                    id_map.get_external_layer(lid)
+                } else {
+                    vertex.parent.and_then(|gid| id_map.get_external_group(gid))
+                };
 
                 // Build extra: emit locked/visible when non-default
                 let mut extra = BTreeMap::new();
@@ -582,13 +716,16 @@ impl DrawioMapping {
                     extra.insert("visible".to_owned(), "0".to_owned());
                 }
 
+                // Parent resolution: if layer_id is set, use the layer's raw id as parent
+                let parent = edge.layer_id.and_then(|lid| id_map.get_external_layer(lid));
+
                 let cell = RawDrawioCell {
                     id: raw_id,
                     value: edge.label.as_ref().map(|l| l.text.as_str().to_owned()),
                     style,
                     vertex: false,
                     edge: true,
-                    parent: None,
+                    parent,
                     source: Some(source_raw),
                     target: Some(target_raw),
                     geometry: if edge.waypoints.is_empty() {
@@ -665,13 +802,20 @@ impl DrawioMapping {
                     extra.insert("visible".to_owned(), "0".to_owned());
                 }
 
+                // Parent resolution: if layer_id is set, use the layer's raw id as parent
+                let parent = if let Some(lid) = group.layer_id {
+                    id_map.get_external_layer(lid)
+                } else {
+                    group.parent.and_then(|gid| id_map.get_external_group(gid))
+                };
+
                 let cell = RawDrawioCell {
                     id: raw_id,
                     value: group.label.as_ref().map(|l| l.text.as_str().to_owned()),
                     style,
                     vertex: false,
                     edge: false,
-                    parent: group.parent.and_then(|gid| id_map.get_external_group(gid)),
+                    parent,
                     source: None,
                     target: None,
                     geometry,
@@ -720,6 +864,50 @@ fn resolve_parent(
             None
         }
     }
+}
+
+/// Resolve a raw `parent` string to a `LayerId` by walking up the parent chain
+/// transitively (shape → group → layer) until a layer cell is found.
+///
+/// Returns `Some(LayerId)` if a layer ancestor is found, `None` otherwise
+/// (meaning the cell belongs to the default layer).
+///
+/// # Cycle Guard
+/// The walk is bounded by `MAX_LAYER_WALK_DEPTH` (64) and cycle-guarded:
+/// if a parent reference repeats, the walk terminates and returns `None`.
+fn resolve_layer(
+    parent: &Option<String>,
+    id_map: &IdMap,
+    parent_map: &BTreeMap<String, String>,
+) -> Option<diagram_core::id::LayerId> {
+    const MAX_LAYER_WALK_DEPTH: usize = 64;
+
+    let mut current = match parent.as_ref() {
+        Some(p) => p.clone(),
+        None => return None,
+    };
+
+    let mut visited: HashSet<String> = HashSet::new();
+
+    for _ in 0..MAX_LAYER_WALK_DEPTH {
+        // Cycle guard: skip if we've already visited this cell
+        if !visited.insert(current.clone()) {
+            return None;
+        }
+
+        // If current is a layer, return its LayerId
+        if let Some(lid) = id_map.get_internal_layer(&current) {
+            return Some(lid);
+        }
+
+        // Walk up to parent; stop if no parent
+        current = match parent_map.get(&current) {
+            Some(p) => p.clone(),
+            None => return None,
+        };
+    }
+
+    None // max depth reached
 }
 
 /// Parse a draw.io style string into a `StyleMap`.
