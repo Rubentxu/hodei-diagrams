@@ -10,11 +10,11 @@ use crate::error::CommandResult;
 use crate::payload::{
     AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, BringForwardPayload,
     BringToFrontPayload, ChangeStylePayload, ConnectVerticesCommand, DisconnectEdgeCommand,
-    EditEdgeLabelPayload, EditLabelPayload, FlipCommand, MoveGroupPayload, MoveVertexPayload,
-    RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload, RemoveVertexPayload,
-    RenamePagePayload, RotateCommand, SendBackwardPayload, SendToBackPayload,
-    SetEdgeLabelOffsetPayload, SetEdgeWaypointsPayload, SetPageMathEnabledPayload,
-    SetVertexParentPayload,
+    DuplicatePagePayload, EditEdgeLabelPayload, EditLabelPayload, FlipCommand, FlipEdgePayload,
+    MoveGroupPayload, MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
+    RemoveVertexPayload, RenamePagePayload, ReorderPagePayload, ReverseEdgePayload, RotateCommand,
+    SendBackwardPayload, SendToBackPayload, SetDefaultStylePayload, SetEdgeLabelOffsetPayload,
+    SetEdgeWaypointsPayload, SetPageMathEnabledPayload, SetVertexParentPayload,
 };
 
 /// A reversible mutation command for the diagram model.
@@ -44,6 +44,10 @@ pub enum Command {
     ConnectVertices(ConnectVerticesCommand),
     /// Disconnect an edge (remove it).
     DisconnectEdge(DisconnectEdgeCommand),
+    /// IP-E: Reverse an edge (swap source/target).
+    ReverseEdge(ReverseEdgePayload),
+    /// IP-E: Flip an edge (reverse waypoint order).
+    FlipEdge(FlipEdgePayload),
     /// Set edge waypoints (used by tree layout).
     SetEdgeWaypoints(SetEdgeWaypointsPayload),
     /// Change a vertex's style.
@@ -54,6 +58,10 @@ pub enum Command {
     RemoveGroup(RemoveGroupPayload),
     /// Add a page to the diagram.
     AddPage(AddPagePayload),
+    /// IP-E: Duplicate a page (scaffolded — full implementation deferred).
+    DuplicatePage(DuplicatePagePayload),
+    /// IP-E: Reorder a page (scaffolded — full implementation deferred).
+    ReorderPage(ReorderPagePayload),
     /// Remove a page and all its cells from the diagram.
     RemovePage(RemovePagePayload),
     /// Rename a page.
@@ -76,6 +84,9 @@ pub enum Command {
     SetEdgeLabelOffset(SetEdgeLabelOffsetPayload),
     /// Set whether math typesetting is enabled on a page.
     SetPageMathEnabled(SetPageMathEnabledPayload),
+    /// IP-E: Set the model's default cell style (used by `AddVertex` when
+    /// no explicit style is provided). `None` clears the default.
+    SetDefaultStyle(SetDefaultStylePayload),
 }
 
 impl Command {
@@ -99,6 +110,8 @@ impl Command {
             Command::AddGroup(p) => p.apply(model),
             Command::RemoveGroup(p) => p.apply(model),
             Command::AddPage(p) => p.apply(model),
+            Command::DuplicatePage(p) => p.apply(model),
+            Command::ReorderPage(p) => p.apply(model),
             Command::RemovePage(p) => p.apply(model),
             Command::RenamePage(p) => p.apply(model),
             Command::RotateVertex(p) => p.apply(model),
@@ -108,8 +121,11 @@ impl Command {
             Command::BringForward(p) => p.apply(model),
             Command::SendBackward(p) => p.apply(model),
             Command::SetVertexParent(p) => p.apply(model),
+            Command::ReverseEdge(p) => p.apply(model),
+            Command::FlipEdge(p) => p.apply(model),
             Command::SetEdgeLabelOffset(p) => p.apply(model),
             Command::SetPageMathEnabled(p) => p.apply(model),
+            Command::SetDefaultStyle(p) => p.apply(model),
         }
     }
 
@@ -128,12 +144,16 @@ impl Command {
             Command::RemoveEdge(p) => p.undo(model),
             Command::ConnectVertices(p) => p.undo(model),
             Command::DisconnectEdge(p) => p.undo(model),
+            Command::ReverseEdge(p) => p.undo(model),
+            Command::FlipEdge(p) => p.undo(model),
             Command::SetEdgeWaypoints(p) => p.undo(model),
             Command::ChangeStyle(p) => p.undo(model),
             Command::AddGroup(p) => p.undo(model),
             Command::RemoveGroup(p) => p.undo(model),
             Command::AddPage(p) => p.undo(model),
             Command::RemovePage(p) => p.undo(model),
+            Command::DuplicatePage(p) => p.undo(model),
+            Command::ReorderPage(p) => p.undo(model),
             Command::RenamePage(p) => p.undo(model),
             Command::RotateVertex(p) => p.undo(model),
             Command::FlipVertex(p) => p.undo(model),
@@ -144,6 +164,7 @@ impl Command {
             Command::SetVertexParent(p) => p.undo(model),
             Command::SetEdgeLabelOffset(p) => p.undo(model),
             Command::SetPageMathEnabled(p) => p.undo(model),
+            Command::SetDefaultStyle(p) => p.undo(model),
         }
     }
 }
@@ -172,7 +193,7 @@ impl CompletedCommand {
 
 #[cfg(test)]
 mod tests {
-    use diagram_core::geometry::CellGeometry;
+    use diagram_core::geometry::{CellGeometry, Point};
     use diagram_core::label::Label;
     use diagram_core::page::Page;
     use diagram_core::style::{StyleMap, StyleValue};
@@ -180,7 +201,7 @@ mod tests {
 
     use super::*;
     use crate::RoutingKind;
-    use crate::payload::{CellTarget, EditEdgeLabelPayload};
+    use crate::payload::{CellTarget, EditEdgeLabelPayload, ReorderDirection};
 
     fn make_model_with_page() -> (DiagramModel, PageId) {
         let mut model = DiagramModel::new();
@@ -796,6 +817,175 @@ mod tests {
 
         cmd.undo(&mut model).unwrap();
         assert_eq!(model.store.len_edge(), 0);
+    }
+
+    // ─── IP-E: ReverseEdge ──────────────────────────────────────────────────
+
+    fn add_edge_between(
+        model: &mut DiagramModel,
+        pid: PageId,
+        v1: VertexId,
+        v2: VertexId,
+    ) -> EdgeId {
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let mut cmd = Command::AddEdge(AddEdgePayload::new(edge));
+        cmd.apply(model).unwrap();
+        match cmd {
+            Command::AddEdge(p) => p.inserted_id.unwrap(),
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn apply_reverse_edge_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let eid = add_edge_between(&mut model, pid, v1, v2);
+
+        let mut cmd = Command::ReverseEdge(ReverseEdgePayload::new(eid));
+        cmd.apply(&mut model).unwrap();
+
+        // Source and target are swapped
+        let edge = model.store.edge(eid).unwrap();
+        assert_eq!(edge.source, v2);
+        assert_eq!(edge.target, v1);
+    }
+
+    #[test]
+    fn apply_reverse_edge_undo_restores_original() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let eid = add_edge_between(&mut model, pid, v1, v2);
+
+        let mut cmd = Command::ReverseEdge(ReverseEdgePayload::new(eid));
+        cmd.apply(&mut model).unwrap();
+        cmd.undo(&mut model).unwrap();
+
+        let edge = model.store.edge(eid).unwrap();
+        assert_eq!(edge.source, v1);
+        assert_eq!(edge.target, v2);
+    }
+
+    // ─── IP-E: FlipEdge ─────────────────────────────────────────────────────
+
+    fn add_edge_with_waypoints(
+        model: &mut DiagramModel,
+        pid: PageId,
+        v1: VertexId,
+        v2: VertexId,
+        waypoints: Vec<Point>,
+    ) -> EdgeId {
+        let edge = Edge {
+            source: v1,
+            target: v2,
+            waypoints: waypoints.clone(),
+            page_id: Some(pid),
+            ..Default::default()
+        };
+        let mut cmd = Command::AddEdge(AddEdgePayload::new(edge));
+        cmd.apply(model).unwrap();
+        match cmd {
+            Command::AddEdge(p) => p.inserted_id.unwrap(),
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn apply_flip_edge_with_waypoints_succeeds() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let original_waypoints = vec![
+            Point { x: 10.0, y: 20.0 },
+            Point { x: 30.0, y: 40.0 },
+            Point { x: 50.0, y: 60.0 },
+        ];
+        let eid = add_edge_with_waypoints(&mut model, pid, v1, v2, original_waypoints.clone());
+
+        let mut cmd = Command::FlipEdge(FlipEdgePayload::new(eid));
+        cmd.apply(&mut model).unwrap();
+
+        // Waypoints are reversed
+        let edge = model.store.edge(eid).unwrap();
+        assert_eq!(edge.waypoints.len(), 3);
+        assert_eq!(edge.waypoints[0].x, 50.0);
+        assert_eq!(edge.waypoints[0].y, 60.0);
+        assert_eq!(edge.waypoints[2].x, 10.0);
+        assert_eq!(edge.waypoints[2].y, 20.0);
+    }
+
+    #[test]
+    fn apply_flip_edge_undo_restores_waypoints() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let original_waypoints = vec![Point { x: 10.0, y: 20.0 }, Point { x: 30.0, y: 40.0 }];
+        let eid = add_edge_with_waypoints(&mut model, pid, v1, v2, original_waypoints.clone());
+
+        let mut cmd = Command::FlipEdge(FlipEdgePayload::new(eid));
+        cmd.apply(&mut model).unwrap();
+        cmd.undo(&mut model).unwrap();
+
+        let edge = model.store.edge(eid).unwrap();
+        assert_eq!(edge.waypoints, original_waypoints);
+    }
+
+    #[test]
+    fn apply_flip_edge_no_waypoints_noop() {
+        let (mut model, pid) = make_model_with_page();
+        let v1 = insert_vertex(&mut model, pid, "V1");
+        let v2 = insert_vertex(&mut model, pid, "V2");
+        let eid = add_edge_between(&mut model, pid, v1, v2);
+
+        // No waypoints — reverse of empty is empty, no-op effectively
+        let mut cmd = Command::FlipEdge(FlipEdgePayload::new(eid));
+        cmd.apply(&mut model).unwrap();
+
+        let edge = model.store.edge(eid).unwrap();
+        assert!(edge.waypoints.is_empty());
+    }
+
+    // ─── IP-E: DuplicatePage + ReorderPage scaffolds ──────────────────────
+
+    #[test]
+    fn apply_duplicate_page_returns_not_implemented() {
+        let (mut model, pid) = make_model_with_page();
+        let mut cmd = Command::DuplicatePage(DuplicatePagePayload::new(pid, None));
+        let result = cmd.apply(&mut model);
+        assert!(matches!(
+            result,
+            Err(crate::error::CommandError::NotImplemented(_))
+        ));
+        // Model is unchanged
+        assert_eq!(model.store.page_count(), 1);
+    }
+
+    #[test]
+    fn apply_reorder_page_returns_not_implemented() {
+        let (mut model, _pid) = make_model_with_page();
+        // Add a second page so we can try to reorder
+        let new_page = Page::default();
+        let new_pid = model.store.insert_page(new_page);
+        let pid_to_move = model.store.pages_with_ids().next().unwrap().0;
+        let mut cmd = Command::ReorderPage(ReorderPagePayload::new(
+            pid_to_move,
+            ReorderDirection::Right,
+        ));
+        let result = cmd.apply(&mut model);
+        assert!(matches!(
+            result,
+            Err(crate::error::CommandError::NotImplemented(_))
+        ));
+        // Model is unchanged: 2 pages still in original order
+        assert_eq!(model.store.page_count(), 2);
+        let _ = new_pid; // suppress unused warning
     }
 
     // ─── RemoveEdge ────────────────────────────────────────────────────────────
@@ -1793,5 +1983,120 @@ mod tests {
 
     fn pid_from_model(model: &DiagramModel, index: usize) -> PageId {
         model.store.pages_with_ids().nth(index).unwrap().0
+    }
+
+    // ─── IP-E: SetDefaultStyle tests ────────────────────────────────────────
+
+    fn make_test_style() -> StyleMap {
+        let mut m = StyleMap::new();
+        m.insert("fillColor", StyleValue::from("#ff0000"));
+        m.insert("strokeColor", StyleValue::from("#000000"));
+        m
+    }
+
+    #[test]
+    fn apply_set_default_style_persists_in_model() {
+        let mut model = DiagramModel::new();
+        let style = make_test_style();
+
+        let mut cmd = Command::SetDefaultStyle(SetDefaultStylePayload::new(Some(style.clone())));
+        cmd.apply(&mut model).unwrap();
+
+        // The default_style is now set
+        let stored = model.default_style();
+        assert!(stored.is_some(), "default_style should be set");
+        let stored = stored.unwrap();
+        assert_eq!(
+            stored.get("fillColor").map(|v| v.as_str().to_string()),
+            Some("#ff0000".to_string())
+        );
+    }
+
+    #[test]
+    fn apply_set_default_style_undo_restores_none() {
+        let mut model = DiagramModel::new();
+        let style = make_test_style();
+
+        // Apply then undo
+        let mut cmd = Command::SetDefaultStyle(SetDefaultStylePayload::new(Some(style.clone())));
+        cmd.apply(&mut model).unwrap();
+        assert!(model.default_style().is_some());
+
+        cmd.undo(&mut model).unwrap();
+        assert!(
+            model.default_style().is_none(),
+            "default_style should be cleared after undo"
+        );
+    }
+
+    #[test]
+    fn apply_clear_default_style_via_none() {
+        let mut model = DiagramModel::new();
+        let style = make_test_style();
+
+        // Set, then clear with None
+        let mut cmd_set = Command::SetDefaultStyle(SetDefaultStylePayload::new(Some(style)));
+        cmd_set.apply(&mut model).unwrap();
+        assert!(model.default_style().is_some());
+
+        let mut cmd_clear = Command::SetDefaultStyle(SetDefaultStylePayload::new(None));
+        cmd_clear.apply(&mut model).unwrap();
+        assert!(model.default_style().is_none());
+    }
+
+    #[test]
+    fn apply_add_vertex_uses_default_style_when_no_explicit_style() {
+        let mut model = DiagramModel::new();
+        let style = make_test_style();
+
+        // Set default style
+        let mut cmd_set =
+            Command::SetDefaultStyle(SetDefaultStylePayload::new(Some(style.clone())));
+        cmd_set.apply(&mut model).unwrap();
+
+        // Add a vertex WITHOUT explicit style
+        let v = Vertex::default();
+        let payload = AddVertexPayload::new(v);
+        let mut cmd_add = Command::AddVertex(payload);
+        cmd_add.apply(&mut model).unwrap();
+
+        // The new vertex should have a style_id (inherited from default)
+        let inserted_id = match &cmd_add {
+            Command::AddVertex(p) => p.inserted_id,
+            _ => unreachable!(),
+        };
+        let vid = inserted_id.unwrap();
+        let stored = model.store.vertex(vid).unwrap();
+        assert!(
+            stored.style_id.is_some(),
+            "vertex should have inherited default style"
+        );
+    }
+
+    #[test]
+    fn apply_add_vertex_explicit_style_overrides_default() {
+        let mut model = DiagramModel::new();
+        let style = make_test_style();
+
+        // Set default style
+        let mut cmd_set = Command::SetDefaultStyle(SetDefaultStylePayload::new(Some(style)));
+        cmd_set.apply(&mut model).unwrap();
+
+        // Add a vertex WITH explicit style (different from default)
+        let v = Vertex::default();
+        let mut explicit_style = StyleMap::new();
+        explicit_style.insert("fillColor", StyleValue::from("#00ff00"));
+        let payload = AddVertexPayload::with_style(v, explicit_style.clone());
+        let mut cmd_add = Command::AddVertex(payload);
+        cmd_add.apply(&mut model).unwrap();
+
+        // Verify the explicit style was used (not the default)
+        let inserted_id = match &cmd_add {
+            Command::AddVertex(p) => p.inserted_id,
+            _ => unreachable!(),
+        };
+        let vid = inserted_id.unwrap();
+        let stored = model.store.vertex(vid).unwrap();
+        assert!(stored.style_id.is_some());
     }
 }

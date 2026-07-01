@@ -511,12 +511,32 @@ impl AddVertexPayload {
         }
     }
 
+    /// Create a new payload for adding a vertex with an explicit inline style.
+    pub fn with_style(vertex: Vertex, style: StyleMap) -> Self {
+        Self {
+            vertex,
+            style: Some(style),
+            inserted_id: None,
+            inserted_style_id: None,
+            applied: false,
+        }
+    }
+
     /// Apply the add-vertex operation.
+    ///
+    /// IP-E: When the payload has no explicit `style` and the model has a
+    /// `default_style`, the new vertex inherits the default. Per-vertex
+    /// styles always win.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
         let mut v = self.vertex.clone();
         // If inline style was provided, insert it and assign to vertex
         if let Some(ref style_map) = self.style {
             let sid = model.store.insert_style(style_map.clone());
+            v.style_id = Some(sid);
+            self.inserted_style_id = Some(sid);
+        } else if let Some(default) = model.default_style() {
+            // No per-vertex style provided; inherit the model's default.
+            let sid = model.store.insert_style(default.clone());
             v.style_id = Some(sid);
             self.inserted_style_id = Some(sid);
         }
@@ -797,6 +817,129 @@ impl EditEdgeLabelPayload {
             .edge_mut(self.id)
             .ok_or(CommandError::EdgeNotFound(self.id))?;
         edge.label = Some(prev);
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-E: Payload for reversing an edge's source and target. draw.io
+/// parity for EDGE-018. The geometry (waypoints, label, style) is
+/// preserved; only source/target swap.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReverseEdgePayload {
+    /// The ID of the edge to reverse.
+    pub id: EdgeId,
+    /// The previous source. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_source: Option<VertexId>,
+    /// The previous target. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_target: Option<VertexId>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl ReverseEdgePayload {
+    /// Create a new payload for reversing an edge.
+    pub fn new(id: EdgeId) -> Self {
+        Self {
+            id,
+            prev_source: None,
+            prev_target: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the reverse-edge operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+
+        // Capture previous values
+        self.prev_source = Some(edge.source);
+        self.prev_target = Some(edge.target);
+
+        // Swap source and target
+        std::mem::swap(&mut edge.source, &mut edge.target);
+
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the reverse-edge operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev_source = self.prev_source.take().ok_or(CommandError::NotApplied)?;
+        let prev_target = self.prev_target.take().ok_or(CommandError::NotApplied)?;
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+        edge.source = prev_source;
+        edge.target = prev_target;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-E: Payload for flipping an edge's waypoint order. draw.io parity
+/// for EDGE-019. The waypoints vec is reversed; source/target and style
+/// are preserved.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlipEdgePayload {
+    /// The ID of the edge to flip.
+    pub id: EdgeId,
+    /// The previous waypoints. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_waypoints: Option<Vec<Point>>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl FlipEdgePayload {
+    /// Create a new payload for flipping an edge.
+    pub fn new(id: EdgeId) -> Self {
+        Self {
+            id,
+            prev_waypoints: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the flip-edge operation (reverse the waypoints).
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+
+        // Capture previous waypoints
+        self.prev_waypoints = Some(edge.waypoints.clone());
+
+        // Reverse the waypoints in place
+        edge.waypoints.reverse();
+
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the flip-edge operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_waypoints.take().ok_or(CommandError::NotApplied)?;
+        let edge = model
+            .store
+            .edge_mut(self.id)
+            .ok_or(CommandError::EdgeNotFound(self.id))?;
+        edge.waypoints = prev;
         self.applied = false;
         Ok(())
     }
@@ -1258,6 +1401,94 @@ impl RemovePagePayload {
         }
 
         self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-E: Direction for the `ReorderPage` command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReorderDirection {
+    /// Move the page to the left (toward index 0).
+    Left,
+    /// Move the page to the right (toward the last index).
+    Right,
+}
+
+/// IP-E: Payload for duplicating a page. Scaffolded for the catalog; the
+/// full implementation is deferred to a follow-up cycle because it
+/// requires rewriting `page_id` references on all cells of the source
+/// page (since the new page has new IDs). The `apply` method returns
+/// `NotImplemented` to signal this clearly.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicatePagePayload {
+    /// The ID of the source page to duplicate.
+    pub source_page_id: PageId,
+    /// The new name (None → "<source name> (copy)").
+    pub new_name: Option<String>,
+}
+
+impl DuplicatePagePayload {
+    /// Create a new payload for duplicating a page.
+    pub fn new(source_page_id: PageId, new_name: Option<String>) -> Self {
+        Self {
+            source_page_id,
+            new_name,
+        }
+    }
+
+    /// Apply the duplicate-page operation.
+    ///
+    /// Not implemented in IP-E. A follow-up cycle will implement the full
+    /// cascade (insert new page + clone all cells with rewritten `page_id`
+    /// references). The TS layer falls back to the IP-D UI-loop approach
+    /// for now.
+    pub fn apply(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
+        Err(CommandError::NotImplemented(
+            "DuplicatePage is deferred to a follow-up cycle. The TS layer \
+             uses the IP-D UI-loop fallback."
+                .to_string(),
+        ))
+    }
+
+    /// Undo is a no-op because `apply` never succeeded.
+    pub fn undo(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
+        Ok(())
+    }
+}
+
+/// IP-E: Payload for reordering a page. Scaffolded for the catalog; the
+/// full implementation is deferred to a follow-up cycle because the
+/// slotmap does not support swapping without changing IDs, and reordering
+/// would require rewriting `page_id` references on all cells.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReorderPagePayload {
+    /// The ID of the page to reorder.
+    pub id: PageId,
+    /// The direction to move the page.
+    pub direction: ReorderDirection,
+}
+
+impl ReorderPagePayload {
+    /// Create a new payload for reordering a page.
+    pub fn new(id: PageId, direction: ReorderDirection) -> Self {
+        Self { id, direction }
+    }
+
+    /// Apply the reorder-page operation.
+    ///
+    /// Not implemented in IP-E. A follow-up cycle will implement the full
+    /// operation (either via a `page_order: Vec<PageId>` field on
+    /// `DiagramModel`, or via remove + reinsert with rewritten
+    /// `page_id` references). The TS layer surfaces a diagnostic and the
+    /// page tab menu's "Move" items are no-ops.
+    pub fn apply(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
+        Err(CommandError::NotImplemented(
+            "ReorderPage is deferred to a follow-up cycle.".to_string(),
+        ))
+    }
+
+    /// Undo is a no-op because `apply` never succeeded.
+    pub fn undo(&mut self, _model: &mut DiagramModel) -> CommandResult<()> {
         Ok(())
     }
 }
@@ -1947,6 +2178,56 @@ impl SetEdgeLabelOffsetPayload {
             .edge_mut(self.id)
             .ok_or(CommandError::EdgeNotFound(self.id))?;
         edge.label_offset = self.prev_offset;
+        self.applied = false;
+        Ok(())
+    }
+}
+
+/// IP-E: Payload for setting the model's default cell style. When applied,
+/// subsequent `AddVertex` commands (without an explicit style) inherit this
+/// style. draw.io parity for STYL-003/004.
+///
+/// The payload itself is just the new default style; the previous value
+/// is captured in `apply` and restored in `undo`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetDefaultStylePayload {
+    /// The new default style. When `None`, the default is cleared.
+    pub style: Option<StyleMap>,
+    /// The previous default style. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_style: Option<StyleMap>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetDefaultStylePayload {
+    /// Create a new payload for setting the default cell style.
+    /// `None` clears the default.
+    pub fn new(style: Option<StyleMap>) -> Self {
+        Self {
+            style,
+            prev_style: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-default-style operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        // Capture previous value before overwriting.
+        self.prev_style = model.default_style.clone();
+        model.set_default_style(self.style.clone());
+        self.applied = true;
+        Ok(())
+    }
+
+    /// Undo the set-default-style operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self.prev_style.take();
+        model.set_default_style(prev);
         self.applied = false;
         Ok(())
     }

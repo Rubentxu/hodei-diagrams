@@ -545,21 +545,38 @@ export class Editor {
    * Set the editor's default style from the first selected shape. Draw.io
    * parity: STYL-003. Multi-selection is a no-op (draw.io convention).
    */
+  /**
+   * IP-E: Set the editor + engine default style from the first selected shape.
+   * Persists to the engine so it survives file reloads.
+   */
   setDefaultStyle(): boolean {
     if (this.#selection.size !== 1) return false;
     const firstId = this.#selection.values().next().value as SlotmapId;
     const vertex = this.#getVertex(firstId);
     if (!vertex) return false;
-    this.#defaultStyle = JSON.parse(JSON.stringify(vertex.style));
+    const style = JSON.parse(JSON.stringify(vertex.style));
+    this.#defaultStyle = style;
+    // IP-E: persist to engine for cross-reload durability
+    const cmd = JSON.stringify({
+      SetDefaultStyle: { style },
+    });
+    this.executeTransaction([cmd]);
+    this.#replay();
     return true;
   }
 
   /**
-   * Clear the editor's default style back to draw.io original
-   * (white fill, black outline). Draw.io parity: STYL-004.
+   * IP-E: Clear the editor + engine default style. Returns null
+   * to draw.io original (white fill, black outline).
    */
   clearDefaultStyle(): void {
     this.#defaultStyle = null;
+    // IP-E: persist to engine
+    const cmd = JSON.stringify({
+      SetDefaultStyle: { style: null },
+    });
+    this.executeTransaction([cmd]);
+    this.#replay();
   }
 
   /**
@@ -1107,6 +1124,32 @@ export class Editor {
     }
     this.#replay();
     return { ok: true, value: undefined };
+  }
+
+  /**
+   * IP-E: Reverse the edge (swap source and target). Returns true on success.
+   * Edge geometry (waypoints, label, style) is preserved.
+   */
+  reverseEdge(edgeId: SlotmapId): boolean {
+    const cmd = JSON.stringify({
+      ReverseEdge: { id: slotmapIdToField(edgeId) },
+    });
+    this.executeTransaction([cmd]);
+    this.#replay();
+    return true;
+  }
+
+  /**
+   * IP-E: Flip the edge (reverse waypoint order). Returns true on success.
+   * Source/target and style are preserved.
+   */
+  flipEdge(edgeId: SlotmapId): boolean {
+    const cmd = JSON.stringify({
+      FlipEdge: { id: slotmapIdToField(edgeId) },
+    });
+    this.executeTransaction([cmd]);
+    this.#replay();
+    return true;
   }
 
   // ─── Active Tool ──────────────────────────────────────────────────────────
@@ -4276,6 +4319,10 @@ export class Editor {
           label: this.isEdgeLocked(edgeHit) ? 'Unlock' : 'Lock',
           action: () => this.toggleEdgeLock(edgeHit),
         },
+        { separator: true, label: '', action: () => {} },
+        // IP-E: Reverse + Flip via engine commands (draw.io EDGE-018, EDGE-019)
+        { label: 'Reverse', action: () => this.reverseEdge(edgeHit) },
+        { label: 'Flip', action: () => this.flipEdge(edgeHit) },
         { separator: true, label: '', action: () => {} },
         { label: 'Delete Edge', action: () => {
           this.#session.disconnectEdge(edgeHit);

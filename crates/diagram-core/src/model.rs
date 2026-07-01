@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::page::Page;
 use crate::store::ModelStore;
+use crate::style::StyleMap;
 
 /// Engine-stamped epoch used as the default value for `created` and `modified`.
 pub fn default_epoch() -> DateTime<Utc> {
@@ -86,6 +87,11 @@ pub struct DiagramModel {
     pub store: ModelStore,
     /// Diagram metadata (title, author, description, tags, timestamps).
     pub metadata: Option<Metadata>,
+    /// IP-E: Default cell style applied to new vertices when no explicit
+    /// style is provided. draw.io parity for STYL-003/004. The editor's
+    /// in-editor cache mirrors this for fast feedback; the engine command
+    /// persists it across reloads.
+    pub default_style: Option<StyleMap>,
 }
 
 impl DiagramModel {
@@ -117,6 +123,18 @@ impl DiagramModel {
     /// Clear the diagram metadata.
     pub fn clear_metadata(&mut self) {
         self.metadata = None;
+    }
+
+    /// IP-E: Borrow the current default cell style, if any.
+    pub fn default_style(&self) -> Option<&StyleMap> {
+        self.default_style.as_ref()
+    }
+
+    /// IP-E: Set the default cell style. When `None`, clears the default.
+    /// The next `AddVertex` command without an explicit style will inherit
+    /// this style.
+    pub fn set_default_style(&mut self, style: Option<StyleMap>) {
+        self.default_style = style;
     }
 }
 
