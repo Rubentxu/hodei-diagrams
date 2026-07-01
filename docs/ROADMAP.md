@@ -299,26 +299,49 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
   - Verification: `just verify` ✅, full Playwright 514 pass (4 pre-existing failures).
   - Archive: `sddk/interaction-parity-ip-de-followup-duplicate-reorder/archive-report.md`.
 
-### In Progress — IP-F Layer Model (6-PR chain)
+- **IP-F (Layer Model)**: `feat/ip-f-layer-*` (PRs #161-#166, v0.91.0).
+  - Engine: `LayerId` newtype, `Layer` struct, `ModelStore.layers` slotmap, denormalized `layer_id` on Vertex/Edge/Group.
+  - Commands: `AddLayer`, `RemoveLayer`, `RenameLayer`, `SetLayerVisible`, `SetLayerLocked`, `MoveShapeToLayer` + undo/redo.
+  - Drawio: Layer cells parse/emit + transitive parent-chain resolution.
+  - Scene: `SceneBuilder` filters hidden layers.
+  - Web-shell: Layers panel + minimum viable layer workflows E2E.
+  - Doc reconciliation: Updated workflows catalog, ROADMAP, ADR-0081 footer.
 
-| PR | Scope | Branch | Status |
-|----|-------|--------|--------|
-| PR1 | Engine foundation (LayerId, Layer, ModelStore.layers, layer_id on Vertex/Edge/Group) | `feat/ip-f-layer-foundation` | ✅ PR #161 merged; verify PASS+debt-verify PASS |
-| PR2 | Commands + History (AddLayer, RemoveLayer, RenameLayer, SetLayerVisible, SetLayerLocked, MoveShapeToLayer + undo/redo) | `feat/ip-f-layer-commands-history` | ✅ PR #162 merged; verify PASS after 2 bounded debt fixes |
-| PR3 | .drawio round-trip (pass-1 layer branch in parser, writer emits layer cells, transitive parent-chain resolution) | `feat/ip-f-layer-drawio-roundtrip` | ✅ PR #163 merged; verify PASS after transitive-resolution debt fix |
-| PR4 | Scene projection (SceneBuilder filters hidden layers) | `feat/ip-f-layer-scene-projection` | ✅ PR #164 merged; verify PASS, debt-verify PASS_WITH_WARNINGS |
-| PR5 | Web-shell UI (Layer panel + minimum viable layer workflows E2E) | `feat/ip-f-layer-web-shell` | ✅ PR #165 merged; verify PASS, debt-verify PASS_WITH_WARNINGS |
-| PR6 | Doc reconciliation (catalog LAYER-001/002/004/005/007/008/009 → Done; ROADMAP; ADR-0081 footer) | `feat/ip-f-layer-doc-reconciliation` | ✅ PR #166 open (2026-07-01) |
-
-- **Rationale**: largest remaining interaction gap; unlocks LAYER-001..011; deferred by ADR-0081.
-- **Strategy artifacts**: `sddk/interaction-parity-ip-f-layer-model/` (proposal, spec, design, tasks, archive-report)
+### In Progress — None
 
 ### Strategy Artifacts
 
 - `docs/adr/0079-drawio-interaction-parity-strategy.md`
 - `docs/adr/0080-keyboard-shortcut-collision-resolution.md`
-- `docs/adr/0081-layer-model-gap-deferred.md`
+- `docs/adr/0081-layer-model-gap-deferred.md` — **Resolved** (IP-F v0.91.0)
 - `docs/drawio-user-interaction-workflows.md`
+
+## 🎯 Interaction Parity Campaign — Gaps Restantes (~100 workflows)
+
+IP-A through IP-F are complete. The workflow catalog (`docs/drawio-user-interaction-workflows.md`) shows ~165 total workflows, of which ~38 are covered, ~27 are partial, and ~100 remain as gaps.
+
+| Área | Gaps | Ejemplos clave | Prioridad |
+|------|------|----------------|-----------|
+| **Canvas nav** | 7 | Space-drag, Home, Shift-wheel, Ctrl-wheel, Outline navigation | P0 |
+| **Shape library** | 10 | Double-click chooser, Shift/Alt modifiers, Replace shape, Insert+connect | P1 |
+| **Selection** | 9 | Alt+drag, Alt+click z-stack, Tab cycle, Ctrl+E/I, drill-down | P0 |
+| **Move/resize** | 8 | Shift nudge, Alt ignore-grid, Shift proportional, Ctrl+Shift+arrow | P1 |
+| **Connectors** | 14 | Shift fixed-point, Alt connect-anywhere, reverse, flip, label drag | P0 |
+| **Groups** | 13 | Drill-down, collapse/expand, lock, swimlane workflows | P1 |
+| **Pages** | 6 | Rename menu, duplicate, reorder, link-to-page, background | P1 |
+| **Tables** | 8 | Toda el área (deferred P2) | P2 |
+| **Style** | 6 | Alt+C/V copy/paste, Ctrl+Shift+D/R default style | P1 |
+| **Text/labels** | 4 | Text chooser, Ctrl+Shift numpad, rich portions | P1 |
+| **Import/ins** | 7 | Links, tooltips, tags, templates | P2 |
+| **Mob/a11y** | 4 | Touch, full keyboard matrix, collab | P3 |
+
+**Prioritización sugerida**:
+- **P0**: Canvas nav (Space-drag, Home), Selection (Alt+drag, Tab cycle), Connectors (Shift fixed-point, Alt connect-anywhere)
+- **P1**: Shape library modifiers, Move/resize modifiers, Group drill-down, Style copy/paste
+- **P2**: Tables, Import/ins (templates, tags)
+- **P3**: Deferred — Touch, collab (ADR-0048)
+
+---
 
 ## 🎯 Original: draw.io Parity Completa (CLOSED)
 
