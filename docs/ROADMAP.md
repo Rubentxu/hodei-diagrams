@@ -308,7 +308,7 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
 | PR3 | .drawio round-trip (pass-1 layer branch in parser, writer emits layer cells, transitive parent-chain resolution) | `feat/ip-f-layer-drawio-roundtrip` | ✅ PR ready; verify PASS after transitive-resolution debt fix |
 | PR4 | Scene projection (SceneBuilder filters hidden layers) | `feat/ip-f-layer-scene-projection` | ✅ PR ready; verify PASS, debt-verify PASS_WITH_WARNINGS |
 | PR5 | Web-shell UI (Layer panel + minimum viable layer workflows E2E) | `feat/ip-f-layer-web-shell` | ✅ PR ready; verify PASS, debt-verify PASS_WITH_WARNINGS |
-| PR6 | Doc reconciliation (catalog LAYER-001/002/004/005/007/008/009 → Done; ROADMAP; ADR-0081 footer) | Planned | ⏳ |
+| PR6 | Doc reconciliation (catalog LAYER-001/002/004/005/007/008/009 → Done; ROADMAP; ADR-0081 footer) | `feat/ip-f-layer-doc-reconciliation` | ✅ DONE (2026-07-01) |
 
 - **Rationale**: largest remaining interaction gap; unlocks LAYER-001..011; deferred by ADR-0081.
 - **Strategy artifacts**: `sddk/interaction-parity-ip-f-layer-model/` (proposal, spec, design, tasks, archive-report)
