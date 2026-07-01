@@ -2581,26 +2581,25 @@ impl RemoveLayerPayload {
         let (layer, vertex_remap, edge_remap) =
             self.removed.take().ok_or(CommandError::NotApplied)?;
 
-        // Re-insert the layer with the old ID
+        // Re-insert the layer. Slotmap may reuse the removed slot or allocate a new key,
+        // so we MUST capture the returned id — the stored layer always has this id.
         let mut reinserted = layer.clone();
         reinserted.id = self.layer_id;
-        let _new_id = model.store.insert_layer(reinserted);
+        let new_id = model.store.insert_layer(reinserted);
 
-        // Restore vertex layer_ids to the REMOVED layer's ID (not the new re-inserted id)
-        // The removed layer was deleted and a new one created with a potentially different ID.
-        // For undo, we must restore the shape's layer_id to point to the original (now re-inserted) layer.
-        for (vid, prev_layer_id) in vertex_remap {
+        // Restore vertex layer_ids to the re-inserted layer's actual id.
+        // Using prev_layer_id (the stale removed-id) would leave shapes pointing to a
+        // non-existent layer when slotmap allocated a new key on re-insert.
+        for (vid, _prev_layer_id) in vertex_remap {
             if let Some(v) = model.store.vertex_mut(vid) {
-                // prev_layer_id was Some(old_layer_id) before remove; restore it
-                // The re-inserted layer has the SAME id as the removed one (slotmap reuse)
-                v.layer_id = prev_layer_id;
+                v.layer_id = Some(new_id);
             }
         }
 
         // Restore edge layer_ids
-        for (eid, prev_layer_id) in edge_remap {
+        for (eid, _prev_layer_id) in edge_remap {
             if let Some(e) = model.store.edge_mut(eid) {
-                e.layer_id = prev_layer_id;
+                e.layer_id = Some(new_id);
             }
         }
 

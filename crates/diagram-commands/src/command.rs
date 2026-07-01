@@ -2553,10 +2553,23 @@ mod tests {
         assert_eq!(model.store.vertex(v).unwrap().layer_id, Some(default_lid));
 
         cmd.undo(&mut model).unwrap();
-        // Shape is back on original layer (with NEW layer id since old layer was removed+re-inserted)
-        // Undo recreates the layer, so we just verify the shape is on SOME named layer (not default)
+        // Shape is back on the re-inserted layer. The re-inserted layer may have the
+        // same or a new LayerId depending on slotmap reuse — verify the id is LIVE.
         let v_stored = model.store.vertex(v).unwrap();
-        assert!(v_stored.layer_id.is_some());
+        let restored_layer_id = v_stored
+            .layer_id
+            .expect("vertex should have a layer_id after undo");
+        // The restored layer_id MUST resolve to a live layer in the store
+        assert!(
+            model.store.layer(restored_layer_id).is_some(),
+            "restored layer_id {restored_layer_id:?} must resolve to a live layer"
+        );
+        // It must be the named layer (not the default)
+        let restored_layer = model.store.layer(restored_layer_id).unwrap();
+        assert!(
+            restored_layer.name.as_ref().map(|n| n.as_str()) == Some("Bg"),
+            "shape should be on the named 'Bg' layer, not the default layer"
+        );
         // And the default layer should still be there
         assert_eq!(model.store.len_layer(), 2);
     }
