@@ -22,9 +22,10 @@
   --accent-hover: #2563eb;
   --accent-dim: rgba(59, 130, 246, 0.15);
   --danger: #ef4444;
+  --success: #22c55e;
 
   /* Typography */
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', monospace;
 
   /* Font size scale */
@@ -122,6 +123,17 @@ button:disabled {
   cursor: default;
 }
 
+/* ─── Global focus-visible system ─────────────────────────────────────────── */
+/* Keyboard focus gets a clear indicator; mouse clicks get nothing (no outline flash) */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ─── 5-Zone Grid Layout (with Rail + HUD) ─────────────────────────────────── */
 #app {
   display: grid;
@@ -160,6 +172,94 @@ button:disabled {
   grid-template-columns: var(--rail-w) 0px 1fr 0px;
 }
 
+/* ─── Responsive: Tablet (768px–1023px) ───────────────────────────────────── */
+/* Inspector hidden by default; canvas maximized. User can toggle via class. */
+@media (max-width: 1023px) {
+  #app {
+    grid-template-columns: var(--rail-w) var(--sidebar-w) 1fr 0px;
+  }
+
+  /* When inspector is toggled open */
+  #app.inspector-collapsed {
+    grid-template-columns: var(--rail-w) var(--sidebar-w) 1fr 0px;
+  }
+
+  #app:not(.inspector-collapsed) {
+    grid-template-columns: var(--rail-w) var(--sidebar-w) 1fr var(--inspector-w);
+  }
+
+  /* Inspector visibility driven by grid column — no !important cascade wars */
+  .inspector {
+    display: none;
+  }
+
+  #app:not(.inspector-collapsed) .inspector {
+    display: flex;
+  }
+}
+
+/* ─── Responsive: Mobile (<768px) ─────────────────────────────────────────── */
+/* Both sidebar and inspector hidden; canvas maximized */
+@media (max-width: 767px) {
+  #app {
+    grid-template-columns: var(--rail-w) 0px 1fr 0px;
+    grid-template-rows: var(--navbar-h) 1fr 0px 0px;
+  }
+
+  .sidebar,
+  .inspector,
+  .hud,
+  .bottom-bar {
+    display: none !important;
+  }
+
+  /* Canvas expands to fill */
+  .canvas-container {
+    grid-column: 2 / -1 !important;
+    grid-row: 2 / -1 !important;
+  }
+
+  /* Floating toggle buttons for mobile panels */
+  .mobile-panel-toggle {
+    display: flex !important;
+  }
+}
+
+/* ─── Responsive: Narrow Mobile (<480px) ───────────────────────────────────── */
+@media (max-width: 479px) {
+  /* Maximize canvas even further — hide HUD and compress navbar */
+  #app {
+    grid-template-rows: var(--navbar-h) 1fr 0px 0px;
+  }
+
+  .hud,
+  .bottom-bar {
+    display: none !important;
+  }
+
+  /* Compact navbar: hide text labels in menus, reduce padding */
+  .menu-dropdown summary {
+    padding: var(--xs) var(--sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .navbar-brand {
+    font-size: var(--font-size-sm);
+    padding-right: var(--sm);
+    border-right: none;
+    margin-right: var(--xs);
+  }
+
+  .navbar-brand-name {
+    display: none;
+  }
+
+  .quick-btn {
+    min-width: 32px;
+    padding: 0 var(--xs);
+  }
+}
+
 /* ─── Zone 1: Navbar ──────────────────────────────────────────────────────── */
 .navbar {
   grid-area: navbar;
@@ -172,16 +272,6 @@ button:disabled {
   overflow: hidden;
 }
 
-.navbar-brand {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.01em;
-  padding-right: var(--md);
-  border-right: 1px solid var(--bg-surface);
-  margin-right: var(--xs);
-}
-
 .navbar-top-row {
   display: flex;
   align-items: center;
@@ -191,6 +281,44 @@ button:disabled {
   overflow: hidden;
   padding: 0 var(--lg);
   height: 44px;
+}
+
+/* ─── Mobile Panel Toggle Buttons ─────────────────────────────────────────── */
+.mobile-panel-toggle {
+  display: none;
+  position: fixed;
+  z-index: 100;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-panel-toggle:hover {
+  background: var(--bg-tertiary);
+  color: var(--text);
+}
+
+.mobile-panel-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mobile-panel-toggle--sidebar {
+  bottom: calc(var(--navbar-h) + var(--xl));
+  left: calc(var(--rail-w) + var(--md));
+}
+
+.mobile-panel-toggle--inspector {
+  bottom: calc(var(--navbar-h) + var(--xl));
+  right: var(--md);
 }
 
 /* ─── Toolbar ──────────────────────────────────────────────────────────────── */
@@ -416,6 +544,54 @@ button:disabled {
   height: 100%;
 }
 
+/* ─── Diagnostics pill — engineering quality gate ───────────────────────────── */
+.diagnostics-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--badge-radius);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: default;
+  transition: opacity var(--motion-fast);
+}
+
+.diagnostics-pill[data-state='clean'] {
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.diagnostics-pill[data-state='error'] {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ─── Brand name ──────────────────────────────────────────────────────────── */
+.navbar-brand {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  padding-right: var(--md);
+  border-right: 1px solid var(--bg-surface);
+  margin-right: var(--xs);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.navbar-brand-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
 .quick-btn {
   display: flex;
   align-items: center;
@@ -529,7 +705,6 @@ button:disabled {
   background: var(--bg-primary);
   color: var(--text);
   font-size: 12px;
-  outline: none;
   transition: border-color var(--motion-fast);
 }
 
@@ -656,7 +831,26 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* ─── More Shapes Accordion ──────────────────────────────────────────────── */
+.more-shapes-accordion {
+  border-top: 1px solid var(--bg-surface);
+  margin-top: var(--xs);
+}
+
+/* Hide native disclosure triangle */
+.more-shapes-accordion summary {
+  list-style: none;
+}
+
+.more-shapes-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
 .more-shapes-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--xs);
   width: calc(100% - var(--sm) * 2);
   margin: var(--sm);
   padding: var(--sm);
@@ -665,14 +859,49 @@ button:disabled {
   color: var(--text-dim);
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
+  cursor: pointer;
   transition:
     border-color var(--motion-fast),
     color var(--motion-fast);
+  user-select: none;
 }
 
-.more-shapes-btn:hover:not(:disabled) {
+.more-shapes-btn:hover {
   border-color: var(--text-dim);
   color: var(--text);
+}
+
+.more-shapes-chevron {
+  font-size: 10px;
+  transition: transform var(--motion-fast);
+}
+
+/* Rotate chevron when accordion is open */
+.more-shapes-accordion[open] .more-shapes-chevron {
+  transform: rotate(180deg);
+}
+
+.more-shapes-content {
+  padding: 0 var(--sm) var(--sm);
+}
+
+/* ─── Load Stencils Link ─────────────────────────────────────────────────── */
+.load-stencils-btn {
+  display: block;
+  width: calc(100% - var(--sm) * 2);
+  margin: 0 var(--sm) var(--sm);
+  padding: var(--xs) var(--sm);
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color var(--motion-fast);
+}
+
+.load-stencils-btn:hover {
+  color: var(--accent);
 }
 
 /* ─── Zone 2: Version History Panel ───────────────────────────────────────── */
@@ -920,7 +1149,36 @@ button:disabled {
 
 .hud-label {
   color: var(--text-dim);
-  opacity: 0.7;
+  /* Labels on secondary items hidden — value alone carries meaning */
+}
+
+.hud-item > .hud-label {
+  display: none;
+}
+
+/* ─── HUD item weight system ────────────────────────────────────────────────── */
+
+/* Primary: always full opacity */
+.hud-primary,
+.hud-save-status {
+  opacity: 1;
+}
+
+/* Secondary: dim when at default state, subtle at all times */
+.hud-snap,
+.hud-grid {
+  opacity: 0.3;
+}
+
+/* Tertiary: coordinates, page, zoom — present but not prominent */
+.hud-cursor,
+.hud-zoom-btn {
+  opacity: 0.5;
+}
+
+/* Empty state: no selection → dim the whole item */
+.hud-item--empty {
+  opacity: 0.35;
 }
 
 .hud-value {
@@ -1197,7 +1455,6 @@ button:disabled {
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 11px;
-  outline: none;
 }
 
 .field-control input[type='color'] + input[type='text']:focus {
@@ -1213,7 +1470,6 @@ button:disabled {
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 11px;
-  outline: none;
 }
 
 .field-control .hex-input:focus {
@@ -1244,7 +1500,6 @@ button:disabled {
   font-family: var(--font-mono);
   font-size: 11px;
   text-align: right;
-  outline: none;
 }
 
 .field-control input[type='number']:focus {
@@ -1259,7 +1514,6 @@ button:disabled {
   background: var(--bg-primary);
   color: var(--text);
   font-size: 11px;
-  outline: none;
 }
 
 .field-control select:focus {
@@ -1375,7 +1629,6 @@ button:disabled {
 }
 
 .position-input-group input[type='number']:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
@@ -1499,7 +1752,6 @@ button:disabled {
   background: var(--bg-primary);
   color: var(--text);
   font-size: 11px;
-  outline: none;
 }
 
 #gradient-type-select:focus {
@@ -1700,7 +1952,6 @@ button:disabled {
   padding: 1px 4px;
   border-radius: 2px;
   width: 80px;
-  outline: none;
 }
 
 .page-tab:hover {
@@ -1966,7 +2217,6 @@ body.presentation-mode .page-tab.active {
   color: var(--text);
   font-size: 13px;
   font-family: inherit;
-  outline: none;
   transition: border-color var(--motion-fast);
 }
 
@@ -2084,9 +2334,8 @@ body.presentation-mode .page-tab.active {
   border: 2px solid #3b82f6;
   border-radius: 4px;
   padding: 4px 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 14px;
-  outline: none;
   box-sizing: border-box;
   margin: 0;
   text-align: center;
