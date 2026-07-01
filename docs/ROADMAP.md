@@ -291,19 +291,15 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
   - HUD semantic hierarchy, responsive breakpoints, focus-visible.
   - Fixed UI platform / connector modifiers specs.
   - `Cargo.lock` formatting.
+- **IP-D/IP-E Follow-up (DuplicatePage + ReorderPage)**: `feat/interaction-parity-ip-de-followup` (PR #160).
+  - Status: Merged.
+  - Rust: `DuplicatePagePayload` (full impl, undo cascade), `ReorderPagePayload` (full impl, `page_order` model support).
+  - TS: `Editor.duplicateActivePage()` and `moveActivePage()` wired to engine commands.
+  - Scene: `SceneBuilder` uses `model.pages_in_order()` to reflect `page_order` in render.
+  - Verification: `just verify` ✅, full Playwright 514 pass (4 pre-existing failures).
+  - Archive: `sddk/interaction-parity-ip-de-followup-duplicate-reorder/archive-report.md`.
 
-### Current Milestone (In Progress)
-
-- **IP-D/IP-E Follow-up (DuplicatePage + ReorderPage)**: `feat/interaction-parity-ip-de-followup` — Ready for PR.
-  - **Status**: Code complete, verified, archive report written.
-  - **Deliverables**:
-    - Rust: `DuplicatePagePayload` (full impl, undo cascade), `ReorderPagePayload` (full impl, `page_order` model support).
-    - TS: `Editor.duplicateActivePage()` and `moveActivePage()` wired to engine commands.
-    - Scene: `SceneBuilder` uses `model.pages_in_order()` to reflect `page_order` in render.
-  - **Verification**: `just verify` ✅, full Playwright 514 pass (4 pre-existing failures).
-  - **Archive**: `sddk/interaction-parity-ip-de-followup-duplicate-reorder/archive-report.md`.
-
-### Remaining Work
+### Next Steps
 
 - **IP-F (Layer Model)** (Deferred per ADR-0081).
   - Scope: full `diagram-core` layer model (ZOrder, LayerId), layer panel UI, export/import.
