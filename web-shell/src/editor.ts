@@ -57,6 +57,8 @@ interface MarqueeState {
   currentY: number;
   /** 'select' replaces/adds to selection, 'deselect' removes from selection. */
   mode: 'select' | 'deselect';
+  /** When true, marquee uses intersection (partial overlap); when false (default), uses containment (fully inside). */
+  useIntersection: boolean;
 }
 
 /** Connect-mode FSM state (drag-based edge creation with anchor resolution). */
@@ -296,18 +298,20 @@ export class Editor {
   /**
    * Select all shapes whose bounds intersect the given rect.
    * Used by marquee selection.
+   * @param useIntersection - when true, uses partial overlap (intersection); when false/undefined, uses containment (fully inside).
    */
-  selectInRect(rect: { x: number; y: number; width: number; height: number }): void {
-    const intersecting = this.#getIntersectingIds(rect);
+  selectInRect(rect: { x: number; y: number; width: number; height: number }, useIntersection?: boolean): void {
+    const intersecting = this.#getIntersectingIds(rect, useIntersection);
     this.#applySelection(new Set(intersecting));
   }
 
   /**
    * Remove all currently-selected shapes whose bounds intersect the given rect.
    * Implements draw.io Alt+Shift+drag deselect box (SEL-006).
+   * @param useIntersection - when true, uses partial overlap (intersection); when false/undefined, uses containment (fully inside).
    */
-  deselectInRect(rect: { x: number; y: number; width: number; height: number }): void {
-    const intersecting = this.#getIntersectingIds(rect);
+  deselectInRect(rect: { x: number; y: number; width: number; height: number }, useIntersection?: boolean): void {
+    const intersecting = this.#getIntersectingIds(rect, useIntersection);
     const next = new Set(this.#selection);
     for (const id of intersecting) {
       next.delete(id);
@@ -2470,9 +2474,9 @@ export class Editor {
   // ─── Marquee Selection ────────────────────────────────────────────────────
 
   /** Start marquee selection at document coordinates (x, y). */
-  #startMarquee(x: number, y: number, mode: 'select' | 'deselect' = 'select'): void {
+  #startMarquee(x: number, y: number, mode: 'select' | 'deselect' = 'select', useIntersection = false): void {
     this.#cancelMarquee();
-    this.#marquee = { originX: x, originY: y, currentX: x, currentY: y, mode };
+    this.#marquee = { originX: x, originY: y, currentX: x, currentY: y, mode, useIntersection };
   }
 
   /** Update marquee endpoint. */
@@ -2488,12 +2492,13 @@ export class Editor {
     if (!this.#marquee) return;
     const rect = this.#normalizeMarqueeRect();
     const mode = this.#marquee.mode;
+    const useIntersection = this.#marquee.useIntersection;
     this.#cancelMarquee();
     if (rect.width > 5 || rect.height > 5) {
       if (mode === 'deselect') {
-        this.deselectInRect(rect);
+        this.deselectInRect(rect, useIntersection);
       } else {
-        this.selectInRect(rect);
+        this.selectInRect(rect, useIntersection);
       }
     }
   }
@@ -2544,8 +2549,10 @@ export class Editor {
     };
   }
 
-  /** Get all shape SlotmapIds whose bounds intersect the given rect. */
-  #getIntersectingIds(rect: { x: number; y: number; width: number; height: number }): SlotmapId[] {
+  /** Get all shape SlotmapIds whose bounds intersect the given rect.
+   * @param useIntersection - when true, uses partial overlap (intersection); when false/undefined, uses containment (shape fully inside rect).
+   */
+  #getIntersectingIds(rect: { x: number; y: number; width: number; height: number }, useIntersection?: boolean): SlotmapId[] {
     const result: SlotmapId[] = [];
 
     for (const page of this.#sceneCache) {
@@ -2566,13 +2573,19 @@ export class Editor {
           const sw = (bounds.size['width'] as number) ?? 0;
           const sh = (bounds.size['height'] as number) ?? 0;
 
-          // Intersection test
-          if (
+          // Containment test (default): shape fully inside rect
+          const contains =
+            sx >= rect.x &&
+            sy >= rect.y &&
+            sx + sw <= rect.x + rect.width &&
+            sy + sh <= rect.y + rect.height;
+          // Intersection test: any partial overlap
+          const intersects =
             sx < rect.x + rect.width &&
             sx + sw > rect.x &&
             sy < rect.y + rect.height &&
-            sy + sh > rect.y
-          ) {
+            sy + sh > rect.y;
+          if (useIntersection ? intersects : contains) {
             result.push({ idx: idField.idx!, version: idField.version! });
           }
         }
@@ -2673,21 +2686,21 @@ export class Editor {
       if (e.altKey && e.shiftKey) {
         // Alt+Shift+click on empty: deselect box (SEL-006)
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
-        this.#startMarquee(docPos.x, docPos.y, 'deselect');
+        this.#startMarquee(docPos.x, docPos.y, 'deselect', true);
         this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
         this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
       } else if (e.altKey) {
-        // Alt+click on empty: force selection box (SEL-004)
+        // Alt+click on empty: force selection box (SEL-004) + intersection mode
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
-        this.#startMarquee(docPos.x, docPos.y, 'select');
+        this.#startMarquee(docPos.x, docPos.y, 'select', true);
         this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
         this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
       } else if (e.shiftKey) {
-        // Shift+click on empty: start marquee
+        // Shift+click on empty: start marquee (containment mode)
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
-        this.#startMarquee(docPos.x, docPos.y, 'select');
+        this.#startMarquee(docPos.x, docPos.y, 'select', false);
         // Add move/up listeners for marquee
         this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
@@ -2708,7 +2721,7 @@ export class Editor {
       if (stackAtPoint.length > 1) {
         // Find current selection in stack; pick the next-lower one
         const currentIdx = stackAtPoint.findIndex((id) => this.isSelected(id));
-        const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % stackAtPoint.length;
+        const nextIdx = currentIdx === -1 ? 0 : Math.min(currentIdx + 1, stackAtPoint.length - 1);
         const next = stackAtPoint[nextIdx]!;
         this.selectOnly(next);
         return;
@@ -4372,10 +4385,11 @@ export class Editor {
       return;
     }
 
-    // Tab / Shift+Tab → cycle selection in z-order (SEL-012)
+    // Tab / Shift+Tab → cycle selection in z-order including edges (SEL-012)
     if (e.key === 'Tab' && !hasMod) {
       e.preventDefault();
-      const allIds = this.#getAllShapeIdsZOrder();
+      // Compose shapes + edges at call site to preserve Ctrl+I shapes-only contract
+      const allIds = [...this.#getAllShapeIdsZOrder(), ...this.#getAllEdgeIds()];
       if (allIds.length === 0) return;
       if (this.#selection.size === 0) {
         this.selectOnly(allIds[0]!);
