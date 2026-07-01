@@ -369,7 +369,7 @@ export function populatePageTabs(
     tab.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      tabRightClickHandler(e as MouseEvent, i, pages.length, tab, callbacks);
+      tabRightClickHandler(e as MouseEvent, i, page.pageId, pages.length, tab, callbacks);
     });
 
     container.appendChild(tab);
@@ -430,11 +430,11 @@ function startRename(
 function tabRightClickHandler(
   e: MouseEvent,
   pageIndex: number,
+  pageId: number,
   totalPages: number,
   tab: HTMLElement,
   callbacks: PageTabCallbacks,
 ): void {
-  const pageId = parseInt(tab.getAttribute('data-page-index') || '-1', 10);
   void pageIndex; // kept for potential future use (e.g., debug)
 
   // Open the inline rename input: we need the tab's name element to swap it.

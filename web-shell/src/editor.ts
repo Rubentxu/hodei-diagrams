@@ -1508,174 +1508,84 @@ export class Editor {
     return this.#activePageSlotId;
   }
 
-  /**
-   * IP-D: Duplicate the current page. Adds a new page (named "<current> (copy)")
-   * and copies all vertices/edges of the current page to it. Returns true on
-   * success. The new page becomes the active page.
-   *
-   * IP-D simplification: the duplicate copies all vertices with the same
-   * geometry and style, and recreates edges between them. Waypoints are
-   * not preserved (deferred to IP-E with the native `DuplicatePage` command).
-   * The kind of each shape is detected from the scene cache (Rect, Ellipse,
-   * etc.) and the new shapes use the same kind.
-   */
+  static #slotmapKey(id: SlotmapId): string {
+    return `${id.idx}:${id.version}`;
+  }
+
+  /** Duplicate the current page via the engine `DuplicatePage` command. */
   duplicateActivePage(): boolean {
     if (!this.#activePageSlotId) return false;
     const activePage = this.#sceneCache[this.#activePageIdx];
     if (!activePage) return false;
 
-    // Snapshot the old page's shapes and edges. We need both geometry AND
-    // source/target mapping for the edges, so the new edges connect the
-    // correct (newly-created) shape IDs.
-    const oldShapes: Array<{
-      oldId: { idx: number; version: number };
-      kind: string;
-      x: number; y: number; w: number; h: number;
-      style: Record<string, unknown>;
-      label: string;
-    }> = [];
-    const oldEdges: Array<{
-      oldSource: { idx: number; version: number };
-      oldTarget: { idx: number; version: number };
-    }> = [];
-
-    for (const elem of activePage.display_list) {
-      const e = elem as Record<string, unknown>;
-      for (const key of Editor.#SHAPE_KEYS) {
-        const variant = e[key] as Record<string, unknown> | undefined;
-        if (!variant) continue;
-        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-        const bounds = variant['bounds'] as
-          | { origin?: Record<string, number>; size?: Record<string, number> }
-          | undefined;
-        if (!idField || !bounds?.origin || !bounds?.size) continue;
-        oldShapes.push({
-          oldId: { idx: idField.idx!, version: idField.version! },
-          kind: key,
-          x: (bounds.origin['x'] as number) ?? 0,
-          y: (bounds.origin['y'] as number) ?? 0,
-          w: (bounds.size['width'] as number) ?? 0,
-          h: (bounds.size['height'] as number) ?? 0,
-          style: (variant['style'] as Record<string, unknown>) ?? {},
-          label: (variant['label'] as string) ?? '',
-        });
-      }
-      const edge = e['Edge'] as Record<string, unknown> | undefined;
-      if (edge) {
-        const src = edge['source'] as { idx?: number; version?: number } | undefined;
-        const tgt = edge['target'] as { idx?: number; version?: number } | undefined;
-        if (src && tgt) {
-          oldEdges.push({
-            oldSource: { idx: src.idx!, version: src.version! },
-            oldTarget: { idx: tgt.idx!, version: tgt.version! },
-          });
-        }
-      }
-    }
-
-    // Add the new page.
-    const newName = `${activePage.name ?? 'Page'} (copy)`;
-    const addPageResult = this.#session.executeCommand(JSON.stringify({
-      AddPage: {
-        page: {
-          id: { idx: 0, version: 0 },
-          name: newName,
-          size: { width: activePage.width, height: activePage.height },
-        },
+    const beforePageIds = new Set(this.#sceneCache.map((page) => Editor.#slotmapKey(page.page_id)));
+    const cmd = JSON.stringify({
+      DuplicatePage: {
+        source_page_id: activePage.page_id,
+        new_name: null,
       },
-    }));
-    if (!addPageResult.ok) {
-      this.#onError(addPageResult.error);
+    });
+    const result = this.#session.executeCommand(cmd);
+    if (!result.ok) {
+      this.#onError(result.error);
       return false;
     }
-    this.#replay();
 
-    const newPageIdx = this.#sceneCache.length - 1;
-    const newPage = this.#sceneCache[newPageIdx];
-    if (!newPage) return false;
-    const newPageSlot = { idx: 0, version: 0 };
-
-    // Add vertices in a single transaction.
-    const commands: string[] = [];
-    for (const s of oldShapes) {
-      commands.push(JSON.stringify({
-        AddVertex: {
-          id: { idx: 0, version: 0 },
-          kind: s.kind,
-          geometry: { x: s.x, y: s.y, width: s.w, height: s.h },
-          style: s.style,
-          label: s.label,
-          page: newPageSlot,
-        },
-      }));
-    }
-    if (commands.length > 0) {
-      this.executeTransaction(commands);
-    }
-    this.#replay();
-
-    // Build the new→old ID map by matching shapes in the new page to the
-    // old shapes by geometry. We rely on the fact that `AddVertex` preserves
-    // the order of commands.
-    const newPageShapeIds: { idx: number; version: number }[] = [];
-    for (const elem of newPage.display_list) {
-      const e = elem as Record<string, unknown>;
-      for (const key of Editor.#SHAPE_KEYS) {
-        const variant = e[key] as Record<string, unknown> | undefined;
-        if (!variant) continue;
-        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-        if (idField) {
-          newPageShapeIds.push({ idx: idField.idx!, version: idField.version! });
-        }
-      }
+    const sceneResult = this.#session.decodeSceneBuffer();
+    if (!sceneResult.ok) {
+      this.#onError(sceneResult.error);
+      return false;
     }
 
-    // Recreate edges by mapping old (idx, version) → new (idx, version).
-    const idMap = new Map<string, { idx: number; version: number }>();
-    for (let i = 0; i < oldShapes.length; i++) {
-      const oldId = oldShapes[i]!.oldId;
-      const newId = newPageShapeIds[i];
-      if (newId) {
-        idMap.set(`${oldId.idx}:${oldId.version}`, newId);
-      }
-    }
-    for (const edge of oldEdges) {
-      const newSrc = idMap.get(`${edge.oldSource.idx}:${edge.oldSource.version}`);
-      const newTgt = idMap.get(`${edge.oldTarget.idx}:${edge.oldTarget.version}`);
-      if (!newSrc || !newTgt) continue;
-      const r = this.#session.connectVerticesAnchored(
-        newSrc, newTgt,
-        { kind: 'auto' },
-        { kind: 'auto' },
-      );
-      if (!r.ok) {
-        this.#onError(r.error);
-      }
+    const newPageIdx = sceneResult.value.findIndex(
+      (page) => !beforePageIds.has(Editor.#slotmapKey(page.page_id)),
+    );
+    if (newPageIdx < 0) {
+      this.#onError('Duplicate page failed: duplicated page not found in scene');
+      return false;
     }
 
-    // Switch to the new page.
     this.#activePageIdx = newPageIdx;
-    this.refreshScene();
+    this.#activePageSlotId = sceneResult.value[newPageIdx]!.page_id;
+    this.#replay();
     return true;
   }
 
-  /**
-   * IP-D: Move the current page left or right in the tab order.
-   *
-   * KNOWN LIMITATION: the engine has no native `ReorderPage` command. For
-   * IP-D, this is a best-effort that succeeds only when there's no
-   * practical side-effect risk. The proper reorder requires a
-   * ReorderPage WASM command (deferred to IP-E).
-   *
-   * Current IP-D behavior: returns false. The page tab menu still shows
-   * Move Left / Move Right as actionable items so the user knows the
-   * feature is intended — the underlying wiring is verified via a unit
-   * test that checks the public method exists and returns false safely.
-   */
+  /** Move the current page left or right via the engine `ReorderPage` command. */
   moveActivePage(direction: 'left' | 'right'): boolean {
-    void direction;
-    // Limitation: no ReorderPage command in the engine yet. See comment.
-    return false;
+    if (!this.#activePageSlotId) return false;
+
+    const currentPageId = this.#activePageSlotId;
+    const commandDirection = direction === 'left' ? 'Left' : 'Right';
+    const cmd = JSON.stringify({
+      ReorderPage: {
+        id: currentPageId,
+        direction: commandDirection,
+      },
+    });
+    const result = this.#session.executeCommand(cmd);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return false;
+    }
+
+    const sceneResult = this.#session.decodeSceneBuffer();
+    if (!sceneResult.ok) {
+      this.#onError(sceneResult.error);
+      return false;
+    }
+    const newIdx = sceneResult.value.findIndex(
+      (page) => Editor.#slotmapKey(page.page_id) === Editor.#slotmapKey(currentPageId),
+    );
+    if (newIdx < 0) {
+      this.#onError('Move page failed: moved page not found in scene');
+      return false;
+    }
+
+    this.#activePageIdx = newIdx;
+    this.#activePageSlotId = currentPageId;
+    this.#replay();
+    return true;
   }
 
   /** Detach event listeners from the viewer container. */

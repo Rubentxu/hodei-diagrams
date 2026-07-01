@@ -8,6 +8,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::id::PageId;
 use crate::page::Page;
 use crate::store::ModelStore;
 use crate::style::StyleMap;
@@ -92,6 +93,11 @@ pub struct DiagramModel {
     /// in-editor cache mirrors this for fast feedback; the engine command
     /// persists it across reloads.
     pub default_style: Option<StyleMap>,
+    /// IP-D/IP-E follow-up: Display order of pages. `None` = slotmap
+    /// insertion order (backward compat). `Some(vec)` = use this order for
+    /// display. Reorder commands set this to swap pages. The slotmap
+    /// identity of cells is unchanged; only the display order changes.
+    pub page_order: Option<Vec<PageId>>,
 }
 
 impl DiagramModel {
@@ -135,6 +141,43 @@ impl DiagramModel {
     /// this style.
     pub fn set_default_style(&mut self, style: Option<StyleMap>) {
         self.default_style = style;
+    }
+
+    /// IP-D/IP-E follow-up: Borrow the current page order, if any.
+    /// `None` means "use slotmap iteration order" (backward compat).
+    pub fn page_order(&self) -> Option<&Vec<PageId>> {
+        self.page_order.as_ref()
+    }
+
+    /// IP-D/IP-E follow-up: Set the page order. When `None`, the slotmap
+    /// iteration order is used.
+    pub fn set_page_order(&mut self, order: Option<Vec<PageId>>) {
+        self.page_order = order;
+    }
+
+    /// IP-D/IP-E follow-up: Compute the current page iteration order.
+    /// If `page_order` is set, iterate in that order and append any pages
+    /// that are missing from the explicit order (e.g. newly added or
+    /// duplicated pages after a reorder). Else, iterate in the slotmap's
+    /// insertion order.
+    pub fn pages_in_order(&self) -> Vec<(PageId, &Page)> {
+        match &self.page_order {
+            Some(order) => {
+                let mut pages: Vec<(PageId, &Page)> = order
+                    .iter()
+                    .filter_map(|pid| self.store.page(*pid).map(|p| (*pid, p)))
+                    .collect();
+
+                for (pid, page) in self.store.pages_with_ids() {
+                    if !order.contains(&pid) {
+                        pages.push((pid, page));
+                    }
+                }
+
+                pages
+            }
+            None => self.store.pages_with_ids().collect(),
+        }
     }
 }
 

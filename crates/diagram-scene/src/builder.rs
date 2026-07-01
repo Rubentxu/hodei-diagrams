@@ -92,12 +92,11 @@ impl SceneBuilder {
     /// This is a pure function — calling it twice with the same model
     /// produces byte-identical scenes.
     pub fn build(&self, model: &DiagramModel) -> SceneResult<Scene> {
-        let store = &model.store;
         let mut pages: Vec<PageScene> = Vec::new();
 
-        // Iterate pages in insertion order
-        for (page_id, page) in store.pages_with_ids() {
-            let page_scene = self.build_page(store, page_id, page)?;
+        // Iterate pages in display order (`page_order` if set, else slotmap order).
+        for (page_id, page) in model.pages_in_order() {
+            let page_scene = self.build_page(&model.store, page_id, page)?;
             pages.push(page_scene);
         }
 

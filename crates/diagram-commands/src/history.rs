@@ -112,9 +112,6 @@ mod tests {
         let mut model = DiagramModel::new();
         let page = Page::new(PageId::default());
         let pid = model.store.insert_page(page);
-        if let Some(p) = model.store.page_mut(pid) {
-            p.id = pid;
-        }
         (model, pid)
     }
 

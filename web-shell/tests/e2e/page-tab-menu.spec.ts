@@ -6,7 +6,7 @@
  * - PAGE-004: Duplicate creates a new page with same contents
  * - PAGE-004b: Duplicate handles edge case of empty page
  * - PAGE-005: Move Left disabled at index 0; Move Right disabled at last
- * - PAGE-005b: moveActivePage is best-effort (returns false) — engine lacks ReorderPage
+ * - PAGE-005b: moveActivePage reorders pages through the engine
  *
  * Reference: docs/drawio-user-interaction-workflows.md (PAGE-002, PAGE-004, PAGE-005)
  * ADR-0080 (not applicable; this is page tab menu per IP-D scope)
@@ -47,19 +47,29 @@ test.describe('Suite IP-D: Page Tab Menu', () => {
     await expect(contextMenu.locator('text=Delete')).toBeVisible();
   });
 
-  test('PAGE-004: duplicateActivePage is exposed and returns a boolean', async ({ page }) => {
-    // The full end-to-end duplicate is covered by the PAGE-004b test
-    // (empty page case). For the file-loaded case, verify the API exists
-    // and returns a boolean. Full round-trip is tested manually + by the
-    // handlePageDuplicate wiring in main.ts.
+  test('PAGE-004: duplicateActivePage duplicates the loaded page and activates the copy', async ({ page }) => {
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    const exists = await page.evaluate(() => {
+    const result = await page.evaluate(() => {
       const editor = (window as any).__hodeiDebug?.getEditor?.();
-      return typeof editor?.duplicateActivePage === 'function';
+      if (!editor) return null;
+      const ok = editor.duplicateActivePage?.();
+      const scene = editor.getSceneCache?.()?.value ?? [];
+      return {
+        ok,
+        activePageIdx: editor.activePageIdx,
+        pages: scene.map((p: any) => ({
+          name: p.name,
+          elements: Array.isArray(p.display_list) ? p.display_list.length : -1,
+        })),
+      };
     });
-    expect(exists).toBe(true);
+    expect(result?.ok).toBe(true);
+    expect(result?.pages).toHaveLength(2);
+    expect(result?.pages?.[1]?.name).toContain('(copy)');
+    expect(result?.pages?.[1]?.elements).toBe(result?.pages?.[0]?.elements);
+    expect(result?.activePageIdx).toBe(1);
   });
 
   test('PAGE-004b: Duplicate handles empty page (creates new empty page)', async ({ page }) => {
@@ -70,42 +80,52 @@ test.describe('Suite IP-D: Page Tab Menu', () => {
     });
     await page.waitForTimeout(300);
 
-    const tabCount = await page.locator('[data-testid^="page-tab-"]').count();
+    const tabCount = await page
+      .locator('[data-testid^="page-tab-"]:not([data-testid="page-tab-add"])')
+      .count();
     expect(tabCount).toBe(2);
   });
 
   test('PAGE-005: Move Left disabled at index 0; Move Right disabled at last', async ({ page }) => {
-    // Add a second page so we can test "Move Right" disabled at last
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
     await page.locator('[data-testid="page-tab-add"]').click();
     await page.waitForTimeout(200);
 
-    // Test the moveActivePage API directly:
-    // - At index 0, move left should return false (and not crash)
-    // - At last index, move right should return false
-    // - move right from index 0 should be allowed but limited
-    const results = await page.evaluate(() => {
-      const editor = (window as any).__hodeiDebug?.getEditor?.();
-      if (!editor) return null;
-      return {
-        moveLeftAtFirst: editor.moveActivePage?.('left'),
-        moveRightAtLast: editor.moveActivePage?.('right'),
-      };
-    });
-    // Both should be false (IP-D limitation: ReorderPage is not in engine)
-    expect(results?.moveLeftAtFirst).toBe(false);
-    expect(results?.moveRightAtLast).toBe(false);
+    const firstTab = page.locator('[data-testid="page-tab-0"]');
+    await firstTab.click({ button: 'right' });
+    const contextMenu = page.locator('.context-menu');
+    await expect(contextMenu).toBeVisible();
+    await expect(contextMenu.locator('button:has-text("Move Left")')).toBeDisabled();
+
+    await page.locator('[data-testid="viewer"]').click({ position: { x: 4, y: 4 } });
+    await expect(contextMenu).toBeHidden();
+
+    const lastTab = page.locator('[data-testid="page-tab-1"]');
+    await lastTab.click({ button: 'right' });
+    await expect(contextMenu.locator('button:has-text("Move Right")')).toBeDisabled();
   });
 
-  test('PAGE-005b: moveActivePage is best-effort (returns false)', async ({ page }) => {
-    // IP-D limitation: ReorderPage is not in the engine yet. The public
-    // method moveActivePage returns false and surfaces a diagnostic.
+  test('PAGE-005b: moveActivePage reorders pages through the engine', async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+    await page.locator('[data-testid="page-tab-add"]').click();
+    await page.locator('[data-testid="page-tab-add"]').click();
+    await page.waitForTimeout(200);
+
+    await page.locator('[data-testid="page-tab-0"] .page-tab-name').click();
+
     const result = await page.evaluate(() => {
       const editor = (window as any).__hodeiDebug?.getEditor?.();
       if (!editor) return null;
-      return editor.moveActivePage?.('right');
+      const before = (editor.getSceneCache?.()?.value ?? []).map((p: any) => p.name);
+      const ok = editor.moveActivePage?.('right');
+      const after = (editor.getSceneCache?.()?.value ?? []).map((p: any) => p.name);
+      return { ok, before, after, activePageIdx: editor.activePageIdx };
     });
-    expect(result).toBe(false);
+    expect(result?.ok).toBe(true);
+    expect(result?.before).toHaveLength(3);
+    expect(result?.after?.[1]).toBe(result?.before?.[0]);
+    expect(result?.activePageIdx).toBe(1);
   });
 });
