@@ -132,7 +132,7 @@ test.describe('Suite IP-C: Connector Modifiers', () => {
       // Get the first edge
       const edges = document.querySelectorAll('[data-edge-id]');
       if (edges.length === 0) return null;
-      const firstEdge = edges[0];
+      const firstEdge = edges[0] as Element;
       const rect = firstEdge.getBoundingClientRect();
       const midX = rect.left + rect.width / 2;
       const midY = rect.top + rect.height / 2;
