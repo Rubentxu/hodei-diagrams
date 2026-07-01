@@ -611,3 +611,66 @@ fn layer_visible_and_locked_from_extra_attributes() {
         "Normal Layer should not be locked (default)"
     );
 }
+
+/// Regression test: transitive layer-id resolution (shape → group → layer).
+///
+/// This tests the fix where `resolve_layer` walks the parent chain transitively
+/// instead of only checking the immediate parent. Without the fix, shapes inside
+/// groups that are inside layers would incorrectly get `layer_id = None`.
+#[test]
+fn transitive_layer_resolution_shape_group_layer() {
+    // XML structure: shape (id=5) -> group (id=4) -> layer (id=2)
+    // The shape's parent is the group, the group's parent is the layer
+    let xml = r#"<mxfile>
+  <diagram name="Page-1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1"/>
+        <mxCell id="2" value="My Layer" vertex="1" style="layer=1" parent="1"/>
+        <mxCell id="3" value="Group Container" vertex="1" parent="2"/>
+        <mxCell id="4" value="Shape in Group" vertex="1" parent="3"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"#;
+
+    let doc = parse_drawio(xml).unwrap();
+    let mapper = DrawioMapping::new();
+    let (model, _id_map) = mapper.to_domain(&doc).unwrap();
+
+    // Should have 1 named layer
+    assert_eq!(model.store.len_layer(), 1, "should have 1 named layer");
+
+    // Get the layer ID
+    let layers: Vec<_> = model
+        .store
+        .layers_with_ids()
+        .filter(|(_, l)| l.name.is_some())
+        .map(|(id, l)| (id, l.name.as_ref().map(|n| n.text.as_str())))
+        .collect();
+
+    let layer_id = layers
+        .iter()
+        .find(|(_, name)| *name == Some("My Layer"))
+        .map(|(id, _)| *id)
+        .expect("should find My Layer");
+
+    // Shape in group should resolve to the layer via transitive walk
+    let vertices: Vec<_> = model
+        .store
+        .vertices_with_ids()
+        .map(|(vid, v)| (vid, v.label.as_ref().map(|l| l.text.as_str()), v.layer_id))
+        .collect();
+
+    let shape_in_group = vertices
+        .iter()
+        .find(|(_, label, _)| *label == Some("Shape in Group"))
+        .expect("should find Shape in Group");
+
+    assert_eq!(
+        shape_in_group.2,
+        Some(layer_id),
+        "Shape in Group should have transitive layer_id (via group → layer)"
+    );
+}

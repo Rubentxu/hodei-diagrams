@@ -8,7 +8,7 @@
 //! See `docs/adr/0009-rust-native-model-with-drawio-mapping.md` and
 //! `docs/adr/0024-preserve-unknown-when-safe-degrade-explicitly.md`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use diagram_core::geometry::{CellGeometry, Size};
 use diagram_core::id::{EdgeId, GroupId, LayerId, VertexId};
@@ -319,6 +319,13 @@ impl DrawioMapping {
         let mut style_cache: BTreeMap<String, diagram_core::id::StyleId> = BTreeMap::new();
 
         for diagram in &raw.diagrams {
+            // Build parent_map for transitive layer resolution (shape → group → layer)
+            let parent_map: BTreeMap<String, String> = diagram
+                .cells
+                .iter()
+                .filter_map(|c| c.parent.clone().map(|p| (c.id.clone(), p)))
+                .collect();
+
             for cell in &diagram.cells {
                 let cell_ref = match id_map.get_cell_ref(&cell.id) {
                     Some(r) => r,
@@ -365,8 +372,8 @@ impl DrawioMapping {
                     CellRef::Vertex(vid) => {
                         let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                         let parent = resolve_parent(&cell.parent, &id_map, diags);
-                        // Resolve layer_id from parent (if parent is a layer cell)
-                        let layer_id = resolve_layer(&cell.parent, &id_map);
+                        // Resolve layer_id from parent chain transitively (shape → group → layer)
+                        let layer_id = resolve_layer(&cell.parent, &id_map, &parent_map);
                         // Preserve page_id set during pass 1
                         let page_id = model.store.vertex(vid).and_then(|v| v.page_id);
                         // z_order from XML child index; locked/visible from extra attributes
@@ -389,8 +396,8 @@ impl DrawioMapping {
                     CellRef::Group(gid) => {
                         let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                         let parent = resolve_parent(&cell.parent, &id_map, diags);
-                        // Resolve layer_id from parent (if parent is a layer cell)
-                        let layer_id = resolve_layer(&cell.parent, &id_map);
+                        // Resolve layer_id from parent chain transitively (shape → group → layer)
+                        let layer_id = resolve_layer(&cell.parent, &id_map, &parent_map);
                         // Preserve page_id set during pass 1
                         let page_id = model.store.group(gid).and_then(|g| g.page_id);
                         // z_order from XML child index; locked/visible from extra attributes
@@ -426,8 +433,8 @@ impl DrawioMapping {
                                 let label = cell.value.as_ref().map(|v| Label::new(v.as_str()));
                                 // Preserve page_id set during pass 1
                                 let page_id = model.store.edge(eid).and_then(|e| e.page_id);
-                                // Resolve layer_id from parent (if parent is a layer cell)
-                                let layer_id = resolve_layer(&cell.parent, &id_map);
+                                // Resolve layer_id from parent chain transitively (shape → group → layer)
+                                let layer_id = resolve_layer(&cell.parent, &id_map, &parent_map);
                                 // z_order from XML child index; locked/visible from extra attributes
                                 let z_order = z_orders.get(&cell.id).copied().unwrap_or(0);
                                 let locked =
@@ -859,13 +866,48 @@ fn resolve_parent(
     }
 }
 
-/// Resolve a raw `parent` string to a `LayerId` if the parent is a layer cell.
+/// Resolve a raw `parent` string to a `LayerId` by walking up the parent chain
+/// transitively (shape → group → layer) until a layer cell is found.
 ///
-/// Returns `Some(LayerId)` if the parent is a layer cell, `None` otherwise
+/// Returns `Some(LayerId)` if a layer ancestor is found, `None` otherwise
 /// (meaning the cell belongs to the default layer).
-fn resolve_layer(parent: &Option<String>, id_map: &IdMap) -> Option<diagram_core::id::LayerId> {
-    let sid = parent.as_ref()?;
-    id_map.get_internal_layer(sid)
+///
+/// # Cycle Guard
+/// The walk is bounded by `MAX_LAYER_WALK_DEPTH` (64) and cycle-guarded:
+/// if a parent reference repeats, the walk terminates and returns `None`.
+fn resolve_layer(
+    parent: &Option<String>,
+    id_map: &IdMap,
+    parent_map: &BTreeMap<String, String>,
+) -> Option<diagram_core::id::LayerId> {
+    const MAX_LAYER_WALK_DEPTH: usize = 64;
+
+    let mut current = match parent.as_ref() {
+        Some(p) => p.clone(),
+        None => return None,
+    };
+
+    let mut visited: HashSet<String> = HashSet::new();
+
+    for _ in 0..MAX_LAYER_WALK_DEPTH {
+        // Cycle guard: skip if we've already visited this cell
+        if !visited.insert(current.clone()) {
+            return None;
+        }
+
+        // If current is a layer, return its LayerId
+        if let Some(lid) = id_map.get_internal_layer(&current) {
+            return Some(lid);
+        }
+
+        // Walk up to parent; stop if no parent
+        current = match parent_map.get(&current) {
+            Some(p) => p.clone(),
+            None => return None,
+        };
+    }
+
+    None // max depth reached
 }
 
 /// Parse a draw.io style string into a `StyleMap`.
