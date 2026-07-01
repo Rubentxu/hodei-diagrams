@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mountSvg, showPage, clear } from '../src/renderer.js';
+import { mountSvg, showPage, clear, setupZoomPan } from '../src/renderer.js';
 import type { PageRender, PageToken } from '../src/types.js';
 
 function createDiv(): HTMLDivElement {
@@ -52,5 +52,22 @@ describe('renderer', () => {
     div.innerHTML = '<svg>old</svg>';
     clear(div);
     expect(div.innerHTML).toBe('');
+  });
+
+  it('panBy mutates transform additively while preserving zoom', () => {
+    const container = createDiv();
+    const viewer = createDiv();
+    container.appendChild(viewer);
+
+    const zoomPan = setupZoomPan(container, viewer);
+
+    // panBy(10, 0) then panBy(5, 0) yields translate(15, 0) at scale(1)
+    zoomPan.panBy(10, 0);
+    expect(container.style.transform).toContain('translate(10px, 0px)');
+    expect(container.style.transform).toContain('scale(1)');
+
+    zoomPan.panBy(5, 0);
+    expect(container.style.transform).toContain('translate(15px, 0px)');
+    expect(container.style.transform).toContain('scale(1)');
   });
 });
