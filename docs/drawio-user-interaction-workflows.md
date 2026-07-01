@@ -123,20 +123,25 @@ No hay un único estándar universal para documentar interacciones ricas de un e
 |----|-----------|---------------|--------------------|--------------|-------------------|
 | SEL-001 | Seleccionar shape/connector | Click | Elemento queda seleccionado; inspector cambia | ✅ | Básico cubierto |
 | SEL-002 | Seleccionar múltiples | `Shift` click / `Ctrl` click | Toggle selección | ✅ | Multi-selection existe; verificar modifiers |
-| SEL-003 | Selection box containment | Drag box | Selecciona elementos completamente dentro | ✅ | Cubierto por selección box si existe; confirmar |
-| SEL-004 | Forzar selection box | `Alt` + drag | Ignora handles y fuerza caja | ⬜ | Gap probable |
-| SEL-005 | Seleccionar intersección | Terminar drag con `Alt` | Incluye elementos parcialmente dentro | ⬜ | Gap probable |
-| SEL-006 | Deselect por box | `Alt+Shift` + drag | Quita elementos de selección | ⬜ | Gap probable |
+| SEL-003 | Selection box containment | Drag box | Selecciona elementos completamente dentro | ✅¹ | Cubierto por selección box; default=containment |
+| SEL-004 | Forzar selection box | `Alt` + drag | Ignora handles y fuerza caja | ✅ | Implementado en pointerdown handler |
+| SEL-005 | Seleccionar intersección | Terminar drag con `Alt` | Incluye elementos parcialmente dentro | ✅² | Alt durante drag = modo intersección |
+| SEL-006 | Deselect por box | `Alt+Shift` + drag | Quita elementos de selección | ✅ | Implementado en deselectInRect |
 | SEL-007 | Toggle deselect | `Shift`/`Ctrl` click selected | Deselecciona elemento | ✅ | Verificar edge cases |
 | SEL-008 | Select all | `Ctrl+A` | Selecciona todo | ✅ | Roadmap v0.65+ Select All |
-| SEL-009 | Select connectors only | `Ctrl+E` Windows | Selecciona conectores | ⬜ | Gap probable |
-| SEL-010 | Select shapes only | `Ctrl+I` Windows | Selecciona shapes/text labels | ⬜ | Gap probable |
-| SEL-011 | Deselect all | `Ctrl+Shift+A` | Limpia selección | ❓ | Probar |
-| SEL-012 | Cycle next/previous | `Tab` / `Shift+Tab` | Selecciona siguiente/anterior incluyendo containers/labels | ⬜ | Gap importante para teclado |
+| SEL-009 | Select connectors only | `Ctrl+E` Windows | Selecciona conectores | ✅ | Implementado en #getAllEdgeIds |
+| SEL-010 | Select shapes only | `Ctrl+I` Windows | Selecciona shapes/text labels | ✅ | Implementado en #getAllShapeIdsZOrder |
+| SEL-011 | Deselect all | `Ctrl+Shift+A` | Limpia selección | ✅ | Verificado en E2E suite |
+| SEL-012 | Cycle next/previous | `Tab` / `Shift+Tab` | Selecciona siguiente/anterior incluyendo containers/labels | ✅³ | Tab cycles shapes+edges; Shift+Tab backwards |
 | SEL-013 | Select parent/container | `Alt+Tab` | Sube al parent | ⬜ | Requiere parent model robusto |
-| SEL-014 | Select underneath | `Alt` + click stacked | Selecciona siguiente en z-stack | ⬜ | Gap probable |
+| SEL-014 | Select underneath | `Alt` + click stacked | Selecciona siguiente en z-stack | ✅⁴ | Alt+click para en z-stack sin wrap |
 | SEL-015 | Selection inside group | Click group, segundo click child | Drill-down | 🟨 | Group existe; drill-down necesita matriz |
 | SEL-016 | Bypass group parent | `Alt` click child | Selecciona topmost child | ⬜ | Gap probable |
+
+[^1]: SEL-003 — containment es el default; antes usaba intersección siempre.
+[^2]: SEL-005 — Alt durante drag cambia a modo intersección (partial overlap).
+[^3]: SEL-012 — Tab ahora incluye edges además de shapes en el ciclo z-order.
+[^4]: SEL-014 — Alt+click se detiene en el fondo del z-stack, no hace wrap al top.
 
 ### 5. Movimiento, resize, rotación y alineación
 
