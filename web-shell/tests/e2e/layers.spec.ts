@@ -103,7 +103,7 @@ test.describe('Suite LAYER: Layers panel UI (IP-F PR5)', () => {
     await page.click('[data-testid="menu-layers"] summary');
     await page.waitForTimeout(200);
 
-    // Initial count should be 3
+    // Initial count should be 3 (Background, Content, Annotations)
     const layerItems = page.locator('[data-testid="layers-panel"] [data-testid^="layer-item-"]');
     await expect(layerItems).toHaveCount(3);
 
@@ -112,8 +112,10 @@ test.describe('Suite LAYER: Layers panel UI (IP-F PR5)', () => {
     await removeBtn.click();
     await page.waitForTimeout(300);
 
-    // Should now have 2 layers
-    await expect(layerItems).toHaveCount(2);
+    // THREE_LAYERS has no default layer. When Annotations is removed, its shapes (Rect E)
+    // need a home, so a default layer is created automatically. Result: 3 layers.
+    // Background and Content stay, plus the new default layer holding Rect E.
+    await expect(layerItems).toHaveCount(3);
   });
 
   // ─── LAYER-004: Toggle layer visibility ───────────────────────────────────
