@@ -1792,6 +1792,9 @@ async function bootstrap(): Promise<void> {
       input.focus();
       input.select();
 
+      // Capture activeSession in a local to satisfy TypeScript's closure analysis
+      const session = activeSession;
+
       const finishRename = (confirm: boolean) => {
         const newName = input.value.trim();
         input.remove();
@@ -1806,7 +1809,7 @@ async function bootstrap(): Promise<void> {
         const cmd = JSON.stringify({
           RenameLayer: { layer_id: { idx: layerIdx, version: layerVersion }, name: { text: newName } },
         });
-        const r = activeSession.executeCommand(cmd);
+        const r = session.executeCommand(cmd);
         if (!r.ok) {
           ui.setDiagnostics('error', `Rename failed: ${r.error}`);
         } else {
@@ -1837,11 +1840,8 @@ async function bootstrap(): Promise<void> {
     const cmd = JSON.stringify({
       RemoveLayer: { layer_id: { idx: layerIdx, version: layerVersion } },
     });
-    console.log('[remove] idx:', layerIdx, 'version:', layerVersion);
     const r = activeSession.executeCommand(cmd);
-    console.log('[remove] result:', JSON.stringify(r));
     if (!r.ok) {
-      console.log('[remove] failed:', r.error);
       ui.setDiagnostics('error', `Remove layer failed: ${r.error}`);
     } else {
       activeEditor?.refreshScene();
