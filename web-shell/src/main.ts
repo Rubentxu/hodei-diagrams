@@ -1652,6 +1652,97 @@ async function bootstrap(): Promise<void> {
     }
   });
 
+  // ─── 13.9. Wire Layers menu (IP-F PR5) ─────────────────────────────────────
+  // Show/hide layers panel when Layers menu is toggled
+  const menuLayers = document.querySelector('[data-testid="menu-layers"]') as HTMLDetailsElement | null;
+  const layersPanel = ui.sidebar.querySelector('[data-testid="layers-panel"]') as HTMLElement | null;
+  const layersListEl = layersPanel?.querySelector('.layers-list') as HTMLElement | null;
+  const addLayerBtn = layersPanel?.querySelector('[data-testid="layers-add-layer"]') as HTMLButtonElement | null;
+
+  function populateLayersPanel(): void {
+    if (!layersPanel || !layersListEl || !activeSession) return;
+    layersPanel.hidden = false;
+    layersListEl.innerHTML = '';
+
+    const pageIdx = activeEditorIdx ?? 0;
+    const result = activeSession.getLayers(pageIdx);
+    if (!result.ok) return;
+
+    const { layers } = result.value;
+    for (const layer of layers) {
+      const layerName = layer.name ?? '(default)';
+      const item = document.createElement('div');
+      item.className = 'layer-item';
+      item.setAttribute('data-testid', `layer-item-${layerName}`);
+
+      // Name
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'layer-name';
+      nameSpan.textContent = layerName;
+      item.appendChild(nameSpan);
+
+      // Visibility toggle
+      const visBtn = document.createElement('button');
+      visBtn.className = 'layer-toggle';
+      visBtn.setAttribute('data-testid', `layer-visibility-${layerName}`);
+      visBtn.setAttribute('data-state', layer.visible ? 'visible' : 'hidden');
+      visBtn.textContent = layer.visible ? '👁' : '🙈';
+      visBtn.title = layer.visible ? 'Hide layer' : 'Show layer';
+      item.appendChild(visBtn);
+
+      // Lock toggle
+      const lockBtn = document.createElement('button');
+      lockBtn.className = 'layer-toggle';
+      lockBtn.setAttribute('data-testid', `layer-lock-${layerName}`);
+      lockBtn.setAttribute('data-state', layer.locked ? 'locked' : 'unlocked');
+      lockBtn.textContent = layer.locked ? '🔒' : '🔓';
+      lockBtn.title = layer.locked ? 'Unlock layer' : 'Lock layer';
+      item.appendChild(lockBtn);
+
+      // Rename button
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'layer-toggle';
+      renameBtn.setAttribute('data-testid', `layer-rename-${layerName}`);
+      renameBtn.textContent = '✏️';
+      renameBtn.title = 'Rename layer';
+      item.appendChild(renameBtn);
+
+      // Remove button (only for non-default layers)
+      if (layer.name !== null) {
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'layer-toggle';
+        removeBtn.setAttribute('data-testid', `layer-remove-${layerName}`);
+        removeBtn.textContent = '🗑';
+        removeBtn.title = 'Remove layer';
+        item.appendChild(removeBtn);
+      }
+
+      layersListEl.appendChild(item);
+    }
+  }
+
+  menuLayers?.addEventListener('toggle', () => {
+    if (menuLayers?.open) {
+      populateLayersPanel();
+    }
+  });
+
+  // Add Layer button in layers panel
+  addLayerBtn?.addEventListener('click', () => {
+    if (!activeSession || !activeEditor) return;
+    const pageIdx = activeEditorIdx ?? 0;
+    const cmd = JSON.stringify({
+      AddLayer: { page_id: { idx: pageIdx, version: 1 }, name: { Text: 'New Layer' } },
+    });
+    const r = activeSession.executeCommand(cmd);
+    if (!r.ok) {
+      ui.setDiagnostics('error', `Add Layer failed: ${r.error}`);
+    } else {
+      activeEditor.refreshScene();
+      populateLayersPanel();
+    }
+  });
+
   // ─── 13.8. Wire Help > Keyboard Shortcuts ───────────────────────────────────
   const menuShortcuts = document.querySelector('[data-testid="menu-shortcuts"]');
   menuShortcuts?.addEventListener('click', () => {

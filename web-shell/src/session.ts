@@ -9,6 +9,7 @@ import type {
   StyleChanges,
   ResolvedStyle,
   MetadataInfo,
+  PageLayers,
 } from './types.js';
 import { ok, err, slotmapIdToField, EMPTY_METADATA } from './types.js';
 import type { WasmModule } from './types.js';
@@ -287,6 +288,28 @@ export class DiagramEngineSession {
         return err('SceneParse: pages is not an array');
       }
       return ok(pages as ScenePage[]);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Get all layers for a given page index.
+   *
+   * IP-F PR5: Used by the Layers panel UI to enumerate and display layers.
+   */
+  getLayers(pageIdx: number): Result<PageLayers, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const raw = this.wasm.get_page_layers(this.handle as number, pageIdx);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return err('LayersParse: ' + (e instanceof Error ? e.message : String(e)));
+      }
+      return ok(parsed as PageLayers);
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }

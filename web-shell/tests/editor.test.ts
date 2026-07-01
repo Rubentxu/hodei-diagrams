@@ -82,6 +82,7 @@ function createMockWasm() {
     clear_edge_anchor: vi.fn(),
     get_edge_anchors: vi.fn(),
     set_page_math_enabled: vi.fn(),
+    get_page_layers: vi.fn(),
   };
 }
 

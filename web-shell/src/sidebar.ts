@@ -10,6 +10,8 @@ import type { StencilLibraryManager } from './stencil-library-manager.js';
 
 export interface SidebarControls {
   container: HTMLElement;
+  layersPanel: HTMLElement;
+  addLayerBtn: HTMLButtonElement;
   rectToolBtn: HTMLButtonElement;
   roundedRectToolBtn: HTMLButtonElement;
   ellipseToolBtn: HTMLButtonElement;
@@ -183,6 +185,26 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   } catch {
     // localStorage unavailable (test environments)
   }
+
+  // ─── Layers Panel (IP-F PR5) ──────────────────────────────────────────────
+  const layersPanel = document.createElement('div');
+  layersPanel.className = 'layers-panel';
+  layersPanel.setAttribute('data-testid', 'layers-panel');
+  layersPanel.hidden = true; // shown when Layers menu is opened
+
+  // Add Layer button
+  const addLayerBtn = document.createElement('button');
+  addLayerBtn.className = 'sidebar-btn';
+  addLayerBtn.textContent = '+ Add Layer';
+  addLayerBtn.setAttribute('data-testid', 'layers-add-layer');
+  layersPanel.appendChild(addLayerBtn);
+
+  // Layers list container (populated dynamically)
+  const layersList = document.createElement('div');
+  layersList.className = 'layers-list';
+  layersPanel.appendChild(layersList);
+
+  container.appendChild(layersPanel);
 
   // ─── Search bar ──────────────────────────────────────────────────────────
   const searchWrap = document.createElement('div');
@@ -591,6 +613,8 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
 
   return {
     container,
+    layersPanel,
+    addLayerBtn,
     rectToolBtn: controls.rectToolBtn,
     roundedRectToolBtn: controls.roundedRectToolBtn,
     ellipseToolBtn: controls.ellipseToolBtn,
