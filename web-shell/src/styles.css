@@ -722,7 +722,7 @@ button:disabled {
 }
 
 .shape-category.disabled {
-  opacity: 0.5;
+  opacity: 1;
   pointer-events: none;
 }
 
@@ -1149,11 +1149,6 @@ button:disabled {
 
 .hud-label {
   color: var(--text-dim);
-  /* Labels on secondary items hidden — value alone carries meaning */
-}
-
-.hud-item > .hud-label {
-  display: none;
 }
 
 /* ─── HUD item weight system ────────────────────────────────────────────────── */

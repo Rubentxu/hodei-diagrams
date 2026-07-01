@@ -129,10 +129,15 @@ test.describe('Slice A: Product Presence UI', () => {
     test('future categories show lock icon and "Soon"', async ({ page }) => {
       await waitForAppReady(page);
 
-      // Disabled categories have coming-soon div (not the count badge span) with text "Soon"
+      // Open "More Shapes" accordion to reveal disabled categories
+      const moreShapesBtn = page.locator('.more-shapes-btn');
+      await expect(moreShapesBtn).toBeVisible();
+      await moreShapesBtn.click();
+
+      // Disabled categories have coming-soon div (not the count badge span) with text "Available soon"
       const comingSoon = page.locator('.shape-category.disabled div.category-coming-soon');
       await expect(comingSoon.first()).toBeVisible();
-      await expect(comingSoon.first()).toHaveText('Soon');
+      await expect(comingSoon.first()).toHaveText('Available soon');
     });
 
     test('three shape buttons visible in General category', async ({ page }) => {

@@ -77,3 +77,8 @@ playwright/.cache/
 # Debug examples — temporary debugging scripts left in crates/**/examples/
 # during feature work (should not be committed; remove when no longer needed)
 crates/**/examples/
+
+# Local tooling artifacts (impeccable, playwright-cli)
+.impeccable/
+.playwright-cli/
+PRODUCT.md

@@ -201,6 +201,11 @@ test.describe('Slice C: Platform Surface UI', () => {
     test('future categories have icons', async ({ page }) => {
       await waitForAppReady(page);
 
+      // Open "More Shapes" accordion to reveal disabled categories
+      const moreShapesBtn = page.locator('.more-shapes-btn');
+      await expect(moreShapesBtn).toBeVisible();
+      await moreShapesBtn.click();
+
       // Find a disabled category
       const disabledCategory = page.locator('.shape-category.disabled').first();
       const icon = disabledCategory.locator('.category-icon');
