@@ -34,8 +34,8 @@
 
 use diagram_core::geometry::{Point as CorePoint, Rect as CoreRect, Size};
 use diagram_core::{
-    CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, ModelStore, Page, StyleMap, Vertex,
-    VertexId,
+    CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, LayerId, ModelStore, Page, StyleMap,
+    Vertex, VertexId,
 };
 
 use crate::element::{
@@ -124,7 +124,10 @@ impl SceneBuilder {
                 continue; // Will be nested under a group
             }
             if !vertex.visible {
-                continue; // Hidden
+                continue; // Hidden (cell-level)
+            }
+            if is_layer_hidden(store, vertex.layer_id) {
+                continue; // Hidden (layer-level)
             }
 
             let elem = self.project_vertex(store, vid, vertex, CorePoint { x: 0.0, y: 0.0 })?;
@@ -155,12 +158,28 @@ impl SceneBuilder {
         }
 
         // Top-level edges: page_id matches (edges don't have parent) AND visible
+        // An edge is included only if BOTH endpoints are on visible layers.
         for (eid, edge) in store.edges_with_ids() {
             if edge.page_id != Some(page_id) {
                 continue;
             }
             if !edge.visible {
                 continue; // Hidden
+            }
+            // Check both endpoints are on visible layers
+            if is_layer_hidden(store, edge.layer_id) {
+                continue; // Edge itself is on a hidden layer
+            }
+            let source_vertex = store.vertex(edge.source);
+            let target_vertex = store.vertex(edge.target);
+            let source_hidden = source_vertex
+                .map(|v| is_layer_hidden(store, v.layer_id))
+                .unwrap_or(false);
+            let target_hidden = target_vertex
+                .map(|v| is_layer_hidden(store, v.layer_id))
+                .unwrap_or(false);
+            if source_hidden || target_hidden {
+                continue; // At least one endpoint is on a hidden layer
             }
 
             match self.project_edge(store, eid, edge) {
@@ -214,6 +233,9 @@ impl SceneBuilder {
             }
             if !group.visible {
                 continue; // Hidden group skips its entire subtree
+            }
+            if is_layer_hidden(store, group.layer_id) {
+                continue; // Hidden (layer-level) — skips entire subtree
             }
 
             let elem =
@@ -593,6 +615,12 @@ impl SceneBuilder {
             if vertex.parent != Some(gid) {
                 continue;
             }
+            if !vertex.visible {
+                continue; // Hidden (cell-level)
+            }
+            if is_layer_hidden(store, vertex.layer_id) {
+                continue; // Hidden (layer-level) — child vertex on a hidden layer
+            }
 
             let elem = self.project_vertex(store, vid, vertex, group_offset)?;
             children.push(elem);
@@ -623,6 +651,9 @@ impl SceneBuilder {
             }
             if !child_group.visible {
                 continue;
+            }
+            if is_layer_hidden(store, child_group.layer_id) {
+                continue; // Hidden (layer-level) — entire child group subtree skipped
             }
             // `group_offset` is THIS group's page origin (the parent of the
             // children we are about to recurse into). Pass it as
@@ -752,6 +783,23 @@ impl SceneBuilder {
     }
 }
 
+// ─── Layer visibility helpers ─────────────────────────────────────────────────
+
+/// Returns `true` if the given `layer_id` resolves to a hidden layer.
+///
+/// - `layer_id = None` → default layer → always visible → returns `false`
+/// - `layer_id = Some(LayerId)` → look up the layer; if it exists and `visible == false` → returns `true`
+/// - Unknown layer ID → returns `false` (defensive: treat unknown layers as visible)
+fn is_layer_hidden(store: &ModelStore, layer_id: Option<LayerId>) -> bool {
+    match layer_id {
+        Some(lid) => store
+            .layer(lid)
+            .map(|layer| !layer.visible)
+            .unwrap_or(false),
+        None => false, // default layer is always visible
+    }
+}
+
 // ─── Geometry flattening helpers ─────────────────────────────────────────────
 
 /// Compute page coordinates from a cell geometry and an accumulated parent offset.
@@ -813,6 +861,7 @@ fn compute_parent_offset(
 mod tests {
     use super::*;
     use diagram_core::label::Label;
+    use diagram_core::{Layer, LayerId};
 
     fn make_geom(x: f64, y: f64, w: f64, h: f64, relative: bool) -> CellGeometry {
         CellGeometry {
@@ -2063,5 +2112,512 @@ mod tests {
         // Relative but zero parent offset: behaves as absolute
         assert_eq!(result.origin.x, 10.0);
         assert_eq!(result.origin.y, 30.0);
+    }
+
+    // =============================================================================
+    // Task 4.1 RED — hidden-layer filtering tests
+    // These tests define the expected behavior for layer visibility filtering.
+    // They currently FAIL because the hidden-layer filter is not yet implemented.
+    // =============================================================================
+
+    #[test]
+    fn build_vertex_on_hidden_layer_is_skipped() {
+        // GIVEN a page with a visible default layer and a hidden named layer
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Insert a hidden layer
+        let hidden_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Hidden")),
+            visible: false, // hidden!
+            locked: false,
+        };
+        let hidden_layer_id = model.store.insert_layer(hidden_layer);
+
+        // Insert a vertex on the hidden layer
+        let geom = make_geom(10.0, 20.0, 80.0, 40.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            page_id: Some(pid),
+            layer_id: Some(hidden_layer_id), // on hidden layer
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Vertex on hidden layer must NOT appear in the scene
+        assert!(
+            page_scene.display_list.is_empty(),
+            "Vertex on hidden layer should be skipped from scene"
+        );
+    }
+
+    #[test]
+    fn build_vertex_on_visible_layer_appears() {
+        // GIVEN a page with a visible named layer
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Insert a visible layer
+        let visible_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Visible")),
+            visible: true, // visible!
+            locked: false,
+        };
+        let visible_layer_id = model.store.insert_layer(visible_layer);
+
+        // Insert a vertex on the visible layer
+        let geom = make_geom(10.0, 20.0, 80.0, 40.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            page_id: Some(pid),
+            layer_id: Some(visible_layer_id), // on visible layer
+            ..Default::default()
+        };
+        let vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Vertex on visible layer MUST appear in the scene
+        assert_eq!(page_scene.display_list.len(), 1);
+        match &page_scene.display_list[0] {
+            VisualElement::Rect(rect) => assert_eq!(rect.id, vid),
+            other => panic!("Expected Rect, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_vertex_on_default_layer_appears() {
+        // GIVEN a page with only the default layer (layer_id = None = default)
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Insert a vertex on the default layer (layer_id = None)
+        let geom = make_geom(10.0, 20.0, 80.0, 40.0, false);
+        let vertex = Vertex {
+            geometry: Some(geom),
+            page_id: Some(pid),
+            layer_id: None, // default layer
+            ..Default::default()
+        };
+        let vid = model.store.insert_vertex(vertex);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Default layer is always visible, so vertex MUST appear
+        assert_eq!(page_scene.display_list.len(), 1);
+        match &page_scene.display_list[0] {
+            VisualElement::Rect(rect) => assert_eq!(rect.id, vid),
+            other => panic!("Expected Rect, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_edge_where_both_endpoints_on_hidden_layer_is_skipped() {
+        // GIVEN a hidden layer with two vertices and an edge between them
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Hidden layer
+        let hidden_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Hidden")),
+            visible: false,
+            locked: false,
+        };
+        let hidden_layer_id = model.store.insert_layer(hidden_layer);
+
+        // Vertex 1 on hidden layer
+        let geom1 = make_geom(10.0, 20.0, 80.0, 40.0, false);
+        let v1 = Vertex {
+            geometry: Some(geom1),
+            page_id: Some(pid),
+            layer_id: Some(hidden_layer_id),
+            ..Default::default()
+        };
+        let vid1 = model.store.insert_vertex(v1);
+
+        // Vertex 2 on hidden layer
+        let geom2 = make_geom(100.0, 20.0, 80.0, 40.0, false);
+        let v2 = Vertex {
+            geometry: Some(geom2),
+            page_id: Some(pid),
+            layer_id: Some(hidden_layer_id),
+            ..Default::default()
+        };
+        let vid2 = model.store.insert_vertex(v2);
+
+        // Edge between them (also on hidden layer)
+        let edge = Edge {
+            source: vid1,
+            target: vid2,
+            page_id: Some(pid),
+            layer_id: Some(hidden_layer_id),
+            ..Default::default()
+        };
+        let _eid = model.store.insert_edge(edge);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Both endpoints are on hidden layer → edge must NOT appear
+        assert!(
+            page_scene.display_list.is_empty(),
+            "Edge with both endpoints on hidden layer should be skipped"
+        );
+    }
+
+    #[test]
+    fn build_edge_where_both_endpoints_on_visible_layer_appears() {
+        // GIVEN a visible layer with two vertices and an edge between them
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Visible layer
+        let visible_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Visible")),
+            visible: true,
+            locked: false,
+        };
+        let visible_layer_id = model.store.insert_layer(visible_layer);
+
+        // Vertex 1 on visible layer
+        let geom1 = make_geom(10.0, 20.0, 80.0, 40.0, false);
+        let v1 = Vertex {
+            geometry: Some(geom1),
+            page_id: Some(pid),
+            layer_id: Some(visible_layer_id),
+            ..Default::default()
+        };
+        let vid1 = model.store.insert_vertex(v1);
+
+        // Vertex 2 on visible layer
+        let geom2 = make_geom(100.0, 20.0, 80.0, 40.0, false);
+        let v2 = Vertex {
+            geometry: Some(geom2),
+            page_id: Some(pid),
+            layer_id: Some(visible_layer_id),
+            ..Default::default()
+        };
+        let vid2 = model.store.insert_vertex(v2);
+
+        // Edge between them (on visible layer)
+        let edge = Edge {
+            source: vid1,
+            target: vid2,
+            page_id: Some(pid),
+            layer_id: Some(visible_layer_id),
+            ..Default::default()
+        };
+        let _eid = model.store.insert_edge(edge);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Both endpoints visible → edge must appear (3 elements: v1 rect, v2 rect, edge)
+        assert_eq!(page_scene.display_list.len(), 3);
+    }
+
+    #[test]
+    fn build_edge_cross_layer_one_hidden_one_visible_is_skipped() {
+        // GIVEN: one vertex on visible layer, one vertex on hidden layer
+        // Edge between them → should be skipped (both endpoints must be visible)
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Visible layer
+        let visible_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Visible")),
+            visible: true,
+            locked: false,
+        };
+        let visible_layer_id = model.store.insert_layer(visible_layer);
+
+        // Hidden layer
+        let hidden_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Hidden")),
+            visible: false,
+            locked: false,
+        };
+        let hidden_layer_id = model.store.insert_layer(hidden_layer);
+
+        // Vertex 1 on visible layer
+        let geom1 = make_geom(10.0, 20.0, 80.0, 40.0, false);
+        let v1 = Vertex {
+            geometry: Some(geom1),
+            page_id: Some(pid),
+            layer_id: Some(visible_layer_id),
+            ..Default::default()
+        };
+        let vid1 = model.store.insert_vertex(v1);
+
+        // Vertex 2 on hidden layer
+        let geom2 = make_geom(100.0, 20.0, 80.0, 40.0, false);
+        let v2 = Vertex {
+            geometry: Some(geom2),
+            page_id: Some(pid),
+            layer_id: Some(hidden_layer_id),
+            ..Default::default()
+        };
+        let vid2 = model.store.insert_vertex(v2);
+
+        // Edge between them (cross-layer)
+        let edge = Edge {
+            source: vid1,
+            target: vid2,
+            page_id: Some(pid),
+            layer_id: None, // default layer
+            ..Default::default()
+        };
+        let _eid = model.store.insert_edge(edge);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Only the vertex on visible layer appears; edge is skipped because
+        // one endpoint (vid2) is on a hidden layer
+        assert_eq!(page_scene.display_list.len(), 1);
+    }
+
+    #[test]
+    fn build_group_on_hidden_layer_is_skipped() {
+        // GIVEN a group on a hidden layer
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Hidden layer
+        let hidden_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Hidden")),
+            visible: false,
+            locked: false,
+        };
+        let hidden_layer_id = model.store.insert_layer(hidden_layer);
+
+        // Group on hidden layer
+        let group_geom = make_geom(10.0, 10.0, 200.0, 200.0, false);
+        let group = Group {
+            geometry: Some(group_geom),
+            page_id: Some(pid),
+            layer_id: Some(hidden_layer_id),
+            ..Default::default()
+        };
+        let _gid = model.store.insert_group(group);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Group on hidden layer must NOT appear
+        assert!(
+            page_scene.display_list.is_empty(),
+            "Group on hidden layer should be skipped"
+        );
+    }
+
+    #[test]
+    fn build_child_vertex_inside_group_on_hidden_layer_is_skipped() {
+        // GIVEN a group on a visible layer, but a child vertex inside it on a hidden layer
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Visible layer for the group
+        let visible_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("VisibleGroup")),
+            visible: true,
+            locked: false,
+        };
+        let visible_layer_id = model.store.insert_layer(visible_layer);
+
+        // Hidden layer for the child vertex
+        let hidden_layer = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("HiddenContent")),
+            visible: false,
+            locked: false,
+        };
+        let hidden_layer_id = model.store.insert_layer(hidden_layer);
+
+        // Group on visible layer
+        let group_geom = make_geom(10.0, 10.0, 200.0, 200.0, false);
+        let group = Group {
+            geometry: Some(group_geom),
+            page_id: Some(pid),
+            layer_id: Some(visible_layer_id),
+            ..Default::default()
+        };
+        let gid = model.store.insert_group(group);
+
+        // Child vertex inside group but on hidden layer
+        let child_geom = make_geom(20.0, 20.0, 50.0, 30.0, true);
+        let child = Vertex {
+            geometry: Some(child_geom),
+            parent: Some(gid),
+            page_id: Some(pid),
+            layer_id: Some(hidden_layer_id), // hidden!
+            ..Default::default()
+        };
+        let _vid = model.store.insert_vertex(child);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Group appears (visible layer) but child vertex on hidden layer is filtered
+        assert_eq!(page_scene.display_list.len(), 1);
+        match &page_scene.display_list[0] {
+            VisualElement::Group(g) => {
+                // Group is visible but has no children because child is on hidden layer
+                assert!(
+                    g.children.is_empty(),
+                    "Child vertex on hidden layer should not appear inside group"
+                );
+            }
+            other => panic!("Expected Group, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn build_three_layers_only_visible_content_appears() {
+        // GIVEN 3 total layers: 2 visible (3 shapes) + 1 hidden (2 shapes)
+        // WHEN scene is built
+        // THEN scene contains only the 3 shapes from visible layers
+        let mut model = DiagramModel::new();
+        let page = Page::new(diagram_core::PageId::default());
+        let pid = model.store.insert_page(page);
+
+        // Visible layer 1: 2 shapes
+        let vis1 = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Vis1")),
+            visible: true,
+            locked: false,
+        };
+        let vis1_id = model.store.insert_layer(vis1);
+
+        // Visible layer 2: 1 shape
+        let vis2 = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Vis2")),
+            visible: true,
+            locked: false,
+        };
+        let vis2_id = model.store.insert_layer(vis2);
+
+        // Hidden layer: 2 shapes
+        let hidden = Layer {
+            id: LayerId::default(),
+            page_id: pid,
+            name: Some(Label::new("Hidden")),
+            visible: false,
+            locked: false,
+        };
+        let hidden_id = model.store.insert_layer(hidden);
+
+        // Shape A on vis1
+        let geom_a = make_geom(10.0, 10.0, 50.0, 50.0, false);
+        let shape_a = Vertex {
+            geometry: Some(geom_a),
+            page_id: Some(pid),
+            layer_id: Some(vis1_id),
+            ..Default::default()
+        };
+        let _vid_a = model.store.insert_vertex(shape_a);
+
+        // Shape B on vis1
+        let geom_b = make_geom(70.0, 10.0, 50.0, 50.0, false);
+        let shape_b = Vertex {
+            geometry: Some(geom_b),
+            page_id: Some(pid),
+            layer_id: Some(vis1_id),
+            ..Default::default()
+        };
+        let _vid_b = model.store.insert_vertex(shape_b);
+
+        // Shape C on vis2
+        let geom_c = make_geom(130.0, 10.0, 50.0, 50.0, false);
+        let shape_c = Vertex {
+            geometry: Some(geom_c),
+            page_id: Some(pid),
+            layer_id: Some(vis2_id),
+            ..Default::default()
+        };
+        let _vid_c = model.store.insert_vertex(shape_c);
+
+        // Shape D on hidden (should NOT appear)
+        let geom_d = make_geom(10.0, 70.0, 50.0, 50.0, false);
+        let shape_d = Vertex {
+            geometry: Some(geom_d),
+            page_id: Some(pid),
+            layer_id: Some(hidden_id),
+            ..Default::default()
+        };
+        let _vid_d = model.store.insert_vertex(shape_d);
+
+        // Shape E on hidden (should NOT appear)
+        let geom_e = make_geom(70.0, 70.0, 50.0, 50.0, false);
+        let shape_e = Vertex {
+            geometry: Some(geom_e),
+            page_id: Some(pid),
+            layer_id: Some(hidden_id),
+            ..Default::default()
+        };
+        let _vid_e = model.store.insert_vertex(shape_e);
+
+        let builder = SceneBuilder::new();
+        let scene = builder.build(&model).unwrap();
+
+        assert_eq!(scene.pages.len(), 1);
+        let page_scene = &scene.pages[0];
+        // Only 3 shapes from visible layers
+        assert_eq!(
+            page_scene.display_list.len(),
+            3,
+            "Only shapes from visible layers should appear (got {:?})",
+            page_scene.display_list
+        );
     }
 }
