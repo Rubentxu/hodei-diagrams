@@ -303,12 +303,12 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
 
 | PR | Scope | Branch | Status |
 |----|-------|--------|--------|
-| PR1 | Engine foundation (LayerId, Layer, ModelStore.layers, layer_id on Vertex/Edge/Group) | `feat/ip-f-layer-foundation` | ✅ PR ready; verify PASS+debt-verify PASS |
-| PR2 | Commands + History (AddLayer, RemoveLayer, RenameLayer, SetLayerVisible, SetLayerLocked, MoveShapeToLayer + undo/redo) | `feat/ip-f-layer-commands-history` | ✅ PR ready; verify PASS after 2 bounded debt fixes |
-| PR3 | .drawio round-trip (pass-1 layer branch in parser, writer emits layer cells, transitive parent-chain resolution) | `feat/ip-f-layer-drawio-roundtrip` | ✅ PR ready; verify PASS after transitive-resolution debt fix |
-| PR4 | Scene projection (SceneBuilder filters hidden layers) | `feat/ip-f-layer-scene-projection` | ✅ PR ready; verify PASS, debt-verify PASS_WITH_WARNINGS |
-| PR5 | Web-shell UI (Layer panel + minimum viable layer workflows E2E) | `feat/ip-f-layer-web-shell` | ✅ PR ready; verify PASS, debt-verify PASS_WITH_WARNINGS |
-| PR6 | Doc reconciliation (catalog LAYER-001/002/004/005/007/008/009 → Done; ROADMAP; ADR-0081 footer) | `feat/ip-f-layer-doc-reconciliation` | ✅ DONE (2026-07-01) |
+| PR1 | Engine foundation (LayerId, Layer, ModelStore.layers, layer_id on Vertex/Edge/Group) | `feat/ip-f-layer-foundation` | ✅ PR #161 merged; verify PASS+debt-verify PASS |
+| PR2 | Commands + History (AddLayer, RemoveLayer, RenameLayer, SetLayerVisible, SetLayerLocked, MoveShapeToLayer + undo/redo) | `feat/ip-f-layer-commands-history` | ✅ PR #162 merged; verify PASS after 2 bounded debt fixes |
+| PR3 | .drawio round-trip (pass-1 layer branch in parser, writer emits layer cells, transitive parent-chain resolution) | `feat/ip-f-layer-drawio-roundtrip` | ✅ PR #163 merged; verify PASS after transitive-resolution debt fix |
+| PR4 | Scene projection (SceneBuilder filters hidden layers) | `feat/ip-f-layer-scene-projection` | ✅ PR #164 merged; verify PASS, debt-verify PASS_WITH_WARNINGS |
+| PR5 | Web-shell UI (Layer panel + minimum viable layer workflows E2E) | `feat/ip-f-layer-web-shell` | ✅ PR #165 merged; verify PASS, debt-verify PASS_WITH_WARNINGS |
+| PR6 | Doc reconciliation (catalog LAYER-001/002/004/005/007/008/009 → Done; ROADMAP; ADR-0081 footer) | `feat/ip-f-layer-doc-reconciliation` | ✅ PR #166 open (2026-07-01) |
 
 - **Rationale**: largest remaining interaction gap; unlocks LAYER-001..011; deferred by ADR-0081.
 - **Strategy artifacts**: `sddk/interaction-parity-ip-f-layer-model/` (proposal, spec, design, tasks, archive-report)
