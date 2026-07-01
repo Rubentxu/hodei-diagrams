@@ -299,12 +299,19 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
   - Verification: `just verify` ✅, full Playwright 514 pass (4 pre-existing failures).
   - Archive: `sddk/interaction-parity-ip-de-followup-duplicate-reorder/archive-report.md`.
 
-### Next Steps
+### In Progress — IP-F Layer Model (6-PR chain)
 
-- **Recent closeout**: 4 pre-existing Playwright failures were fixed (HUD labels + future categories visibility). Visual suites now show 70/72 passing with 2 intentional skips.
-- **IP-F (Layer Model)** is the next implementation milestone.
-  - Scope: full `diagram-core` layer model (ZOrder, LayerId), layer panel UI, export/import.
-  - Rationale: largest remaining interaction gap; deferred by ADR-0081 and now promoted as the next cycle.
+| PR | Scope | Branch | Status |
+|----|-------|--------|--------|
+| PR1 | Engine foundation (LayerId, Layer, ModelStore.layers, layer_id on Vertex/Edge/Group) | `feat/ip-f-layer-foundation` | ✅ PR ready; verify PASS+debt-verify PASS |
+| PR2 | Commands + History (AddLayer, RemoveLayer, RenameLayer, SetLayerVisible, SetLayerLocked, MoveShapeToLayer + undo) | Planned | ⏳ |
+| PR3 | .drawio round-trip (pass-1 layer branch in parser, writer emits `parent="0"`, 3-layer golden fixture) | Planned | ⏳ |
+| PR4 | Scene projection (SceneBuilder filters hidden layers) | Planned | ⏳ |
+| PR5 | Web-shell UI (Layer panel + Z-Order rename + ≥8 E2E) | Planned | ⏳ |
+| PR6 | Doc reconciliation (catalog LAYER-001/002/004/005/007/008/009 → Done; ROADMAP; ADR-0081 footer) | Planned | ⏳ |
+
+- **Rationale**: largest remaining interaction gap; unlocks LAYER-001..011; deferred by ADR-0081.
+- **Strategy artifacts**: `sddk/interaction-parity-ip-f-layer-model/` (proposal, spec, design, tasks, archive-report)
 
 ### Strategy Artifacts
 
