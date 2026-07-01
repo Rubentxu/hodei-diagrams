@@ -189,10 +189,13 @@ test.describe('Slice C: Platform Surface UI', () => {
   });
 
   test.describe('Sidebar Category Icons', () => {
-    test('General category has an icon', async ({ page }) => {
-      // SKIPPED: Pre-existing UI/test mismatch — test expects emoji '⬜' but UI now uses
-      // an <img> element for category icons. Test needs update to check for img element.
-      test.skip();
+    test('General category has an SVG icon', async ({ page }) => {
+      await waitForAppReady(page);
+      // Category icons are inline SVG elements set via innerHTML
+      const generalIcon = page.locator('.shape-category .category-icon').first();
+      await expect(generalIcon).toBeVisible();
+      const svg = generalIcon.locator('svg');
+      await expect(svg).toBeVisible();
     });
 
     test('future categories have icons', async ({ page }) => {
