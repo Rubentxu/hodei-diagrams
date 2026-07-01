@@ -63,6 +63,8 @@ export interface ZoomPanControls {
    * Uses 5% viewport margin by default. Safe no-op when viewer is empty.
    */
   fitToView(_padding?: number): void;
+  /** Pan viewport by a delta in pre-scale (pan-space) pixels. */
+  panBy(_dx: number, _dy: number): void;
 }
 
 /**
@@ -170,6 +172,12 @@ export function setupZoomPan(
     panY = newPanY;
     applyTransform();
     container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom } }));
+  }
+
+  function panBy(dx: number, dy: number): void {
+    panX += dx;
+    panY += dy;
+    applyTransform();
   }
 
   // ─── Wheel: pan by default, Ctrl/Cmd+wheel = zoom, Shift+wheel = horizontal ──
@@ -288,5 +296,5 @@ export function setupZoomPan(
     if (e.button === 1) e.preventDefault();
   });
 
-  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView };
+  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView, panBy };
 }
