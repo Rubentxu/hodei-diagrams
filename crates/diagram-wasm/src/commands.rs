@@ -667,6 +667,7 @@ pub fn group_vertices(handle: u32, vertex_indices_json: &str) -> Result<(), JsVa
             locked: false,
             visible: true,
             parent: None,
+            layer_id: None,
         };
 
         // Step 1: Insert group imperatively to get the GroupId

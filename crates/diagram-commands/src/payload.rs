@@ -4,8 +4,8 @@
 //! (initially None or false) that `apply` populates and `undo` consumes.
 
 use diagram_core::{
-    CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Page, PageId, Point, StyleId,
-    StyleMap, Vertex, VertexId,
+    CellGeometry, DiagramModel, Edge, EdgeId, Group, GroupId, Label, Layer, LayerId, Page, PageId,
+    Point, StyleId, StyleMap, Vertex, VertexId,
 };
 use diagram_routing::{Direction, EdgeStyle, RoutingRequest, resolve_anchor, route};
 
@@ -477,6 +477,7 @@ type RemovedPage = (
     Vec<(VertexId, Vertex)>,
     Vec<(EdgeId, Edge)>,
     Vec<(GroupId, Group)>,
+    Vec<(LayerId, Layer)>,
 );
 
 /// Payload for adding a vertex.
@@ -1336,14 +1337,14 @@ impl RemovePagePayload {
 
     /// Undo the remove-page operation with full reference fixup.
     ///
-    /// Re-inserts the page, vertices, edges, and groups with NEW IDs and
+    /// Re-inserts the page, vertices, edges, groups, and layers with NEW IDs and
     /// rewrites all references (`page_id`, `source`/`target`, `parent`) to
     /// point to the new IDs.
     pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
         if !self.applied {
             return Err(CommandError::NotApplied);
         }
-        let (page, vertices, edges, groups) =
+        let (page, vertices, edges, groups, layers) =
             self.removed.take().ok_or(CommandError::NotApplied)?;
 
         // Re-insert page (gets NEW PageId)
@@ -1380,6 +1381,12 @@ impl RemovePagePayload {
             }
 
             model.store.insert_edge(edge);
+        }
+
+        // Re-insert layers with rewritten page_id
+        for (_old_lid, mut layer) in layers {
+            layer.page_id = new_pid;
+            model.store.insert_layer(layer);
         }
 
         // Fix up vertex parents: vertices that had parent = Some(old_gid) -> Some(new_gid)

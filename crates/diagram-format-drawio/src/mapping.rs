@@ -343,6 +343,7 @@ impl DrawioMapping {
                             style_id,
                             parent,
                             page_id,
+                            layer_id: None,
                             z_order,
                             locked,
                             visible,

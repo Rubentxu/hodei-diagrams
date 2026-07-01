@@ -287,6 +287,7 @@ impl ModelStore {
         Vec<(VertexId, Vertex)>,
         Vec<(EdgeId, Edge)>,
         Vec<(GroupId, Group)>,
+        Vec<(LayerId, Layer)>,
     )> {
         let page = self.pages.remove(id)?;
 
@@ -312,6 +313,13 @@ impl ModelStore {
             .map(|(k, g)| (k, g.clone()))
             .collect();
 
+        let layers: Vec<(LayerId, Layer)> = self
+            .layers
+            .iter()
+            .filter(|(_, l)| l.page_id == page.id)
+            .map(|(k, l)| (k, l.clone()))
+            .collect();
+
         // Remove collected cells
         let vertex_ids: Vec<VertexId> = vertices.iter().map(|(k, _)| *k).collect();
         self.vertices.retain(|k, _| !vertex_ids.contains(&k));
@@ -322,7 +330,10 @@ impl ModelStore {
         let group_ids: Vec<GroupId> = groups.iter().map(|(k, _)| *k).collect();
         self.groups.retain(|k, _| !group_ids.contains(&k));
 
-        Some((page, vertices, edges, groups))
+        let layer_ids: Vec<LayerId> = layers.iter().map(|(k, _)| *k).collect();
+        self.layers.retain(|k, _| !layer_ids.contains(&k));
+
+        Some((page, vertices, edges, groups, layers))
     }
 
     // ─── MUTABLE ACCESSORS ────────────────────────────────────────────────────
@@ -414,8 +425,7 @@ mod tests {
     use crate::ModelStore;
     use crate::edge::Edge;
     use crate::group::Group;
-    use crate::id::PageId;
-    use crate::id::VertexId;
+    use crate::id::{LayerId, PageId, VertexId};
     use crate::label::Label;
     use crate::page::Page;
     use crate::style::{StyleMap, StyleValue};
@@ -527,14 +537,19 @@ mod tests {
         };
         let _gid = store.insert_group(g.clone());
 
+        // Insert layer L on page P
+        let l = Layer::new(LayerId::default(), pid);
+        let _lid = store.insert_layer(l);
+
         assert_eq!(store.page_count(), 1);
         assert_eq!(store.len_vertex(), 1);
         assert_eq!(store.len_edge(), 1);
         assert_eq!(store.len_group(), 1);
+        assert_eq!(store.len_layer(), 1);
 
         // Remove page P — should cascade-remove all its cells
         let result = store.remove_page(pid);
-        let (removed_page, removed_vertices, removed_edges, removed_groups) =
+        let (removed_page, removed_vertices, removed_edges, removed_groups, removed_layers) =
             result.expect("page should exist");
 
         assert_eq!(removed_page.id, pid);
@@ -542,12 +557,14 @@ mod tests {
         assert_eq!(removed_vertices[0].0, vid);
         assert_eq!(removed_edges.len(), 1);
         assert_eq!(removed_groups.len(), 1);
+        assert_eq!(removed_layers.len(), 1);
 
         // Store is now empty
         assert_eq!(store.page_count(), 0);
         assert_eq!(store.len_vertex(), 0);
         assert_eq!(store.len_edge(), 0);
         assert_eq!(store.len_group(), 0);
+        assert_eq!(store.len_layer(), 0);
     }
 
     #[test]
@@ -646,6 +663,25 @@ mod tests {
             store.group(gid).unwrap().label.as_ref().unwrap().as_str(),
             "group edited"
         );
+    }
+
+    #[test]
+    fn group_default_layer_id_is_none() {
+        let g = Group::default();
+        assert!(g.layer_id.is_none());
+    }
+
+    #[test]
+    fn group_layer_id_can_be_set() {
+        let mut store = ModelStore::new();
+        let layer = Layer::new(LayerId::default(), PageId::default());
+        let lid = store.insert_layer(layer);
+        let g = Group {
+            layer_id: Some(lid),
+            ..Default::default()
+        };
+        let gid = store.insert_group(g);
+        assert_eq!(store.group(gid).unwrap().layer_id, Some(lid));
     }
 
     // ─── REPLACE MUTATORS ─────────────────────────────────────────────────────

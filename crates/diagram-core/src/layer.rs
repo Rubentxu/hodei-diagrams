@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 /// and locked/unlocked independently.
 ///
 /// See ADR-0081 §Layer model.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Layer {
     /// Engine-owned identifier for this layer.
