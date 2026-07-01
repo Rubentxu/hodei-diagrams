@@ -58,6 +58,10 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       clear_edge_anchor: mod.clear_edge_anchor,
       get_edge_anchors: mod.get_edge_anchors,
       set_page_math_enabled: mod.set_page_math_enabled,
+      // ─── Layer queries (IP-F PR5) ───────────────────────────────────────
+      // After WASM rebuild: mod.get_page_layers will exist
+      // Before rebuild: use a stub so the app loads (panel will show error state)
+      get_page_layers: (mod as Record<string, unknown>).get_page_layers as ((h: number, p: number) => string) ?? (() => '{\"page_idx\":0,\"layers\":[]}') as ((h: number, p: number) => string),
     };
 
     return ok(wasm);

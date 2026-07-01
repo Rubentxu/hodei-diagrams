@@ -63,6 +63,8 @@ export type WasmModule = {
   get_resolved_style(_h: number, _vertexId: number): string;
   get_metadata(_h: number): string;
   set_metadata(_h: number, _json: string): void;
+  // ─── Layer queries (IP-F PR5) ────────────────────────────────────────────────
+  get_page_layers(_h: number, _pageIdx: number): string;
   apply_layout(_h: number, _kind_json: string, _config_json: string): void;
   apply_hierarchical_layout(_h: number, _config_json: string): void;
   route_all_edges(_h: number): void;
@@ -131,6 +133,23 @@ export interface ScenePage {
   display_list: Record<string, unknown>[];
   /** Whether math rendering is enabled for this page (from Rust PageScene.math_enabled). */
   math_enabled?: boolean;
+}
+
+// ─── Layer Types (IP-F PR5) ─────────────────────────────────────────────────────
+
+/** A layer descriptor returned by get_page_layers WASM call. */
+export interface LayerInfo {
+  idx: number;
+  version: number;
+  name: string | null;
+  visible: boolean;
+  locked: boolean;
+}
+
+/** Response from get_page_layers WASM call. */
+export interface PageLayers {
+  page_idx: number;
+  layers: LayerInfo[];
 }
 
 // ─── Style Types ──────────────────────────────────────────────────────────────

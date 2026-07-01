@@ -8,17 +8,18 @@ use crate::Command;
 use crate::error::{CommandError, CommandResult};
 use crate::history::History;
 use crate::payload::{
-    AddEdgePayload, AddGroupPayload, AddPagePayload, AddVertexPayload, BringForwardPayload,
-    BringToFrontPayload, CellTarget, ChangeStylePayload, ConnectVerticesCommand,
-    DisconnectEdgeCommand, EditEdgeLabelPayload, EditLabelPayload, MoveGroupPayload,
-    MoveVertexPayload, RemoveEdgePayload, RemoveGroupPayload, RemovePagePayload,
-    RemoveVertexPayload, RenamePagePayload, RoutingKind, SendBackwardPayload, SendToBackPayload,
-    SetEdgeLabelOffsetPayload, SetEdgeWaypointsPayload, SetPageMathEnabledPayload,
-    SetVertexParentPayload,
+    AddEdgePayload, AddGroupPayload, AddLayerPayload, AddPagePayload, AddVertexPayload,
+    BringForwardPayload, BringToFrontPayload, CellTarget, ChangeStylePayload,
+    ConnectVerticesCommand, DisconnectEdgeCommand, EditEdgeLabelPayload, EditLabelPayload,
+    MoveGroupPayload, MoveShapeToLayerPayload, MoveVertexPayload, RemoveEdgePayload,
+    RemoveGroupPayload, RemoveLayerPayload, RemovePagePayload, RemoveVertexPayload,
+    RenameLayerPayload, RenamePagePayload, RoutingKind, SendBackwardPayload, SendToBackPayload,
+    SetEdgeLabelOffsetPayload, SetEdgeWaypointsPayload, SetLayerLockedPayload,
+    SetLayerVisiblePayload, SetPageMathEnabledPayload, SetVertexParentPayload,
 };
 use diagram_core::{
-    CellGeometry, Edge, EdgeId, Group, GroupId, Label, Metadata, Page, PageId, Point, StyleMap,
-    Vertex, VertexId,
+    CellGeometry, Edge, EdgeId, Group, GroupId, Label, LayerId, Metadata, Page, PageId, Point,
+    StyleMap, Vertex, VertexId,
 };
 
 /// Editor façade for executing commands with undo/redo support.
@@ -408,6 +409,60 @@ impl Transaction {
     pub fn rename_page(mut self, id: PageId, name: Label) -> Self {
         self.commands
             .push(Command::RenamePage(RenamePagePayload::new(id, name)));
+        self
+    }
+
+    // ─── IP-F Layer commands ──────────────────────────────────────────────────
+
+    /// Add a named layer to a page in the transaction.
+    pub fn add_layer(mut self, page_id: PageId, name: Option<Label>) -> Self {
+        self.commands
+            .push(Command::AddLayer(AddLayerPayload::new(page_id, name)));
+        self
+    }
+
+    /// Remove a layer in the transaction (shapes move to page default layer).
+    pub fn remove_layer(mut self, id: LayerId) -> Self {
+        self.commands
+            .push(Command::RemoveLayer(RemoveLayerPayload::new(id)));
+        self
+    }
+
+    /// Rename a layer in the transaction.
+    pub fn rename_layer(mut self, id: LayerId, name: Label) -> Self {
+        self.commands
+            .push(Command::RenameLayer(RenameLayerPayload::new(id, name)));
+        self
+    }
+
+    /// Set layer visibility in the transaction.
+    pub fn set_layer_visible(mut self, id: LayerId, visible: bool) -> Self {
+        self.commands
+            .push(Command::SetLayerVisible(SetLayerVisiblePayload::new(
+                id, visible,
+            )));
+        self
+    }
+
+    /// Set layer locked state in the transaction.
+    pub fn set_layer_locked(mut self, id: LayerId, locked: bool) -> Self {
+        self.commands
+            .push(Command::SetLayerLocked(SetLayerLockedPayload::new(
+                id, locked,
+            )));
+        self
+    }
+
+    /// Move shapes to a different layer in the transaction.
+    pub fn move_shape_to_layer(
+        mut self,
+        vertex_ids: Vec<VertexId>,
+        edge_ids: Vec<EdgeId>,
+        layer_id: Option<LayerId>,
+    ) -> Self {
+        self.commands.push(Command::MoveShapeToLayer(
+            MoveShapeToLayerPayload::with_edges(vertex_ids, edge_ids, layer_id),
+        ));
         self
     }
 

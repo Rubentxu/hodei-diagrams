@@ -103,6 +103,15 @@ pub fn execute_transaction(handle: u32, commands_json: &str) -> Result<(), JsVal
             Command::SetEdgeLabelOffset(p) => tx.set_edge_label_offset(p.id, p.offset),
             // SetPageMathEnabled: enable/disable math typesetting on a page
             Command::SetPageMathEnabled(p) => tx.set_page_math_enabled(p.page_id, p.enabled),
+            // IP-F Layer commands
+            Command::AddLayer(p) => tx.add_layer(p.page_id, p.name),
+            Command::RemoveLayer(p) => tx.remove_layer(p.layer_id),
+            Command::RenameLayer(p) => tx.rename_layer(p.layer_id, p.name),
+            Command::SetLayerVisible(p) => tx.set_layer_visible(p.layer_id, p.visible),
+            Command::SetLayerLocked(p) => tx.set_layer_locked(p.layer_id, p.locked),
+            Command::MoveShapeToLayer(p) => {
+                tx.move_shape_to_layer(p.vertex_ids, p.edge_ids, p.layer_id)
+            }
             // Handle any future variants gracefully (non_exhaustive)
             _ => tx,
         }

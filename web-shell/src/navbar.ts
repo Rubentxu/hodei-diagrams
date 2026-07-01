@@ -259,6 +259,25 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   insertMenu.appendChild(insertList);
   menuBar.appendChild(insertMenu);
 
+  // ─── Layers menu (IP-F PR5) ───────────────────────────────────────────────
+  const layersMenu = document.createElement('details');
+  layersMenu.className = 'menu-dropdown';
+  layersMenu.setAttribute('data-testid', 'menu-layers');
+  const layersSummary = document.createElement('summary');
+  layersSummary.textContent = 'Layers';
+  layersMenu.appendChild(layersSummary);
+  const layersList = document.createElement('div');
+  layersList.className = 'menu-items';
+
+  const addLayerItem = document.createElement('button');
+  addLayerItem.className = 'menu-item';
+  addLayerItem.textContent = 'Add Layer';
+  addLayerItem.setAttribute('data-testid', 'menu-add-layer');
+  layersList.appendChild(addLayerItem);
+
+  layersMenu.appendChild(layersList);
+  menuBar.appendChild(layersMenu);
+
   // ─── Arrange menu ──────────────────────────────────────────────────────────
   const arrangeMenu = document.createElement('details');
   arrangeMenu.className = 'menu-dropdown';

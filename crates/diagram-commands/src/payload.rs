@@ -2546,9 +2546,21 @@ impl RemoveLayerPayload {
 
         let page_id = layer.page_id;
 
-        // Find the default layer for this page
-        let default_layer_id = Self::find_default_layer_id(&model.store, page_id)
-            .ok_or(CommandError::LayerNotFound(live_id))?;
+        // Find the default layer for this page, creating one if it doesn't exist.
+        // This can happen when a .drawio file with only named layers is loaded —
+        // the parser doesn't create an implicit default layer since all shapes
+        // are explicitly assigned to named layers.
+        let default_layer_id =
+            Self::find_default_layer_id(&model.store, page_id).unwrap_or_else(|| {
+                let default_layer = Layer {
+                    page_id,
+                    name: None,
+                    visible: true,
+                    locked: false,
+                    ..Default::default()
+                };
+                model.store.insert_layer(default_layer)
+            });
 
         // Collect vertex ids on this layer
         let vertex_ids: Vec<VertexId> = model

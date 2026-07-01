@@ -32,6 +32,7 @@ mod commands;
 mod engine;
 mod export;
 mod import;
+mod layers;
 mod layout;
 mod metadata;
 mod render;
@@ -48,6 +49,7 @@ pub use commands::{
 pub use engine::{create_engine, dispose_engine};
 pub use export::{export_drawio, export_drawio_fresh_engine};
 pub use import::import_drawio;
+pub use layers::get_page_layers;
 pub use layout::{apply_layout, route_all_edges};
 pub use metadata::{get_metadata, set_metadata};
 pub use render::{
