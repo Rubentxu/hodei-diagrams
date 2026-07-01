@@ -162,7 +162,7 @@ test.describe('Suite LAYER: Layers panel UI (IP-F PR5)', () => {
   // ─── LAYER-007: Move shape to layer ──────────────────────────────────────
 
   test('LAYER-007: Move selected shape to a different layer', async ({ page }) => {
-    // Select Rect C (which is on the Content layer)
+    // Select Rect C (which is on the Content layer in three-layers.drawio)
     const rectC = page.locator('svg [data-vertex-id]').nth(2); // 0-indexed: 3rd shape
     await rectC.click();
     await page.waitForTimeout(200);
@@ -171,22 +171,32 @@ test.describe('Suite LAYER: Layers panel UI (IP-F PR5)', () => {
     const selectedCount = await page.locator('.selected').count();
     expect(selectedCount).toBeGreaterThanOrEqual(1);
 
+    // Count shapes on canvas before move (3 layers × 1-2 shapes each = 5 total)
+    const shapesBefore = await page.locator('svg [data-vertex-id]').count();
+    expect(shapesBefore).toBe(5);
+
     // Open Layers menu
     await page.click('[data-testid="menu-layers"] summary');
     await page.waitForTimeout(200);
 
-    // Click on Background layer to move the shape there
+    // Move Rect C to Background layer by clicking the Background layer row
     const bgLayer = page.locator('[data-testid="layer-item-Background"]');
     await bgLayer.click();
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(600);
 
-    // The shape should now be on the Background layer (this is verified by the
-    // scene re-rendering without errors - the command succeeds)
-    const errorBanner = page.locator('[data-testid="error-banner"]');
+    // Verify no error occurred
     const errorMessage = page.locator('[data-testid="error-message"]');
     if (await errorMessage.count() > 0) {
       const msg = (await errorMessage.textContent())?.trim() ?? '';
       expect(msg).toBe('');
     }
+
+    // Verify the shape is still on canvas (move succeeded, no shapes disappeared)
+    const shapesAfter = await page.locator('svg [data-vertex-id]').count();
+    expect(shapesAfter).toBe(5);
+
+    // Verify the shape is still selected (selection preserved after move)
+    const selectedAfter = await page.locator('.selected').count();
+    expect(selectedAfter).toBeGreaterThanOrEqual(1);
   });
 });
