@@ -2455,10 +2455,13 @@ impl AddLayerPayload {
 
     /// Apply the add-layer operation.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
-        let mut layer = Layer::default();
-        layer.page_id = self.page_id;
-        layer.name = self.name.clone();
-        // visible: true, locked: false by default
+        let layer = Layer {
+            page_id: self.page_id,
+            name: self.name.clone(),
+            visible: true,
+            locked: false,
+            ..Default::default()
+        };
         let id = model.store.insert_layer(layer);
         self.inserted_id = Some(id);
         self.applied = true;
