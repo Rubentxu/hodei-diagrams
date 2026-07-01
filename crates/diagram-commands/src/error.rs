@@ -49,6 +49,12 @@ pub enum CommandError {
     /// Undo requires re-inserting items but ID remap references were not found.
     #[error("undo requires re-inserting items; ID remap references not found")]
     UndoIdRemap,
+
+    /// IP-E: A command was scaffolded but its full implementation is deferred
+    /// to a follow-up cycle. The TS layer falls back to a UI-loop or
+    /// surfaces a diagnostic.
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
 }
 
 /// Convenience alias for `Result<T, CommandError>`.
