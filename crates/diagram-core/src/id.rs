@@ -19,6 +19,8 @@ slotmap::new_key_type! {
     pub struct PageId;
     /// Identifier for a style entry in the engine style store.
     pub struct StyleId;
+    /// Identifier for a layer (a named group of shapes within a page).
+    pub struct LayerId;
 }
 
 // `slotmap::new_key_type!` derives `Copy`, `Clone`, `Default`, `Eq`,
@@ -42,6 +44,7 @@ impl_display!(EdgeId, "edge");
 impl_display!(GroupId, "group");
 impl_display!(PageId, "page");
 impl_display!(StyleId, "style");
+impl_display!(LayerId, "layer");
 
 /// Access the `(idx, version)` pair of a slotmap key without going through
 /// `serde_json`. Implemented for every `new_key_type!` produced in this crate.
@@ -79,4 +82,4 @@ macro_rules! impl_stable_id_ext {
     };
 }
 
-impl_stable_id_ext!(VertexId, EdgeId, GroupId, PageId, StyleId);
+impl_stable_id_ext!(VertexId, EdgeId, GroupId, PageId, StyleId, LayerId);

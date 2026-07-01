@@ -7,7 +7,7 @@
 //! ADR-0023 (engine-owned stable IDs).
 
 use crate::geometry::CellGeometry;
-use crate::id::{GroupId, PageId, StyleId};
+use crate::id::{GroupId, LayerId, PageId, StyleId};
 use crate::label::Label;
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +29,8 @@ pub struct Vertex {
     pub parent: Option<GroupId>,
     /// The page this vertex belongs to, if any.
     pub page_id: Option<PageId>,
+    /// The layer this vertex belongs to, if any. `None` means the default layer.
+    pub layer_id: Option<LayerId>,
     /// Z-order for layering: higher values render on top. Ties are broken
     /// by engine ID (higher ID on top). Default is 0.
     /// See ADR-0058 §Z-order semantics.
@@ -52,6 +54,7 @@ impl Default for Vertex {
             style_id: None,
             parent: None,
             page_id: None,
+            layer_id: None,
             z_order: 0,
             locked: false,
             visible: true, // Visible by default per ADR-0058

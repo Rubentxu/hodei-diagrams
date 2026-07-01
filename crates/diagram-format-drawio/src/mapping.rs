@@ -321,6 +321,7 @@ impl DrawioMapping {
                             style_id,
                             parent,
                             page_id,
+                            layer_id: None,
                             z_order,
                             locked,
                             visible,
@@ -389,6 +390,7 @@ impl DrawioMapping {
                                         })
                                         .unwrap_or_default(),
                                     page_id,
+                                    layer_id: None,
                                     z_order,
                                     locked,
                                     visible,

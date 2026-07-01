@@ -5,7 +5,7 @@
 //! dropped with a `Diagnostic` in `DrawioMapping`.
 
 use crate::geometry::Point;
-use crate::id::{PageId, StyleId, VertexId};
+use crate::id::{LayerId, PageId, StyleId, VertexId};
 use crate::label::Label;
 use serde::{Deserialize, Serialize};
 
@@ -34,6 +34,8 @@ pub struct Edge {
     pub waypoints: Vec<Point>,
     /// The page this edge belongs to, if any.
     pub page_id: Option<PageId>,
+    /// The layer this edge belongs to, if any. `None` means the default layer.
+    pub layer_id: Option<LayerId>,
     /// Z-order for layering: higher values render on top. Ties are broken
     /// by engine ID (higher ID on top). Default is 0.
     /// See ADR-0058 §Z-order semantics.
@@ -61,6 +63,7 @@ impl Default for Edge {
             target: VertexId::default(),
             waypoints: Vec::new(),
             page_id: None,
+            layer_id: None,
             z_order: 0,
             locked: false,
             visible: true, // Visible by default per ADR-0058

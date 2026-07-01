@@ -9,7 +9,8 @@
 
 use crate::edge::Edge;
 use crate::group::Group;
-use crate::id::{EdgeId, GroupId, PageId, StyleId, VertexId};
+use crate::id::{EdgeId, GroupId, LayerId, PageId, StyleId, VertexId};
+use crate::layer::Layer;
 use crate::page::Page;
 use crate::style::StyleMap;
 use crate::vertex::Vertex;
@@ -22,6 +23,7 @@ pub struct ModelStore {
     vertices: SlotMap<VertexId, Vertex>,
     edges: SlotMap<EdgeId, Edge>,
     groups: SlotMap<GroupId, Group>,
+    layers: SlotMap<LayerId, Layer>,
     styles: SlotMap<StyleId, StyleMap>,
 }
 
@@ -155,6 +157,56 @@ impl ModelStore {
     /// Borrow all groups with their IDs in insertion order.
     pub fn groups_with_ids(&self) -> impl Iterator<Item = (GroupId, &Group)> {
         self.groups.iter()
+    }
+
+    // ─── LAYER ACCESSORS ─────────────────────────────────────────────────────────
+
+    /// Look up a layer by its engine ID.
+    pub fn layer(&self, id: LayerId) -> Option<&Layer> {
+        self.layers.get(id)
+    }
+
+    /// Look up a layer by its engine ID (mutable).
+    pub fn layer_mut(&mut self, id: LayerId) -> Option<&mut Layer> {
+        self.layers.get_mut(id)
+    }
+
+    /// Insert a layer, returning its engine-assigned ID.
+    pub fn insert_layer(&mut self, l: Layer) -> LayerId {
+        let id = self.layers.insert(l);
+        if let Some(stored) = self.layers.get_mut(id) {
+            stored.id = id;
+        }
+        id
+    }
+
+    /// Replace a layer by its engine ID, returning the old value if present.
+    pub fn replace_layer(&mut self, id: LayerId, l: Layer) -> Option<Layer> {
+        self.layers.get_mut(id).map(|old| std::mem::replace(old, l))
+    }
+
+    /// Remove a layer by its engine ID, returning the removed value if present.
+    ///
+    /// Does NOT cascade to vertices and edges that reference this layer.
+    /// Consumers are responsible for orphaning shapes or moving them to the
+    /// default layer.
+    pub fn remove_layer(&mut self, id: LayerId) -> Option<Layer> {
+        self.layers.remove(id)
+    }
+
+    /// Number of layers currently in the store.
+    pub fn len_layer(&self) -> usize {
+        self.layers.len()
+    }
+
+    /// Borrow all layers with their IDs in insertion order.
+    pub fn layers_with_ids(&self) -> impl Iterator<Item = (LayerId, &Layer)> {
+        self.layers.iter()
+    }
+
+    /// Iterate over all layers (mutable), needed by format crates for testing.
+    pub fn layers_mut(&mut self) -> impl Iterator<Item = &mut Layer> {
+        self.layers.values_mut()
     }
 
     /// Look up a style entry by its engine ID.
@@ -803,5 +855,110 @@ mod tests {
         store.insert_edge(e);
 
         assert_eq!(store.min_z_order(pid), -5);
+    }
+
+    // ─── LAYER TESTS ────────────────────────────────────────────────────────────
+
+    use crate::layer::Layer;
+
+    #[test]
+    fn layer_insert_lookup_replace() {
+        let mut store = ModelStore::new();
+
+        // Insert a layer
+        let layer = Layer::default();
+        let lid = store.insert_layer(layer);
+        assert!(store.layer(lid).is_some());
+        // The stored layer has id normalized to the slotmap key
+        assert_eq!(store.layer(lid).unwrap().id, lid);
+        assert_eq!(store.len_layer(), 1);
+
+        // Replace the layer
+        let layer2 = Layer {
+            name: Some(crate::label::Label::new("Test Layer")),
+            ..Default::default()
+        };
+        let old = store.replace_layer(lid, layer2.clone());
+        // old has id normalized to slotmap key
+        assert_eq!(old.as_ref().unwrap().id, lid);
+        assert_eq!(store.layer(lid), Some(&layer2));
+
+        // Lookup non-existent
+        let bogus = crate::id::LayerId::default();
+        assert!(store.layer(bogus).is_none());
+    }
+
+    #[test]
+    fn layer_remove_returns_value() {
+        let mut store = ModelStore::new();
+        let layer = Layer::default();
+        let lid = store.insert_layer(layer);
+        let removed = store.remove_layer(lid);
+        // removed has id normalized to slotmap key
+        assert_eq!(removed.as_ref().unwrap().id, lid);
+        assert_eq!(store.len_layer(), 0);
+    }
+
+    #[test]
+    fn layer_remove_idempotent() {
+        let mut store = ModelStore::new();
+        let layer = Layer::default();
+        let lid = store.insert_layer(layer);
+        let first = store.remove_layer(lid);
+        assert!(first.is_some());
+        let second = store.remove_layer(lid);
+        assert!(second.is_none());
+    }
+
+    #[test]
+    fn layer_mut_allows_in_place_edit() {
+        let mut store = ModelStore::new();
+        let layer = Layer::default();
+        let lid = store.insert_layer(layer);
+
+        store.layer_mut(lid).unwrap().name = Some(crate::label::Label::new("renamed"));
+        assert_eq!(
+            store.layer(lid).unwrap().name.as_ref().unwrap().as_str(),
+            "renamed"
+        );
+    }
+
+    #[test]
+    fn layers_with_ids_returns_all_layers() {
+        let mut store = ModelStore::new();
+        let layer1 = Layer::default();
+        let layer2 = Layer::default();
+        let lid1 = store.insert_layer(layer1);
+        let lid2 = store.insert_layer(layer2);
+
+        let ids: Vec<_> = store.layers_with_ids().map(|(id, _)| id).collect();
+        assert!(ids.contains(&lid1));
+        assert!(ids.contains(&lid2));
+    }
+
+    #[test]
+    fn layers_mut_returns_mutable_layers() {
+        let mut store = ModelStore::new();
+        let layer = Layer::default();
+        let lid = store.insert_layer(layer);
+
+        for l in store.layers_mut() {
+            l.name = Some(crate::label::Label::new("edited"));
+        }
+        assert_eq!(
+            store.layer(lid).unwrap().name.as_ref().unwrap().as_str(),
+            "edited"
+        );
+    }
+
+    #[test]
+    fn smoke_insert_mutate_remove_verify_no_layer() {
+        let mut store = ModelStore::new();
+        let layer = Layer::default();
+        let lid = store.insert_layer(layer);
+        store.layer_mut(lid).unwrap().name = Some(crate::label::Label::new("temp"));
+        let removed = store.remove_layer(lid);
+        assert!(removed.is_some());
+        assert!(store.layer(lid).is_none());
     }
 }
