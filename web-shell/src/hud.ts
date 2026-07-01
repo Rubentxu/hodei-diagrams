@@ -35,7 +35,7 @@ export function buildHud(): HudControls {
 
   // ─── Selection info ────────────────────────────────────────────────────────
   const selItem = document.createElement('div');
-  selItem.className = 'hud-item';
+  selItem.className = 'hud-item hud-primary';
 
   const selLabel = document.createElement('span');
   selLabel.className = 'hud-label';
@@ -133,7 +133,7 @@ export function buildHud(): HudControls {
 
   // ─── Page info ─────────────────────────────────────────────────────────────
   const pageItem = document.createElement('div');
-  pageItem.className = 'hud-item';
+  pageItem.className = 'hud-item hud-page';
 
   const pageLabel = document.createElement('span');
   pageLabel.className = 'hud-label';
@@ -220,6 +220,12 @@ export function buildHud(): HudControls {
     container,
     setSelection: (label: string) => {
       selValue.textContent = label;
+      // Dim the whole selection item when nothing is selected
+      if (label === 'Nothing selected') {
+        selItem.classList.add('hud-item--empty');
+      } else {
+        selItem.classList.remove('hud-item--empty');
+      }
     },
     setPage: (current: number, total: number) => {
       pageValue.textContent = `${current}/${total}`;
