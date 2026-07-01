@@ -301,9 +301,10 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
 
 ### Next Steps
 
-- **IP-F (Layer Model)** (Deferred per ADR-0081).
+- **Recent closeout**: 4 pre-existing Playwright failures were fixed (HUD labels + future categories visibility). Visual suites now show 70/72 passing with 2 intentional skips.
+- **IP-F (Layer Model)** is the next implementation milestone.
   - Scope: full `diagram-core` layer model (ZOrder, LayerId), layer panel UI, export/import.
-  - Rationale: larger scope, defers to post-campaign.
+  - Rationale: largest remaining interaction gap; deferred by ADR-0081 and now promoted as the next cycle.
 
 ### Strategy Artifacts
 
