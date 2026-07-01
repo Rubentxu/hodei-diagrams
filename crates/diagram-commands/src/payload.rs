@@ -470,13 +470,11 @@ impl SendBackwardPayload {
 /// Captured state for undo of a group removal.
 type OrphanedChildren = Vec<(VertexId, Option<GroupId>)>;
 
-/// Captured state for undo of a layer removal (layer + shape remappings).
-#[allow(clippy::type_complexity)]
-type RemovedLayer = (
-    Layer,
-    Vec<(VertexId, Option<LayerId>)>,
-    Vec<(EdgeId, Option<LayerId>)>,
-);
+/// Captured state for undo of a layer removal (layer + shape ids).
+/// Shape prev-layer-id was tracked but never used — undo always restores to the
+/// re-inserted layer's live id (which may differ from the removed id due to
+/// slotmap reuse). Kept as simple id vectors for clarity.
+type RemovedLayer = (Layer, Vec<VertexId>, Vec<EdgeId>);
 
 /// Captured state for undo of a page removal (page + all its cells).
 #[allow(clippy::type_complexity)]
@@ -2483,12 +2481,22 @@ impl AddLayerPayload {
 ///
 /// Shapes on the removed layer are moved to the page's default layer.
 /// The default layer itself cannot be removed (this is a no-op).
+///
+/// # Undo/Redo State
+///
+/// `self.layer_id` is the input id (set at construction). After undo re-inserts
+/// the layer, `self.live_layer_id` tracks the slotmap's actual assigned id (which
+/// may differ due to key reuse). Redo uses `live_layer_id` to find the correct
+/// layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoveLayerPayload {
     /// The layer to remove.
     pub layer_id: LayerId,
-    /// The removed layer and the { old_shape_layer_id → new_shape_layer_id } remap
-    /// for vertices and edges. Populated by `apply`.
+    /// The live layer id after undo. Used by redo to find the re-inserted layer.
+    /// Populated by `undo`; `apply` falls back to `layer_id` if this is `None`.
+    #[serde(skip)]
+    live_layer_id: Option<LayerId>,
+    /// The removed layer and the shape ids that were on it. Populated by `apply`.
     #[serde(skip)]
     pub removed: Option<RemovedLayer>,
     /// Whether this command has been applied.
@@ -2501,6 +2509,7 @@ impl RemoveLayerPayload {
     pub fn new(layer_id: LayerId) -> Self {
         Self {
             layer_id,
+            live_layer_id: None,
             removed: None,
             applied: false,
         }
@@ -2516,12 +2525,15 @@ impl RemoveLayerPayload {
 
     /// Apply the remove-layer operation.
     pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        // Resolve the live layer id: undo populates live_layer_id; first apply uses layer_id.
+        let live_id = self.live_layer_id.unwrap_or(self.layer_id);
+
         // Get the layer or error
         let layer = model
             .store
-            .layer(self.layer_id)
+            .layer(live_id)
             .cloned()
-            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+            .ok_or(CommandError::LayerNotFound(live_id))?;
 
         // No-op if this is the default layer
         if layer.is_default() {
@@ -2533,42 +2545,42 @@ impl RemoveLayerPayload {
 
         // Find the default layer for this page
         let default_layer_id = Self::find_default_layer_id(&model.store, page_id)
-            .ok_or(CommandError::LayerNotFound(self.layer_id))?;
+            .ok_or(CommandError::LayerNotFound(live_id))?;
 
-        // Collect vertex remap pairs (vid, prev_layer_id) first
-        let vertex_remap: Vec<(VertexId, Option<LayerId>)> = model
+        // Collect vertex ids on this layer
+        let vertex_ids: Vec<VertexId> = model
             .store
             .vertices_with_ids()
-            .filter(|(_, v)| v.layer_id == Some(self.layer_id))
-            .map(|(vid, v)| (vid, v.layer_id))
+            .filter(|(_, v)| v.layer_id == Some(live_id))
+            .map(|(vid, _)| vid)
             .collect();
 
-        // Collect edge remap pairs (eid, prev_layer_id) first
-        let edge_remap: Vec<(EdgeId, Option<LayerId>)> = model
+        // Collect edge ids on this layer
+        let edge_ids: Vec<EdgeId> = model
             .store
             .edges_with_ids()
-            .filter(|(_, e)| e.layer_id == Some(self.layer_id))
-            .map(|(eid, e)| (eid, e.layer_id))
+            .filter(|(_, e)| e.layer_id == Some(live_id))
+            .map(|(eid, _)| eid)
             .collect();
 
         // Now update vertices (no longer iterating)
-        for (vid, _) in &vertex_remap {
-            if let Some(v) = model.store.vertex_mut(*vid) {
+        for &vid in &vertex_ids {
+            if let Some(v) = model.store.vertex_mut(vid) {
                 v.layer_id = Some(default_layer_id);
             }
         }
 
         // Now update edges
-        for (eid, _) in &edge_remap {
-            if let Some(e) = model.store.edge_mut(*eid) {
+        for &eid in &edge_ids {
+            if let Some(e) = model.store.edge_mut(eid) {
                 e.layer_id = Some(default_layer_id);
             }
         }
 
         // Remove the layer
-        model.store.remove_layer(self.layer_id);
+        model.store.remove_layer(live_id);
 
-        self.removed = Some((layer, vertex_remap, edge_remap));
+        self.removed = Some((layer, vertex_ids, edge_ids));
         self.applied = true;
         Ok(())
     }
@@ -2578,8 +2590,7 @@ impl RemoveLayerPayload {
         if !self.applied {
             return Err(CommandError::NotApplied);
         }
-        let (layer, vertex_remap, edge_remap) =
-            self.removed.take().ok_or(CommandError::NotApplied)?;
+        let (layer, vertex_ids, edge_ids) = self.removed.take().ok_or(CommandError::NotApplied)?;
 
         // Re-insert the layer. Slotmap may reuse the removed slot or allocate a new key,
         // so we MUST capture the returned id — the stored layer always has this id.
@@ -2587,17 +2598,18 @@ impl RemoveLayerPayload {
         reinserted.id = self.layer_id;
         let new_id = model.store.insert_layer(reinserted);
 
+        // Track the live id so redo can find the correct layer.
+        self.live_layer_id = Some(new_id);
+
         // Restore vertex layer_ids to the re-inserted layer's actual id.
-        // Using prev_layer_id (the stale removed-id) would leave shapes pointing to a
-        // non-existent layer when slotmap allocated a new key on re-insert.
-        for (vid, _prev_layer_id) in vertex_remap {
+        for vid in vertex_ids {
             if let Some(v) = model.store.vertex_mut(vid) {
                 v.layer_id = Some(new_id);
             }
         }
 
         // Restore edge layer_ids
-        for (eid, _prev_layer_id) in edge_remap {
+        for eid in edge_ids {
             if let Some(e) = model.store.edge_mut(eid) {
                 e.layer_id = Some(new_id);
             }
