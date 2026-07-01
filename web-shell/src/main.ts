@@ -876,6 +876,7 @@ async function bootstrap(): Promise<void> {
       ui.hud.setZoom(100);
       ui.zoomDisplay.textContent = '100%';
     },
+    pan: (dx, dy) => zoomPan?.panBy(dx, dy),
   });
 
   // Zoom menu item wiring (View > Zoom In/Out/Reset)
