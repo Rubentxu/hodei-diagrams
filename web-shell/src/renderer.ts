@@ -64,7 +64,7 @@ export interface ZoomPanControls {
    */
   fitToView(_padding?: number): void;
   /** Pan viewport by a delta in pre-scale (pan-space) pixels. */
-  panBy(dx: number, dy: number): void;
+  panBy(_dx: number, _dy: number): void;
 }
 
 /**

@@ -144,7 +144,7 @@ export class Editor {
   #zoomIn: (() => void) | null = null;
   #zoomOut: (() => void) | null = null;
   #resetZoom: (() => void) | null = null;
-  #pan: ((dx: number, dy: number) => void) | null = null;
+  #pan: ((_dx: number, _dy: number) => void) | null = null;
   #abortController: AbortController | null = null;
 
   // ─── Stencil Drag Preview ────────────────────────────────────────────────
@@ -171,7 +171,7 @@ export class Editor {
     zoomIn?: () => void;
     zoomOut?: () => void;
     resetZoom?: () => void;
-    pan?: (dx: number, dy: number) => void;
+    pan?: (_dx: number, _dy: number) => void;
   }): void {
     if (opts.zoomIn) this.#zoomIn = opts.zoomIn;
     if (opts.zoomOut) this.#zoomOut = opts.zoomOut;
