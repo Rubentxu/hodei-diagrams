@@ -144,6 +144,7 @@ export class Editor {
   #zoomIn: (() => void) | null = null;
   #zoomOut: (() => void) | null = null;
   #resetZoom: (() => void) | null = null;
+  #pan: ((dx: number, dy: number) => void) | null = null;
   #abortController: AbortController | null = null;
 
   // ─── Stencil Drag Preview ────────────────────────────────────────────────
@@ -166,10 +167,16 @@ export class Editor {
   }
 
   /** Set zoom control callbacks for keyboard shortcuts. */
-  setZoomCallbacks(opts: { zoomIn?: () => void; zoomOut?: () => void; resetZoom?: () => void }): void {
+  setZoomCallbacks(opts: {
+    zoomIn?: () => void;
+    zoomOut?: () => void;
+    resetZoom?: () => void;
+    pan?: (dx: number, dy: number) => void;
+  }): void {
     if (opts.zoomIn) this.#zoomIn = opts.zoomIn;
     if (opts.zoomOut) this.#zoomOut = opts.zoomOut;
     if (opts.resetZoom) this.#resetZoom = opts.resetZoom;
+    if (opts.pan) this.#pan = opts.pan;
   }
 
   // ─── Edge / Bend Editing ───────────────────────────────────────────────────
@@ -4544,8 +4551,8 @@ export class Editor {
       return;
     }
 
-    // Arrow keys → nudge selected shapes (1px, Shift = 10px)
-    if (this.#selection.size > 0 && !hasMod) {
+    // Arrow keys → nudge selected shapes (1px, Shift = 10px) OR pan viewport (no selection)
+    if (!hasMod) {
       const step = e.shiftKey ? 10 : 1;
       let dx = 0;
       let dy = 0;
@@ -4557,7 +4564,11 @@ export class Editor {
         default: return;
       }
       e.preventDefault();
-      this.#nudgeSelection(dx, dy);
+      if (this.#selection.size > 0) {
+        this.#nudgeSelection(dx, dy);
+      } else {
+        this.#pan?.(dx, dy);
+      }
       return;
     }
   }
