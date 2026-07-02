@@ -2359,17 +2359,25 @@ export class Editor {
    * @param next New selection set
    */
   #applySelection(next: Set<SlotmapId>): void {
-    // Remove .selected from all elements
+    // Remove .selected from all elements (vertices and groups)
     this.#viewer.querySelectorAll('[data-vertex-id]').forEach((el) => {
       el.classList.remove('selected');
     });
+    this.#viewer.querySelectorAll('[data-group-id]').forEach((el) => {
+      el.classList.remove('selected');
+    });
     this.#selection = next;
-    // Add .selected to all selected elements
+    // Add .selected to all selected elements (vertices and groups)
     for (const id of this.#selection) {
-      const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
-      const el = this.#viewer.querySelector(selector);
-      if (el) {
-        el.classList.add('selected');
+      const vertexSelector = `[data-vertex-id="${id.idx}:${id.version}"]`;
+      const groupSelector = `[data-group-id="${id.idx}:${id.version}"]`;
+      const vertexEl = this.#viewer.querySelector(vertexSelector);
+      const groupEl = this.#viewer.querySelector(groupSelector);
+      if (vertexEl) {
+        vertexEl.classList.add('selected');
+      }
+      if (groupEl) {
+        groupEl.classList.add('selected');
       }
     }
     // Notify selection change
