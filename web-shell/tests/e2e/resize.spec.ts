@@ -12,17 +12,23 @@ test.describe('Suite: proportional-resize', () => {
    * THEN the shape resizes freely with no aspect ratio constraint
    */
   test('RESIZE-001: Corner resize without Shift — free resize', async ({ page }) => {
+    page.on('console', msg => console.log('BROWSER:', msg.type(), msg.text()));
+    page.on('pageerror', err => console.log('PAGE ERROR:', err.message));
+
     await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
     const viewer = page.locator('[data-testid="viewer"]');
-    const rect = viewer.locator('[data-vertex-id]').first();
+    const svg = viewer.locator('svg').first();
 
-    // Select the shape
-    await rect.click();
-    await page.waitForTimeout(300);
+    // Get SVG viewBox to understand coordinate mapping
+    const viewerBox = await viewer.boundingBox();
+    if (!viewerBox) throw new Error('Viewer not visible');
+    await page.mouse.click(viewerBox.x + viewerBox.width / 2, viewerBox.y + viewerBox.height / 2);
+
+    await page.waitForTimeout(500);
 
     // Resize handles should be visible
     const handles = viewer.locator('.resize-handle');
@@ -44,9 +50,11 @@ test.describe('Suite: proportional-resize', () => {
     const viewer = page.locator('[data-testid="viewer"]');
     const rect = viewer.locator('[data-vertex-id]').first();
 
-    // Select the shape
-    await rect.click();
-    await page.waitForTimeout(300);
+    // Select the shape — use page.mouse.click with viewer center (not rect.click())
+    const viewerBox = await viewer.boundingBox();
+    if (!viewerBox) throw new Error('Viewer not visible');
+    await page.mouse.click(viewerBox.x + viewerBox.width / 2, viewerBox.y + viewerBox.height / 2);
+    await page.waitForTimeout(500);
 
     // Find the NE handle (top-right corner)
     const neHandle = viewer.locator('.resize-handle[data-handle="ne"]');

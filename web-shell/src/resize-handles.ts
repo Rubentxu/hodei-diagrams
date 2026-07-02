@@ -44,7 +44,9 @@ interface ProportionalState {
  * Edge handles: N, E, S, W
  */
 export class ResizeHandlesOverlay {
-  readonly #svgLayer: HTMLElement;
+  // Getter instead of direct reference — re-queries DOM on each call so we always
+  // get the current SVG element (avoids stale reference after mountSvg replaces innerHTML)
+  readonly #getSvgLayer: () => HTMLElement;
   readonly #sceneProvider: () => ScenePage[];
   readonly #getVertexGeometry: (id: SlotmapId) => ShapeBounds | null;
   readonly #setVertexGeometry: (
@@ -58,13 +60,13 @@ export class ResizeHandlesOverlay {
   #onUpBound: (_e: PointerEvent) => void;
 
   constructor(
-    svgLayer: HTMLElement,
+    getSvgLayer: () => HTMLElement,
     sceneProvider: () => ScenePage[],
     getVertexGeometry: (id: SlotmapId) => ShapeBounds | null,
     setVertexGeometry: (id: SlotmapId, geom: ShapeBounds) => void,
     onGeometryChanged: () => void,
   ) {
-    this.#svgLayer = svgLayer;
+    this.#getSvgLayer = getSvgLayer;
     this.#sceneProvider = sceneProvider;
     this.#getVertexGeometry = getVertexGeometry;
     this.#setVertexGeometry = setVertexGeometry;
@@ -78,8 +80,9 @@ export class ResizeHandlesOverlay {
    * @param selection Set of selected SlotmapIds (only renders for single shape)
    */
   render(selection: Set<SlotmapId>): void {
+    const svgLayer = this.#getSvgLayer();
     // Remove existing handles
-    this.#svgLayer.querySelectorAll('.resize-handle').forEach((el) => el.remove());
+    svgLayer.querySelectorAll('.resize-handle').forEach((el) => el.remove());
 
     // Only render for single shape selection
     if (selection.size !== 1) return;
@@ -149,7 +152,7 @@ export class ResizeHandlesOverlay {
       this.#startDrag(vertexId, bounds, pos, circle, e.clientX, e.clientY);
     });
 
-    this.#svgLayer.appendChild(circle);
+    this.#getSvgLayer().appendChild(circle);
   }
 
   /**
@@ -211,7 +214,7 @@ export class ResizeHandlesOverlay {
     if (!this.#dragState) return;
 
     const { handle, origGeom, startMouseX, startMouseY } = this.#dragState;
-    const rect = this.#svgLayer.getBoundingClientRect();
+    const rect = this.#getSvgLayer().getBoundingClientRect();
     const zoom = this.#getZoom();
     const docX = (e.clientX - rect.left) / zoom;
     const docY = (e.clientY - rect.top) / zoom;
@@ -343,7 +346,7 @@ export class ResizeHandlesOverlay {
     ];
 
     for (const { pos, x, y } of positions) {
-      const handle = this.#svgLayer.querySelector(
+      const handle = this.#getSvgLayer().querySelector(
         `.resize-handle[data-handle="${pos}"]`,
       ) as SVGCircleElement | null;
       if (handle) {
@@ -428,7 +431,7 @@ export class ResizeHandlesOverlay {
 
   /** Get current zoom level from the SVG layer's transform. */
   #getZoom(): number {
-    const style = this.#svgLayer.style.transform;
+    const style = this.#getSvgLayer().style.transform;
     const match = style.match(/scale\(([^)]+)\)/);
     if (match) {
       return parseFloat(match[1]!) || 1;
@@ -441,6 +444,6 @@ export class ResizeHandlesOverlay {
     document.removeEventListener('pointermove', this.#onMoveBound);
     document.removeEventListener('pointerup', this.#onUpBound);
     this.#dragState = null;
-    this.#svgLayer.querySelectorAll('.resize-handle').forEach((el) => el.remove());
+    this.#getSvgLayer().querySelectorAll('.resize-handle').forEach((el) => el.remove());
   }
 }

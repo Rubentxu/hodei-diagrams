@@ -231,9 +231,15 @@ export class Editor {
     // Initialize port handles overlay
     this.#portHandles = new PortHandlesOverlay(viewer, () => this.#sceneCache, session);
 
-    // Initialize resize handles overlay
+    // Initialize resize handles overlay — use SVG element so handles are in SVG coordinate space
+    // Note: we must look up the SVG dynamically because mountSvg replaces viewer.innerHTML
+    const getSvgLayer = () => {
+      const svgEl = viewer.querySelector('svg');
+      if (!svgEl) throw new Error('SVG element not found in viewer');
+      return svgEl as unknown as HTMLElement;
+    };
     this.#resizeHandles = new ResizeHandlesOverlay(
-      viewer,
+      getSvgLayer as () => HTMLElement,
       () => this.#sceneCache,
       (id) => this.#findOriginalGeometry(id),
       (id, geom) => this.setVertexGeometry(id, geom),
@@ -2229,10 +2235,31 @@ export class Editor {
 
   // ─── Coordinate Conversion ────────────────────────────────────────────────
 
-  /** Convert screen client coordinates to document-space coordinates, accounting for zoom. */
+  /** Convert screen client coordinates to document-space coordinates, accounting for zoom and SVG viewBox. */
   #clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
     const rect = this.#viewer.getBoundingClientRect();
     const zoom = this.#getZoom();
+    // Get SVG viewBox to handle non-uniform scaling (preserveAspectRatio="none")
+    const svg = this.#viewer.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.getAttribute('viewBox');
+      if (viewBox) {
+        const parts = viewBox.split(/\s+/).map(Number);
+        if (parts.length === 4) {
+          const vbX = parts[0]!;
+          const vbY = parts[1]!;
+          const vbW = parts[2]!;
+          const vbH = parts[3]!;
+          const svgRect = svg.getBoundingClientRect();
+          const scaleX = vbW / svgRect.width;
+          const scaleY = vbH / svgRect.height;
+          return {
+            x: (clientX - svgRect.left) * scaleX,
+            y: (clientY - svgRect.top) * scaleY,
+          };
+        }
+      }
+    }
     return {
       x: (clientX - rect.left) / zoom,
       y: (clientY - rect.top) / zoom,
@@ -2470,6 +2497,9 @@ export class Editor {
     }
     // Notify selection change
     this.#notifySelectionChange();
+
+    // Re-render resize handles when selection changes
+    this.#resizeHandles.render(this.#selection);
   }
 
   /** Notify selection change listeners. */
