@@ -78,6 +78,11 @@ export type WasmModule = {
   clear_edge_anchor(_h: number, _edge_idx: number, _end: number): void;
   get_edge_anchors(_h: number, _edge_idx: number): string;
   set_page_math_enabled(_h: number, _page_idx: number, _enabled: boolean): void;
+  // ─── Selection (Slice 3) ─────────────────────────────────────────────────────
+  resolve_selection(_h: number, _x: number, _y: number, _alt: boolean, _shift: boolean, _ctrl: boolean, _meta: boolean): string;
+  select_target(_h: number, _target_json: string): void;
+  clear_selection(_h: number): void;
+  get_selection(_h: number): string;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
@@ -104,6 +109,24 @@ export type SelectionState =
   | { type: 'ONE'; element: SlotmapId }
   | { type: 'MANY'; elements: SlotmapId[] }
   | { type: 'GROUP_DRILL_DOWN'; groupId: SlotmapId; groupElement: Element };
+
+/** Keyboard modifiers for selection resolution. Mirrors `SelectionModifiers` on the Rust side. */
+export interface SelectionModifiers {
+  alt: boolean;
+  shift: boolean;
+  ctrl: boolean;
+  meta: boolean;
+}
+
+/**
+ * Engine-owned selection target. Mirrors `SelectionTarget` on the Rust side.
+ * Serialized as JSON: `{"type":"Vertex","id":{"idx":1,"version":1}}`
+ */
+export type SelectionTarget =
+  | { type: 'None' }
+  | { type: 'Vertex'; id: SlotmapId }
+  | { type: 'Group'; id: SlotmapId }
+  | { type: 'Edge'; id: SlotmapId };
 
 /**
  * Parse a `data-vertex-id` attribute value in `"idx:version"` format.

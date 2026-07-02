@@ -1093,6 +1093,105 @@ export class DiagramEngineSession {
       return err(e instanceof Error ? e.message : String(e));
     }
   }
+
+  // ─── Selection (Slice 3) ─────────────────────────────────────────────────────
+
+  /**
+   * Resolve a click point + modifiers into an engine-owned SelectionTarget.
+   *
+   * Uses the engine's scene hit-testing and SelectionService to apply
+   * the correct selection semantics (SEL-015, SEL-016).
+   *
+   * @param x Document-space X coordinate
+   * @param y Document-space Y coordinate
+   * @param modifiers Keyboard modifiers (alt, shift, ctrl, meta)
+   * @returns The resolved SelectionTarget, or an error
+   */
+  resolveSelection(
+    x: number,
+    y: number,
+    modifiers: { alt: boolean; shift: boolean; ctrl: boolean; meta: boolean },
+  ): Result<import('./types.js').SelectionTarget, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const raw = this.wasm.resolve_selection(
+        this.handle as number,
+        x,
+        y,
+        modifiers.alt,
+        modifiers.shift,
+        modifiers.ctrl,
+        modifiers.meta,
+      );
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return err('SelectionTargetParse: ' + (e instanceof Error ? e.message : String(e)));
+      }
+      return ok(parsed as import('./types.js').SelectionTarget);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Select a target using the engine's selection model.
+   *
+   * @param target A SelectionTarget to select
+   */
+  selectTarget(target: import('./types.js').SelectionTarget): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.select_target(this.handle as number, JSON.stringify(target));
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Clear all selections in the engine.
+   */
+  clearSelection(): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.clear_selection(this.handle as number);
+      this.#onStateChange?.();
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Get the current engine selection as a JSON array of SelectionTarget.
+   *
+   * @returns Array of currently selected targets, or an error
+   */
+  getSelection(): Result<import('./types.js').SelectionTarget[], EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      const raw = this.wasm.get_selection(this.handle as number);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        return err('SelectionParse: ' + (e instanceof Error ? e.message : String(e)));
+      }
+      if (!Array.isArray(parsed)) {
+        return err('SelectionParse: expected array, got ' + typeof parsed);
+      }
+      return ok(parsed as import('./types.js').SelectionTarget[]);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
+  }
 }
 
 export interface EdgeAnchorsDto {
