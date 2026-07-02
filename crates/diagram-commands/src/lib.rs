@@ -9,6 +9,7 @@ pub mod editor;
 pub mod error;
 pub mod history;
 pub mod payload;
+pub mod selection;
 
 pub use command::{Command, CompletedCommand};
 pub use editor::{Editor, Transaction};

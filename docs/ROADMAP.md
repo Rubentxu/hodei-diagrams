@@ -299,6 +299,13 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
   - Verification: `just verify` ✅, full Playwright 514 pass (4 pre-existing failures).
   - Archive: `sddk/interaction-parity-ip-de-followup-duplicate-reorder/archive-report.md`.
 
+- **IP-B Quality Polish (selection-reconciliation)**: `feat/selection-reconciliation-quality-polish`.
+  - Status: Ready for PR merge.
+  - 3 draw.io parity corrections: marquee containment default (Alt=intersection), Tab includes edges, Alt+click no-wrap.
+  - Catalog reconciliation: SEL-004/006/009/010/011/012/014 → ✅.
+  - Verification: PASS WITH WARNINGS (W-1: AC-5a placeholder, W-2: AABB unit test suggestion).
+  - Archive: Engram `sddk/selection-reconciliation-quality-polish/archive-report`.
+
 - **IP-F (Layer Model)**: `feat/ip-f-layer-*` (PRs #161-#166, v0.91.0).
   - Engine: `LayerId` newtype, `Layer` struct, `ModelStore.layers` slotmap, denormalized `layer_id` on Vertex/Edge/Group.
   - Commands: `AddLayer`, `RemoveLayer`, `RenameLayer`, `SetLayerVisible`, `SetLayerLocked`, `MoveShapeToLayer` + undo/redo.
@@ -307,7 +314,14 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
   - Web-shell: Layers panel + minimum viable layer workflows E2E.
   - Doc reconciliation: Updated workflows catalog, ROADMAP, ADR-0081 footer.
 
-### In Progress — None
+### In Progress
+
+- **IP-G (Selection v2 — Engine-Owned Typed Selection)**: `selection-v2-engine-owned` (planned).
+  - Status: Planned — blocked by grill-with-docs redesign.
+  - Scope: Typed `SelectionTarget = Vertex | Group | Edge` owned by Diagram Engine; WASM boundary contract; Web Shell adapter for SEL-015/016 drill-down + Alt-bypass; supersedes partial PR #169 behavior.
+  - Evidence: `feat/group-drilldown-e2e` (frozen as evidence), failing E2E runs, verifier reports.
+  - Epic slices: typed model → engine commands → WASM contract → shell adapter → E2E parity.
+  - ADR: ADR-0082 (replaced with engine-owned typed selection semantics).
 
 ### Strategy Artifacts
 
@@ -397,6 +411,7 @@ Análisis exhaustivo de features restantes, ordenadas por impacto:
 | 0079 | Draw.io Interaction Parity Strategy | UX / Interaction |
 | 0080 | Keyboard Shortcut Collision Resolution | UX / Interaction |
 | 0081 | Layer Model Gap Deferred | UX / Interaction |
+| 0082 | Engine-Owned Typed Selection Semantics | UX / Interaction |
 
 ## Reglas de Actualización
 

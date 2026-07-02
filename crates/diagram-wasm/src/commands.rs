@@ -3,6 +3,7 @@
 use crate::engine::{with_engine, with_engine_mut};
 use diagram_commands::{Command, RoutingKind, Transaction};
 use diagram_core::geometry::CellGeometry;
+use diagram_core::selection::SelectionTarget;
 use diagram_core::{Group, PageId, VertexId};
 use diagram_scene::ResolvedStyle;
 use diagram_scene::resolver::StyleResolver;
@@ -1232,6 +1233,62 @@ pub fn flush_commands(handle: u32, written_len: usize) -> Result<(), JsValue> {
             .map_err(|err| Box::leak(format!("Apply: {err}").into_boxed_str()) as &str)?;
         e.buffers.command.clear();
         Ok(())
+    })
+    .and_then(|r| r)
+    .map_err(JsValue::from_str)
+}
+
+/// Select a target by parsing a JSON serialized SelectionTarget.
+///
+/// JSON format: `{"type":"Vertex","id":{"idx":1,"version":1}}`
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+/// - `InvalidTarget: <json_error>` if the JSON is malformed
+#[wasm_bindgen]
+pub fn select_target(handle: u32, target_json: &str) -> Result<(), JsValue> {
+    let target: SelectionTarget = serde_json::from_str(target_json)
+        .map_err(|e| JsValue::from_str(&format!("InvalidTarget: {e}")))?;
+
+    with_engine_mut(handle, |e| {
+        e.editor.model_mut().selection_mut().select(target);
+        Ok(())
+    })
+    .and_then(|r| r)
+    .map_err(JsValue::from_str)
+}
+
+/// Clear all selections on an engine.
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+#[wasm_bindgen]
+pub fn clear_selection(handle: u32) -> Result<(), JsValue> {
+    with_engine_mut(handle, |e| {
+        e.editor.model_mut().selection_mut().clear();
+        Ok(())
+    })
+    .and_then(|r| r)
+    .map_err(JsValue::from_str)
+}
+
+/// Get the current selection as a JSON array of SelectionTarget.
+///
+/// Returns a JSON array like:
+/// `[{"type":"Vertex","id":{"idx":1,"version":1}}]`
+///
+/// # Errors
+///
+/// - `InvalidHandle` if the engine handle is invalid
+#[wasm_bindgen]
+pub fn get_selection(handle: u32) -> Result<String, JsValue> {
+    with_engine(handle, |e| {
+        let selection = e.editor.model().selection();
+        let targets: Vec<_> = selection.all().cloned().collect();
+        serde_json::to_string(&targets)
+            .map_err(|e| Box::leak(format!("Serialize: {e}").into_boxed_str()) as &str)
     })
     .and_then(|r| r)
     .map_err(JsValue::from_str)

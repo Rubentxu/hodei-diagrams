@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::id::PageId;
 use crate::page::Page;
+use crate::selection::SelectionState;
 use crate::store::ModelStore;
 use crate::style::StyleMap;
 
@@ -98,6 +99,8 @@ pub struct DiagramModel {
     /// display. Reorder commands set this to swap pages. The slotmap
     /// identity of cells is unchanged; only the display order changes.
     pub page_order: Option<Vec<PageId>>,
+    /// Current engine-side selection state.
+    pub selection: SelectionState,
 }
 
 impl DiagramModel {
@@ -178,6 +181,16 @@ impl DiagramModel {
             }
             None => self.store.pages_with_ids().collect(),
         }
+    }
+
+    /// Borrow the current selection state.
+    pub fn selection(&self) -> &SelectionState {
+        &self.selection
+    }
+
+    /// Mutably borrow the current selection state.
+    pub fn selection_mut(&mut self) -> &mut SelectionState {
+        &mut self.selection
     }
 }
 
