@@ -43,6 +43,21 @@ fn eid_attr(id: &EdgeId) -> String {
     format!(" data-edge-id=\"{}\"", stable_id(id))
 }
 
+/// Serialize a `GroupId` to a `data-group-id` attribute string.
+///
+/// Format: `data-group-id="idx:version"` — compact, no quote-escaping needed
+/// in SVG attributes. Both fields are required for slotmap lookups.
+/// Skips emitting when the id is the default/placeholder (u32::MAX idx, version=1).
+fn gid_attr(id: &impl diagram_core::StableIdExt) -> String {
+    let (idx, version) = id.stable_id_parts();
+    if idx == u32::MAX && version == 1 {
+        // This is the slotmap null/placeholder key
+        String::new()
+    } else {
+        format!(" data-group-id=\"{}\"", stable_id(id))
+    }
+}
+
 /// Converts a `VisualElement` to an SVG string.
 ///
 /// Returns the SVG representation of the element, indented with 2 spaces per
@@ -811,12 +826,14 @@ fn group_to_svg(
             g.bounds.size.width,
             g.bounds.size.height,
         );
+        let gid = gid_attr(&g.id);
         (
-            format!("<g clip-path=\"url(#clip_{})\">", clip_id),
+            format!("<g clip-path=\"url(#clip_{})\"{gid}>", clip_id),
             format!("{}</g>", ind),
         )
     } else {
-        ("<g>".to_string(), format!("{}</g>", ind))
+        let gid = gid_attr(&g.id);
+        (format!("<g{gid}>"), format!("{}</g>", ind))
     };
 
     let mut result = String::new();
@@ -1803,5 +1820,77 @@ mod tests {
         let result = element_to_svg(&path, &mut clip, &mut defs, 0);
         assert!(result.contains(" L "));
         assert!(!result.contains(" C "));
+    }
+}
+
+#[cfg(test)]
+mod gid_attr_tests {
+    use super::*;
+    use diagram_core::StableIdExt;
+
+    #[test]
+    fn gid_attr_returns_empty_for_null_group_id() {
+        // GroupId::default() is the slotmap null key (idx=u32::MAX, version=1)
+        // which should NOT emit data-group-id.
+        // We verify gid_attr returns empty string for null key.
+        let null_gid = diagram_core::GroupId::default();
+        let (idx, version) = null_gid.stable_id_parts();
+        assert_eq!(idx, u32::MAX, "null key should have idx=u32::MAX");
+        assert_eq!(version, 1, "null key should have version=1");
+
+        // gid_attr should return empty for null key
+        let result = gid_attr(&null_gid);
+        assert!(
+            result.is_empty(),
+            "gid_attr should return empty for null key"
+        );
+    }
+
+    #[test]
+    fn group_to_svg_with_valid_id_emits_data_group_id() {
+        use diagram_core::geometry::{Point, Rect, Size};
+        use diagram_scene::ResolvedStyle;
+        use slotmap::SlotMap;
+
+        // Create a real GroupId by inserting into a slotmap
+        let mut sm: SlotMap<diagram_core::GroupId, ()> = SlotMap::with_key();
+        let real_gid = sm.insert(());
+
+        // Verify it's NOT the null key
+        let (idx, _version) = real_gid.stable_id_parts();
+        assert_ne!(idx, u32::MAX, "real GroupId should not be null key");
+
+        // Build a minimal GroupElement with the real GroupId
+        let group_elem = GroupElement {
+            id: real_gid,
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 100.0,
+                },
+            },
+            style: ResolvedStyle::default(),
+            children: vec![],
+            clip: false,
+            header: None,
+        };
+
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = group_to_svg(&group_elem, &mut clip, &mut defs, 0);
+
+        // Assert the output contains data-group-id="idx:version"
+        let expected_attr = format!("data-group-id=\"{}\"", stable_id(&real_gid));
+        assert!(
+            result.contains(&expected_attr),
+            "group_to_svg should emit data-group-id attribute, got:\n{}",
+            result
+        );
+        assert!(
+            result.contains("<g"),
+            "group_to_svg should emit a <g> element, got:\n{}",
+            result
+        );
     }
 }
