@@ -27,7 +27,8 @@ test.describe('Locked group selection', () => {
     await expect(page.locator('[data-testid="viewer"] svg')).toBeVisible();
 
     // Click on child v1 (inside the locked group)
-    const child = page.locator('[data-vertex-id]').first();
+    // g1 (locked group vertex) is .first(), v1 is .nth(1) — both have data-vertex-id
+    const child = page.locator('[data-vertex-id]').nth(1);
     const box = await child.boundingBox();
     if (!box) throw new Error('Child not visible');
     
