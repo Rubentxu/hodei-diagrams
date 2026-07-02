@@ -1,0 +1,21 @@
+<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <!-- Three shapes at IDENTICAL position = fully stacked z-order -->
+        <!-- id=bottom first in XML → behind -->
+        <mxCell id="bottom" vertex="1" value="Bottom">
+          <mxGeometry x="100" y="100" width="60" height="60" as="geometry"/>
+        </mxCell>
+        <!-- id=middle second → in middle -->
+        <mxCell id="middle" vertex="1" value="Middle">
+          <mxGeometry x="100" y="100" width="60" height="60" as="geometry"/>
+        </mxCell>
+        <!-- id=top last → on TOP of z-stack -->
+        <mxCell id="top" vertex="1" value="Top">
+          <mxGeometry x="100" y="100" width="60" height="60" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
