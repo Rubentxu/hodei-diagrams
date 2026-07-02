@@ -8,6 +8,24 @@ use crate::{DiagramModel, EdgeId, GroupId, VertexId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+/// A geometric hit-test result returned by the hit tester.
+#[derive(Debug, Clone, PartialEq)]
+pub enum HitResult {
+    /// A vertex was hit.
+    Vertex(VertexId),
+    /// A group was hit.
+    Group(GroupId),
+    /// An edge was hit.
+    Edge(EdgeId),
+}
+
+/// Trait for hit-testing geometric shapes at a point.
+/// Implemented by infrastructure layers (scene) that have access to geometry.
+pub trait HitTester: Send + Sync {
+    /// Returns all entities at the given point, ordered from top-most to bottom-most.
+    fn hit_test(&self, x: f64, y: f64) -> Vec<HitResult>;
+}
+
 /// A selected target in the diagram.
 //
 // INVARIANT: `SelectionTarget` must remain serde-transparent (untagged) so the
@@ -24,6 +42,16 @@ pub enum SelectionTarget {
     Edge(EdgeId),
     /// No target (sentinel for "no hit" or "clear selection").
     None,
+}
+
+impl From<HitResult> for SelectionTarget {
+    fn from(h: HitResult) -> Self {
+        match h {
+            HitResult::Vertex(id) => SelectionTarget::Vertex(id),
+            HitResult::Group(id) => SelectionTarget::Group(id),
+            HitResult::Edge(id) => SelectionTarget::Edge(id),
+        }
+    }
 }
 
 impl SelectionTarget {

@@ -29,6 +29,7 @@
 pub mod builder;
 pub mod element;
 pub mod error;
+pub mod hit_tester;
 pub mod resolver;
 pub mod scene;
 pub mod stencil_provider;

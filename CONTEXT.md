@@ -32,6 +32,14 @@ _Avoid_: JSON-heavy bridge, JS-owned model copies, chatty per-shape callbacks
 The rule that user intent enters the Diagram Engine as explicit commands and the engine responds with state changes and render diffs. It borrows the clarity of Redux-style unidirectional flow without forcing the internal engine to be a literal Redux store.
 _Avoid_: Direct mutation from arbitrary callers, Redux-as-framework, reducer-everywhere dogma
 
+**Typed Selection Target**:
+A selection identity that carries both the entity kind (`Vertex`, `Group`, `Edge`) and its stable id. Slotmap ids are only unique inside their own entity store, so selection code must not treat a raw `idx:version` pair as globally unique across vertices, groups, and edges.
+_Avoid_: Raw SlotmapId as selection target, idx:version as global identity, inferring entity kind from DOM or scene traversal order
+
+**Selection Semantics**:
+The rules that decide which diagram entity becomes selected from user intent, including group drill-down, Alt-bypass behavior, z-stack cycling, and locked-shape handling. Selection Semantics belong to the Diagram Engine; the Web Shell forwards input intent and renders the engine's selected targets.
+_Avoid_: Web Shell-owned selection behavior, DOM traversal as behavioral source of truth, renderer attribute collisions defining selection outcomes
+
 **Render Backend**:
 A pluggable renderer that consumes scene data produced by the Diagram Engine. Backend choice affects performance and ergonomics, but it must not redefine diagram behavior or file semantics.
 _Avoid_: Renderer-owned behavior, UI-driven rendering rules

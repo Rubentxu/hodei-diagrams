@@ -1293,3 +1293,34 @@ pub fn get_selection(handle: u32) -> Result<String, JsValue> {
     .and_then(|r| r)
     .map_err(JsValue::from_str)
 }
+
+/// Resolve a click at (x, y) with keyboard modifiers into a SelectionTarget.
+///
+/// This is a stub: it requires access to the current scene which lives in
+/// diagram-scene and is not directly accessible from the WASM engine handle.
+/// Slice 3 will wire in the actual scene hit-testing via the engine's scene
+/// projection.
+///
+/// # Arguments
+/// - `x`: X coordinate in page space
+/// - `y`: Y coordinate in page space
+/// - `alt`: Alt key pressed (bypass group — SEL-016)
+/// - `shift`: Shift key pressed
+/// - `ctrl`: Ctrl key pressed
+/// - `meta`: Meta (Command on Mac) key pressed
+///
+/// Returns a JSON `SelectionTarget` object, or `{"type":"None"}` for the stub.
+#[wasm_bindgen]
+pub fn resolve_selection(
+    _handle: u32,
+    _x: f64,
+    _y: f64,
+    _alt: bool,
+    _shift: bool,
+    _ctrl: bool,
+    _meta: bool,
+) -> Result<String, JsValue> {
+    // Stub: returns None until Slice 3 wires in the scene
+    let target = SelectionTarget::None;
+    serde_json::to_string(&target).map_err(|e| JsValue::from_str(&format!("Serialize: {e}")))
+}

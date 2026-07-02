@@ -68,6 +68,92 @@ pub enum VisualElement {
     Image(ImageElement),
 }
 
+use diagram_core::selection::HitResult;
+
+impl VisualElement {
+    /// Returns the `HitResult` for this element if it has a selection ID.
+    ///
+    /// Text and path elements do not participate in hit-testing.
+    pub fn selection_id(&self) -> Option<HitResult> {
+        match self {
+            VisualElement::Rect(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::RoundedRect(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Ellipse(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Diamond(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Triangle(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Hexagon(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Cylinder(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Cloud(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Parallelogram(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Trapezoid(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Polygon(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Text(_) => None,
+            VisualElement::Line(e) => Some(HitResult::Edge(e.id)),
+            VisualElement::Path(e) => Some(HitResult::Edge(e.id)),
+            VisualElement::Group(e) => Some(HitResult::Group(e.id)),
+            VisualElement::Stencil(e) => Some(HitResult::Vertex(e.id)),
+            VisualElement::Image(e) => Some(HitResult::Vertex(e.id)),
+        }
+    }
+
+    /// Returns the bounding rect for this element.
+    pub fn bounds(&self) -> Option<diagram_core::geometry::Rect> {
+        use diagram_core::geometry::{Point, Rect, Size};
+        match self {
+            VisualElement::Rect(e) => Some(e.bounds),
+            VisualElement::RoundedRect(e) => Some(e.bounds),
+            VisualElement::Ellipse(e) => Some(e.bounds),
+            VisualElement::Diamond(e) => Some(e.bounds),
+            VisualElement::Triangle(e) => Some(e.bounds),
+            VisualElement::Hexagon(e) => Some(e.bounds),
+            VisualElement::Cylinder(e) => Some(e.bounds),
+            VisualElement::Cloud(e) => Some(e.bounds),
+            VisualElement::Parallelogram(e) => Some(e.bounds),
+            VisualElement::Trapezoid(e) => Some(e.bounds),
+            VisualElement::Polygon(e) => Some(e.bounds),
+            // Text is a point label — use anchor as degenerate 1x1 box
+            VisualElement::Text(e) => Some(Rect {
+                origin: e.anchor,
+                size: Size {
+                    width: 1.0,
+                    height: 1.0,
+                },
+            }),
+            // Line: bounding box of from/to points
+            VisualElement::Line(e) => Some(Rect {
+                origin: Point {
+                    x: e.from.x.min(e.to.x),
+                    y: e.from.y.min(e.to.y),
+                },
+                size: Size {
+                    width: (e.from.x - e.to.x).abs().max(1.0),
+                    height: (e.from.y - e.to.y).abs().max(1.0),
+                },
+            }),
+            // Path: bounding box of all points
+            VisualElement::Path(e) => {
+                if e.points.is_empty() {
+                    return None;
+                }
+                let min_x = e.points.iter().map(|p| p.x).fold(f64::MAX, f64::min);
+                let min_y = e.points.iter().map(|p| p.y).fold(f64::MAX, f64::min);
+                let max_x = e.points.iter().map(|p| p.x).fold(f64::MIN, f64::max);
+                let max_y = e.points.iter().map(|p| p.y).fold(f64::MIN, f64::max);
+                Some(Rect {
+                    origin: Point { x: min_x, y: min_y },
+                    size: Size {
+                        width: (max_x - min_x).max(1.0),
+                        height: (max_y - min_y).max(1.0),
+                    },
+                })
+            }
+            VisualElement::Group(e) => Some(e.bounds),
+            VisualElement::Stencil(e) => Some(e.bounds),
+            VisualElement::Image(e) => Some(e.bounds),
+        }
+    }
+}
+
 /// A draw.io stencil element — resolved path commands embedded at scene build.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StencilElement {
