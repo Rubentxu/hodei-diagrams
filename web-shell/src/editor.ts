@@ -2355,29 +2355,94 @@ export class Editor {
   }
 
   /**
+   * Find the shape variant kind ('Group', 'Rect', etc.) for a given SlotmapId.
+   * Searches top-level display list elements AND Group children (which contain
+   * child vertices). Returns the kind if found, or null if not in the scene cache.
+   */
+  #findShapeKey(id: SlotmapId): string | null {
+    for (const page of this.#sceneCache) {
+      for (const elem of page.display_list) {
+        const found = this.#findShapeKeyInElement(elem, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Helper for #findShapeKey: search within a single element, including
+   * the children of Group elements. The element has a 'kind' property
+   * ('Rect', 'Group', etc.) and shape data with an 'id' field.
+   */
+  #findShapeKeyInElement(elem: Record<string, unknown>, id: SlotmapId): string | null {
+    if (!elem) return null;
+    // The 'kind' property tells us if this is 'Rect', 'Group', etc.
+    const kind = elem['kind'];
+    if (typeof kind === 'string') {
+      // Check if this element's ID matches
+      const idField = elem['id'];
+      if (idField && typeof idField === 'object') {
+        const idObj = idField as { idx?: unknown; version?: unknown };
+        if (typeof idObj.idx === 'number' && typeof idObj.version === 'number') {
+          if (idObj.idx === id.idx && idObj.version === id.version) {
+            return kind; // Found! Return 'Rect', 'Group', etc.
+          }
+        }
+      }
+      // If this is a Group, recurse into children
+      if (kind === 'Group') {
+        const children = elem['children'];
+        if (Array.isArray(children)) {
+          for (const child of children) {
+            if (typeof child !== 'object' || child === null) continue;
+            const found = this.#findShapeKeyInElement(child as Record<string, unknown>, id);
+            if (found) return found;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Apply a new selection set, update CSS classes, and notify listeners.
    * @param next New selection set
    */
   #applySelection(next: Set<SlotmapId>): void {
     // Remove .selected from all elements (vertices and groups)
-    this.#viewer.querySelectorAll('[data-vertex-id]').forEach((el) => {
-      el.classList.remove('selected');
-    });
-    this.#viewer.querySelectorAll('[data-group-id]').forEach((el) => {
+    this.#viewer.querySelectorAll('.selected').forEach((el) => {
       el.classList.remove('selected');
     });
     this.#selection = next;
-    // Add .selected to all selected elements (vertices and groups)
+    if (this.#selection.size === 0) {
+      this.#notifySelectionChange();
+      return;
+    }
+    // Add .selected only to the correct element for each ID.
+    // First try using #findShapeKey to determine the type from scene cache.
+    // If that returns null (scene cache not yet populated), fall back to
+    // querying both attributes and selecting whichever exists — this
+    // preserves original behavior when scene cache is unavailable.
     for (const id of this.#selection) {
-      const vertexSelector = `[data-vertex-id="${id.idx}:${id.version}"]`;
-      const groupSelector = `[data-group-id="${id.idx}:${id.version}"]`;
-      const vertexEl = this.#viewer.querySelector(vertexSelector);
-      const groupEl = this.#viewer.querySelector(groupSelector);
-      if (vertexEl) {
-        vertexEl.classList.add('selected');
-      }
-      if (groupEl) {
-        groupEl.classList.add('selected');
+      const shapeKey = this.#findShapeKey(id);
+      const idStr = `${id.idx}:${id.version}`;
+      if (shapeKey) {
+        // Scene cache hit: use the determined type
+        const attrName = shapeKey === 'Group' ? 'data-group-id' : 'data-vertex-id';
+        const el = this.#viewer.querySelector(`[${attrName}="${idStr}"]`);
+        if (el) {
+          el.classList.add('selected');
+        }
+      } else {
+        // Scene cache miss: query both attributes (original behavior)
+        const vertexEl = this.#viewer.querySelector(`[data-vertex-id="${idStr}"]`);
+        const groupEl = this.#viewer.querySelector(`[data-group-id="${idStr}"]`);
+        if (vertexEl) {
+          vertexEl.classList.add('selected');
+        }
+        if (groupEl) {
+          groupEl.classList.add('selected');
+        }
       }
     }
     // Notify selection change
@@ -2417,10 +2482,13 @@ export class Editor {
       this.#notifySelectionChange();
     }
 
-    // Re-apply CSS class to DOM elements
+    // Re-apply CSS class to DOM elements using typed queries
     for (const id of this.#selection) {
-      const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
-      const el = this.#viewer.querySelector(selector);
+      const shapeKey = this.#findShapeKey(id);
+      if (!shapeKey) continue;
+      const idStr = `${id.idx}:${id.version}`;
+      const attrName = shapeKey === 'Group' ? 'data-group-id' : 'data-vertex-id';
+      const el = this.#viewer.querySelector(`[${attrName}="${idStr}"]`);
       if (el) {
         el.classList.add('selected');
       }
