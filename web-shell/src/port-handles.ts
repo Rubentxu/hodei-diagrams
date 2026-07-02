@@ -37,6 +37,12 @@ interface DragHandle {
   startMouseY: number;
 }
 
+/** State for Shift-axis-constrained drag. */
+interface ShiftDragState {
+  axis: 'H' | 'V' | null;
+  locked: boolean;
+}
+
 /**
  * Port handle overlay: renders draggable anchor handles on selected edges.
  *
@@ -51,6 +57,7 @@ export class PortHandlesOverlay {
   readonly #sceneProvider: () => ScenePage[];
   readonly #session: DiagramEngineSession;
   #dragHandle: DragHandle | null = null;
+  #shiftDragState: ShiftDragState = { axis: null, locked: false };
   #onMoveBound: (_e: PointerEvent) => void;
   #onUpBound: (_e: PointerEvent) => void;
 
@@ -167,6 +174,8 @@ export class PortHandlesOverlay {
       startMouseY: clientY,
     };
 
+    this.#shiftDragState = { axis: null, locked: false };
+
     handleEl.style.cursor = 'grabbing';
     document.addEventListener('pointermove', this.#onMoveBound);
     document.addEventListener('pointerup', this.#onUpBound);
@@ -178,13 +187,41 @@ export class PortHandlesOverlay {
   #onDragMove(e: PointerEvent): void {
     if (!this.#dragHandle) return;
 
-    const { shapeBounds, handleEl } = this.#dragHandle;
+    const { shapeBounds, handleEl, startMouseX, startMouseY } = this.#dragHandle;
 
     // Get current document position from client
     const rect = this.#svgLayer.getBoundingClientRect();
     const zoom = this.#getZoom();
-    const docX = (e.clientX - rect.left) / zoom;
-    const docY = (e.clientY - rect.top) / zoom;
+    let docX = (e.clientX - rect.left) / zoom;
+    let docY = (e.clientY - rect.top) / zoom;
+
+    // Apply Shift-axis constraint: after 3px, lock to dominant axis (H or V)
+    if (e.shiftKey) {
+      const dx = e.clientX - startMouseX;
+      const dy = e.clientY - startMouseY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      if (!this.#shiftDragState.locked) {
+        const THRESHOLD = 3;
+        if (absDx > THRESHOLD || absDy > THRESHOLD) {
+          this.#shiftDragState.axis = absDx >= absDy ? 'H' : 'V';
+          this.#shiftDragState.locked = true;
+        }
+      }
+
+      if (this.#shiftDragState.locked) {
+        if (this.#shiftDragState.axis === 'H') {
+          // Lock vertical: keep docY at start position
+          const startDocY = (startMouseY - rect.top) / zoom;
+          docY = this.#projectOntoPerimeter(shapeBounds, docX, startDocY).y;
+        } else {
+          // Lock horizontal: keep docX at start position
+          const startDocX = (startMouseX - rect.left) / zoom;
+          docX = this.#projectOntoPerimeter(shapeBounds, startDocX, docY).x;
+        }
+      }
+    }
 
     // Compute the perimeter anchor position (clamped to shape bounds)
     const anchorPos = this.#projectOntoPerimeter(shapeBounds, docX, docY);
@@ -241,6 +278,7 @@ export class PortHandlesOverlay {
     }
 
     this.#dragHandle = null;
+    this.#shiftDragState = { axis: null, locked: false };
   }
 
   /**

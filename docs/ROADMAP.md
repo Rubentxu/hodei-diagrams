@@ -336,9 +336,9 @@ IP-A through IP-F are complete. The workflow catalog (`docs/drawio-user-interact
 
 | Área | Gaps | Ejemplos clave | Prioridad |
 |------|------|----------------|-----------|
-| **Canvas nav** | 7 | Space-drag, Home, Shift-wheel, Ctrl-wheel, Outline navigation | P0 |
+| **Canvas nav** | 4 | Shift-wheel, Ctrl-wheel, Arrow-key pan (no selection), Outline nav | P0 |
 | **Shape library** | 10 | Double-click chooser, Shift/Alt modifiers, Replace shape, Insert+connect | P1 |
-| **Selection** | 9 | Alt+drag, Alt+click z-stack, Tab cycle, Ctrl+E/I, drill-down | P0 |
+| **Selection** | 6 | Shift+Alt modifiers, proportional resize, drill-down | P0 |
 | **Move/resize** | 8 | Shift nudge, Alt ignore-grid, Shift proportional, Ctrl+Shift+arrow | P1 |
 | **Connectors** | 14 | Shift fixed-point, Alt connect-anywhere, reverse, flip, label drag | P0 |
 | **Groups** | 13 | Drill-down, collapse/expand, lock, swimlane workflows | P1 |
