@@ -3430,15 +3430,25 @@ export class Editor {
 
     // IP-C: Mode-driven anchor selection
     // - 'floating' (default): auto anchors
-    // - 'fixed-only': both anchors fixed to shape centers
-    // - 'anywhere': both anchors floating (default behavior, explicit)
-    let sourceAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } = { kind: 'auto' };
-    let targetAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } = { kind: 'auto' };
+    // - 'fixed-only': both anchors fixed to Center port
+    // - 'anywhere': both anchors normalized at cursor perimeter positions
+    let sourceAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } | { kind: 'normalized'; nx: number; ny: number } = { kind: 'auto' };
+    let targetAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } | { kind: 'normalized'; nx: number; ny: number } = { kind: 'auto' };
     if (connectMode === 'fixed-only') {
-      // For 'fixed-only', we'd need to know the exact port index clicked.
-      // For now, default to 'Center' port on both ends (still a fixed anchor).
       sourceAnchor = { kind: 'fixed', port: 'Center' };
       targetAnchor = { kind: 'fixed', port: 'Center' };
+    } else if (connectMode === 'anywhere') {
+      // EDGE-003: Alt held → normalized anchor at cursor position on perimeter
+      const sourceBounds = this.#findOriginalGeometry(sourceId);
+      const targetBounds = this.#findOriginalGeometry(hit);
+      if (sourceBounds && targetBounds) {
+        const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
+        const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
+        const sourceNorm = this.#computePerimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
+        const targetNorm = this.#computePerimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
+        sourceAnchor = { kind: 'normalized', nx: sourceNorm.nx, ny: sourceNorm.ny };
+        targetAnchor = { kind: 'normalized', nx: targetNorm.nx, ny: targetNorm.ny };
+      }
     }
 
     const r = this.#session.connectVerticesAnchored(
@@ -3557,7 +3567,9 @@ export class Editor {
       const targetNorm = this.#computePerimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
 
       const sourceKind = this.#classifyAnchorKind(sourceNorm.nx, sourceNorm.ny);
-      const targetKind = this.#classifyAnchorKind(targetNorm.nx, targetNorm.ny);
+      // EDGE-003: Alt held → 'anywhere' mode forces normalized anchor at cursor position
+      const isAnywhere = this.#connectState!.mode === 'anywhere';
+      const targetKind = isAnywhere ? 'normalized' : this.#classifyAnchorKind(targetNorm.nx, targetNorm.ny);
 
       const sourceAnchor =
         sourceKind === 'normalized'
