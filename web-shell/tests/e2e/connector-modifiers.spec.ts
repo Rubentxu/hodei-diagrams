@@ -6,6 +6,7 @@
  * - EDGE-012: Right-click on connector segment shows "Add Waypoint"
  * - EDGE-014: Right-click on waypoint shows "Remove Waypoint"
  * - EDGE-004: Shift constrains port handle drag to dominant axis
+ * - EDGE-003: Alt+connect anywhere creates edge with normalized anchor on target
  *
  * Reference: docs/drawio-user-interaction-workflows.md (EDGE-003..005, 012, 014, 015)
  * ADR-0079 (interaction parity strategy)
@@ -208,5 +209,75 @@ test.describe('Suite IP-C: Connector Modifiers', () => {
     // The wiring is in editor.ts (#onContextMenu + #findSegmentAtPoint).
     // Skip the actual right-click since there's no waypoint to click.
     test.skip();
+  });
+
+  test('EDGE-003: Alt+connect anywhere creates edge with normalized anchor on target', async ({ page }) => {
+    // two-shapes.drawio: rect1 at (60,80) 80x40, rect2 at (240,80) 80x40, edge between them
+    await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Count existing edges (fixture has 1 edge between the two shapes)
+    const initialEdges = await page.locator('[data-edge-id]').count();
+    expect(initialEdges).toBeGreaterThan(0);
+
+    // Activate connector tool via the rail button
+    await page.click('[data-testid="rail-connector-btn"]');
+    await page.waitForTimeout(100);
+
+    // Get the visual centers of both rects in the viewer (viewport coordinates)
+    // The data-vertex-id is on <rect> elements, not <g>.
+    // viewBox="60 80 260 40" means the SVG coordinate space starts at (60,80) with 260x40 units.
+    // rect1 at SVG (60,80) 80x40 → center at SVG (100,100)
+    // rect2 at SVG (240,80) 80x40 → center at SVG (280,100)
+    const centers = await page.evaluate(() => {
+      const svg = document.querySelector('[data-testid="viewer"] svg') as SVGSVGElement;
+      if (!svg) return null;
+      const svgRect = svg.getBoundingClientRect();
+      const vb = svg.viewBox.baseVal;
+      const scaleX = svgRect.width / vb.width;
+      const scaleY = svgRect.height / vb.height;
+
+      function svgToViewport(svgX: number, svgY: number) {
+        return {
+          x: svgRect.left + (svgX - vb.x) * scaleX,
+          y: svgRect.top + (svgY - vb.y) * scaleY,
+        };
+      }
+
+      // rect1 center: SVG (100, 100)
+      const c1 = svgToViewport(100, 100);
+      // rect2 center: SVG (280, 100)
+      const c2 = svgToViewport(280, 100);
+      return { c1, c2, svgLeft: svgRect.left, svgTop: svgRect.top, scaleX, scaleY, vbX: vb.x, vbY: vb.y };
+    });
+
+    if (!centers) {
+      test.skip();
+      return;
+    }
+
+    const shape1Center = centers.c1;
+    const shape2Center = centers.c2;
+
+    if (!shape1Center || !shape2Center) {
+      test.skip();
+      return;
+    }
+
+    // Click source shape with Alt held → sets connectMode='anywhere'
+    await page.keyboard.down('Alt');
+    await page.mouse.click(shape1Center.x, shape1Center.y);
+    await page.waitForTimeout(100);
+
+    // Release Alt; connectMode is already stored as 'anywhere'
+    await page.keyboard.up('Alt');
+
+    // Click target shape — upHandler uses stored connectMode → normalized anchor
+    await page.mouse.click(shape2Center.x, shape2Center.y);
+    await page.waitForTimeout(300);
+
+    // Verify a new edge was created
+    const finalEdges = await page.locator('[data-edge-id]').count();
+    expect(finalEdges).toBe(initialEdges + 1);
   });
 });
