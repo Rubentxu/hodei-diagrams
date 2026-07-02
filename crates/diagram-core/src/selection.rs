@@ -4,9 +4,27 @@
 //! (vertices, groups, edges) are currently selected. The WASM boundary
 //! exposes this state and allows mutation via commands.
 
-use crate::{EdgeId, GroupId, VertexId};
+use crate::{DiagramModel, EdgeId, GroupId, VertexId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+
+/// A geometric hit-test result returned by the hit tester.
+#[derive(Debug, Clone, PartialEq)]
+pub enum HitResult {
+    /// A vertex was hit.
+    Vertex(VertexId),
+    /// A group was hit.
+    Group(GroupId),
+    /// An edge was hit.
+    Edge(EdgeId),
+}
+
+/// Trait for hit-testing geometric shapes at a point.
+/// Implemented by infrastructure layers (scene) that have access to geometry.
+pub trait HitTester: Send + Sync {
+    /// Returns all entities at the given point, ordered from top-most to bottom-most.
+    fn hit_test(&self, x: f64, y: f64) -> Vec<HitResult>;
+}
 
 /// A selected target in the diagram.
 //
@@ -22,17 +40,33 @@ pub enum SelectionTarget {
     Group(GroupId),
     /// An edge is selected.
     Edge(EdgeId),
+    /// No target (sentinel for "no hit" or "clear selection").
+    None,
+}
+
+impl From<HitResult> for SelectionTarget {
+    fn from(h: HitResult) -> Self {
+        match h {
+            HitResult::Vertex(id) => SelectionTarget::Vertex(id),
+            HitResult::Group(id) => SelectionTarget::Group(id),
+            HitResult::Edge(id) => SelectionTarget::Edge(id),
+        }
+    }
 }
 
 impl SelectionTarget {
     /// Returns `true` if this target is locked.
     ///
-    /// Currently a stub — real implementation requires access to the model store.
     /// Locked targets cannot be selected or manipulated by the user.
-    pub fn is_locked(&self) -> bool {
-        // TODO: Delegate to model store once selection lives in DiagramModel.
-        // For now, no target is locked.
-        false
+    pub fn is_locked(&self, model: &DiagramModel) -> bool {
+        match self {
+            SelectionTarget::Vertex(id) => {
+                model.store.vertex(*id).map(|v| v.locked).unwrap_or(false)
+            }
+            SelectionTarget::Group(id) => model.store.group(*id).map(|g| g.locked).unwrap_or(false),
+            SelectionTarget::Edge(id) => model.store.edge(*id).map(|e| e.locked).unwrap_or(false),
+            SelectionTarget::None => false,
+        }
     }
 }
 
@@ -88,6 +122,110 @@ impl SelectionState {
     }
 }
 
+/// A stack of selection targets ordered from top-most (visible) to bottom-most.
+/// Produced by hit-testing at a given point.
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct HitStack(Vec<SelectionTarget>);
+
+impl HitStack {
+    /// Create a new `HitStack` from a vector of targets (topmost = index 0).
+    pub fn new(targets: Vec<SelectionTarget>) -> Self {
+        Self(targets)
+    }
+
+    /// Returns the topmost (first) target, if any.
+    pub fn topmost(&self) -> Option<&SelectionTarget> {
+        self.0.first()
+    }
+
+    /// Returns the target directly under the given target in the stack.
+    pub fn under(&self, target: &SelectionTarget) -> Option<&SelectionTarget> {
+        let idx = self.0.iter().position(|t| t == target)?;
+        self.0.get(idx + 1)
+    }
+
+    /// Returns all children of the given group target.
+    /// Note: Scene graph traversal is needed to implement this fully.
+    pub fn children_of(&self, group: &SelectionTarget) -> Vec<&SelectionTarget> {
+        // TODO: Scene graph traversal needed — requires access to Scene/VisualElement
+        // from diagram-scene crate. Currently returns empty Vec as placeholder.
+        let _ = group;
+        Vec::new()
+    }
+}
+
+/// Input modifiers from the Web Shell.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SelectionModifiers {
+    /// Alt key pressed.
+    pub alt: bool,
+    /// Shift key pressed.
+    pub shift: bool,
+    /// Ctrl key pressed.
+    pub ctrl: bool,
+    /// Meta (Command on Mac) key pressed.
+    pub meta: bool,
+}
+
+/// Check if a target is locked according to the model.
+///
+/// Locked targets should be skipped during selection resolution.
+pub fn is_target_locked(target: &SelectionTarget, model: &DiagramModel) -> bool {
+    target.is_locked(model)
+}
+
+/// Compute the hit stack at a given point by querying the scene.
+///
+/// This function lives in `diagram-core` but requires `diagram-scene`'s `Scene`
+/// and `VisualElement` types. A direct import would create a circular dependency
+/// (diagram-scene depends on diagram-core). Therefore this is a stub that will
+/// be implemented in a crate that can depend on both, or via a trait abstraction
+/// in a future slice.
+///
+/// SeeSlice 3 for proper scene integration.
+pub fn compute_hit_stack(_point: (f64, f64), _scene: &impl SceneAccess) -> HitStack {
+    // TODO: Implement scene traversal using VisualElement::contains_point
+    // Requires Scene type from diagram-scene crate.
+    HitStack::default()
+}
+
+/// Trait to abstract scene access for hit-testing.
+///
+/// Used to avoid a direct dependency on diagram-scene while allowing
+/// hit-testing to be implemented once the scene types are available.
+pub trait SceneAccess {
+    /// Returns all targets at the given point, ordered topmost-first.
+    fn targets_at_point(&self, point: (f64, f64)) -> Vec<SelectionTarget>;
+}
+
+/// Resolve the intended selection target from a point, scene, current selection, and modifiers.
+///
+/// This is the ENGINE'S selection semantics resolver. It interprets click + modifiers
+/// to determine what should be selected.
+///
+/// # Arguments
+/// * `point` - The (x, y) coordinate of the click
+/// * `scene` - Access to the scene for hit-testing
+/// * `current_selection` - The current selection state
+/// * `modifiers` - Keyboard modifiers from the Web Shell
+///
+/// # Returns
+/// The `SelectionTarget` to select, or `SelectionTarget::None` if no hit.
+pub fn resolve_selection_intent(
+    _point: (f64, f64),
+    _scene: &impl SceneAccess,
+    _current_selection: &SelectionState,
+    _modifiers: &SelectionModifiers,
+) -> SelectionTarget {
+    // TODO: Implement full selection semantics:
+    // - Plain click: if topmost is a group, select it
+    // - Second click on selected group: drill down to child
+    // - Alt+click: bypass group, select topmost child
+    // - Skip locked targets
+    // Requires scene traversal from diagram-scene
+    SelectionTarget::None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,7 +246,9 @@ mod tests {
     fn selection_target_variant_vertex() {
         let target = SelectionTarget::Vertex(default_vid());
         assert!(matches!(target, SelectionTarget::Vertex(_)));
-        assert!(!target.is_locked());
+        // Vertex not in model store → locked check returns false
+        let model = DiagramModel::new();
+        assert!(!target.is_locked(&model));
     }
 
     #[test]
@@ -225,5 +365,113 @@ mod tests {
 
         state.clear();
         assert_eq!(state.len(), 0);
+    }
+
+    // ─── HitStack tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn hit_stack_topmost_returns_first() {
+        let vid = default_vid();
+        let gid = default_gid();
+        let targets = vec![SelectionTarget::Vertex(vid), SelectionTarget::Group(gid)];
+        let stack = HitStack::new(targets);
+
+        assert_eq!(stack.topmost(), Some(&SelectionTarget::Vertex(vid)));
+    }
+
+    #[test]
+    fn hit_stack_under_returns_next() {
+        let vid = default_vid();
+        let gid = default_gid();
+        let targets = vec![SelectionTarget::Vertex(vid), SelectionTarget::Group(gid)];
+        let stack = HitStack::new(targets);
+
+        assert_eq!(
+            stack.under(&SelectionTarget::Vertex(vid)),
+            Some(&SelectionTarget::Group(gid))
+        );
+    }
+
+    #[test]
+    fn hit_stack_under_none_if_last() {
+        let gid = default_gid();
+        let targets = vec![SelectionTarget::Group(gid)];
+        let stack = HitStack::new(targets);
+
+        assert!(stack.under(&SelectionTarget::Group(gid)).is_none());
+    }
+
+    #[test]
+    fn hit_stack_children_of_group_stub() {
+        // children_of currently returns empty Vec (stub implementation)
+        let gid = default_gid();
+        let targets = vec![SelectionTarget::Group(gid)];
+        let stack = HitStack::new(targets);
+
+        let children = stack.children_of(&SelectionTarget::Group(gid));
+        assert!(children.is_empty());
+    }
+
+    #[test]
+    fn hit_stack_empty_returns_none() {
+        let stack = HitStack::new(Vec::new());
+        assert!(stack.topmost().is_none());
+    }
+
+    // ─── SelectionModifiers tests ───────────────────────────────────────────────
+
+    #[test]
+    fn selection_modifiers_default_is_false() {
+        let mods = SelectionModifiers::default();
+        assert!(!mods.alt);
+        assert!(!mods.shift);
+        assert!(!mods.ctrl);
+        assert!(!mods.meta);
+    }
+
+    #[test]
+    fn selection_modifiers_with_alt() {
+        let mods = SelectionModifiers {
+            alt: true,
+            ..Default::default()
+        };
+        assert!(mods.alt);
+        assert!(!mods.shift);
+    }
+
+    // ─── is_target_locked tests ────────────────────────────────────────────────
+
+    #[test]
+    fn is_target_locked_vertex_not_in_store() {
+        let model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(default_vid());
+        // Vertex not in model → false
+        assert!(!is_target_locked(&target, &model));
+    }
+
+    #[test]
+    fn is_target_locked_none_returns_false() {
+        let model = DiagramModel::new();
+        let target = SelectionTarget::None;
+        assert!(!is_target_locked(&target, &model));
+    }
+
+    // ─── resolve_selection_intent stub tests ──────────────────────────────────
+
+    #[test]
+    fn resolve_selection_intent_stub_returns_none() {
+        struct EmptyScene;
+        impl SceneAccess for EmptyScene {
+            fn targets_at_point(&self, _: (f64, f64)) -> Vec<SelectionTarget> {
+                Vec::new()
+            }
+        }
+
+        let scene = EmptyScene;
+        let selection = SelectionState::default();
+        let modifiers = SelectionModifiers::default();
+
+        let result = resolve_selection_intent((0.0, 0.0), &scene, &selection, &modifiers);
+        assert_eq!(result, SelectionTarget::None);
     }
 }

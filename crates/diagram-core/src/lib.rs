@@ -37,7 +37,10 @@ pub use layer::Layer;
 pub use model::DiagramModel;
 pub use model::Metadata;
 pub use page::Page;
-pub use selection::{SelectionState, SelectionTarget};
+pub use selection::{
+    HitResult, HitStack, HitTester, SceneAccess, SelectionModifiers, SelectionState,
+    SelectionTarget, compute_hit_stack, is_target_locked, resolve_selection_intent,
+};
 pub use store::ModelStore;
 pub use style::{StyleMap, StyleValue};
 pub use vertex::Vertex;
