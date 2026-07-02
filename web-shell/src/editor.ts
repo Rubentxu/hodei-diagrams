@@ -2666,6 +2666,22 @@ export class Editor {
       return;
     }
 
+    // C1: Plain click on group → select the group directly (SEL-015 / R1)
+    // Intercept [data-group-id] before hitTest so groups are selectable on plain click
+    if (!e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      const groupEl = (e.target as Element)?.closest('[data-group-id]');
+      if (groupEl) {
+        const groupIdAttr = groupEl.getAttribute('data-group-id');
+        if (groupIdAttr) {
+          const groupId = parseSlotmapAttr(groupIdAttr);
+          if (groupId) {
+            this.selectOnly(groupId);
+            return;
+          }
+        }
+      }
+    }
+
     const hit = this.#hitTest(e);
 
     if (!hit) {
@@ -2820,7 +2836,7 @@ export class Editor {
     }
   }
 
-  #onPointerUp(_e: PointerEvent): void {
+  #onPointerUp(e: PointerEvent): void {
     // Clean up listeners first
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
@@ -2831,7 +2847,7 @@ export class Editor {
 
     // Handle GROUP_DRILL_DOWN commit on mouseup
     if (this.#drillDown) {
-      this.#commitDrillDown(this.#drillDown);
+      this.#commitDrillDown(this.#drillDown, e);
       return;
     }
 
@@ -3079,12 +3095,28 @@ export class Editor {
   }
 
   /**
-   * Commit a group drill-down by selecting the group element and transitioning
-   * to the ONE state.
+   * Commit a group drill-down by selecting the topmost child at the click point,
+   * or the group itself if no child is hit. (R3 / SEL-016)
    */
-  #commitDrillDown(state: { groupId: SlotmapId; groupElement: Element }): void {
+  #commitDrillDown(
+    state: { groupId: SlotmapId; groupElement: Element },
+    e: PointerEvent,
+  ): void {
     this.#drillDown = null;
-    // Transition to ONE state with the group element as the sole selection
+    // Find the topmost child element at the click point (C2 fix)
+    const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY);
+    const childEl = elementsAtPoint.find((el) => el.hasAttribute('data-vertex-id'));
+    if (childEl) {
+      const childIdAttr = childEl.getAttribute('data-vertex-id');
+      if (childIdAttr) {
+        const childId = parseSlotmapAttr(childIdAttr);
+        if (childId) {
+          this.#applySelection(new Set([childId]));
+          return;
+        }
+      }
+    }
+    // Fallback: no child hit → select the group itself
     this.#applySelection(new Set([state.groupId]));
   }
 
