@@ -166,6 +166,10 @@ export class Editor {
     return this.#textEdit !== null;
   }
 
+  // ─── Group Drill-Down FSM ────────────────────────────────────────────────
+  /** Tracks the pending group drill-down state entered via Alt+click on a group. */
+  #drillDown: { groupId: SlotmapId; groupElement: Element } | null = null;
+
   /** Set zoom control callbacks for keyboard shortcuts. */
   setZoomCallbacks(opts: {
     zoomIn?: () => void;
@@ -2701,7 +2705,26 @@ export class Editor {
 
     // Hit a shape
     if (e.altKey && !e.shiftKey) {
-      // Alt+click on shape: select underneath in z-stack (SEL-014)
+      // GROUP_DRILL_DOWN: Alt+click on a group element enters drill-down state
+      const groupEl = (e.target as Element)?.closest('[data-group-id]');
+      if (groupEl) {
+        const groupIdAttr = groupEl.getAttribute('data-group-id');
+        if (groupIdAttr) {
+          const groupId = parseSlotmapAttr(groupIdAttr);
+          if (groupId) {
+            if (this.isShapeLocked(groupId)) {
+              // Locked group: treat as deselect (clear selection)
+              this.clearSelection();
+            } else {
+              // Not locked: enter GROUP_DRILL_DOWN state
+              this.#drillDown = { groupId, groupElement: groupEl };
+            }
+            return;
+          }
+        }
+      }
+      // No data-group-id: fall through to existing z-cycle logic (SEL-014)
+      // Alt+click on shape: select underneath in z-stack
       // Find all shapes at the click point, cycle to the next-lower one
       const docPos = this.#clientToDoc(e.clientX, e.clientY);
       const stackAtPoint = this.#getIdsAtPoint(docPos.x, docPos.y);
@@ -2797,6 +2820,12 @@ export class Editor {
 
     // Remove snap guides
     this.#clearGuides();
+
+    // Handle GROUP_DRILL_DOWN commit on mouseup
+    if (this.#drillDown) {
+      this.#commitDrillDown(this.#drillDown);
+      return;
+    }
 
     // Handle marquee end
     if (this.#marquee) {
@@ -3041,6 +3070,16 @@ export class Editor {
     this.#replay();
   }
 
+  /**
+   * Commit a group drill-down by selecting the group element and transitioning
+   * to the ONE state.
+   */
+  #commitDrillDown(state: { groupId: SlotmapId; groupElement: Element }): void {
+    this.#drillDown = null;
+    // Transition to ONE state with the group element as the sole selection
+    this.#applySelection(new Set([state.groupId]));
+  }
+
   /** Find original geometry for a vertex from the scene cache. */
   #findOriginalGeometry(
     vid: SlotmapId,
@@ -3074,6 +3113,7 @@ export class Editor {
     'Parallelogram',
     'Trapezoid',
     'Polygon',
+    'Group',
   ] as const;
 
   /**

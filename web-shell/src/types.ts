@@ -98,10 +98,12 @@ export type SlotmapId = {
   readonly version: number;
 };
 
-/** Current selection state: single VertexId or null. */
-export type SelectionState = {
-  selectedId: SlotmapId | null;
-};
+/** Selection state discriminated union for editor FSM states. */
+export type SelectionState =
+  | { type: 'IDLE' }
+  | { type: 'ONE'; element: SlotmapId }
+  | { type: 'MANY'; elements: SlotmapId[] }
+  | { type: 'GROUP_DRILL_DOWN'; groupId: SlotmapId; groupElement: Element };
 
 /**
  * Parse a `data-vertex-id` attribute value in `"idx:version"` format.
