@@ -91,7 +91,7 @@ fn group_nested_renders_with_clip_path() {
 
     let svg = &pages[0].1;
     assert!(
-        svg.contains("<g clip-path=\"url(#clip_0)\">"),
+        svg.contains("clip-path=\"url(#clip_0)\""),
         "Should contain clipped group"
     );
     assert!(svg.contains("<defs>"), "Should contain defs for clip path");

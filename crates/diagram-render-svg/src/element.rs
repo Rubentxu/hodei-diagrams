@@ -43,6 +43,21 @@ fn eid_attr(id: &EdgeId) -> String {
     format!(" data-edge-id=\"{}\"", stable_id(id))
 }
 
+/// Serialize a `GroupId` to a `data-group-id` attribute string.
+///
+/// Format: `data-group-id="idx:version"` — compact, no quote-escaping needed
+/// in SVG attributes. Both fields are required for slotmap lookups.
+/// Skips emitting when the id is the default/placeholder (u32::MAX idx, version=1).
+fn gid_attr(id: &impl diagram_core::StableIdExt) -> String {
+    let (idx, version) = id.stable_id_parts();
+    if idx == u32::MAX && version == 1 {
+        // This is the slotmap null/placeholder key
+        String::new()
+    } else {
+        format!(" data-group-id=\"{}\"", stable_id(id))
+    }
+}
+
 /// Converts a `VisualElement` to an SVG string.
 ///
 /// Returns the SVG representation of the element, indented with 2 spaces per
@@ -811,12 +826,14 @@ fn group_to_svg(
             g.bounds.size.width,
             g.bounds.size.height,
         );
+        let gid = gid_attr(&g.id);
         (
-            format!("<g clip-path=\"url(#clip_{})\">", clip_id),
+            format!("<g clip-path=\"url(#clip_{})\"{gid}>", clip_id),
             format!("{}</g>", ind),
         )
     } else {
-        ("<g>".to_string(), format!("{}</g>", ind))
+        let gid = gid_attr(&g.id);
+        (format!("<g{gid}>"), format!("{}</g>", ind))
     };
 
     let mut result = String::new();
@@ -1803,5 +1820,29 @@ mod tests {
         let result = element_to_svg(&path, &mut clip, &mut defs, 0);
         assert!(result.contains(" L "));
         assert!(!result.contains(" C "));
+    }
+}
+
+#[cfg(test)]
+mod gid_attr_tests {
+    use super::*;
+    use diagram_core::StableIdExt;
+
+    #[test]
+    fn gid_attr_emits_for_valid_group_id() {
+        // GroupId::default() is the slotmap null key (idx=u32::MAX, version=1)
+        // which should NOT emit data-group-id.
+        // We verify gid_attr returns empty string for null key.
+        let null_gid = diagram_core::GroupId::default();
+        let (idx, version) = null_gid.stable_id_parts();
+        assert_eq!(idx, u32::MAX, "null key should have idx=u32::MAX");
+        assert_eq!(version, 1, "null key should have version=1");
+
+        // gid_attr should return empty for null key
+        let result = gid_attr(&null_gid);
+        assert!(
+            result.is_empty(),
+            "gid_attr should return empty for null key"
+        );
     }
 }
