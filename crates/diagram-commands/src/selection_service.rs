@@ -206,4 +206,68 @@ mod tests {
         let result = service.resolve(50.0, 50.0, &mods);
         assert!(matches!(result, SelectionTarget::Group(g) if g == gid));
     }
+
+    // ─── SEL-016: Alt+click empty group area tests ───────────────────────────────
+
+    /// Test E: Alt+click on empty group area selects the group itself (SEL-016).
+    ///
+    /// Scenario: GIVEN a group has no child at click point P
+    ///           WHEN the user Alt+clicks at P
+    ///           THEN the group is `SelectionTarget::Group(group_id)`
+    ///
+    /// This is the "empty group area" fallback case in SEL-016:
+    /// when hits = [Group] and alt = true, we bypass the group first
+    /// but have no child to show — so we fall back to the group itself.
+    #[test]
+    fn test_alt_click_on_empty_group_area_selects_group() {
+        let gid = diagram_core::GroupId::default();
+        // Hit list: only the group (no child at this point)
+        let hit_tester = MockHitTester {
+            hits: vec![HitResult::Group(gid)],
+        };
+        let model = make_model();
+        let service = SelectionService::new(&hit_tester, &model);
+        let mods = SelectionModifiers {
+            alt: true,
+            ..Default::default()
+        };
+
+        // Alt+click on empty group area → group selected (SEL-016 fallback)
+        let result = service.resolve(50.0, 50.0, &mods);
+        assert!(matches!(result, SelectionTarget::Group(g) if g == gid));
+    }
+
+    // ─── is_locked unit tests ────────────────────────────────────────────────────
+
+    /// Unit test: is_locked() returns true for a group that has locked=true.
+    ///
+    /// This verifies the is_locked method itself with a real locked group
+    /// inserted into the model's store.
+    #[test]
+    fn test_is_locked_returns_true_for_locked_group() {
+        use diagram_core::Group;
+
+        let mut model = make_model();
+        // Create a locked group and insert it into the store
+        let locked_group = Group {
+            locked: true,
+            ..Default::default()
+        };
+        let gid = model.store.insert_group(locked_group);
+
+        // Verify is_locked returns true for this group
+        let target = SelectionTarget::Group(gid);
+        assert!(target.is_locked(&model));
+    }
+
+    /// Unit test: is_locked() returns false for a group that is not locked.
+    #[test]
+    fn test_is_locked_returns_false_for_unlocked_group() {
+        let gid = diagram_core::GroupId::default();
+        let target = SelectionTarget::Group(gid);
+        let model = make_model();
+
+        // Group not in model → is_locked returns false
+        assert!(!target.is_locked(&model));
+    }
 }
