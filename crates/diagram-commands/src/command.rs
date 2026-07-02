@@ -242,6 +242,7 @@ mod tests {
     use diagram_core::geometry::{CellGeometry, Point};
     use diagram_core::label::Label;
     use diagram_core::page::Page;
+    use diagram_core::selection::SelectionTarget;
     use diagram_core::style::{StyleMap, StyleValue};
     use diagram_core::{Edge, EdgeId, Group, GroupId, Layer, LayerId, PageId, Vertex, VertexId};
 
@@ -2919,5 +2920,158 @@ mod tests {
         // Edge should also have moved
         let e_stored = model.store.edge(e).unwrap();
         assert_eq!(e_stored.layer_id, Some(target_layer));
+    }
+
+    // ─── Selection Commands ─────────────────────────────────────────────────────
+
+    #[test]
+    fn apply_select_target_succeeds() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        let mut cmd = Command::SelectTarget(SelectTargetPayload::new(target.clone()));
+        cmd.apply(&mut model).unwrap();
+
+        assert!(
+            model.selection().contains(&target),
+            "target should be selected"
+        );
+    }
+
+    #[test]
+    fn undo_select_target_removes_selection() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        let mut cmd = Command::SelectTarget(SelectTargetPayload::new(target.clone()));
+        cmd.apply(&mut model).unwrap();
+        assert!(model.selection().contains(&target));
+
+        cmd.undo(&mut model).unwrap();
+        assert!(
+            !model.selection().contains(&target),
+            "target should be deselected after undo"
+        );
+    }
+
+    #[test]
+    fn apply_deselect_target_succeeds() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        // Pre-select
+        model.selection_mut().select(target.clone());
+        assert!(model.selection().contains(&target));
+
+        let mut cmd = Command::DeselectTarget(DeselectTargetPayload::new(target.clone()));
+        cmd.apply(&mut model).unwrap();
+
+        assert!(
+            !model.selection().contains(&target),
+            "target should be deselected"
+        );
+    }
+
+    #[test]
+    fn undo_deselect_target_restores_selection() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        model.selection_mut().select(target.clone());
+        let mut cmd = Command::DeselectTarget(DeselectTargetPayload::new(target.clone()));
+        cmd.apply(&mut model).unwrap();
+        assert!(!model.selection().contains(&target));
+
+        cmd.undo(&mut model).unwrap();
+        assert!(
+            model.selection().contains(&target),
+            "target should be re-selected after undo"
+        );
+    }
+
+    #[test]
+    fn apply_toggle_selection_toggles_on() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        assert!(!model.selection().contains(&target));
+        let mut cmd = Command::ToggleSelection(ToggleSelectionPayload::new(target.clone()));
+        cmd.apply(&mut model).unwrap();
+
+        assert!(
+            model.selection().contains(&target),
+            "toggle should select when starting unselected"
+        );
+    }
+
+    #[test]
+    fn apply_toggle_selection_toggles_off() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        model.selection_mut().select(target.clone());
+        assert!(model.selection().contains(&target));
+
+        let mut cmd = Command::ToggleSelection(ToggleSelectionPayload::new(target.clone()));
+        cmd.apply(&mut model).unwrap();
+
+        assert!(
+            !model.selection().contains(&target),
+            "toggle should deselect when starting selected"
+        );
+    }
+
+    #[test]
+    fn undo_toggle_selection_restores_prior_state() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        // Start unselected — toggle select — undo should deselect
+        let mut cmd = Command::ToggleSelection(ToggleSelectionPayload::new(target.clone()));
+        cmd.apply(&mut model).unwrap();
+        assert!(model.selection().contains(&target));
+
+        cmd.undo(&mut model).unwrap();
+        assert!(
+            !model.selection().contains(&target),
+            "toggle undo should restore unselected state"
+        );
+    }
+
+    #[test]
+    fn apply_clear_selection_clears_all() {
+        let mut model = DiagramModel::new();
+        let target1 = SelectionTarget::Vertex(VertexId::default());
+        let target2 = SelectionTarget::Group(GroupId::default());
+
+        model.selection_mut().select(target1.clone());
+        model.selection_mut().select(target2.clone());
+        assert_eq!(model.selection().len(), 2);
+
+        let mut cmd = Command::ClearSelection(ClearSelectionPayload::new());
+        cmd.apply(&mut model).unwrap();
+
+        assert!(
+            model.selection().is_empty(),
+            "selection should be empty after clear"
+        );
+    }
+
+    #[test]
+    fn undo_clear_selection_is_noop() {
+        let mut model = DiagramModel::new();
+        let target = SelectionTarget::Vertex(VertexId::default());
+
+        model.selection_mut().select(target.clone());
+        let mut cmd = Command::ClearSelection(ClearSelectionPayload::new());
+        cmd.apply(&mut model).unwrap();
+        assert!(model.selection().is_empty());
+
+        // Undo cannot restore previous selection without snapshot
+        cmd.undo(&mut model).unwrap();
+        assert!(
+            model.selection().is_empty(),
+            "undo of clear_selection is a no-op"
+        );
     }
 }
