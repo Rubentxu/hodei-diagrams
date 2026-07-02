@@ -2729,7 +2729,8 @@ export class Editor {
 
     // Hit a shape
     if (e.altKey && !e.shiftKey) {
-      // GROUP_DRILL_DOWN: Alt+click on a group element enters drill-down state
+      // GROUP_DRILL_DOWN: Alt+click on a group element selects topmost child directly (SEL-016)
+      // (Previously deferred to pointerup via #drillDown, but pointerup wasn't registered yet)
       const groupEl = (e.target as Element)?.closest('[data-group-id]');
       if (groupEl) {
         const groupIdAttr = groupEl.getAttribute('data-group-id');
@@ -2740,8 +2741,22 @@ export class Editor {
               // Locked group: treat as deselect (clear selection)
               this.clearSelection();
             } else {
-              // Not locked: enter GROUP_DRILL_DOWN state
-              this.#drillDown = { groupId, groupElement: groupEl };
+              // Find topmost child element at the click point
+              const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY);
+              const childEl = elementsAtPoint.find((el) => el.hasAttribute('data-vertex-id'));
+              if (childEl) {
+                const childIdAttr = childEl.getAttribute('data-vertex-id');
+                if (childIdAttr) {
+                  const childId = parseSlotmapAttr(childIdAttr);
+                  if (childId) {
+                    // Alt+click hit a child INSIDE the group → select the child (SEL-016)
+                    this.#applySelection(new Set([childId]));
+                    return;
+                  }
+                }
+              }
+              // Fallback: Alt+click hit empty group area → select the group
+              this.#applySelection(new Set([groupId]));
             }
             return;
           }
