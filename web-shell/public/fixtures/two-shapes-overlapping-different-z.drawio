@@ -2,13 +2,14 @@
   <diagram>
     <mxGraphModel>
       <root>
-        <!-- id=2 first in XML → drawn first → behind -->
-        <mxCell id="2" vertex="1" value="Behind">
-          <mxGeometry x="60" y="60" width="120" height="120" as="geometry"/>
+        <!-- Two shapes that partially overlap in the center -->
+        <!-- Shape A: left half -->
+        <mxCell id="2" vertex="1" value="ShapeA">
+          <mxGeometry x="80" y="80" width="100" height="80" as="geometry"/>
         </mxCell>
-        <!-- id=3 second in XML → drawn second → on top (overlapping region) -->
-        <mxCell id="3" vertex="1" value="On Top">
-          <mxGeometry x="160" y="100" width="80" height="40" as="geometry"/>
+        <!-- Shape B: right half, overlapping Shape A by 40px in center -->
+        <mxCell id="3" vertex="1" value="ShapeB">
+          <mxGeometry x="140" y="80" width="100" height="80" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
