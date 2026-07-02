@@ -5,8 +5,7 @@
  * - EDGE-015: Alt+Shift+R clears all waypoints on selected edge
  * - EDGE-012: Right-click on connector segment shows "Add Waypoint"
  * - EDGE-014: Right-click on waypoint shows "Remove Waypoint"
- * - EDGE-003/004/005: Modifier routing during connect drag (covered via
- *   context menu path + behavior verification)
+ * - EDGE-004: Shift constrains port handle drag to dominant axis
  *
  * Reference: docs/drawio-user-interaction-workflows.md (EDGE-003..005, 012, 014, 015)
  * ADR-0079 (interaction parity strategy)
@@ -28,6 +27,60 @@ test.describe('Suite IP-C: Connector Modifiers', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await waitForAppReady(page);
+  });
+
+  test('EDGE-004: Shift constrains port handle drag to dominant axis', async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Select the first edge to make port handles visible
+    const edge = page.locator('[data-edge-id]').first();
+    if (await edge.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    await edge.click({ force: true });
+    await page.waitForTimeout(200);
+
+    // Find a port handle (circle with class 'port-handle')
+    const portHandle = page.locator('.port-handle').first();
+    if (await portHandle.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    // Get initial position
+    const initialCx = await portHandle.getAttribute('cx');
+    const initialCy = await portHandle.getAttribute('cy');
+    expect(initialCx).not.toBeNull();
+    expect(initialCy).not.toBeNull();
+
+    // Drag with Shift held — horizontal drag > 3px threshold
+    // The handle should lock to horizontal axis (cy stays same)
+    const box = await portHandle.boundingBox();
+    if (!box) {
+      test.skip();
+      return;
+    }
+
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+
+    // Perform Shift+drag horizontally (rightward)
+    await page.mouse.move(startX, startY);
+    await page.keyboard.down('Shift');
+    await page.mouse.down();
+    await page.mouse.move(startX + 50, startY + 2); // 50px horizontal, 2px vertical (should lock to H)
+    await page.mouse.up();
+    await page.keyboard.up('Shift');
+    await page.waitForTimeout(100);
+
+    // Verify the handle moved horizontally but not vertically (axis locked)
+    const finalCx = await portHandle.getAttribute('cx');
+    const finalCy = await portHandle.getAttribute('cy');
+    expect(finalCx).not.toBe(initialCx); // Horizontal position changed
+    expect(finalCy).toBe(initialCy); // Vertical position unchanged (H axis lock)
   });
 
   test('EDGE-015: Alt+Shift+R clears all waypoints on selected edge', async ({ page }) => {
