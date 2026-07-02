@@ -15,6 +15,7 @@ import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
+import { ResizeHandlesOverlay } from './resize-handles.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -195,6 +196,9 @@ export class Editor {
   // ─── Port Handles Overlay ──────────────────────────────────────────────────
   readonly #portHandles: PortHandlesOverlay;
 
+  // ─── Resize Handles Overlay ──────────────────────────────────────────────
+  readonly #resizeHandles: ResizeHandlesOverlay;
+
   // Internal clipboard for copy/paste
   #clipboard: { vertices: Vertex[]; offset: number } | null = null;
 
@@ -226,6 +230,15 @@ export class Editor {
 
     // Initialize port handles overlay
     this.#portHandles = new PortHandlesOverlay(viewer, () => this.#sceneCache, session);
+
+    // Initialize resize handles overlay
+    this.#resizeHandles = new ResizeHandlesOverlay(
+      viewer,
+      () => this.#sceneCache,
+      (id) => this.#findOriginalGeometry(id),
+      (id, geom) => this.setVertexGeometry(id, geom),
+      () => this.#replay(),
+    );
   }
 
   // ─── Public Selection API ──────────────────────────────────────────────────
@@ -2425,6 +2438,9 @@ export class Editor {
     } else {
       this.#portHandles.render(new Set());
     }
+
+    // Re-render resize handles if a single vertex is selected
+    this.#resizeHandles.render(this.#selection);
   }
 
   // ─── Selection ────────────────────────────────────────────────────────────
