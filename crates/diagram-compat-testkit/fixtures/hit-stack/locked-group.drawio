@@ -1,0 +1,14 @@
+<mxfile>
+  <diagram name="Locked Group Test">
+    <mxGraphModel>
+      <root>
+        <mxCell id="g1" value="Locked Group" vertex="1" locked="1">
+          <mxGeometry x="10" y="10" width="300" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="v1" value="Child in Locked Group" vertex="1" parent="g1">
+          <mxGeometry x="20" y="20" width="100" height="60" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
