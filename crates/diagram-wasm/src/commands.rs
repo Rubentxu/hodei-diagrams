@@ -1,12 +1,13 @@
 //! Command execution: translate JSON commands to engine calls.
 
-use crate::engine::{with_engine, with_engine_mut};
+use crate::engine::{WasmStencilProvider, with_engine, with_engine_mut};
+use diagram_commands::selection_service::SelectionService;
 use diagram_commands::{Command, RoutingKind, Transaction};
 use diagram_core::geometry::CellGeometry;
-use diagram_core::selection::SelectionTarget;
+use diagram_core::selection::{HitTester, SelectionModifiers, SelectionTarget};
 use diagram_core::{Group, PageId, VertexId};
-use diagram_scene::ResolvedStyle;
 use diagram_scene::resolver::StyleResolver;
+use diagram_scene::{ResolvedStyle, SceneBuilder};
 use wasm_bindgen::prelude::*;
 
 /// Execute a command on an engine from a JSON string.
@@ -1296,10 +1297,9 @@ pub fn get_selection(handle: u32) -> Result<String, JsValue> {
 
 /// Resolve a click at (x, y) with keyboard modifiers into a SelectionTarget.
 ///
-/// This is a stub: it requires access to the current scene which lives in
-/// diagram-scene and is not directly accessible from the WASM engine handle.
-/// Slice 3 will wire in the actual scene hit-testing via the engine's scene
-/// projection.
+/// Uses the engine's scene (built from the current model) as the hit tester,
+/// combined with `SelectionService` to apply the engine's selection semantics
+/// (SEL-015, SEL-016).
 ///
 /// # Arguments
 /// - `x`: X coordinate in page space
@@ -1309,18 +1309,44 @@ pub fn get_selection(handle: u32) -> Result<String, JsValue> {
 /// - `ctrl`: Ctrl key pressed
 /// - `meta`: Meta (Command on Mac) key pressed
 ///
-/// Returns a JSON `SelectionTarget` object, or `{"type":"None"}` for the stub.
+/// Returns a JSON `SelectionTarget` object.
 #[wasm_bindgen]
 pub fn resolve_selection(
-    _handle: u32,
-    _x: f64,
-    _y: f64,
-    _alt: bool,
-    _shift: bool,
-    _ctrl: bool,
-    _meta: bool,
+    handle: u32,
+    x: f64,
+    y: f64,
+    alt: bool,
+    shift: bool,
+    ctrl: bool,
+    meta: bool,
 ) -> Result<String, JsValue> {
-    // Stub: returns None until Slice 3 wires in the scene
-    let target = SelectionTarget::None;
-    serde_json::to_string(&target).map_err(|e| JsValue::from_str(&format!("Serialize: {e}")))
+    let result = with_engine(handle, |e| {
+        // Build scene from model for hit testing
+        let provider = WasmStencilProvider::new(e.stencil_libraries.clone());
+        let scene = SceneBuilder::new()
+            .with_stencil_provider(Box::new(provider))
+            .build(e.editor.model())
+            .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
+
+        // Scene implements HitTester, so use it directly
+        let hit_tester: &dyn HitTester = &scene;
+        let service = SelectionService::new(hit_tester, e.editor.model());
+
+        let modifiers = SelectionModifiers {
+            alt,
+            shift,
+            ctrl,
+            meta,
+        };
+
+        let target = service.resolve(x, y, &modifiers);
+        Ok::<_, &'static str>(target)
+    });
+
+    match result {
+        Ok(Ok(target)) => serde_json::to_string(&target)
+            .map_err(|e| JsValue::from_str(&format!("Serialize: {e}"))),
+        Ok(Err(e)) => Err(JsValue::from_str(e)),
+        Err(e) => Err(JsValue::from_str(e)),
+    }
 }

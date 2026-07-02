@@ -8,6 +8,8 @@ import type {
   GradientConfig,
   EngineError,
   Result,
+  SelectionTarget,
+  SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
@@ -289,6 +291,84 @@ export class Editor {
 
   /** Clear all selection. */
   clearSelection(): void {
+    this.#applySelection(new Set());
+  }
+
+  // ─── Engine-Backed Selection (Slice 3) ──────────────────────────────────────
+
+  /**
+   * Resolve a click point + modifiers into an engine-owned SelectionTarget.
+   *
+   * Uses the engine's scene hit-testing and SelectionService to apply
+   * the correct selection semantics (SEL-015, SEL-016).
+   *
+   * @param x Document-space X coordinate
+   * @param y Document-space Y coordinate
+   * @param modifiers Keyboard modifiers
+   * @returns The resolved SelectionTarget, or null on error
+   */
+  resolveSelection(
+    x: number,
+    y: number,
+    modifiers: SelectionModifiers,
+  ): SelectionTarget | null {
+    const result = this.#session.resolveSelection(x, y, modifiers);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return null;
+    }
+    return result.value;
+  }
+
+  /**
+   * Convert an engine SelectionTarget to a SlotmapId for DOM selection.
+   *
+   * Engine targets carry typed IDs (Vertex/Group/Edge with {idx, version}),
+   * while DOM selection uses SlotmapId format.
+   *
+   * Returns null if the target is 'None' or has an unknown type.
+   */
+  #engineTargetToSlotmapId(target: SelectionTarget): SlotmapId | null {
+    switch (target.type) {
+      case 'Vertex':
+      case 'Group':
+      case 'Edge':
+        // The id field is already a SlotmapId-compatible {idx, version}
+        return target.id;
+      case 'None':
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Select an engine-owned target via the engine's selection model.
+   * After engine selection, updates DOM selection state.
+   *
+   * @param target The SelectionTarget to select
+   */
+  selectTarget(target: SelectionTarget): void {
+    const result = this.#session.selectTarget(target);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    // Convert engine target to DOM SlotmapId and update DOM selection
+    const id = this.#engineTargetToSlotmapId(target);
+    if (id) {
+      this.#applySelection(new Set([id]));
+    }
+  }
+
+  /**
+   * Clear engine selection and DOM selection.
+   */
+  clearSelectionEngine(): void {
+    const result = this.#session.clearSelection();
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
     this.#applySelection(new Set());
   }
 
@@ -2703,58 +2783,55 @@ export class Editor {
       return;
     }
 
-    // Hit a shape
-    if (e.altKey && !e.shiftKey) {
-      // GROUP_DRILL_DOWN: Alt+click on a group element enters drill-down state
-      const groupEl = (e.target as Element)?.closest('[data-group-id]');
-      if (groupEl) {
-        const groupIdAttr = groupEl.getAttribute('data-group-id');
-        if (groupIdAttr) {
-          const groupId = parseSlotmapAttr(groupIdAttr);
-          if (groupId) {
-            if (this.isShapeLocked(groupId)) {
-              // Locked group: treat as deselect (clear selection)
-              this.clearSelection();
-            } else {
-              // Not locked: enter GROUP_DRILL_DOWN state
-              this.#drillDown = { groupId, groupElement: groupEl };
-            }
-            return;
-          }
-        }
+    // Hit a shape — use engine-backed selection resolution (Slice 3)
+    // The engine's resolve() handles alt-bypass semantics (SEL-016) and
+    // locked target filtering automatically.
+    const docPos = this.#clientToDoc(e.clientX, e.clientY);
+    const modifiers: SelectionModifiers = {
+      alt: e.altKey,
+      shift: e.shiftKey,
+      ctrl: e.ctrlKey,
+      meta: e.metaKey,
+    };
+    const target = this.resolveSelection(docPos.x, docPos.y, modifiers);
+
+    if (!target) {
+      // Error — resolveSelection returned null, error was already reported
+      return;
+    }
+
+    if (target.type === 'None') {
+      // No shape at point
+      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        this.clearSelection();
       }
-      // No data-group-id: fall through to existing z-cycle logic (SEL-014)
-      // Alt+click on shape: select underneath in z-stack
-      // Find all shapes at the click point, cycle to the next-lower one
-      const docPos = this.#clientToDoc(e.clientX, e.clientY);
-      const stackAtPoint = this.#getIdsAtPoint(docPos.x, docPos.y);
-      if (stackAtPoint.length > 1) {
-        // Find current selection in stack; pick the next-lower one
-        const currentIdx = stackAtPoint.findIndex((id) => this.isSelected(id));
-        const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % stackAtPoint.length;
-        const next = stackAtPoint[nextIdx]!;
-        this.selectOnly(next);
-        return;
-      }
-      // Only one shape at point: just select it
-      this.selectOnly(hit);
-    } else if (e.shiftKey) {
+      return;
+    }
+
+    // Convert engine target to SlotmapId for DOM selection
+    const id = this.#engineTargetToSlotmapId(target);
+    if (!id) {
+      // Unknown target type — should not happen
+      return;
+    }
+
+    // Apply selection based on modifiers
+    if (e.shiftKey) {
       // Shift+click: toggle in selection
-      this.toggleSelection(hit);
+      this.toggleSelection(id);
     } else if (e.ctrlKey || e.metaKey) {
       // Cmd/Ctrl+click: add to selection
-      this.addToSelection(hit);
+      this.addToSelection(id);
     } else {
       // Plain click: select only
-      this.selectOnly(hit);
+      this.selectOnly(id);
     }
 
     // Set pointer capture and start drag tracking
     this.#viewer.setPointerCapture(e.pointerId);
 
-    const docPos = this.#clientToDoc(e.clientX, e.clientY);
     this.#dragState = {
-      vertexId: hit,
+      vertexId: id,
       startX: docPos.x,
       startY: docPos.y,
       currentX: docPos.x,

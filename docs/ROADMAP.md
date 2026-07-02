@@ -316,12 +316,12 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
 
 ### In Progress
 
-- **IP-G (Selection v2 — Engine-Owned Typed Selection)**: `selection-v2-engine-owned` (planned).
-  - Status: Planned — blocked by grill-with-docs redesign.
+- **IP-G (Selection v2 — Engine-Owned Typed Selection)**: `selection-v2-engine-owned` (Slices 1+2 merged).
+  - Status: Slices 1 (merged v0.93.0 PR #170) + 2 (merged v0.94.0 PR #171) complete; Slice 3 (Web Shell adapter) + Slice 4 (E2E parity) remain.
   - Scope: Typed `SelectionTarget = Vertex | Group | Edge` owned by Diagram Engine; WASM boundary contract; Web Shell adapter for SEL-015/016 drill-down + Alt-bypass; supersedes partial PR #169 behavior.
   - Evidence: `feat/group-drilldown-e2e` (frozen as evidence), failing E2E runs, verifier reports.
-  - Epic slices: typed model → engine commands → WASM contract → shell adapter → E2E parity.
-  - ADR: ADR-0082 (replaced with engine-owned typed selection semantics).
+  - Epic slices: typed model (✅) → engine commands (✅) → WASM contract (✅) → shell adapter (Slice 3 pending) → E2E parity (Slice 4 pending).
+  - ADR: ADR-0082 (engine-owned typed selection semantics).
 
 ### Strategy Artifacts
 

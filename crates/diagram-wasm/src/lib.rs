@@ -44,8 +44,8 @@ pub use commands::{
     ROUTING_KIND_ORTHOGONAL, ROUTING_KIND_STRAIGHT, clear_edge_anchor, clear_selection,
     command_buffer_capacity, command_buffer_ptr, connect_vertices, connect_vertices_anchored,
     disconnect_edge, engine_can_redo, engine_can_undo, execute_command, execute_transaction,
-    flush_commands, get_edge_anchors, get_resolved_style, get_selection, redo, select_target,
-    set_edge_anchor, undo,
+    flush_commands, get_edge_anchors, get_resolved_style, get_selection, redo, resolve_selection,
+    select_target, set_edge_anchor, undo,
 };
 pub use engine::{create_engine, dispose_engine};
 pub use export::{export_drawio, export_drawio_fresh_engine};

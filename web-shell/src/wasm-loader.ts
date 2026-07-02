@@ -62,6 +62,13 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
       // After WASM rebuild: mod.get_page_layers will exist
       // Before rebuild: use a stub so the app loads (panel will show error state)
       get_page_layers: (mod as Record<string, unknown>).get_page_layers as ((h: number, p: number) => string) ?? (() => '{\"page_idx\":0,\"layers\":[]}') as ((h: number, p: number) => string),
+      // ─── Selection (Slice 3) ───────────────────────────────────────────
+      // After WASM rebuild: mod.{resolve_selection,select_target,clear_selection,get_selection} will exist
+      // Before rebuild: use stubs so the app loads
+      resolve_selection: ((mod as Record<string, unknown>).resolve_selection as WasmModule['resolve_selection']) ?? (() => '{"type":"None"}'),
+      select_target: ((mod as Record<string, unknown>).select_target as WasmModule['select_target']) ?? (() => {}),
+      clear_selection: ((mod as Record<string, unknown>).clear_selection as WasmModule['clear_selection']) ?? (() => {}),
+      get_selection: ((mod as Record<string, unknown>).get_selection as WasmModule['get_selection']) ?? (() => '[]'),
     };
 
     return ok(wasm);

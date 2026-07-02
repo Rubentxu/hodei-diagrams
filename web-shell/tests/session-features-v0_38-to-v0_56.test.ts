@@ -54,6 +54,10 @@ function createMockWasm() {
     get_edge_anchors: vi.fn(),
     set_page_math_enabled: vi.fn(),
     get_page_layers: vi.fn(),
+    resolve_selection: vi.fn(),
+    select_target: vi.fn(),
+    clear_selection: vi.fn(),
+    get_selection: vi.fn(),
   };
 }
 
