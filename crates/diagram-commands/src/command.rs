@@ -19,6 +19,9 @@ use crate::payload::{
     SetLayerLockedPayload, SetLayerVisiblePayload, SetPageMathEnabledPayload,
     SetVertexParentPayload,
 };
+use crate::selection::{
+    ClearSelectionPayload, DeselectTargetPayload, SelectTargetPayload, ToggleSelectionPayload,
+};
 
 /// A reversible mutation command for the diagram model.
 ///
@@ -102,6 +105,14 @@ pub enum Command {
     SetLayerLocked(SetLayerLockedPayload),
     /// IP-F: Move shapes to a different layer.
     MoveShapeToLayer(MoveShapeToLayerPayload),
+    /// IP-F: Select a specific target (additive).
+    SelectTarget(SelectTargetPayload),
+    /// IP-F: Deselect a specific target.
+    DeselectTarget(DeselectTargetPayload),
+    /// IP-F: Toggle a target's selection state.
+    ToggleSelection(ToggleSelectionPayload),
+    /// IP-F: Clear the entire selection.
+    ClearSelection(ClearSelectionPayload),
 }
 
 impl Command {
@@ -147,6 +158,10 @@ impl Command {
             Command::SetLayerVisible(p) => p.apply(model),
             Command::SetLayerLocked(p) => p.apply(model),
             Command::MoveShapeToLayer(p) => p.apply(model),
+            Command::SelectTarget(p) => p.apply(model),
+            Command::DeselectTarget(p) => p.apply(model),
+            Command::ToggleSelection(p) => p.apply(model),
+            Command::ClearSelection(p) => p.apply(model),
         }
     }
 
@@ -192,6 +207,10 @@ impl Command {
             Command::SetLayerVisible(p) => p.undo(model),
             Command::SetLayerLocked(p) => p.undo(model),
             Command::MoveShapeToLayer(p) => p.undo(model),
+            Command::SelectTarget(p) => p.undo(model),
+            Command::DeselectTarget(p) => p.undo(model),
+            Command::ToggleSelection(p) => p.undo(model),
+            Command::ClearSelection(p) => p.undo(model),
         }
     }
 }
