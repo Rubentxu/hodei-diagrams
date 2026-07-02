@@ -4,8 +4,9 @@
 //! (vertices, groups, edges) are currently selected. The WASM boundary
 //! exposes this state and allows mutation via commands.
 
-use crate::{DiagramModel, EdgeId, GroupId, VertexId};
+use crate::{DiagramModel, EdgeId, GroupId, StableIdExt, VertexId};
 use serde::{Deserialize, Serialize};
+use slotmap::KeyData;
 use std::collections::HashSet;
 
 /// A geometric hit-test result returned by the hit tester.
@@ -28,11 +29,16 @@ pub trait HitTester: Send + Sync {
 
 /// A selected target in the diagram.
 //
-// INVARIANT: `SelectionTarget` must remain serde-transparent (untagged) so the
-// WASM boundary can serialize/deserialize it as a simple JSON object with a
-// `type` field matching the variant name.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(tag = "type", content = "id")]
+// The JSON representation uses `{idx, version}` for IDs so the WASM boundary
+// is compatible with the TypeScript `SlotmapId` type:
+//
+//     {"type":"Vertex","id":{"idx":1,"version":1}}
+//
+// Slotmap's default serde serializes keys as raw integers, so we implement
+// custom serialization via `StableIdExt::stable_id_parts()` and custom
+// deserialization to handle both `{idx, version}` (preferred) and bare u64
+// (backward compatibility).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SelectionTarget {
     /// A vertex is selected.
     Vertex(VertexId),
@@ -66,6 +72,125 @@ impl SelectionTarget {
             SelectionTarget::Group(id) => model.store.group(*id).map(|g| g.locked).unwrap_or(false),
             SelectionTarget::Edge(id) => model.store.edge(*id).map(|e| e.locked).unwrap_or(false),
             SelectionTarget::None => false,
+        }
+    }
+}
+
+/// Serializes `SelectionTarget` with `{idx, version}` IDs for WASM boundary compatibility.
+/// We serialize the `id` field as a named struct rather than a tuple so the output is:
+/// `{"type":"Vertex","id":{"idx":1,"version":1}}`
+impl Serialize for SelectionTarget {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        #[serde(deny_unknown_fields)]
+        struct IdPayload {
+            idx: u32,
+            version: u32,
+        }
+
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        enum TargetOutput {
+            Vertex { r#type: &'static str, id: IdPayload },
+            Group { r#type: &'static str, id: IdPayload },
+            Edge { r#type: &'static str, id: IdPayload },
+            None { r#type: &'static str },
+        }
+
+        match self {
+            SelectionTarget::Vertex(id) => TargetOutput::Vertex {
+                r#type: "Vertex",
+                id: IdPayload {
+                    idx: id.stable_id_parts().0,
+                    version: id.stable_id_parts().1,
+                },
+            },
+            SelectionTarget::Group(id) => TargetOutput::Group {
+                r#type: "Group",
+                id: IdPayload {
+                    idx: id.stable_id_parts().0,
+                    version: id.stable_id_parts().1,
+                },
+            },
+            SelectionTarget::Edge(id) => TargetOutput::Edge {
+                r#type: "Edge",
+                id: IdPayload {
+                    idx: id.stable_id_parts().0,
+                    version: id.stable_id_parts().1,
+                },
+            },
+            SelectionTarget::None => TargetOutput::None { r#type: "None" },
+        }
+        .serialize(serializer)
+    }
+}
+
+/// Deserializes `SelectionTarget` from JSON like:
+/// `{"type":"Vertex","id":{"idx":1,"version":1}}` (preferred) or
+/// `{"type":"Vertex","id":4294967295}` (bare u64, backward compat).
+impl<'de> Deserialize<'de> for SelectionTarget {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum RawId {
+            Obj { idx: u32, version: u32 },
+            Int(u64),
+        }
+
+        #[derive(Deserialize)]
+        #[serde(tag = "type", content = "id")]
+        enum RawTarget {
+            Vertex(RawId),
+            Group(RawId),
+            Edge(RawId),
+            None,
+        }
+
+        let raw = RawTarget::deserialize(deserializer)?;
+
+        // Helper to reconstruct a slotmap key from (idx, version).
+        // `KeyData::from_ffi` is pub in slotmap 1.x.
+        // The FFI format is `(version_odd << 32) | idx` where version_odd is
+        // the slotmap-internal version (always odd, so we OR with 1).
+        fn make_key_data(idx: u32, version: u32) -> KeyData {
+            let version_odd = if version == 0 { 1 } else { version | 1 };
+            KeyData::from_ffi((version_odd as u64) << 32 | idx as u64)
+        }
+
+        match raw {
+            RawTarget::Vertex(RawId::Obj { idx, version }) => {
+                let vid: VertexId = make_key_data(idx, version).into();
+                Ok(SelectionTarget::Vertex(vid))
+            }
+            RawTarget::Vertex(RawId::Int(raw)) => {
+                let vid: VertexId = KeyData::from_ffi(raw).into();
+                Ok(SelectionTarget::Vertex(vid))
+            }
+            RawTarget::Group(RawId::Obj { idx, version }) => {
+                let gid: GroupId = make_key_data(idx, version).into();
+                Ok(SelectionTarget::Group(gid))
+            }
+            RawTarget::Group(RawId::Int(raw)) => {
+                let gid: GroupId = KeyData::from_ffi(raw).into();
+                Ok(SelectionTarget::Group(gid))
+            }
+            RawTarget::Edge(RawId::Obj { idx, version }) => {
+                let eid: EdgeId = make_key_data(idx, version).into();
+                Ok(SelectionTarget::Edge(eid))
+            }
+            RawTarget::Edge(RawId::Int(raw)) => {
+                let eid: EdgeId = KeyData::from_ffi(raw).into();
+                Ok(SelectionTarget::Edge(eid))
+            }
+            RawTarget::None => Ok(SelectionTarget::None),
         }
     }
 }
