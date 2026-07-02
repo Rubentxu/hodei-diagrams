@@ -96,6 +96,12 @@ fn group_nested_renders_with_clip_path() {
     );
     assert!(svg.contains("<defs>"), "Should contain defs for clip path");
     assert!(svg.contains("</defs>"), "Should close defs tag");
+    // Verify the group element has a data-group-id attribute
+    assert!(svg.contains("<g"), "Should contain a <g> element");
+    assert!(
+        svg.contains("data-group-id=\""),
+        "Group <g> element should have data-group-id attribute"
+    );
 }
 
 #[test]

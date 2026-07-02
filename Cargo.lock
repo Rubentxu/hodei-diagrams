@@ -657,6 +657,7 @@ dependencies = [
  "diagram-core",
  "diagram-format-drawio",
  "diagram-scene",
+ "slotmap",
 ]
 
 [[package]]

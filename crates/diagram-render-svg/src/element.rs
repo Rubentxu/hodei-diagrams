@@ -1829,7 +1829,7 @@ mod gid_attr_tests {
     use diagram_core::StableIdExt;
 
     #[test]
-    fn gid_attr_emits_for_valid_group_id() {
+    fn gid_attr_returns_empty_for_null_group_id() {
         // GroupId::default() is the slotmap null key (idx=u32::MAX, version=1)
         // which should NOT emit data-group-id.
         // We verify gid_attr returns empty string for null key.
@@ -1843,6 +1843,54 @@ mod gid_attr_tests {
         assert!(
             result.is_empty(),
             "gid_attr should return empty for null key"
+        );
+    }
+
+    #[test]
+    fn group_to_svg_with_valid_id_emits_data_group_id() {
+        use diagram_core::geometry::{Point, Rect, Size};
+        use diagram_scene::ResolvedStyle;
+        use slotmap::SlotMap;
+
+        // Create a real GroupId by inserting into a slotmap
+        let mut sm: SlotMap<diagram_core::GroupId, ()> = SlotMap::with_key();
+        let real_gid = sm.insert(());
+
+        // Verify it's NOT the null key
+        let (idx, _version) = real_gid.stable_id_parts();
+        assert_ne!(idx, u32::MAX, "real GroupId should not be null key");
+
+        // Build a minimal GroupElement with the real GroupId
+        let group_elem = GroupElement {
+            id: real_gid,
+            bounds: Rect {
+                origin: Point { x: 0.0, y: 0.0 },
+                size: Size {
+                    width: 100.0,
+                    height: 100.0,
+                },
+            },
+            style: ResolvedStyle::default(),
+            children: vec![],
+            clip: false,
+            header: None,
+        };
+
+        let mut clip = ClipPathManager::new();
+        let mut defs = DefsManager::new();
+        let result = group_to_svg(&group_elem, &mut clip, &mut defs, 0);
+
+        // Assert the output contains data-group-id="idx:version"
+        let expected_attr = format!("data-group-id=\"{}\"", stable_id(&real_gid));
+        assert!(
+            result.contains(&expected_attr),
+            "group_to_svg should emit data-group-id attribute, got:\n{}",
+            result
+        );
+        assert!(
+            result.contains("<g"),
+            "group_to_svg should emit a <g> element, got:\n{}",
+            result
         );
     }
 }
