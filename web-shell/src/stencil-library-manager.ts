@@ -1,7 +1,7 @@
 /**
  * stencil-library-manager.ts — Single source of truth for loaded .xml stencil libraries.
  *
- * Wraps DiagramEngineSession.loadStencilLibrary() (engine registration) +
+ * Wraps DiagramEngineSession.setStencilLibrary() (engine registration) +
  * wasm.parse_stencil_library_xml() (TS-side shape cache for rendering).
  * The sidebar subscribes and re-renders categories dynamically.
  */
@@ -87,7 +87,10 @@ export class StencilLibraryManager {
     const json = this.wasm.parse_stencil_library_xml(xml);
     const shapes: StencilInfo[] = JSON.parse(json);
     // Register with engine
-    this.wasm.set_stencil_library(this.session as unknown as number, name, xml);
+    const registered = this.session.setStencilLibrary(name, xml);
+    if (!registered.ok) {
+      throw new Error(`Failed to register stencil library "${name}": ${registered.error}`);
+    }
     // Update cache (replaces existing library under same name)
     this.libraries.set(name, shapes);
     this.notifyChange();

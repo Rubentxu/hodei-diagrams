@@ -461,9 +461,9 @@ async function bootstrap(): Promise<void> {
   activeSession = sessionResult.value;
 
   // ─── 3. Create StencilLibraryManager ───────────────────────────────────────
-  // The manager auto-loads general.xml + flowchart.xml in its constructor.
-  // It must exist BEFORE buildEmptyUi so the sidebar can subscribe to it.
-  // Pass a callback to update the HUD loading indicator (hud is available via closure after line ~515).
+  // The manager must exist BEFORE buildEmptyUi so the sidebar can subscribe to it.
+  // Default libraries are loaded after the HUD exists (see startAutoLoad below),
+  // otherwise loading callbacks would fire before the indicator can render.
   const stencilManager = new StencilLibraryManager(activeSession, wasmResult.value, (loading: boolean) => {
     hud?.setLoading({ wasm: false, stencil: loading });
   });
