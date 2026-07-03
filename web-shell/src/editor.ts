@@ -2241,7 +2241,7 @@ export class Editor {
     if (svg) {
       const viewBox = svg.getAttribute('viewBox');
       if (viewBox) {
-        const parts = viewBox.split(/\s+/).map(Number);
+        const parts = viewBox.trim().split(/[\s,]+/).map(Number);
         if (parts.length === 4) {
           const vbX = parts[0]!;
           const vbY = parts[1]!;
@@ -2251,8 +2251,8 @@ export class Editor {
           const scaleX = vbW / svgRect.width;
           const scaleY = vbH / svgRect.height;
           return {
-            x: (clientX - svgRect.left) * scaleX,
-            y: (clientY - svgRect.top) * scaleY,
+            x: vbX + (clientX - svgRect.left) * scaleX,
+            y: vbY + (clientY - svgRect.top) * scaleY,
           };
         }
       }

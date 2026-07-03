@@ -208,6 +208,29 @@ describe('Editor', () => {
     expect(editor.activeTool).toBe('ellipse');
   });
 
+  describe('coordinate conversion', () => {
+    it('includes non-zero SVG viewBox origin when mapping client to document coordinates', () => {
+      viewer.innerHTML =
+        '<svg viewBox="100 100 450 200"><rect data-vertex-id="1:1" x="120" y="120" width="80" height="60"/></svg>';
+
+      const svg = viewer.querySelector('svg');
+      expect(svg).not.toBeNull();
+      vi.spyOn(svg!, 'getBoundingClientRect').mockReturnValue({
+        x: 10,
+        y: 20,
+        left: 10,
+        top: 20,
+        right: 910,
+        bottom: 420,
+        width: 900,
+        height: 400,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+      expect(editor.clientToDoc(130, 120)).toEqual({ x: 160, y: 150 });
+    });
+  });
+
   describe('hit-testing', () => {
     it('click on a shape selects it', () => {
       const rect = viewer.querySelector('[data-vertex-id="0:0"]');
