@@ -5,10 +5,9 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.101.0 — MOVE-013 (Keyboard resize Ctrl+Shift+Arrow) cerrado. Cubertura 545 E2E + 220 unit + 947 cargo.**
-- Primer gap del backlog post-IP-G cerrado.
-- Effect: `Ctrl+Shift+Arrow` resizes selected shapes (Left/Right width, Up/Down height, ±1 unit). Multi-selection resizes each shape as one atomic MoveVertex transaction.
-- Latent fix: `#nudgeSelection` now sends a complete CellGeometry, restoring MoveVertex reliability on selections with accumulated transforms.
+**v0.102.0 — MOVE-003 + MOVE-004 (grid nudge + Alt bypass) cerrados. Cubertura 548 E2E + 220 unit + 947 cargo.**
+- Grid-on-the-fly UX completo: Shift+Arrow salta a la siguiente línea de grid, Alt bypassa snap durante nudge y resize.
+- Multi-shape (5+5): MOVE-013 + MOVE-003 + MOVE-004. E2E suite incrementada 540 → 548.
 - IP-G épica cerrada: `SelectionTarget = Vertex | Group | Edge` propiedad del engine, bridge WASM con `{idx, version}`, shell adapter para SEL-015/016 drill-down + Alt-bypass, edge prefiere vertex en conectores (draw.io convention).
 - Slices de la épica: 1 (typed model, v0.93.0) + 2 (engine commands, v0.94.0) + 3 (WASM contract + shell adapter, v0.95.0) + 4 (E2E parity + selection drill-down estable, v0.100.0).
 - 540/540 Playwright E2E pass, 13 skipped (pre-existing), 0 failed.
@@ -334,11 +333,17 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
 
 - **MOVE-013 (Post-IP-G Gap — Keyboard resize via Ctrl+Shift+Arrow)**: `feat/move-013-keyboard-resize` (PR #182, v0.101.0).
   - Editor: new `Ctrl+Shift+Arrow` branch in `#onKeyDown` + `#resizeSelection(dw, dh)` sibling to `#nudgeSelection`.
-  - Behavior: Left/Right adjusts width, Up/Down adjusts height, ±1 user-unit per press. Multi-selection resizes each shape via a single atomic MoveVertex transaction.
+  - Behavior: Left/Right adjusts width, Up/Down adjusts height, ±1 user-unit per press. Multi-selection resizes each shape as a single atomic MoveVertex transaction.
   - Snap: when grid snap is enabled, the shape's origin (x, y) snaps to the nearest grid line so the shape stays anchored at its top-left corner (draw.io parity).
   - Latent fix in passing: `#nudgeSelection` now sends a complete `CellGeometry` (rotation, flip_h, flip_v), restoring MoveVertex reliability on selections with accumulated transforms.
   - E2E: `tests/e2e/move-resize-modifiers.spec.ts` (MOVE-prefix suite, 5 cases).
   - Release: tagged `v0.101.0` (annotated) + GitHub release notes.
+- **MOVE-003 + MOVE-004 (Post-IP-G Gap — Grid nudge + Alt bypass)**: `feat/move-003-004-grid-nudge-and-alt-bypass` (PR #185, v0.102.0).
+  - **MOVE-003**: Shift+Arrow lands each selected shape's top-left on the next grid line in the direction of motion (per-shape, GRID_SIZE = 20). No-op when snap is off.
+  - **MOVE-004**: hold Alt during nudge or Ctrl+Shift+Arrow resize to bypass `#snapToGrid` for that operation — useful for fine placements across grid lines.
+  - Editor: `#nudgeSelection` and `#resizeSelection` accept opts `{shiftToGrid, ignoreSnap}`; new shared helper `#nextGridCoord(current, dir, shiftToGrid, ignoreSnap)`.
+  - E2E: 4 new specs in `tests/e2e/move-resize-modifiers.spec.ts` under the MOVE-003/004 describe block.
+  - Release: tagged `v0.102.0` (annotated) + GitHub release notes.
 
 ### In Progress
 
@@ -371,7 +376,7 @@ and easier to batch as small follow-up stories rather than full epic slices.
 | **Canvas nav** | 4 | Outline nav, Jump-to-shape (`Ctrl+F`), Page tab color | P0 |
 | **Shape library** | 10 | Double-click chooser, Shift/Alt modifiers, Replace shape, Insert+connect | P1 |
 | **Selection** | 6 | Shift+Alt modifiers, rectangular marquee, rename-on-double-click | P1 |
-| **Move/resize** | 7 (8 → 7, MOVE-013 closed in v0.101.0) | Shift nudge, Alt ignore-grid, Ctrl+arrow step | P0 |
+| **Move/resize** | 5 (8 → 5: MOVE-013 + MOVE-003 + MOVE-004 closed in v0.101.0–v0.102.0) | Ctrl+arrow step, multi-shape proportional, advanced (group outer / centered / keyboard resize) | P1 |
 | **Connectors** | 14 | Reverse, flip, label drag, waypoint add by drag | P1 |
 | **Groups** | 13 | Collapse/expand, child lock, swimlane workflows | P1 |
 | **Pages** | 6 | Rename menu, link-to-page, page thumbnail | P1 |
@@ -381,10 +386,10 @@ and easier to batch as small follow-up stories rather than full epic slices.
 | **Import/ins** | 7 | Links, tooltips, tags, templates, import filters | P2 |
 | **Mob/a11y** | 4 | Touch, full keyboard matrix, screen reader parity | P3 |
 
-**Suggested batching** (revised after v0.101.0):
-- **P0 (next batch, target v0.102.0)**: more Move/resize modifiers (7 gaps left in the row — Shift nudge, Alt ignore-grid, Ctrl+arrow step are the natural next picks) + Canvas nav highlights (outline, page tab color).
-- **P1 (target v0.103–v0.105)**: shape-library modifiers + group cleanup + page menu + connectors polish.
-- **P2 (target v0.106+)**: tables + import expansions + style presets.
+**Suggested batching** (revised after v0.102.0):
+- **P0 (next batch, target v0.103.0)**: Canvas nav highlights (outline nav, page tab color) + 3 remaining Move/resize modifiers (`Ctrl+arrow` step, multi-shape proportional, advanced group resize).
+- **P1 (target v0.104–v0.106)**: shape-library modifiers + group cleanup + page menu + connectors polish.
+- **P2 (target v0.107+)**: tables + import expansions + style presets.
 - **P3 (deferred)**: Touch + collab per ADR-0048.
 
 ### Strategy notes
