@@ -5,9 +5,9 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.103.0 — SEL-005 (marquee mode contain vs intersect) cerrado. Cubertura 548 E2E + 220 unit + 947 cargo.**
-- Marquee selection: plain Shift+drag = contain (sólo shapes fully inside), Alt+drag = intersect (draw.io convention). Alt+Shift+drag = deselect by intersect (SEL-006).
-- E2E spec para SEL-005 sigue como TODO — el engine y el routing del editor están cubiertos por unit + code review.
+**v0.104.0 — MOVE-016 (insert-space / move-area) cerrado. Cubertura 550 E2E + 220 unit + 947 cargo.**
+- Move-area gesture: Alt+Ctrl+Shift+drag en empty area → todas las shapes cuyo bbox intersecta el rect barrido se trasladan por la delta del drag al release.
+- Suite `move-resize-modifiers` cubre 5+5+1 specs (MOVE-003, MOVE-004, MOVE-013, MOVE-016).
 - IP-G épica cerrada: `SelectionTarget = Vertex | Group | Edge` propiedad del engine, bridge WASM con `{idx, version}`, shell adapter para SEL-015/016 drill-down + Alt-bypass, edge prefiere vertex en conectores (draw.io convention).
 - Slices de la épica: 1 (typed model, v0.93.0) + 2 (engine commands, v0.94.0) + 3 (WASM contract + shell adapter, v0.95.0) + 4 (E2E parity + selection drill-down estable, v0.100.0).
 - 540/540 Playwright E2E pass, 13 skipped (pre-existing), 0 failed.
@@ -355,6 +355,12 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
   - 4 new unit tests in `selection_service.rs` (prefer vertex over edge at endpoint; click on edge alone still returns edge; alt+click branch covers).
   - E2E spec for SEL-005: TODO (engine-side behavior is unit-tested; authoring a robust E2E for the multi-modifier dispatch is deferred).
   - Release: tagged `v0.103.0` (annotated) + GitHub release notes.
+- **MOVE-016 (Post-IP-G Gap — Insert-space / move-area)**: `fix/move-016-insert-space-drag` (PR #189, v0.104.0).
+  - Alt+Ctrl+Shift+drag in empty area → translate all shapes whose bounds intersect the swept rect by the drag delta on release.
+  - Editor: new `MoveAreaState` FSM state; `#startMoveArea` / `#updateMoveArea` / `#endMoveArea` methods; `#onPointerDown` routes by modifier; `#onPointerUp` commits a single MoveVertex transaction.
+  - Snap is intentionally NOT applied — the user explicitly asked to push shapes out of the way.
+  - E2E: 1 new spec in `tests/e2e/move-resize-modifiers-move-016.spec.ts` continuing the move-resize-modifiers family.
+  - Release: tagged `v0.104.0` (annotated) + GitHub release notes.
 
 ### In Progress
 
@@ -387,7 +393,7 @@ and easier to batch as small follow-up stories rather than full epic slices.
 | **Canvas nav** | 4 | Outline nav, Jump-to-shape (`Ctrl+F`), Page tab color | P0 |
 | **Shape library** | 10 | Double-click chooser, Shift/Alt modifiers, Replace shape, Insert+connect | P1 |
 | **Selection** | 5 (6 → 5: SEL-005 closed in v0.103.0) | Shift+Alt modifiers, rectangular marquee, rename-on-double-click | P1 |
-| **Move/resize** | 5 (8 → 5: MOVE-013 + MOVE-003 + MOVE-004 closed in v0.101.0–v0.102.0) | Ctrl+arrow step, multi-shape proportional, advanced (group outer / centered / keyboard resize) | P1 |
+| **Move/resize** | 4 (8 → 4: MOVE-013 + MOVE-003 + MOVE-004 + MOVE-016 closed in v0.101.0–v0.104.0) | Ctrl+arrow step, multi-shape proportional, advanced (group outer / centered / keyboard resize) | P1 |
 | **Connectors** | 14 | Reverse, flip, label drag, waypoint add by drag | P1 |
 | **Groups** | 13 | Collapse/expand, child lock, swimlane workflows | P1 |
 | **Pages** | 6 | Rename menu, link-to-page, page thumbnail | P1 |
