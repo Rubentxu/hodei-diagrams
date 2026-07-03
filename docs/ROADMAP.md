@@ -256,15 +256,11 @@ Planning artifacts:
 
 WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bottleneck on 1k/5k/10k-shape fixtures.
 
-## 🎯 Active Track: Gaps Restantes — Post-IP-G (2026-07-03)
+## 🎯 Active Track: Interaction Parity Campaign (2026-07-01)
 
-**Strategy**: With the Interaction Parity Campaign A–G fully closed in v0.100.0, the next
-focus is the residual draw.io UX gaps that didn't fit any IP slice (~100 workflows).
-Triage by frequency of use and test cost; aim for batches of 10–20 specs per release.
+**Strategy**: Close UX/behavior gaps vs draw.io using measured evidence and ADR-driven decisions.
 
 ### Milestones Delivered (Merged to main)
-
-**Interaction Parity Campaign (closed in v0.100.0, `IP-A → IP-G`)**
 
 - **IP-A (Pan/Zoom)**: `feat/interaction-parity-pan-zoom` (PR #154).
   - Plain wheel = vertical pan, `Shift+wheel` = horizontal pan, `Ctrl/Cmd+wheel` = zoom.
@@ -316,22 +312,24 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
   - Scene: `SceneBuilder` filters hidden layers.
   - Web-shell: Layers panel + minimum viable layer workflows E2E.
   - Doc reconciliation: Updated workflows catalog, ROADMAP, ADR-0081 footer.
-- **IP-G (Selection v2 — Engine-Owned Typed Selection)**: `selection-v2-engine-owned` (PRs #170, #171, #172, #179 — all 4 slices merged, v0.100.0).
-  - Slices: 1 (v0.93.0 #170 typed model) + 2 (v0.94.0 #171 engine `SelectionService`) + 3 (v0.95.0 #172 WASM boundary + Web Shell adapter) + 4 (v0.100.0 #179 E2E parity + viewBox fix + edge-prefers-vertex + stencil manager refactor).
-  - Scope: Typed `SelectionTarget = Vertex | Group | Edge` owned by Diagram Engine; WASM boundary contract (`resolve_selection` / `select_target` / `get_selection` / `clear_selection`); Web Shell adapter replacing PR #169 partial behavior.
-  - ADR: ADR-0082 (engine-owned typed selection semantics) — **RESOLVED**.
-  - Closing fixes in v0.100.0:
-    - SelectionTarget serde uses `{idx, version}` SlotmapId format (slice 3).
-    - Web Shell dispatches per target type: `data-vertex-id` / `data-group-id` / `data-edge-id`.
-    - `Editor.#clientToDoc` accounts for non-zero SVG `viewBox` origins.
-    - `SelectionService::resolve` defers edges to non-edge hits at connector endpoints so plain click + Alt+click select the vertex (draw.io convention).
-    - `Editor.#onPointerDown` defers to engine when DOM hit-test finds only an edge endpoint.
-    - `StencilLibraryManager` registers via `DiagramEngineSession.setStencilLibrary` (eliminates latent stale-handle risk when first handle was 0).
-  - Release: tagged `v0.100.0` (annotated) + GitHub release notes.
 
 ### In Progress
 
-_(none — IP-G closed in v0.100.0; Campaign A–G ended)_
+_(none — IP-G completed in v0.100.0)_
+
+## 🎯 Recently Closed Tracks
+
+- **IP-G (Selection v2 — Engine-Owned Typed Selection)**: `selection-v2-engine-owned` (all 4 slices merged, v0.100.0).
+  - Slices 1 (v0.93.0 PR #170) + 2 (v0.94.0 PR #171) + 3 (v0.95.0 PR #172) + 4 (v0.100.0 PR #179) all merged.
+  - Scope: Typed `SelectionTarget = Vertex | Group | Edge` owned by Diagram Engine; WASM boundary contract; Web Shell adapter for SEL-015/016 drill-down + Alt-bypass; supersedes partial PR #169 behavior.
+  - ADR: ADR-0082 (engine-owned typed selection semantics).
+  - Closing fixes in v0.100.0:
+    - SelectionTarget now Vertex|Group|Edge with `{idx, version}` SlotmapId format (slice 3).
+    - Web Shell uses `data-vertex-id` / `data-group-id` / `data-edge-id` per target type.
+    - `Editor.#clientToDoc` accounts for non-zero SVG `viewBox` origins (PR within #179).
+    - `SelectionService::resolve` defers edges to non-edge hits at connector endpoints so plain click + Alt+click select the vertex (draw.io convention).
+    - `Editor.#onPointerDown` defers to engine when DOM hit-test finds only an edge endpoint.
+    - `StencilLibraryManager` registers via `DiagramEngineSession.setStencilLibrary` (eliminated latent stale-handle risk).
 
 ### Strategy Artifacts
 
@@ -340,42 +338,30 @@ _(none — IP-G closed in v0.100.0; Campaign A–G ended)_
 - `docs/adr/0081-layer-model-gap-deferred.md` — **Resolved** (IP-F v0.91.0)
 - `docs/drawio-user-interaction-workflows.md`
 
-## 🎯 Gaps Restantes — Post-IP-G (~100 workflows)
+## 🎯 Interaction Parity Campaign — Gaps Restantes (~100 workflows)
 
-With IP-A through IP-G closed in v0.100.0, ~100 draw.io workflows remain as individual gaps.
-The workflow catalog (`docs/drawio-user-interaction-workflows.md`) shows ~165 total workflows:
-~38 covered, ~27 partial, ~100 remaining. The IP slices consolidated the highest-impact,
-keyboard-and-mouse centered work; what remains is more atomic, one or two flows per item,
-and easier to batch as small follow-up stories rather than full epic slices.
-
-### Triage
+IP-A through IP-F are complete. The workflow catalog (`docs/drawio-user-interaction-workflows.md`) shows ~165 total workflows, of which ~38 are covered, ~27 are partial, and ~100 remain as gaps.
 
 | Área | Gaps | Ejemplos clave | Prioridad |
 |------|------|----------------|-----------|
-| **Canvas nav** | 4 | Outline nav, Jump-to-shape (`Ctrl+F`), Page tab color | P0 |
+| **Canvas nav** | 4 | Shift-wheel, Ctrl-wheel, Arrow-key pan (no selection), Outline nav | P0 |
 | **Shape library** | 10 | Double-click chooser, Shift/Alt modifiers, Replace shape, Insert+connect | P1 |
-| **Selection** | 6 | Shift+Alt modifiers, rectangular marquee, rename-on-double-click | P1 |
-| **Move/resize** | 8 | Shift nudge, Alt ignore-grid, Ctrl+Shift+arrow step | P0 |
-| **Connectors** | 14 | Reverse, flip, label drag, waypoint add by drag | P1 |
-| **Groups** | 13 | Collapse/expand, child lock, swimlane workflows | P1 |
-| **Pages** | 6 | Rename menu, link-to-page, page thumbnail | P1 |
-| **Tables** | 8 | Toda el área (deferred P2 per ADR) | P2 |
-| **Style** | 6 | Default style presets, quick-style, style library | P1 |
+| **Selection** | 6 | Shift+Alt modifiers, proportional resize, drill-down | P0 |
+| **Move/resize** | 8 | Shift nudge, Alt ignore-grid, Shift proportional, Ctrl+Shift+arrow | P1 |
+| **Connectors** | 14 | Shift fixed-point, Alt connect-anywhere, reverse, flip, label drag | P0 |
+| **Groups** | 13 | Drill-down, collapse/expand, lock, swimlane workflows | P1 |
+| **Pages** | 6 | Rename menu, duplicate, reorder, link-to-page, background | P1 |
+| **Tables** | 8 | Toda el área (deferred P2) | P2 |
+| **Style** | 6 | Alt+C/V copy/paste, Ctrl+Shift+D/R default style | P1 |
 | **Text/labels** | 4 | Text chooser, Ctrl+Shift numpad, rich portions | P1 |
-| **Import/ins** | 7 | Links, tooltips, tags, templates, import filters | P2 |
-| **Mob/a11y** | 4 | Touch, full keyboard matrix, screen reader parity | P3 |
+| **Import/ins** | 7 | Links, tooltips, tags, templates | P2 |
+| **Mob/a11y** | 4 | Touch, full keyboard matrix, collab | P3 |
 
-**Suggested batching** (revised after v0.100.0):
-- **P0 (next batch, target v0.101.0)**: move/resize modifiers — small, well-bounded, no engine changes.
-- **P1 (target v0.102–v0.104)**: shape-library modifiers + group cleanup + page menu + connectors polish.
-- **P2 (target v0.105+)**: tables + import expansions + style presets.
-- **P3 (deferred)**: Touch + collab per ADR-0048.
-
-### Strategy notes
-- After IP-G, selection modes are stable (`Mod-N` matrix in `selection-modifiers.spec.ts`).
-  Selection-adjacent work should land as small spec additions rather than new epic slices.
-- Connector work is mostly WASM serialization + UI; no engine redesign needed.
-- Each batch should ship with E2E specs as the primary deliverable (per ADR-0075).
+**Prioritización sugerida**:
+- **P0**: Canvas nav (Space-drag, Home), Selection (Alt+drag, Tab cycle), Connectors (Shift fixed-point, Alt connect-anywhere)
+- **P1**: Shape library modifiers, Move/resize modifiers, Group drill-down, Style copy/paste
+- **P2**: Tables, Import/ins (templates, tags)
+- **P3**: Deferred — Touch, collab (ADR-0048)
 
 ---
 
