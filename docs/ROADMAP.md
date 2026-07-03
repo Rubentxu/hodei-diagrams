@@ -5,7 +5,10 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.100.0 — IP-G (Selection v2 Engine-Owned) cerrado. Cubertura 540 E2E + 220 unit + 947 cargo.**
+**v0.101.0 — MOVE-013 (Keyboard resize Ctrl+Shift+Arrow) cerrado. Cubertura 545 E2E + 220 unit + 947 cargo.**
+- Primer gap del backlog post-IP-G cerrado.
+- Effect: `Ctrl+Shift+Arrow` resizes selected shapes (Left/Right width, Up/Down height, ±1 unit). Multi-selection resizes each shape as one atomic MoveVertex transaction.
+- Latent fix: `#nudgeSelection` now sends a complete CellGeometry, restoring MoveVertex reliability on selections with accumulated transforms.
 - IP-G épica cerrada: `SelectionTarget = Vertex | Group | Edge` propiedad del engine, bridge WASM con `{idx, version}`, shell adapter para SEL-015/016 drill-down + Alt-bypass, edge prefiere vertex en conectores (draw.io convention).
 - Slices de la épica: 1 (typed model, v0.93.0) + 2 (engine commands, v0.94.0) + 3 (WASM contract + shell adapter, v0.95.0) + 4 (E2E parity + selection drill-down estable, v0.100.0).
 - 540/540 Playwright E2E pass, 13 skipped (pre-existing), 0 failed.
@@ -329,6 +332,14 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
     - `StencilLibraryManager` registers via `DiagramEngineSession.setStencilLibrary` (eliminates latent stale-handle risk when first handle was 0).
   - Release: tagged `v0.100.0` (annotated) + GitHub release notes.
 
+- **MOVE-013 (Post-IP-G Gap — Keyboard resize via Ctrl+Shift+Arrow)**: `feat/move-013-keyboard-resize` (PR #182, v0.101.0).
+  - Editor: new `Ctrl+Shift+Arrow` branch in `#onKeyDown` + `#resizeSelection(dw, dh)` sibling to `#nudgeSelection`.
+  - Behavior: Left/Right adjusts width, Up/Down adjusts height, ±1 user-unit per press. Multi-selection resizes each shape via a single atomic MoveVertex transaction.
+  - Snap: when grid snap is enabled, the shape's origin (x, y) snaps to the nearest grid line so the shape stays anchored at its top-left corner (draw.io parity).
+  - Latent fix in passing: `#nudgeSelection` now sends a complete `CellGeometry` (rotation, flip_h, flip_v), restoring MoveVertex reliability on selections with accumulated transforms.
+  - E2E: `tests/e2e/move-resize-modifiers.spec.ts` (MOVE-prefix suite, 5 cases).
+  - Release: tagged `v0.101.0` (annotated) + GitHub release notes.
+
 ### In Progress
 
 _(none — IP-G closed in v0.100.0; Campaign A–G ended)_
@@ -360,7 +371,7 @@ and easier to batch as small follow-up stories rather than full epic slices.
 | **Canvas nav** | 4 | Outline nav, Jump-to-shape (`Ctrl+F`), Page tab color | P0 |
 | **Shape library** | 10 | Double-click chooser, Shift/Alt modifiers, Replace shape, Insert+connect | P1 |
 | **Selection** | 6 | Shift+Alt modifiers, rectangular marquee, rename-on-double-click | P1 |
-| **Move/resize** | 8 | Shift nudge, Alt ignore-grid, Ctrl+Shift+arrow step | P0 |
+| **Move/resize** | 7 (8 → 7, MOVE-013 closed in v0.101.0) | Shift nudge, Alt ignore-grid, Ctrl+arrow step | P0 |
 | **Connectors** | 14 | Reverse, flip, label drag, waypoint add by drag | P1 |
 | **Groups** | 13 | Collapse/expand, child lock, swimlane workflows | P1 |
 | **Pages** | 6 | Rename menu, link-to-page, page thumbnail | P1 |
@@ -370,10 +381,10 @@ and easier to batch as small follow-up stories rather than full epic slices.
 | **Import/ins** | 7 | Links, tooltips, tags, templates, import filters | P2 |
 | **Mob/a11y** | 4 | Touch, full keyboard matrix, screen reader parity | P3 |
 
-**Suggested batching** (revised after v0.100.0):
-- **P0 (next batch, target v0.101.0)**: move/resize modifiers — small, well-bounded, no engine changes.
-- **P1 (target v0.102–v0.104)**: shape-library modifiers + group cleanup + page menu + connectors polish.
-- **P2 (target v0.105+)**: tables + import expansions + style presets.
+**Suggested batching** (revised after v0.101.0):
+- **P0 (next batch, target v0.102.0)**: more Move/resize modifiers (7 gaps left in the row — Shift nudge, Alt ignore-grid, Ctrl+arrow step are the natural next picks) + Canvas nav highlights (outline, page tab color).
+- **P1 (target v0.103–v0.105)**: shape-library modifiers + group cleanup + page menu + connectors polish.
+- **P2 (target v0.106+)**: tables + import expansions + style presets.
 - **P3 (deferred)**: Touch + collab per ADR-0048.
 
 ### Strategy notes
