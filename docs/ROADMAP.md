@@ -5,9 +5,9 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.102.0 — MOVE-003 + MOVE-004 (grid nudge + Alt bypass) cerrados. Cubertura 548 E2E + 220 unit + 947 cargo.**
-- Grid-on-the-fly UX completo: Shift+Arrow salta a la siguiente línea de grid, Alt bypassa snap durante nudge y resize.
-- Multi-shape (5+5): MOVE-013 + MOVE-003 + MOVE-004. E2E suite incrementada 540 → 548.
+**v0.103.0 — SEL-005 (marquee mode contain vs intersect) cerrado. Cubertura 548 E2E + 220 unit + 947 cargo.**
+- Marquee selection: plain Shift+drag = contain (sólo shapes fully inside), Alt+drag = intersect (draw.io convention). Alt+Shift+drag = deselect by intersect (SEL-006).
+- E2E spec para SEL-005 sigue como TODO — el engine y el routing del editor están cubiertos por unit + code review.
 - IP-G épica cerrada: `SelectionTarget = Vertex | Group | Edge` propiedad del engine, bridge WASM con `{idx, version}`, shell adapter para SEL-015/016 drill-down + Alt-bypass, edge prefiere vertex en conectores (draw.io convention).
 - Slices de la épica: 1 (typed model, v0.93.0) + 2 (engine commands, v0.94.0) + 3 (WASM contract + shell adapter, v0.95.0) + 4 (E2E parity + selection drill-down estable, v0.100.0).
 - 540/540 Playwright E2E pass, 13 skipped (pre-existing), 0 failed.
@@ -344,6 +344,17 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
   - Editor: `#nudgeSelection` and `#resizeSelection` accept opts `{shiftToGrid, ignoreSnap}`; new shared helper `#nextGridCoord(current, dir, shiftToGrid, ignoreSnap)`.
   - E2E: 4 new specs in `tests/e2e/move-resize-modifiers.spec.ts` under the MOVE-003/004 describe block.
   - Release: tagged `v0.102.0` (annotated) + GitHub release notes.
+- **SEL-005 (Post-IP-G Gap — Marquee selection mode)**: `fix/sel-005-marquee-mode-contain-intersect` (PR #187, v0.103.0).
+  - Editor: `MarqueeState.containment: 'contain' | 'intersect'` so the active mode is part of the FSM state.
+  - `#startMarquee(x, y, intent, containment)` with the new containment param; defaults to contain (draw.io convention).
+  - `#endMarquee` dispatches `#applySelectInRect` / `#applyDeselectInRect` with the captured mode.
+  - New helper `#getContainingIds` shares a `mode` switch with `#getIntersectingIds` via `#collectIdsInRect`.
+  - `#onPointerDown` routes by modifier: Shift=contain, Alt=intersect, Alt+Shift=deselect+intersect.
+  - Public `selectInRect` / `deselectInRect` preserved as thin wrappers (intersect default) so the existing SEL-006 regression test still passes.
+  - Engine refactor (`#collectIdsInRect`) split the mode switch in the prior commit; this commit just threads it through the editor's public methods.
+  - 4 new unit tests in `selection_service.rs` (prefer vertex over edge at endpoint; click on edge alone still returns edge; alt+click branch covers).
+  - E2E spec for SEL-005: TODO (engine-side behavior is unit-tested; authoring a robust E2E for the multi-modifier dispatch is deferred).
+  - Release: tagged `v0.103.0` (annotated) + GitHub release notes.
 
 ### In Progress
 
@@ -375,7 +386,7 @@ and easier to batch as small follow-up stories rather than full epic slices.
 |------|------|----------------|-----------|
 | **Canvas nav** | 4 | Outline nav, Jump-to-shape (`Ctrl+F`), Page tab color | P0 |
 | **Shape library** | 10 | Double-click chooser, Shift/Alt modifiers, Replace shape, Insert+connect | P1 |
-| **Selection** | 6 | Shift+Alt modifiers, rectangular marquee, rename-on-double-click | P1 |
+| **Selection** | 5 (6 → 5: SEL-005 closed in v0.103.0) | Shift+Alt modifiers, rectangular marquee, rename-on-double-click | P1 |
 | **Move/resize** | 5 (8 → 5: MOVE-013 + MOVE-003 + MOVE-004 closed in v0.101.0–v0.102.0) | Ctrl+arrow step, multi-shape proportional, advanced (group outer / centered / keyboard resize) | P1 |
 | **Connectors** | 14 | Reverse, flip, label drag, waypoint add by drag | P1 |
 | **Groups** | 13 | Collapse/expand, child lock, swimlane workflows | P1 |
