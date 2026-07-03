@@ -36,39 +36,67 @@ impl<'a> SelectionService<'a> {
 
         if modifiers.alt {
             // Alt+click: bypass group, select topmost child (SEL-016)
-            // But if NO child exists at this point, fall back to the group itself
+            // But if NO child exists at this point, fall back to the group itself.
+            // Edges are also skipped for the same reason as groups: connect-mode
+            // needs a vertex/cycle target, not the edge itself. If the only thing
+            // at the click point is an edge endpoint with no underlying shape,
+            // fall back to the edge (covers clicking mid-line, away from any
+            // endpoint).
             let mut group_fallback: Option<SelectionTarget> = None;
+            let mut edge_fallback: Option<SelectionTarget> = None;
 
             for hit in &hits {
                 let target: SelectionTarget = hit.clone().into();
                 if let SelectionTarget::Group(_) = &target {
-                    // Remember this group as fallback (SEL-016: empty group area case)
                     if group_fallback.is_none() && !target.is_locked(self.model) {
                         group_fallback = Some(target.clone());
                     }
-                    continue; // skip groups first
+                    continue;
+                }
+                if let SelectionTarget::Edge(_) = &target {
+                    if edge_fallback.is_none() && !target.is_locked(self.model) {
+                        edge_fallback = Some(target.clone());
+                    }
+                    continue;
                 }
                 if !target.is_locked(self.model) {
-                    return target; // found an unlocked non-group child
+                    return target; // unlocked vertex/group-less target
                 }
             }
 
-            // No non-group child found — if we hit a group area, select the group (SEL-016 empty area case)
+            // No non-group/non-edge child found — fall back to group first
+            // (SEL-016 empty group case), then to edge (mid-line click).
             if let Some(group) = group_fallback {
                 return group;
             }
-
+            if let Some(edge) = edge_fallback {
+                return edge;
+            }
             return SelectionTarget::None;
         }
 
-        // Plain click: select topmost unlocked target (SEL-015)
+        // Plain click: select topmost unlocked target (SEL-015).
+        // Edges that share a point with a vertex (the connection point) defer
+        // to the vertex — drawing convention is "vertices are on top of the
+        // edges that connect to them", so clicking the endpoint selects the
+        // vertex, not the edge (the edge is still selectable by clicking on
+        // the line itself, away from any endpoint).
+        let mut edge_fallback: Option<SelectionTarget> = None;
         for hit in &hits {
             let target: SelectionTarget = hit.clone().into();
-            if !target.is_locked(self.model) {
-                return target;
+            if target.is_locked(self.model) {
+                continue;
+            }
+            match target {
+                SelectionTarget::Edge(edge_id) => {
+                    if edge_fallback.is_none() {
+                        edge_fallback = Some(SelectionTarget::Edge(edge_id));
+                    }
+                }
+                _ => return target,
             }
         }
-        SelectionTarget::None
+        edge_fallback.unwrap_or(SelectionTarget::None)
     }
 }
 
@@ -238,6 +266,46 @@ mod tests {
     }
 
     // ─── is_locked unit tests ────────────────────────────────────────────────────
+
+    /// Test: Plain click at a point where a vertex and an edge coincide (the
+    /// edge endpoint that connects the vertex) prefers the vertex. Without
+    /// this preference, clicking on the geometric center of a shape that
+    /// has an incoming edge would silently select the edge, breaking
+    /// selection-on-shape in fixtures where vertices overlap their own
+    /// incoming edges (e.g. two-shapes.drawio).
+    #[test]
+    fn test_plain_click_prefers_vertex_over_edge_at_endpoint() {
+        let vid = diagram_core::VertexId::default();
+        let eid = diagram_core::EdgeId::default();
+        // Topmost hits first — edge rendered on top of vertex.
+        let hit_tester = MockHitTester {
+            hits: vec![HitResult::Edge(eid), HitResult::Vertex(vid)],
+        };
+        let model = make_model();
+        let service = SelectionService::new(&hit_tester, &model);
+        let mods = SelectionModifiers::default();
+
+        let result = service.resolve(0.0, 0.0, &mods);
+        assert!(matches!(result, SelectionTarget::Vertex(v) if v == vid));
+    }
+
+    /// Test: Plain click on the edge itself (no overlapping vertex) keeps
+    /// returning the edge. The preference only kicks in when a vertex
+    /// actually shares the click point — clicking on a regular edge
+    /// segment still selects the edge.
+    #[test]
+    fn test_plain_click_on_edge_alone_still_returns_edge() {
+        let eid = diagram_core::EdgeId::default();
+        let hit_tester = MockHitTester {
+            hits: vec![HitResult::Edge(eid)],
+        };
+        let model = make_model();
+        let service = SelectionService::new(&hit_tester, &model);
+        let mods = SelectionModifiers::default();
+
+        let result = service.resolve(0.0, 0.0, &mods);
+        assert!(matches!(result, SelectionTarget::Edge(e) if e == eid));
+    }
 
     /// Unit test: is_locked() returns true for a group that has locked=true.
     ///

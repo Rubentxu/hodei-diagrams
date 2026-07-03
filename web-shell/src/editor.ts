@@ -372,11 +372,8 @@ export class Editor {
       this.#onError(result.error);
       return;
     }
-    // Convert engine target to DOM SlotmapId and update DOM selection
-    const id = this.#engineTargetToSlotmapId(target);
-    if (id) {
-      this.#applySelection(new Set([id]));
-    }
+    // Use typed DOM selection so Group/Edge targets get correct attribute
+    this.#applyTarget(target);
   }
 
   /**
@@ -2244,7 +2241,7 @@ export class Editor {
     if (svg) {
       const viewBox = svg.getAttribute('viewBox');
       if (viewBox) {
-        const parts = viewBox.split(/\s+/).map(Number);
+        const parts = viewBox.trim().split(/[\s,]+/).map(Number);
         if (parts.length === 4) {
           const vbX = parts[0]!;
           const vbY = parts[1]!;
@@ -2254,8 +2251,8 @@ export class Editor {
           const scaleX = vbW / svgRect.width;
           const scaleY = vbH / svgRect.height;
           return {
-            x: (clientX - svgRect.left) * scaleX,
-            y: (clientY - svgRect.top) * scaleY,
+            x: vbX + (clientX - svgRect.left) * scaleX,
+            y: vbY + (clientY - svgRect.top) * scaleY,
           };
         }
       }
@@ -2479,15 +2476,21 @@ export class Editor {
 
   /**
    * Apply a new selection set, update CSS classes, and notify listeners.
-   * @param next New selection set
+   * @param next New selection set (legacy, treats all IDs as vertices)
    */
   #applySelection(next: Set<SlotmapId>): void {
     // Remove .selected from all elements
     this.#viewer.querySelectorAll('[data-vertex-id]').forEach((el) => {
       el.classList.remove('selected');
     });
+    this.#viewer.querySelectorAll('[data-group-id]').forEach((el) => {
+      el.classList.remove('selected');
+    });
+    this.#viewer.querySelectorAll('[data-edge-id]').forEach((el) => {
+      el.classList.remove('selected');
+    });
     this.#selection = next;
-    // Add .selected to all selected elements
+    // Add .selected to all selected elements (legacy: all IDs treated as vertices)
     for (const id of this.#selection) {
       const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
       const el = this.#viewer.querySelector(selector);
@@ -2499,6 +2502,54 @@ export class Editor {
     this.#notifySelectionChange();
 
     // Re-render resize handles when selection changes
+    this.#resizeHandles.render(this.#selection);
+  }
+
+  /**
+   * Apply selection for a typed engine target, using the correct DOM attribute.
+   * - Vertex → [data-vertex-id]
+   * - Group  → [data-group-id]
+   * - Edge   → [data-edge-id]
+   */
+  #applyTarget(target: SelectionTarget): void {
+    // Remove .selected from all element types
+    this.#viewer.querySelectorAll('[data-vertex-id]').forEach((el) => {
+      el.classList.remove('selected');
+    });
+    this.#viewer.querySelectorAll('[data-group-id]').forEach((el) => {
+      el.classList.remove('selected');
+    });
+    this.#viewer.querySelectorAll('[data-edge-id]').forEach((el) => {
+      el.classList.remove('selected');
+    });
+
+    const { id, attribute } = (() => {
+      switch (target.type) {
+        case 'Vertex':
+          return { id: target.id, attribute: 'data-vertex-id' };
+        case 'Group':
+          return { id: target.id, attribute: 'data-group-id' };
+        case 'Edge':
+          return { id: target.id, attribute: 'data-edge-id' };
+        case 'None':
+        default:
+          return { id: null, attribute: null };
+      }
+    })();
+
+    if (id && attribute) {
+      const selector = `[${attribute}="${id.idx}:${id.version}"]`;
+      const el = this.#viewer.querySelector(selector);
+      if (el) {
+        el.classList.add('selected');
+      }
+      // Update internal SlotmapId set for resize handles
+      this.#selection = new Set([id]);
+    } else {
+      this.#selection = new Set();
+    }
+
+    this.#notifySelectionChange();
     this.#resizeHandles.render(this.#selection);
   }
 
@@ -2535,12 +2586,15 @@ export class Editor {
       this.#notifySelectionChange();
     }
 
-    // Re-apply CSS class to DOM elements
+    // Re-apply CSS class to DOM elements (check all attribute types)
     for (const id of this.#selection) {
-      const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
-      const el = this.#viewer.querySelector(selector);
-      if (el) {
-        el.classList.add('selected');
+      for (const attr of ['data-vertex-id', 'data-group-id', 'data-edge-id']) {
+        const selector = `[${attr}="${id.idx}:${id.version}"]`;
+        const el = this.#viewer.querySelector(selector);
+        if (el) {
+          el.classList.add('selected');
+          break; // found — don't check other attributes
+        }
       }
     }
   }
@@ -2791,6 +2845,43 @@ export class Editor {
       // Try edge hit testing as fallback
       const edgeHit = this.#hitTestEdge(e);
       if (edgeHit) {
+        // Edge endpoints visually overlap with their source/target vertex on
+        // the SVG. The DOM hit-test returns the edge line (drawn on top), but
+        // the engine's selection semantics prefer the vertex — defer to it.
+        // Engine returns Vertex|Group|Edge|None; on a real edge click away
+        // from any endpoint it returns Edge and we fall through to edge
+        // selection below.
+        const docPos = this.#clientToDoc(e.clientX, e.clientY);
+        const modifiers: SelectionModifiers = {
+          alt: e.altKey,
+          shift: e.shiftKey,
+          ctrl: e.ctrlKey,
+          meta: e.metaKey,
+        };
+        const engineTarget = this.resolveSelection(docPos.x, docPos.y, modifiers);
+        if (engineTarget && engineTarget.type !== 'None') {
+          const id = this.#engineTargetToSlotmapId(engineTarget);
+          if (id) {
+            if (e.shiftKey) this.toggleSelection(id);
+            else if (e.ctrlKey || e.metaKey) this.addToSelection(id);
+            else this.selectOnly(id);
+            // Drag tracking for non-empty vertex hit (mirror the shape hit path)
+            this.#viewer.setPointerCapture(e.pointerId);
+            this.#dragState = {
+              vertexId: id,
+              startX: docPos.x,
+              startY: docPos.y,
+              currentX: docPos.x,
+              currentY: docPos.y,
+            };
+            this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+            this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+            this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+            return;
+          }
+        }
+        // Engine confirmed the click is on an edge (mid-line) — fall back
+        // to the existing edge selection behavior.
         this.#selectEdge(edgeHit);
         return;
       }
@@ -2854,35 +2945,32 @@ export class Editor {
       return;
     }
 
-    // Convert engine target to SlotmapId for DOM selection
-    const id = this.#engineTargetToSlotmapId(target);
-    if (!id) {
-      // Unknown target type — should not happen
-      return;
-    }
-
     // Apply selection based on modifiers
+    // Extract id here for dragState — use #applyTarget for typed plain-click selection
+    const id = this.#engineTargetToSlotmapId(target);
     if (e.shiftKey) {
       // Shift+click: toggle in selection
-      this.toggleSelection(id);
+      if (id) this.toggleSelection(id);
     } else if (e.ctrlKey || e.metaKey) {
       // Cmd/Ctrl+click: add to selection
-      this.addToSelection(id);
+      if (id) this.addToSelection(id);
     } else {
-      // Plain click: select only
-      this.selectOnly(id);
+      // Plain click: select only — use typed target so Group/Edge gets correct DOM attribute
+      this.selectTarget(target);
     }
 
     // Set pointer capture and start drag tracking
     this.#viewer.setPointerCapture(e.pointerId);
 
-    this.#dragState = {
-      vertexId: id,
-      startX: docPos.x,
-      startY: docPos.y,
-      currentX: docPos.x,
-      currentY: docPos.y,
-    };
+    if (id) {
+      this.#dragState = {
+        vertexId: id,
+        startX: docPos.x,
+        startY: docPos.y,
+        currentX: docPos.x,
+        currentY: docPos.y,
+      };
+    }
 
     // Add drag-specific listeners (stored references for cleanup)
     this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
