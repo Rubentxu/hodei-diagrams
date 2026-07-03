@@ -5,9 +5,10 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.104.0 — MOVE-016 (insert-space / move-area) cerrado. Cubertura 550 E2E + 220 unit + 947 cargo.**
-- Move-area gesture: Alt+Ctrl+Shift+drag en empty area → todas las shapes cuyo bbox intersecta el rect barrido se trasladan por la delta del drag al release.
-- Suite `move-resize-modifiers` cubre 5+5+1 specs (MOVE-003, MOVE-004, MOVE-013, MOVE-016).
+**v0.105.0 — Fix MoveVertex payload (rotation/flip preservado) shipped. Cubertura 550 E2E + 220 unit + 947 cargo.**
+- **Bug crítico del usuario** (post-v0.104.0): drag, inspector position, y resize handles silenciosamente no hacían nada porque `MoveVertex` payload omitía `rotation/flip_h/flip_v`. La E2E suite pasaba por la razón equivocada (no verificaba que la x cambiara).
+- Fix: `#findOriginalGeometry` ahora devuelve la geometría completa; `#buildMoveVertexCmd` y la facade `setVertexGeometry` propagan los 8 campos. Regression test `tests/e2e/move-vertex-rotation.spec.ts` que sí verifica el cambio de x.
+- La rotación por Ctrl+R / Shift+R / H / V ya funcionaba (usa `RotateVertex` payload, no `MoveVertex`).
 - IP-G épica cerrada: `SelectionTarget = Vertex | Group | Edge` propiedad del engine, bridge WASM con `{idx, version}`, shell adapter para SEL-015/016 drill-down + Alt-bypass, edge prefiere vertex en conectores (draw.io convention).
 - Slices de la épica: 1 (typed model, v0.93.0) + 2 (engine commands, v0.94.0) + 3 (WASM contract + shell adapter, v0.95.0) + 4 (E2E parity + selection drill-down estable, v0.100.0).
 - 540/540 Playwright E2E pass, 13 skipped (pre-existing), 0 failed.
@@ -355,6 +356,12 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
   - 4 new unit tests in `selection_service.rs` (prefer vertex over edge at endpoint; click on edge alone still returns edge; alt+click branch covers).
   - E2E spec for SEL-005: TODO (engine-side behavior is unit-tested; authoring a robust E2E for the multi-modifier dispatch is deferred).
   - Release: tagged `v0.103.0` (annotated) + GitHub release notes.
+- **MoveVertex payload missing rotation (v0.105.0 critical fix)**: PR #191 `fix/movevertex-rotation-fix`.
+  - User reported: shape creation / move / resize / rotate not working.
+  - Rotation was a red herring (Ctrl+R / H / V use `RotateVertex` and already worked). The actual bug: `MoveVertex` JSON omitted `rotation / flip_h / flip_v`, so the engine's `CellGeometry` deserializer rejected the command with `InvalidCommand: missing field \`rotation\`` and the action was silently dropped.
+  - Fix: `#findOriginalGeometry` returns the full geometry (8 fields); `#buildMoveVertexCmd` and `#setVertexGeometry` propagate the full set; 5 internal call sites spread rotation/flip/relative from `orig`.
+  - E2E: new regression `tests/e2e/move-vertex-rotation.spec.ts` (1 spec) verifies that drag actually changes the data-vertex-id x attribute. The existing drag test only verified the SVG is still visible, so it was passing for the wrong reason.
+
 - **MOVE-016 (Post-IP-G Gap — Insert-space / move-area)**: `fix/move-016-insert-space-drag` (PR #189, v0.104.0).
   - Alt+Ctrl+Shift+drag in empty area → translate all shapes whose bounds intersect the swept rect by the drag delta on release.
   - Editor: new `MoveAreaState` FSM state; `#startMoveArea` / `#updateMoveArea` / `#endMoveArea` methods; `#onPointerDown` routes by modifier; `#onPointerUp` commits a single MoveVertex transaction.
