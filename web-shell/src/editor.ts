@@ -549,11 +549,18 @@ export class Editor {
     for (const id of this.#selection) {
       const orig = this.#findOriginalGeometry(id);
       if (!orig) continue;
+      // Carry rotation/flip/relative through. Without these, the engine's
+      // MoveVertex deserializer fails with "missing field `rotation`" and
+      // the move silently does nothing.
       const newGeom = {
         x: orig.x + dx,
         y: orig.y + dy,
         width: orig.width,
         height: orig.height,
+        rotation: orig.rotation,
+        flip_h: orig.flip_h,
+        flip_v: orig.flip_v,
+        relative: orig.relative,
       };
       commands.push(this.#buildMoveVertexCmd(id, newGeom));
     }
@@ -912,7 +919,7 @@ export class Editor {
       .filter(
         (
           b,
-        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } =>
+        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number; rotation: number; flip_h: boolean; flip_v: boolean; relative: boolean } } =>
           b.geom !== null,
       );
 
@@ -974,7 +981,7 @@ export class Editor {
       .filter(
         (
           b,
-        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } =>
+        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number; rotation: number; flip_h: boolean; flip_v: boolean; relative: boolean } } =>
           b.geom !== null,
       );
 
@@ -1040,7 +1047,7 @@ export class Editor {
       .filter(
         (
           b,
-        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number } } =>
+        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number; rotation: number; flip_h: boolean; flip_v: boolean; relative: boolean } } =>
           b.geom !== null,
       );
 
@@ -3255,6 +3262,11 @@ export class Editor {
    * Public facade to mutate the geometry of a single vertex.
    * Dispatches a MoveVertex command using absolute geometry.
    * Clamps non-positive width/height and ignores NaN inputs.
+   *
+   * The caller MAY pass only {x, y, width, height}; rotation/flip_h/flip_v
+   * will be inherited from the current scene-cache geometry of the same
+   * vertex. This preserves rotation and flips when the inspector or
+   * resize handles adjust position or size.
    */
   setVertexGeometry(
     id: SlotmapId,
@@ -3271,16 +3283,54 @@ export class Editor {
     ) {
       return; // ignore invalid — UI should clamp before calling
     }
-    this.#session.executeCommands([this.#buildMoveVertexCmd(id, geom)]);
+    // Inherit rotation/flip from the existing geometry so that a drag
+    // (or an inspector position edit) doesn't accidentally clear them.
+    const current = this.#findOriginalGeometry(id);
+    const fullGeom =
+      current !== null
+        ? {
+            x: geom.x,
+            y: geom.y,
+            width: geom.width,
+            height: geom.height,
+            rotation: current.rotation,
+            flip_h: current.flip_h,
+            flip_v: current.flip_v,
+            relative: false,
+          }
+        : {
+            x: geom.x,
+            y: geom.y,
+            width: geom.width,
+            height: geom.height,
+            rotation: 0,
+            flip_h: false,
+            flip_v: false,
+            relative: false,
+          };
+    this.#session.executeCommands([this.#buildMoveVertexCmd(id, fullGeom)]);
     this.#replay();
   }
 
   // ─── Command Builders ─────────────────────────────────────────────────────
 
-  /** Build a MoveVertex command JSON string. Uses absolute geometry. */
+  /**
+   * Build a MoveVertex command JSON string. The geometry must be a full
+   * `CellGeometry` (x, y, width, height, rotation, flip_h, flip_v,
+   * relative). Missing any of these fails serde validation in the engine.
+   */
   #buildMoveVertexCmd(
     vid: SlotmapId,
-    newGeom: { x: number; y: number; width: number; height: number },
+    newGeom: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      rotation: number;
+      flip_h: boolean;
+      flip_v: boolean;
+      relative: boolean;
+    },
   ): string {
     return JSON.stringify({
       MoveVertex: {
@@ -3290,7 +3340,10 @@ export class Editor {
           y: newGeom.y,
           width: newGeom.width,
           height: newGeom.height,
-          relative: false,
+          relative: newGeom.relative,
+          rotation: newGeom.rotation,
+          flip_h: newGeom.flip_h,
+          flip_v: newGeom.flip_v,
         },
       },
     });
@@ -3454,6 +3507,13 @@ export class Editor {
       y: orig.y + dy,
       width: orig.width,
       height: orig.height,
+      // Carry rotation / flip / relative through. Without these the
+      // engine's MoveVertex deserializer fails with "missing field
+      // `rotation`" and the drag silently does nothing.
+      rotation: orig.rotation,
+      flip_h: orig.flip_h,
+      flip_v: orig.flip_v,
+      relative: orig.relative,
     };
 
     const cmd = this.#buildMoveVertexCmd(vid, newGeom);
@@ -3476,9 +3536,30 @@ export class Editor {
   }
 
   /** Find original geometry for a vertex from the scene cache. */
+  /**
+   * Read the current full geometry of a vertex from the scene cache.
+   * Returns null if the shape is not in the cache (e.g., the user deleted
+   * it during a transaction).
+   *
+   * The returned object includes rotation, flip_h, flip_v, and relative.
+   * MoveVertex and other geometry commands require all CellGeometry
+   * fields, so callers that use this to build a new payload must pass
+   * everything through (not just x/y/width/height).
+   */
   #findOriginalGeometry(
     vid: SlotmapId,
-  ): { x: number; y: number; width: number; height: number } | null {
+  ):
+    | {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        rotation: number;
+        flip_h: boolean;
+        flip_v: boolean;
+        relative: boolean;
+      }
+    | null {
     const variant = this.#findShapeById(vid);
     if (!variant) return null;
     const bounds = variant['bounds'] as
@@ -3490,6 +3571,10 @@ export class Editor {
       y: (bounds.origin['y'] as number) ?? 0,
       width: (bounds.size['width'] as number) ?? 0,
       height: (bounds.size['height'] as number) ?? 0,
+      rotation: (variant['rotation'] as number) ?? 0,
+      flip_h: (variant['flip_h'] as boolean) ?? false,
+      flip_v: (variant['flip_v'] as boolean) ?? false,
+      relative: false,
     };
   }
 
