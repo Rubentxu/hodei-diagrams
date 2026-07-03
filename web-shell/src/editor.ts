@@ -52,6 +52,18 @@ interface DragState {
   currentY: number;
 }
 
+/** Move-area gesture state (MOVE-016). All shapes whose bounds intersect
+ *  the rect swept by the drag are translated by the drag delta on release. */
+interface MoveAreaState {
+  /** Doc-space origin of the gesture (start of the drag). */
+  originX: number;
+  originY: number;
+  /** Doc-space current pointer position (end of the drag, updated on
+   *  pointermove). */
+  currentX: number;
+  currentY: number;
+}
+
 /** Marquee selection state. */
 interface MarqueeState {
   originX: number;
@@ -134,6 +146,7 @@ export class Editor {
   readonly #viewer: HTMLElement;
   #selection: Set<SlotmapId> = new Set();
   #marquee: MarqueeState | null = null;
+  #moveArea: MoveAreaState | null = null;
   #dragState: DragState | null = null;
   #activeTool: ToolKind = null;
   #connectState: ConnectState | null = null;
@@ -2733,6 +2746,77 @@ export class Editor {
     }
   }
 
+  /**
+   * Start a move-area gesture (MOVE-016). All shapes whose bounds
+   * intersect the rect swept by the drag are translated by the drag
+   * delta on release. No visual feedback during the drag; the
+   * translation is committed atomically when the gesture ends.
+   */
+  #startMoveArea(x: number, y: number): void {
+    this.#moveArea = { originX: x, originY: y, currentX: x, currentY: y };
+  }
+
+  /** Update the move-area endpoint. */
+  #updateMoveArea(x: number, y: number): void {
+    if (!this.#moveArea) return;
+    this.#moveArea.currentX = x;
+    this.#moveArea.currentY = y;
+  }
+
+  /**
+   * End the move-area gesture: find all shapes whose bounds intersect
+   * the rect swept by the drag (origin → current), translate each by the
+   * drag delta, and commit a single MoveVertex per shape.
+   */
+  #endMoveArea(): void {
+    if (!this.#moveArea) return;
+    const { originX, originY, currentX, currentY } = this.#moveArea;
+    this.#moveArea = null;
+    const dx = currentX - originX;
+    const dy = currentY - originY;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    const rect = {
+      x: Math.min(originX, currentX),
+      y: Math.min(originY, currentY),
+      width: Math.abs(currentX - originX),
+      height: Math.abs(currentY - originY),
+    };
+    const ids = this.#getIntersectingIds(rect);
+    if (ids.length === 0) return;
+    const cmds: string[] = [];
+    for (const id of ids) {
+      const el = this.#viewer.querySelector(
+        `[data-vertex-id="${id.idx}:${id.version}"]`,
+      ) as SVGGraphicsElement | null;
+      if (!el) continue;
+      const bbox = el.getBBox();
+      cmds.push(
+        JSON.stringify({
+          MoveVertex: {
+            id: slotmapIdToField(id),
+            geometry: {
+              x: bbox.x + dx,
+              y: bbox.y + dy,
+              width: bbox.width,
+              height: bbox.height,
+              relative: false,
+              rotation: 0,
+              flip_h: false,
+              flip_v: false,
+            },
+          },
+        }),
+      );
+    }
+    if (cmds.length === 0) return;
+    const result = this.#session.executeTransaction(cmds);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    this.#replay();
+  }
+
   /** Cancel any active marquee without selecting. */
   #cancelMarquee(): void {
     this.#marquee = null;
@@ -2967,7 +3051,17 @@ export class Editor {
         this.#clearEdgeSelection();
       }
 
-      if (e.altKey && e.shiftKey) {
+      if (e.altKey && e.shiftKey && e.ctrlKey) {
+        // Alt+Ctrl+Shift+click on empty: insert-space / move-area (MOVE-016).
+        // All shapes whose bounds intersect the rect swept by this drag will
+        // be translated by the drag delta on pointerup. The gesture starts
+        // here; the actual move is committed in #onPointerUp.
+        const docPos = this.#clientToDoc(e.clientX, e.clientY);
+        this.#startMoveArea(docPos.x, docPos.y);
+        this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+        this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+        this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+      } else if (e.altKey && e.shiftKey) {
         // Alt+Shift+click on empty: deselect box (SEL-006, intersect)
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
         this.#startMarquee(docPos.x, docPos.y, 'deselect', 'intersect');
@@ -3079,6 +3173,12 @@ export class Editor {
       return;
     }
 
+    // Handle move-area dragging (MOVE-016)
+    if (this.#moveArea) {
+      this.#updateMoveArea(docPos.x, docPos.y);
+      return;
+    }
+
     // Handle shape dragging
     if (!this.#dragState) return;
 
@@ -3119,6 +3219,12 @@ export class Editor {
     // Handle marquee end
     if (this.#marquee) {
       this.#endMarquee();
+      return;
+    }
+
+    // Handle move-area end (MOVE-016)
+    if (this.#moveArea) {
+      this.#endMoveArea();
       return;
     }
 
