@@ -2845,6 +2845,43 @@ export class Editor {
       // Try edge hit testing as fallback
       const edgeHit = this.#hitTestEdge(e);
       if (edgeHit) {
+        // Edge endpoints visually overlap with their source/target vertex on
+        // the SVG. The DOM hit-test returns the edge line (drawn on top), but
+        // the engine's selection semantics prefer the vertex — defer to it.
+        // Engine returns Vertex|Group|Edge|None; on a real edge click away
+        // from any endpoint it returns Edge and we fall through to edge
+        // selection below.
+        const docPos = this.#clientToDoc(e.clientX, e.clientY);
+        const modifiers: SelectionModifiers = {
+          alt: e.altKey,
+          shift: e.shiftKey,
+          ctrl: e.ctrlKey,
+          meta: e.metaKey,
+        };
+        const engineTarget = this.resolveSelection(docPos.x, docPos.y, modifiers);
+        if (engineTarget && engineTarget.type !== 'None') {
+          const id = this.#engineTargetToSlotmapId(engineTarget);
+          if (id) {
+            if (e.shiftKey) this.toggleSelection(id);
+            else if (e.ctrlKey || e.metaKey) this.addToSelection(id);
+            else this.selectOnly(id);
+            // Drag tracking for non-empty vertex hit (mirror the shape hit path)
+            this.#viewer.setPointerCapture(e.pointerId);
+            this.#dragState = {
+              vertexId: id,
+              startX: docPos.x,
+              startY: docPos.y,
+              currentX: docPos.x,
+              currentY: docPos.y,
+            };
+            this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+            this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+            this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+            return;
+          }
+        }
+        // Engine confirmed the click is on an edge (mid-line) — fall back
+        // to the existing edge selection behavior.
         this.#selectEdge(edgeHit);
         return;
       }
