@@ -57,7 +57,12 @@ function createMockSession() {
   return {
     isActive: true,
     dispose: vi.fn(),
-  } as unknown as { isActive: boolean; dispose: () => void };
+    setStencilLibrary: vi.fn().mockReturnValue({ ok: true, value: undefined }),
+  } as unknown as {
+    isActive: boolean;
+    dispose: () => void;
+    setStencilLibrary: ReturnType<typeof vi.fn>;
+  };
 }
 
 const SAMPLE_LIBRARY_XML = '<shapes name="test"><shape name="Square" w="40" h="40"><background><path>M 0,0 L 40,0 L 40,40 L 0,40 Z</path></background><foreground><fill/></foreground></shape><shape name="Circle" w="40" h="40"><background><path>M 20,0 A 20,20 0 1,0 20,40 A 20,20 0 1,0 20,0 Z</path></background><foreground><fill/></foreground></shape></shapes>';
@@ -95,11 +100,10 @@ describe('StencilLibraryManager', () => {
   });
 
   describe('constructor', () => {
-    it('auto-loads default libraries on construction', async () => {
+    it('does not auto-load default libraries during construction', () => {
       const mockWasm = createMockWasm();
       const mockSession = createMockSession();
 
-      // Mock fetch for default library loading
       const fetchMock = vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({}),
@@ -107,21 +111,42 @@ describe('StencilLibraryManager', () => {
       } as unknown as Response);
       vi.stubGlobal('fetch', fetchMock);
 
-      mockWasm.parse_stencil_library_xml.mockReturnValue(JSON.stringify(SAMPLE_STENCILS));
-
-      // Create manager — constructor kicks off auto-load
+      // Constructor must stay side-effect free: main.ts calls startAutoLoad()
+      // only after the HUD exists and can receive loading callbacks.
       new StencilLibraryManager(mockSession as never, mockWasm as never);
 
-      // Wait for async constructor to settle
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('startAutoLoad', () => {
+    it('loads default libraries when explicitly started', async () => {
+      const mockWasm = createMockWasm();
+      const mockSession = createMockSession();
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(SAMPLE_LIBRARY_XML),
+      } as unknown as Response);
+      vi.stubGlobal('fetch', fetchMock);
+
+      mockWasm.parse_stencil_library_xml.mockReturnValue(JSON.stringify(SAMPLE_STENCILS));
+
+      const manager = new StencilLibraryManager(mockSession as never, mockWasm as never);
+      manager.startAutoLoad();
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenNthCalledWith(1, '/fixtures/general.xml');
+      expect(fetchMock).toHaveBeenNthCalledWith(2, '/fixtures/flowchart.xml');
+
       await new Promise((r) => setTimeout(r, 50));
 
-      // Should have attempted to fetch at least one default library
-      expect(fetchMock).toHaveBeenCalled();
+      expect(mockSession.setStencilLibrary).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('loadFromUrl', () => {
-    it('calls set_stencil_library with correct arguments on success', async () => {
+    it('registers fetched XML through the active engine session on success', async () => {
       const mockWasm = createMockWasm();
       const mockSession = createMockSession();
 
@@ -137,7 +162,7 @@ describe('StencilLibraryManager', () => {
       await manager.loadFromUrl('test', 'http://example.com/test.xml');
 
       expect(mockWasm.parse_stencil_library_xml).toHaveBeenCalledWith(SAMPLE_LIBRARY_XML);
-      expect(mockWasm.set_stencil_library).toHaveBeenCalled();
+      expect(mockSession.setStencilLibrary).toHaveBeenCalledWith('test', SAMPLE_LIBRARY_XML);
     });
 
     it('throws when fetch fails', async () => {

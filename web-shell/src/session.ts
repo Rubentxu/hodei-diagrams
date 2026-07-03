@@ -776,9 +776,24 @@ export class DiagramEngineSession {
       const xml = await resp.text();
       // Validate that the XML parses before calling set_stencil_library
       this.wasm.parse_stencil_library_xml(xml); // throws on parse error
-      this.wasm.set_stencil_library(this.handle as number, library, xml);
+      const r = this.setStencilLibrary(library, xml);
+      if (!r.ok) {
+        console.error(`[session] Failed to register stencil library "${library}": ${r.error}`);
+      }
     } catch (e) {
       console.error(`[session] Failed to load stencil library "${library}": ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /** Register already-loaded stencil XML in the engine cache. */
+  setStencilLibrary(library: string, xml: string): Result<void, EngineError> {
+    const g = this.guard();
+    if (!g.ok) return g;
+    try {
+      this.wasm.set_stencil_library(this.handle as number, library, xml);
+      return ok(undefined);
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
     }
   }
 
