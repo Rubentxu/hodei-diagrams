@@ -2001,6 +2001,49 @@ async function bootstrap(): Promise<void> {
      * tests only.
      */
     getEditor: () => activeEditor ?? null,
+    /** Add a Rectangle vertex at exact SVG (doc-space) coordinates. Used by
+     *  E2E tests to set up fixtures with known bounds without going through
+     *  the rect-tool palette (whose CSS-to-doc conversion depends on the
+     *  viewBox fit-to-view transform). */
+    addRectAt: (x: number, y: number, width: number, height: number) => {
+      if (!activeSession) return null;
+      // Look up the active page id from the scene cache. The vertex MUST
+      // belong to a page for the scene builder to project it.
+      const cache = activeEditor?.getSceneCache?.();
+      if (!cache || !cache.ok || cache.value.length === 0) return null;
+      const activePageSlot = cache.value[0]!.page_id;
+      const w = width > 0 ? width : 80;
+      const h = height > 0 ? height : 40;
+      const r = activeSession.executeCommand(
+        JSON.stringify({
+          AddVertex: {
+            vertex: {
+              geometry: {
+                x,
+                y,
+                width: w,
+                height: h,
+                relative: false,
+                rotation: 0,
+                flip_h: false,
+                flip_v: false,
+              },
+              label: null,
+              style_id: null,
+              parent: null,
+              page_id: { idx: activePageSlot.idx, version: activePageSlot.version },
+              layer_id: null,
+              z_order: 0,
+              locked: false,
+              visible: true,
+            },
+          },
+        }),
+      );
+      if (!r.ok) return null;
+      activeEditor?.refreshScene?.();
+      return true;
+    },
     manualSaveVersion,
   };
 

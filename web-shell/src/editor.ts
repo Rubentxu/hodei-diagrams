@@ -58,8 +58,11 @@ interface MarqueeState {
   originY: number;
   currentX: number;
   currentY: number;
-  /** 'select' replaces/adds to selection, 'deselect' removes from selection. */
-  mode: 'select' | 'deselect';
+  /** 'select' adds to selection, 'deselect' removes from selection. */
+  intent: 'select' | 'deselect';
+  /** Containment filter: 'contain' = only shapes fully inside, 'intersect'
+   *  = any shape that the box touches. Default draw.io mode is contain. */
+  containment: 'contain' | 'intersect';
 }
 
 /** Connect-mode FSM state (drag-based edge creation with anchor resolution). */
@@ -394,25 +397,58 @@ export class Editor {
   }
 
   /**
-   * Select all shapes whose bounds intersect the given rect.
-   * Used by marquee selection.
+   * Apply selection by marquee rect, filtering by containment mode.
+   * - 'contain': only shapes whose bounds are fully inside the rect.
+   * - 'intersect': any shape the rect touches (Alt modifier).
+   * Implements SEL-005 (Alt = intersect) and the default Shift+drag = contain
+   * marquee behavior in draw.io.
    */
-  selectInRect(rect: { x: number; y: number; width: number; height: number }): void {
-    const intersecting = this.#getIntersectingIds(rect);
-    this.#applySelection(new Set(intersecting));
+  #applySelectInRect(
+    rect: { x: number; y: number; width: number; height: number },
+    containment: 'contain' | 'intersect',
+  ): void {
+    const ids =
+      containment === 'contain'
+        ? this.#getContainingIds(rect)
+        : this.#getIntersectingIds(rect);
+    this.#applySelection(new Set(ids));
   }
 
   /**
-   * Remove all currently-selected shapes whose bounds intersect the given rect.
-   * Implements draw.io Alt+Shift+drag deselect box (SEL-006).
+   * Remove selection by marquee rect, filtering by containment mode.
+   * Implements SEL-006 (Alt+Shift+drag = deselect by intersection).
    */
-  deselectInRect(rect: { x: number; y: number; width: number; height: number }): void {
-    const intersecting = this.#getIntersectingIds(rect);
+  #applyDeselectInRect(
+    rect: { x: number; y: number; width: number; height: number },
+    containment: 'contain' | 'intersect',
+  ): void {
+    const ids =
+      containment === 'contain'
+        ? this.#getContainingIds(rect)
+        : this.#getIntersectingIds(rect);
     const next = new Set(this.#selection);
-    for (const id of intersecting) {
+    for (const id of ids) {
       next.delete(id);
     }
     this.#applySelection(next);
+  }
+
+  /**
+   * Public wrapper preserved for the SEL-006 regression test: removes
+   * currently-selected shapes whose bounds intersect the given rect.
+   * Uses the intersect mode (matches the pre-SEL-005 behavior).
+   */
+  selectInRect(rect: { x: number; y: number; width: number; height: number }): void {
+    this.#applySelectInRect(rect, 'intersect');
+  }
+
+  /**
+   * Public wrapper preserved for the SEL-006 regression test: removes
+   * currently-selected shapes whose bounds intersect the given rect.
+   * Uses the intersect mode (matches the pre-SEL-005 behavior).
+   */
+  deselectInRect(rect: { x: number; y: number; width: number; height: number }): void {
+    this.#applyDeselectInRect(rect, 'intersect');
   }
 
   /**
@@ -2653,10 +2689,25 @@ export class Editor {
 
   // ─── Marquee Selection ────────────────────────────────────────────────────
 
-  /** Start marquee selection at document coordinates (x, y). */
-  #startMarquee(x: number, y: number, mode: 'select' | 'deselect' = 'select'): void {
+  /** Start marquee selection at document coordinates (x, y).
+   *  - intent: 'select' adds to selection, 'deselect' removes from selection.
+   *  - containment: 'contain' (default draw.io, fully inside) or
+   *    'intersect' (Alt modifier; anything the box touches). */
+  #startMarquee(
+    x: number,
+    y: number,
+    intent: 'select' | 'deselect' = 'select',
+    containment: 'contain' | 'intersect' = 'contain',
+  ): void {
     this.#cancelMarquee();
-    this.#marquee = { originX: x, originY: y, currentX: x, currentY: y, mode };
+    this.#marquee = {
+      originX: x,
+      originY: y,
+      currentX: x,
+      currentY: y,
+      intent,
+      containment,
+    };
   }
 
   /** Update marquee endpoint. */
@@ -2667,17 +2718,17 @@ export class Editor {
     this.#renderMarquee();
   }
 
-  /** End marquee selection, compute intersecting shapes. */
+  /** End marquee selection, compute matching shapes by intent + containment. */
   #endMarquee(): void {
     if (!this.#marquee) return;
     const rect = this.#normalizeMarqueeRect();
-    const mode = this.#marquee.mode;
+    const { intent, containment } = this.#marquee;
     this.#cancelMarquee();
     if (rect.width > 5 || rect.height > 5) {
-      if (mode === 'deselect') {
-        this.deselectInRect(rect);
+      if (intent === 'deselect') {
+        this.#applyDeselectInRect(rect, containment);
       } else {
-        this.selectInRect(rect);
+        this.#applySelectInRect(rect, containment);
       }
     }
   }
@@ -2730,8 +2781,25 @@ export class Editor {
 
   /** Get all shape SlotmapIds whose bounds intersect the given rect. */
   #getIntersectingIds(rect: { x: number; y: number; width: number; height: number }): SlotmapId[] {
-    const result: SlotmapId[] = [];
+    return this.#collectIdsInRect(rect, 'intersect');
+  }
 
+  /** Get all shape SlotmapIds whose bounds are fully contained in the rect. */
+  #getContainingIds(rect: { x: number; y: number; width: number; height: number }): SlotmapId[] {
+    return this.#collectIdsInRect(rect, 'contain');
+  }
+
+  /**
+   * Single-collection helper that filters scene shapes by AABB containment
+   * against the marquee rect. Mode 'contain' keeps shapes whose bounds are
+   * fully inside; mode 'intersect' keeps shapes whose bounds touch the rect
+   * at all. Returns SlotmapIds in z-order.
+   */
+  #collectIdsInRect(
+    rect: { x: number; y: number; width: number; height: number },
+    mode: 'contain' | 'intersect',
+  ): SlotmapId[] {
+    const result: SlotmapId[] = [];
     for (const page of this.#sceneCache) {
       for (const elem of page.display_list) {
         const e = elem as Record<string, unknown>;
@@ -2750,13 +2818,21 @@ export class Editor {
           const sw = (bounds.size['width'] as number) ?? 0;
           const sh = (bounds.size['height'] as number) ?? 0;
 
-          // Intersection test
-          if (
-            sx < rect.x + rect.width &&
-            sx + sw > rect.x &&
-            sy < rect.y + rect.height &&
-            sy + sh > rect.y
-          ) {
+          let hit: boolean;
+          if (mode === 'contain') {
+            hit =
+              sx >= rect.x &&
+              sy >= rect.y &&
+              sx + sw <= rect.x + rect.width &&
+              sy + sh <= rect.y + rect.height;
+          } else {
+            hit =
+              sx < rect.x + rect.width &&
+              sx + sw > rect.x &&
+              sy < rect.y + rect.height &&
+              sy + sh > rect.y;
+          }
+          if (hit) {
             result.push({ idx: idField.idx!, version: idField.version! });
           }
         }
@@ -2892,23 +2968,25 @@ export class Editor {
       }
 
       if (e.altKey && e.shiftKey) {
-        // Alt+Shift+click on empty: deselect box (SEL-006)
+        // Alt+Shift+click on empty: deselect box (SEL-006, intersect)
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
-        this.#startMarquee(docPos.x, docPos.y, 'deselect');
+        this.#startMarquee(docPos.x, docPos.y, 'deselect', 'intersect');
         this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
         this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
       } else if (e.altKey) {
-        // Alt+click on empty: force selection box (SEL-004)
+        // Alt+click on empty: select via intersection (SEL-005). Without Alt,
+        // Shift+drag uses contain mode (draw.io convention). With Alt, the
+        // user opts into intersect.
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
-        this.#startMarquee(docPos.x, docPos.y, 'select');
+        this.#startMarquee(docPos.x, docPos.y, 'select', 'intersect');
         this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
         this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
       } else if (e.shiftKey) {
-        // Shift+click on empty: start marquee
+        // Shift+click on empty: start marquee (SEL-003, contain by default)
         const docPos = this.#clientToDoc(e.clientX, e.clientY);
-        this.#startMarquee(docPos.x, docPos.y, 'select');
+        this.#startMarquee(docPos.x, docPos.y, 'select', 'contain');
         // Add move/up listeners for marquee
         this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
