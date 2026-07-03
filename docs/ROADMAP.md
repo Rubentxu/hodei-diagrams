@@ -5,15 +5,14 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.76.0 — Phase 2 P2-3 completo y renderer strategy cerrada.**
-Phase A (scene buffer, v0.72.0) + Phase C (SVG buffer, v0.73.0) + Phase D (3.32× browser validation, v0.74.0) + Phase B (command buffer zero-copy JS→Rust, v0.75.0) + TS postcard decoder (v0.76.0) cierran el ciclo completo zero-copy:
-- **WASM→JS**: `readSceneBuffer()` + `PostcardDecoder` (todas las variantes de VisualElement) → typed Scene sin JSON parse
-- **JS→WASM**: `flushCommands()` + `postcard::from_bytes<Vec<Command>>` → atomic batch dispatch
-- Benchmark: 3.32× en browser para scene reads, ~2% diferencia native (to_domain domina)
+**v0.100.0 — IP-G (Selection v2 Engine-Owned) cerrado. Cubertura 540 E2E + 220 unit + 947 cargo.**
+- IP-G épica cerrada: `SelectionTarget = Vertex | Group | Edge` propiedad del engine, bridge WASM con `{idx, version}`, shell adapter para SEL-015/016 drill-down + Alt-bypass, edge prefiere vertex en conectores (draw.io convention).
+- Slices de la épica: 1 (typed model, v0.93.0) + 2 (engine commands, v0.94.0) + 3 (WASM contract + shell adapter, v0.95.0) + 4 (E2E parity + selection drill-down estable, v0.100.0).
+- 540/540 Playwright E2E pass, 13 skipped (pre-existing), 0 failed.
 
-**ADR-0076 + ADR-0077:** WebGPU/WebGL full evolution queda diferida. SVG + zero-copy bridge es el path canónico; v0.77 conecta ese path al loop real del editor y cierra paridad draw.io con decisiones pragmáticas y medidas.
+**Próxima pista (en inspección):** Cerrar el gap roster de `IP Gaps Restantes (~100 workflows)`. Después: stencil coverage, conflict resolution, presentation polish.
 
-E2E Coverage Campaign: **472/472 tests green** (v0.69.0). Zero regressions.
+E2E Coverage Campaign: **540/540 tests green** (v0.100.0). Zero regressions.
 
 | Crate | Capa | Status |
 |-------|------|--------|
@@ -22,9 +21,9 @@ E2E Coverage Campaign: **472/472 tests green** (v0.69.0). Zero regressions.
 | `diagram-commands` | Comandos | ✅ (17 commands) |
 | `diagram-compat-testkit` | Testing | ✅ |
 | `diagram-scene` | Proyección | ✅ (PathElement + endArrow/startArrow) |
-| `diagram-render-svg` | Render SVG | ✅ (data-edge-id + arrow markers) |
+| `diagram-render-svg` | Render SVG | ✅ (data-vertex-id / data-group-id / data-edge-id) |
 | `diagram-render-wgpu` | Render WebGPU | ⏸ experimental / deferred by ADR-0076 |
-| `diagram-wasm` | WASM Bridge | ✅ (20 exports) |
+| `diagram-wasm` | WASM Bridge | ✅ (24 exports — Slice 3 added selection commands) |
 | `diagram-routing` | Routing | ✅ (engine + bend editing + normalization) |
 | `diagram-layout` | Layout | ✅ (5 engines + UI) |
 | `web-shell/` | UI (TypeScript) | ✅ viewer + editor |
@@ -316,12 +315,21 @@ WebGPU/WebGL may be reopened only with measured evidence that SVG/DOM is the bot
 
 ### In Progress
 
-- **IP-G (Selection v2 — Engine-Owned Typed Selection)**: `selection-v2-engine-owned` (Slices 1+2 merged).
-  - Status: Slices 1 (merged v0.93.0 PR #170) + 2 (merged v0.94.0 PR #171) complete; Slice 3 (Web Shell adapter) + Slice 4 (E2E parity) remain.
+_(none — IP-G completed in v0.100.0)_
+
+## 🎯 Recently Closed Tracks
+
+- **IP-G (Selection v2 — Engine-Owned Typed Selection)**: `selection-v2-engine-owned` (all 4 slices merged, v0.100.0).
+  - Slices 1 (v0.93.0 PR #170) + 2 (v0.94.0 PR #171) + 3 (v0.95.0 PR #172) + 4 (v0.100.0 PR #179) all merged.
   - Scope: Typed `SelectionTarget = Vertex | Group | Edge` owned by Diagram Engine; WASM boundary contract; Web Shell adapter for SEL-015/016 drill-down + Alt-bypass; supersedes partial PR #169 behavior.
-  - Evidence: `feat/group-drilldown-e2e` (frozen as evidence), failing E2E runs, verifier reports.
-  - Epic slices: typed model (✅) → engine commands (✅) → WASM contract (✅) → shell adapter (Slice 3 pending) → E2E parity (Slice 4 pending).
   - ADR: ADR-0082 (engine-owned typed selection semantics).
+  - Closing fixes in v0.100.0:
+    - SelectionTarget now Vertex|Group|Edge with `{idx, version}` SlotmapId format (slice 3).
+    - Web Shell uses `data-vertex-id` / `data-group-id` / `data-edge-id` per target type.
+    - `Editor.#clientToDoc` accounts for non-zero SVG `viewBox` origins (PR within #179).
+    - `SelectionService::resolve` defers edges to non-edge hits at connector endpoints so plain click + Alt+click select the vertex (draw.io convention).
+    - `Editor.#onPointerDown` defers to engine when DOM hit-test finds only an edge endpoint.
+    - `StencilLibraryManager` registers via `DiagramEngineSession.setStencilLibrary` (eliminated latent stale-handle risk).
 
 ### Strategy Artifacts
 
