@@ -4814,21 +4814,32 @@ export class Editor {
       return;
     }
 
-    // Arrow keys → nudge selected shapes (1px, Shift = 10px) OR pan viewport (no selection)
+    // Arrow keys → nudge selected shapes OR pan viewport (no selection).
+    //   Plain: 1px nudge, snap respects Alt-bypass (MOVE-004).
+    //   Shift: lands the selection on the next grid line in the direction
+    //          (MOVE-003). With Shift + Alt: shift-step + no snap.
     if (!hasMod) {
-      const step = e.shiftKey ? 10 : 1;
       let dx = 0;
       let dy = 0;
       switch (e.key) {
-        case 'ArrowLeft': dx = -step; break;
-        case 'ArrowRight': dx = step; break;
-        case 'ArrowUp': dy = -step; break;
-        case 'ArrowDown': dy = step; break;
+        case 'ArrowLeft': dx = -1; break;
+        case 'ArrowRight': dx = 1; break;
+        case 'ArrowUp': dy = -1; break;
+        case 'ArrowDown': dy = 1; break;
         default: return;
       }
       e.preventDefault();
       if (this.#selection.size > 0) {
-        this.#nudgeSelection(dx, dy);
+        if (e.shiftKey) {
+          // MOVE-003: per-shape snap to next grid line in direction.
+          this.#nudgeSelection(dx, dy, {
+            shiftToGrid: true,
+            ignoreSnap: e.altKey,
+          });
+        } else {
+          // Plain nudge: dx, dy are ±1, snap decisions inside the method.
+          this.#nudgeSelection(dx, dy, { ignoreSnap: e.altKey });
+        }
       } else {
         this.#pan?.(dx, dy);
       }
@@ -4837,30 +4848,45 @@ export class Editor {
 
     // Ctrl+Shift+Arrow → resize selection by 1px (MOVE-013).
     // Left/Right adjusts width, Up/Down adjusts height. Negative direction
-    // when Left/Up is held. Snaps the resulting bbox to grid if snap is on.
-    // No-op with empty selection. Draw.io parity.
+    // when Left/Up is held. Snaps the resulting bbox to grid if snap is on
+    // (Alt bypasses snap per MOVE-004).
     if (hasMod && e.shiftKey) {
-      const step = 1;
       let dw = 0;
       let dh = 0;
       switch (e.key) {
-        case 'ArrowLeft':  dw = -step; break;
-        case 'ArrowRight': dw =  step; break;
-        case 'ArrowUp':    dh = -step; break;
-        case 'ArrowDown':  dh =  step; break;
+        case 'ArrowLeft':  dw = -1; break;
+        case 'ArrowRight': dw =  1; break;
+        case 'ArrowUp':    dh = -1; break;
+        case 'ArrowDown':  dh =  1; break;
         default: return;
       }
       if (this.#selection.size === 0) return;
       if (dw === 0 && dh === 0) return;
       e.preventDefault();
-      this.#resizeSelection(dw, dh);
+      this.#resizeSelection(dw, dh, { ignoreSnap: e.altKey });
       return;
     }
   }
 
-  /** Move all selected shapes by (dx, dy) via a single atomic transaction. */
-  #nudgeSelection(dx: number, dy: number): void {
+  /**
+   * Move all selected shapes by (dx, dy) in document units via a single atomic
+   * transaction.
+   *
+   * Options:
+   *   - `shiftToGrid`: when Shift is held, each shape's new top-left corner
+   *     lands on the next grid line in the direction of motion per shape
+   *     (MOVE-003). With `dx > 0` move to the next grid line strictly greater
+   *     than currentX; with `dx < 0` move to the next grid line strictly
+   *     smaller. Same for y.
+   *   - `ignoreSnap`: bypass grid snap entirely (MOVE-004 Alt modifier).
+   */
+  #nudgeSelection(
+    dx: number,
+    dy: number,
+    opts: { shiftToGrid?: boolean; ignoreSnap?: boolean } = {},
+  ): void {
     if (this.#selection.size === 0) return;
+    const { shiftToGrid = false, ignoreSnap = false } = opts;
     const cmds: string[] = [];
     for (const id of this.#selection) {
       const el = this.#viewer.querySelector(
@@ -4868,29 +4894,28 @@ export class Editor {
       ) as SVGGraphicsElement | null;
       if (!el) continue;
       const bbox = el.getBBox();
-      const newGeom = {
-        x: bbox.x + dx,
-        y: bbox.y + dy,
-        width: bbox.width,
-        height: bbox.height,
-        relative: false,
-        rotation: 0,
-        flip_h: false,
-        flip_v: false,
-      };
+      const nextX = this.#nextGridCoord(bbox.x, dx, shiftToGrid, ignoreSnap);
+      const nextY = this.#nextGridCoord(bbox.y, dy, shiftToGrid, ignoreSnap);
       cmds.push(
         JSON.stringify({
           MoveVertex: {
             id: slotmapIdToField(id),
-            geometry: newGeom,
+            geometry: {
+              x: nextX,
+              y: nextY,
+              width: bbox.width,
+              height: bbox.height,
+              relative: false,
+              rotation: 0,
+              flip_h: false,
+              flip_v: false,
+            },
           },
         }),
       );
     }
     if (cmds.length === 0) return;
-    console.warn('[debug-resize-r]', { nCmds: cmds.length, sample: cmds[0] });
     const result = this.#session.executeTransaction(cmds);
-    console.warn('[debug-resize-r-res]', result);
     if (!result.ok) {
       this.#onError(result.error);
       return;
@@ -4899,14 +4924,47 @@ export class Editor {
   }
 
   /**
+   * Compute the next position for a single coordinate given a unit-axis motion.
+   * The return is the next grid line in direction `dir` (±1, 0) when Shift is
+   * held and snap is on; otherwise a plain delta from `current`.
+   *
+   *   - When `shiftToGrid && !ignoreSnap && this.#snapEnabled`:
+   *       pick the next multiple of GRID_SIZE strictly greater (`dir > 0`)
+   *       or strictly smaller (`dir < 0`) than `current`.
+   *   - When snap is off or ignoreSnap is true: `current + dir`.
+   *   - When `dir === 0`: pass through.
+   */
+  #nextGridCoord(
+    current: number,
+    dir: number,
+    shiftToGrid: boolean,
+    ignoreSnap: boolean,
+  ): number {
+    if (dir === 0) return current;
+    const GRID_SIZE = 20;
+    if (shiftToGrid && !ignoreSnap && this.#snapEnabled) {
+      if (dir > 0) return Math.floor(current / GRID_SIZE + 1) * GRID_SIZE;
+      return Math.ceil(current / GRID_SIZE - 1) * GRID_SIZE;
+    }
+    return current + dir;
+  }
+
+  /**
    * Resize all selected shapes by (dw, dh) in document units via a single atomic
    * transaction. Each shape's new width is `bbox.width + dw`; new height is
-   * `bbox.height + dh`. If snap is enabled, the resulting width/height are
-   * rounded to the nearest grid line. No-op when `dw === 0 && dh === 0` or the
-   * selection is empty. (MOVE-013 keyboard resize with Ctrl+Shift+Arrow.)
+   * `bbox.height + dh`. If snap is enabled (and not bypassed), the resulting
+   * origin is snapped to the nearest grid line so the shape stays anchored at
+   * its top-left corner (MOVE-013 + MOVE-004 ignored via Alt).
+   *
+   * No-op when `dw === 0 && dh === 0` or the selection is empty.
    */
-  #resizeSelection(dw: number, dh: number): void {
+  #resizeSelection(
+    dw: number,
+    dh: number,
+    opts: { ignoreSnap?: boolean } = {},
+  ): void {
     if (this.#selection.size === 0 || (dw === 0 && dh === 0)) return;
+    const { ignoreSnap = false } = opts;
     const cmds: string[] = [];
     for (const id of this.#selection) {
       const el = this.#viewer.querySelector(
@@ -4919,11 +4977,9 @@ export class Editor {
       // Minimum size clamp at 1px so shapes cannot collapse to zero-area.
       if (nextWidth < 1) nextWidth = 1;
       if (nextHeight < 1) nextHeight = 1;
-      // Snap to grid if enabled. Snap width/height by adjusting the bbox origin
-      // so the shape stays anchored at its top-left corner (matches draw.io).
       let nextX = bbox.x;
       let nextY = bbox.y;
-      if (this.#snapEnabled) {
+      if (this.#snapEnabled && !ignoreSnap) {
         const snapped = this.#snapToGrid(nextX, nextY);
         nextX = snapped.x;
         nextY = snapped.y;
