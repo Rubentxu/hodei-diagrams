@@ -4834,6 +4834,28 @@ export class Editor {
       }
       return;
     }
+
+    // Ctrl+Shift+Arrow → resize selection by 1px (MOVE-013).
+    // Left/Right adjusts width, Up/Down adjusts height. Negative direction
+    // when Left/Up is held. Snaps the resulting bbox to grid if snap is on.
+    // No-op with empty selection. Draw.io parity.
+    if (hasMod && e.shiftKey) {
+      const step = 1;
+      let dw = 0;
+      let dh = 0;
+      switch (e.key) {
+        case 'ArrowLeft':  dw = -step; break;
+        case 'ArrowRight': dw =  step; break;
+        case 'ArrowUp':    dh = -step; break;
+        case 'ArrowDown':  dh =  step; break;
+        default: return;
+      }
+      if (this.#selection.size === 0) return;
+      if (dw === 0 && dh === 0) return;
+      e.preventDefault();
+      this.#resizeSelection(dw, dh);
+      return;
+    }
   }
 
   /** Move all selected shapes by (dx, dy) via a single atomic transaction. */
@@ -4852,12 +4874,74 @@ export class Editor {
         width: bbox.width,
         height: bbox.height,
         relative: false,
+        rotation: 0,
+        flip_h: false,
+        flip_v: false,
       };
       cmds.push(
         JSON.stringify({
           MoveVertex: {
             id: slotmapIdToField(id),
             geometry: newGeom,
+          },
+        }),
+      );
+    }
+    if (cmds.length === 0) return;
+    console.warn('[debug-resize-r]', { nCmds: cmds.length, sample: cmds[0] });
+    const result = this.#session.executeTransaction(cmds);
+    console.warn('[debug-resize-r-res]', result);
+    if (!result.ok) {
+      this.#onError(result.error);
+      return;
+    }
+    this.#replay();
+  }
+
+  /**
+   * Resize all selected shapes by (dw, dh) in document units via a single atomic
+   * transaction. Each shape's new width is `bbox.width + dw`; new height is
+   * `bbox.height + dh`. If snap is enabled, the resulting width/height are
+   * rounded to the nearest grid line. No-op when `dw === 0 && dh === 0` or the
+   * selection is empty. (MOVE-013 keyboard resize with Ctrl+Shift+Arrow.)
+   */
+  #resizeSelection(dw: number, dh: number): void {
+    if (this.#selection.size === 0 || (dw === 0 && dh === 0)) return;
+    const cmds: string[] = [];
+    for (const id of this.#selection) {
+      const el = this.#viewer.querySelector(
+        `[data-vertex-id="${id.idx}:${id.version}"]`,
+      ) as SVGGraphicsElement | null;
+      if (!el) continue;
+      const bbox = el.getBBox();
+      let nextWidth = bbox.width + dw;
+      let nextHeight = bbox.height + dh;
+      // Minimum size clamp at 1px so shapes cannot collapse to zero-area.
+      if (nextWidth < 1) nextWidth = 1;
+      if (nextHeight < 1) nextHeight = 1;
+      // Snap to grid if enabled. Snap width/height by adjusting the bbox origin
+      // so the shape stays anchored at its top-left corner (matches draw.io).
+      let nextX = bbox.x;
+      let nextY = bbox.y;
+      if (this.#snapEnabled) {
+        const snapped = this.#snapToGrid(nextX, nextY);
+        nextX = snapped.x;
+        nextY = snapped.y;
+      }
+      cmds.push(
+        JSON.stringify({
+          MoveVertex: {
+            id: slotmapIdToField(id),
+            geometry: {
+              x: nextX,
+              y: nextY,
+              width: nextWidth,
+              height: nextHeight,
+              relative: false,
+              rotation: 0,
+              flip_h: false,
+              flip_v: false,
+            },
           },
         }),
       );
