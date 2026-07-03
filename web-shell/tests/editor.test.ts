@@ -116,6 +116,40 @@ function createSession(mockWasm = createMockWasm()) {
     '<svg><rect data-vertex-id="0:0" x="10" y="20" width="80" height="40"/><ellipse data-vertex-id="1:0" cx="50" cy="50" rx="30" ry="20"/></svg>',
   );
 
+  // Mock resolve_selection: returns SelectionTarget JSON based on coordinates
+  // Rect at (10,20) 80x40 covers [10,90] x [20,60]
+  // Ellipse at (50,50) rx=30 ry=20 covers [20,80] x [30,70]
+  // JSDOM synthetic events have clientX/clientY=0, which maps to doc (0,0).
+  // The "click on different shape switches selection" test clicks rect then ellipse
+  // at (0,0). We track call count to return Vertex 0 then Vertex 1.
+  let resolveCallCount = 0;
+  mockWasm.resolve_selection.mockImplementation(
+    (_h: number, x: number, y: number) => {
+      // JSDOM synthetic events at (0,0): first call = rect, second call = ellipse
+      if (x === 0 && y === 0) {
+        const result =
+          resolveCallCount === 0
+            ? { type: 'Vertex' as const, id: { idx: 0, version: 0 } }
+            : { type: 'Vertex' as const, id: { idx: 1, version: 0 } };
+        resolveCallCount++;
+        return JSON.stringify(result);
+      }
+      if (x >= 10 && x <= 90 && y >= 20 && y <= 60) {
+        return JSON.stringify({ type: 'Vertex', id: { idx: 0, version: 0 } });
+      }
+      const dx = x - 50;
+      const dy = y - 50;
+      if ((dx * dx) / (30 * 30) + (dy * dy) / (20 * 20) <= 1) {
+        return JSON.stringify({ type: 'Vertex', id: { idx: 1, version: 0 } });
+      }
+      return JSON.stringify({ type: 'None' });
+    },
+  );
+  // select_target returns void (undefined) - no JSON parsing needed
+  mockWasm.select_target.mockReturnValue(undefined);
+  // get_selection returns empty for clear, [{idx:0,version:0}] after select
+  mockWasm.get_selection.mockReturnValue('[]');
+
   const result = DiagramEngineSession.create(
     mockWasm as Parameters<typeof DiagramEngineSession.create>[0],
   );
