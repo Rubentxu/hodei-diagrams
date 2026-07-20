@@ -1,7 +1,8 @@
 /**
  * resize-handles.ts — Resize handle overlay for shape resize editing.
  *
- * Renders 8 draggable handles (4 corners + 4 edge midpoints) on a single selected shape.
+ * Renders 8 draggable resize handles (4 corners + 4 edge midpoints) plus one
+ * rotation handle on a single selected shape.
  * Shift+drag constrains resize to proportional aspect ratio.
  *
  * UX: Resize = direct drag of corner/edge handle (no modal, no click-then-edit).
@@ -24,7 +25,20 @@ export type HandlePosition = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 interface ResizeDragState {
   handle: HandlePosition;
   vertexId: SlotmapId;
-  origGeom: ShapeBounds;
+  startGeom: ShapeBounds;
+  currentGeom: ShapeBounds;
+  startMouseX: number;
+  startMouseY: number;
+}
+
+/** A rotation handle being dragged. */
+interface RotationDragState {
+  vertexId: SlotmapId;
+  centerX: number;
+  centerY: number;
+  radius: number;
+  startAngle: number;
+  currentAngleDelta: number;
   startMouseX: number;
   startMouseY: number;
 }
@@ -48,31 +62,30 @@ export class ResizeHandlesOverlay {
   // get the current SVG element (avoids stale reference after mountSvg replaces innerHTML)
   readonly #getSvgLayer: () => HTMLElement;
   readonly #sceneProvider: () => ScenePage[];
-  readonly #getVertexGeometry: (id: SlotmapId) => ShapeBounds | null;
-  readonly #setVertexGeometry: (
-    id: SlotmapId,
-    geom: ShapeBounds,
-  ) => void;
-  readonly #onGeometryChanged: () => void;
+  readonly #setVertexGeometry: (_id: SlotmapId, _geom: ShapeBounds) => void;
+  readonly #rotateVertex: (_id: SlotmapId, _angleDelta: number) => void;
   #dragState: ResizeDragState | null = null;
+  #rotationDragState: RotationDragState | null = null;
   #proportionalState: ProportionalState = { aspectRatio: 1, dominant: 'width', locked: false };
   #onMoveBound: (_e: PointerEvent) => void;
   #onUpBound: (_e: PointerEvent) => void;
+  #onRotateMoveBound: (_e: PointerEvent) => void;
+  #onRotateUpBound: (_e: PointerEvent) => void;
 
   constructor(
     getSvgLayer: () => HTMLElement,
     sceneProvider: () => ScenePage[],
-    getVertexGeometry: (id: SlotmapId) => ShapeBounds | null,
-    setVertexGeometry: (id: SlotmapId, geom: ShapeBounds) => void,
-    onGeometryChanged: () => void,
+    setVertexGeometry: (_id: SlotmapId, _geom: ShapeBounds) => void,
+    rotateVertex: (_id: SlotmapId, _angleDelta: number) => void,
   ) {
     this.#getSvgLayer = getSvgLayer;
     this.#sceneProvider = sceneProvider;
-    this.#getVertexGeometry = getVertexGeometry;
     this.#setVertexGeometry = setVertexGeometry;
-    this.#onGeometryChanged = onGeometryChanged;
+    this.#rotateVertex = rotateVertex;
     this.#onMoveBound = (e: PointerEvent) => this.#onDragMove(e);
     this.#onUpBound = (e: PointerEvent) => this.#onDragEnd(e);
+    this.#onRotateMoveBound = (e: PointerEvent) => this.#onRotateMove(e);
+    this.#onRotateUpBound = (e: PointerEvent) => this.#onRotateEnd(e);
   }
 
   /**
@@ -81,8 +94,7 @@ export class ResizeHandlesOverlay {
    */
   render(selection: Set<SlotmapId>): void {
     const svgLayer = this.#getSvgLayer();
-    // Remove existing handles
-    svgLayer.querySelectorAll('.resize-handle').forEach((el) => el.remove());
+    this.#clearHandles(svgLayer);
 
     // Only render for single shape selection
     if (selection.size !== 1) return;
@@ -109,6 +121,7 @@ export class ResizeHandlesOverlay {
     for (const { pos, x, y } of positions) {
       this.#createHandle(vertexId, bounds, pos, x, y);
     }
+    this.#createRotationHandle(vertexId, bounds);
   }
 
   /**
@@ -145,14 +158,89 @@ export class ResizeHandlesOverlay {
       }
     });
 
-    // Mousedown initiates drag
-    circle.addEventListener('mousedown', (e: MouseEvent) => {
+    // Pointerdown initiates drag. This MUST stop propagation before the
+    // editor-level pointerdown handler sees the event, otherwise the handle
+    // click is interpreted as an empty-canvas click and clears selection.
+    circle.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
       this.#startDrag(vertexId, bounds, pos, circle, e.clientX, e.clientY);
     });
 
     this.#getSvgLayer().appendChild(circle);
+  }
+
+  /** Create the rotation handle above the selected shape. */
+  #createRotationHandle(vertexId: SlotmapId, bounds: ShapeBounds): void {
+    const { centerX, handleX, handleY } = this.#rotationHandleGeometry(bounds);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('class', 'rotation-handle-link');
+    line.setAttribute('x1', String(centerX));
+    line.setAttribute('y1', String(bounds.y));
+    line.setAttribute('x2', String(handleX));
+    line.setAttribute('y2', String(handleY));
+    line.setAttribute('stroke', '#4a9eff');
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke-dasharray', '4 3');
+    line.style.pointerEvents = 'none';
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', String(handleX));
+    circle.setAttribute('cy', String(handleY));
+    circle.setAttribute('r', '6');
+    circle.setAttribute('class', 'rotation-handle');
+    circle.setAttribute('data-testid', 'rotation-handle');
+    circle.setAttribute('data-vertex-idx', String(vertexId.idx));
+    circle.setAttribute('data-vertex-version', String(vertexId.version));
+    circle.setAttribute('fill', '#f59e0b');
+    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('stroke-width', '1.5');
+    circle.style.cursor = 'grab';
+    circle.style.pointerEvents = 'all';
+
+    circle.addEventListener('mouseenter', () => {
+      circle.setAttribute('fill', '#d97706');
+    });
+    circle.addEventListener('mouseleave', () => {
+      if (!this.#rotationDragState) {
+        circle.setAttribute('fill', '#f59e0b');
+      }
+    });
+
+    circle.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.#startRotationDrag(vertexId, bounds, circle, e.clientX, e.clientY);
+    });
+
+    const svgLayer = this.#getSvgLayer();
+    svgLayer.appendChild(line);
+    svgLayer.appendChild(circle);
+  }
+
+  /** Geometry for the rotation handle in document coordinates. */
+  #rotationHandleGeometry(bounds: ShapeBounds): {
+    centerX: number;
+    centerY: number;
+    handleX: number;
+    handleY: number;
+    radius: number;
+  } {
+    const centerX = bounds.x + bounds.width / 2;
+    const centerY = bounds.y + bounds.height / 2;
+    const offset = Math.max(28, Math.min(44, bounds.height * 0.35));
+    const handleX = centerX;
+    const handleY = bounds.y - offset;
+    return {
+      centerX,
+      centerY,
+      handleX,
+      handleY,
+      radius: Math.hypot(handleX - centerX, handleY - centerY),
+    };
   }
 
   /**
@@ -189,7 +277,8 @@ export class ResizeHandlesOverlay {
     this.#dragState = {
       handle,
       vertexId,
-      origGeom,
+      startGeom: origGeom,
+      currentGeom: origGeom,
       startMouseX: clientX,
       startMouseY: clientY,
     };
@@ -213,7 +302,7 @@ export class ResizeHandlesOverlay {
   #onDragMove(e: PointerEvent): void {
     if (!this.#dragState) return;
 
-    const { handle, origGeom, startMouseX, startMouseY } = this.#dragState;
+    const { handle, startGeom, startMouseX, startMouseY } = this.#dragState;
     const rect = this.#getSvgLayer().getBoundingClientRect();
     const zoom = this.#getZoom();
     const docX = (e.clientX - rect.left) / zoom;
@@ -250,13 +339,13 @@ export class ResizeHandlesOverlay {
     }
 
     // Compute new geometry based on handle position
-    const newGeom = this.#computeResizeGeometry(origGeom, handle, dx, dy);
+    const newGeom = this.#computeResizeGeometry(startGeom, handle, dx, dy);
 
     // Update all handle positions visually (they move with the shape)
     this.#updateHandlePositions(newGeom);
 
     // Store for commit on pointerup
-    this.#dragState.origGeom = newGeom;
+    this.#dragState.currentGeom = newGeom;
   }
 
   /**
@@ -354,6 +443,116 @@ export class ResizeHandlesOverlay {
         handle.setAttribute('cy', String(y));
       }
     }
+    this.#updateRotationHandlePosition(bounds);
+  }
+
+  /** Update the rotation handle and its guide line to match current bounds. */
+  #updateRotationHandlePosition(bounds: ShapeBounds): void {
+    const { centerX, handleX, handleY } = this.#rotationHandleGeometry(bounds);
+    const handle = this.#getSvgLayer().querySelector('.rotation-handle') as SVGCircleElement | null;
+    if (handle) {
+      handle.setAttribute('cx', String(handleX));
+      handle.setAttribute('cy', String(handleY));
+    }
+    const line = this.#getSvgLayer().querySelector(
+      '.rotation-handle-link',
+    ) as SVGLineElement | null;
+    if (line) {
+      line.setAttribute('x1', String(centerX));
+      line.setAttribute('y1', String(bounds.y));
+      line.setAttribute('x2', String(handleX));
+      line.setAttribute('y2', String(handleY));
+    }
+  }
+
+  /** Start dragging the rotation handle. */
+  #startRotationDrag(
+    vertexId: SlotmapId,
+    bounds: ShapeBounds,
+    handleEl: SVGCircleElement,
+    clientX: number,
+    clientY: number,
+  ): void {
+    const { centerX, centerY, radius } = this.#rotationHandleGeometry(bounds);
+    this.#rotationDragState = {
+      vertexId,
+      centerX,
+      centerY,
+      radius,
+      startAngle: this.#angleFromCenter(centerX, centerY, clientX, clientY),
+      currentAngleDelta: 0,
+      startMouseX: clientX,
+      startMouseY: clientY,
+    };
+    handleEl.style.cursor = 'grabbing';
+    document.addEventListener('pointermove', this.#onRotateMoveBound);
+    document.addEventListener('pointerup', this.#onRotateUpBound);
+  }
+
+  /** Handle pointer movement while rotating. */
+  #onRotateMove(e: PointerEvent): void {
+    if (!this.#rotationDragState) return;
+    const state = this.#rotationDragState;
+    const angle = this.#angleFromCenter(state.centerX, state.centerY, e.clientX, e.clientY);
+    state.currentAngleDelta = this.#normalizeAngleDelta(angle - state.startAngle);
+
+    const handleAngle = state.startAngle + state.currentAngleDelta;
+    const handleX = state.centerX + Math.cos(handleAngle) * state.radius;
+    const handleY = state.centerY + Math.sin(handleAngle) * state.radius;
+    const handle = this.#getSvgLayer().querySelector('.rotation-handle') as SVGCircleElement | null;
+    if (handle) {
+      handle.setAttribute('cx', String(handleX));
+      handle.setAttribute('cy', String(handleY));
+    }
+    const line = this.#getSvgLayer().querySelector(
+      '.rotation-handle-link',
+    ) as SVGLineElement | null;
+    if (line) {
+      line.setAttribute('x2', String(handleX));
+      line.setAttribute('y2', String(handleY));
+    }
+  }
+
+  /** End rotation drag and commit an engine rotation command. */
+  #onRotateEnd(e: PointerEvent): void {
+    if (!this.#rotationDragState) return;
+    const state = this.#rotationDragState;
+    document.removeEventListener('pointermove', this.#onRotateMoveBound);
+    document.removeEventListener('pointerup', this.#onRotateUpBound);
+
+    const dx = e.clientX - state.startMouseX;
+    const dy = e.clientY - state.startMouseY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const angleDelta = this.#normalizeAngleDelta(
+      this.#angleFromCenter(state.centerX, state.centerY, e.clientX, e.clientY) - state.startAngle,
+    );
+    this.#rotationDragState = null;
+
+    if (dist >= 3 && Math.abs(angleDelta) >= Math.PI / 180) {
+      this.#rotateVertex(state.vertexId, angleDelta);
+    }
+  }
+
+  /** Convert a browser point to document coordinates using the same model as resize. */
+  #clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.#getSvgLayer().getBoundingClientRect();
+    const zoom = this.#getZoom();
+    return {
+      x: (clientX - rect.left) / zoom,
+      y: (clientY - rect.top) / zoom,
+    };
+  }
+
+  #angleFromCenter(centerX: number, centerY: number, clientX: number, clientY: number): number {
+    const doc = this.#clientToDoc(clientX, clientY);
+    return Math.atan2(doc.y - centerY, doc.x - centerX);
+  }
+
+  #normalizeAngleDelta(angle: number): number {
+    let normalized = angle;
+    while (normalized > Math.PI) normalized -= Math.PI * 2;
+    while (normalized < -Math.PI) normalized += Math.PI * 2;
+    return normalized;
   }
 
   /**
@@ -362,7 +561,7 @@ export class ResizeHandlesOverlay {
   #onDragEnd(e: PointerEvent): void {
     if (!this.#dragState) return;
 
-    const { vertexId, origGeom, startMouseX, startMouseY } = this.#dragState;
+    const { vertexId, currentGeom, startMouseX, startMouseY } = this.#dragState;
 
     document.removeEventListener('pointermove', this.#onMoveBound);
     document.removeEventListener('pointerup', this.#onUpBound);
@@ -379,7 +578,7 @@ export class ResizeHandlesOverlay {
     }
 
     // Commit the resize
-    this.#setVertexGeometry(vertexId, origGeom);
+    this.#setVertexGeometry(vertexId, currentGeom);
 
     this.#dragState = null;
     this.#proportionalState = { aspectRatio: 1, dominant: 'width', locked: false };
@@ -443,7 +642,16 @@ export class ResizeHandlesOverlay {
   dispose(): void {
     document.removeEventListener('pointermove', this.#onMoveBound);
     document.removeEventListener('pointerup', this.#onUpBound);
+    document.removeEventListener('pointermove', this.#onRotateMoveBound);
+    document.removeEventListener('pointerup', this.#onRotateUpBound);
     this.#dragState = null;
-    this.#getSvgLayer().querySelectorAll('.resize-handle').forEach((el) => el.remove());
+    this.#rotationDragState = null;
+    this.#clearHandles(this.#getSvgLayer());
+  }
+
+  #clearHandles(svgLayer: HTMLElement = this.#getSvgLayer()): void {
+    svgLayer
+      .querySelectorAll('.resize-handle, .rotation-handle, .rotation-handle-link')
+      .forEach((el) => el.remove());
   }
 }

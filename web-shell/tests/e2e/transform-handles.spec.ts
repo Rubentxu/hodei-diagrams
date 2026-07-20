@@ -1,0 +1,129 @@
+/**
+ * transform-handles.spec.ts — browser-backed coverage for the visible transform
+ * handles contract. These tests guard the real user workflow, not only the
+ * persisted MoveVertex payload.
+ */
+import { test, expect } from '@playwright/test';
+import { waitForAppReady } from './helpers/app-ready.js';
+
+async function loadAndSelectSimpleRect(page: import('@playwright/test').Page) {
+  await page.goto('/');
+  await waitForAppReady(page);
+  await page.evaluate(() => {
+    const debug = (
+      window as unknown as {
+        __hodeiDebug?: {
+          addRectAt?: (_x: number, _y: number, _width: number, _height: number) => boolean | null;
+        };
+      }
+    ).__hodeiDebug;
+    if (!debug?.addRectAt) throw new Error('__hodeiDebug.addRectAt is not available');
+    debug.addRectAt(120, 100, 80, 40);
+    // A second rectangle expands the viewBox so the selected rect's transform
+    // handles are inside the SVG viewport instead of sitting on its edges.
+    debug.addRectAt(420, 20, 60, 40);
+  });
+  await page.waitForSelector('[data-testid="viewer"] svg');
+  await page.waitForTimeout(250);
+
+  const viewer = page.locator('[data-testid="viewer"]');
+  const rect = viewer.locator('[data-vertex-id]').first();
+  const box = await rect.boundingBox();
+  if (!box) throw new Error('simple rect not visible');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(rect).toHaveClass(/selected/);
+  await expect(viewer.locator('.resize-handle')).toHaveCount(8);
+  return { viewer, rect };
+}
+
+test.describe('Transform handles visual contract', () => {
+  test('drag preview moves selected shape and transform handles together before mouseup', async ({
+    page,
+  }) => {
+    const { viewer, rect } = await loadAndSelectSimpleRect(page);
+    const nwHandle = viewer.locator('.resize-handle[data-handle="nw"]');
+
+    const rectBefore = await rect.boundingBox();
+    const handleBefore = await nwHandle.boundingBox();
+    if (!rectBefore || !handleBefore) throw new Error('shape or handle not visible before drag');
+
+    await page.mouse.move(
+      rectBefore.x + rectBefore.width / 2,
+      rectBefore.y + rectBefore.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      rectBefore.x + rectBefore.width / 2 + 45,
+      rectBefore.y + rectBefore.height / 2 + 25,
+      {
+        steps: 5,
+      },
+    );
+
+    const rectDuring = await rect.boundingBox();
+    const handleDuring = await nwHandle.boundingBox();
+    await page.mouse.up();
+
+    if (!rectDuring || !handleDuring) throw new Error('shape or handle not visible during drag');
+    expect(rectDuring.x).toBeGreaterThan(rectBefore.x + 20);
+    expect(handleDuring.x).toBeGreaterThan(handleBefore.x + 20);
+    expect(handleDuring.y).toBeGreaterThan(handleBefore.y + 10);
+  });
+
+  test('dragging a resize handle keeps transform handles visible and commits size change', async ({
+    page,
+  }) => {
+    const { viewer, rect } = await loadAndSelectSimpleRect(page);
+    const eastHandle = viewer.locator('.resize-handle[data-handle="e"]');
+
+    const beforeWidth = Number(await rect.getAttribute('width'));
+    const handleBox = await eastHandle.boundingBox();
+    if (!Number.isFinite(beforeWidth) || !handleBox)
+      throw new Error('shape or east handle not visible before resize');
+
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2 + 35,
+      handleBox.y + handleBox.height / 2,
+      { steps: 5 },
+    );
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+
+    await expect(viewer.locator('.resize-handle')).toHaveCount(8);
+    const afterWidth = Number(await rect.getAttribute('width'));
+    expect(afterWidth).toBeGreaterThan(beforeWidth + 15);
+  });
+
+  test('single-shape selection shows a rotation handle and dragging it rotates the shape', async ({
+    page,
+  }) => {
+    const { viewer, rect } = await loadAndSelectSimpleRect(page);
+    const rotationHandle = viewer.locator('.rotation-handle');
+    await expect(rotationHandle).toHaveCount(1);
+
+    const rectBox = await rect.boundingBox();
+    const handleBox = await rotationHandle.boundingBox();
+    if (!rectBox || !handleBox)
+      throw new Error('shape or rotation handle not visible before rotate');
+
+    const rectCenterX = rectBox.x + rectBox.width / 2;
+    const handleCenterX = handleBox.x + handleBox.width / 2;
+    expect(Math.abs(handleCenterX - rectCenterX)).toBeLessThan(3);
+
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(rectBox.x + rectBox.width + 30, rectBox.y + rectBox.height / 2, {
+      steps: 8,
+    });
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+
+    const outerHTML = await viewer
+      .locator('svg')
+      .first()
+      .evaluate((el) => el.outerHTML);
+    expect(outerHTML).toMatch(/rotate\((?!0(?:\.0+)?(?:\s|\)))/);
+  });
+});
