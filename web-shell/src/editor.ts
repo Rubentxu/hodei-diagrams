@@ -2907,6 +2907,7 @@ export class Editor {
    * Register an overlay hit zone (Pattern D 9a).
    * Returns a disposer — call it to remove the zone.
    */
+  // ponytail: registerOverlayHitZone is hard-private + Editor ctor hardcodes zones; future overlays must add to Editor ctor; track OCP-friendly refactor for r108
   #registerOverlayHitZone(zone: OverlayHitZone): () => void {
     this.#overlayHitZones.push(zone);
     return () => {

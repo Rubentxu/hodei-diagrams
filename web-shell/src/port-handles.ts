@@ -53,6 +53,8 @@ export class PortHandlesOverlay {
   #onMoveBound: (_e: PointerEvent) => void;
   #onUpBound: (_e: PointerEvent) => void;
 
+  // ponytail: DragSession<T> migration deferred — port FSM still owns manual listeners; track for r108
+
   constructor(
     svgLayer: HTMLElement,
     sceneProvider: () => ScenePage[],
