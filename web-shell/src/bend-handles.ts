@@ -33,7 +33,6 @@ interface BendDragState extends DragStateBase {
  * same DragSession<BendDragState> FSM, same OverlayHost contract.
  */
 export class BendHandlesOverlay {
-  readonly #svgLayer: HTMLElement;
   readonly #viewer: HTMLElement;
   readonly #sceneProvider: () => ScenePage[];
   readonly #session: DiagramEngineSession;
@@ -51,7 +50,6 @@ export class BendHandlesOverlay {
   #selectedBend: { edgeId: SlotmapId; bendIndex: number } | null = null;
 
   constructor(
-    svgLayer: HTMLElement,
     viewer: HTMLElement,
     sceneProvider: () => ScenePage[],
     session: DiagramEngineSession,
@@ -59,7 +57,6 @@ export class BendHandlesOverlay {
     onError: (msg: string) => void,
     onBendSelect: (edgeId: SlotmapId | null, bendIndex: number | null) => void,
   ) {
-    this.#svgLayer = svgLayer;
     this.#viewer = viewer;
     this.#sceneProvider = sceneProvider;
     this.#session = session;

@@ -300,11 +300,9 @@ export class ResizeHandlesOverlay {
   // ─── DragSession callbacks for resize ────────────────────────────────────────
 
   #resizeOnMove(e: PointerEvent, state: ResizeDragState2): ResizeDragState2 {
-    const svgLayer = this.#getSvgLayer();
-    const rect = svgLayer.getBoundingClientRect();
-    const zoom = getZoom(this.#getSvgLayer());
-    const docX = (e.clientX - rect.left) / zoom;
-    const docY = (e.clientY - rect.top) / zoom;
+    const doc = clientToDoc(this.#getSvgLayer(), e.clientX, e.clientY);
+    const docX = doc.x;
+    const docY = doc.y;
     let dx = docX - state.startDocX;
     let dy = docY - state.startDocY;
 

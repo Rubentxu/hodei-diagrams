@@ -288,7 +288,6 @@ export class Editor {
       return svgEl as unknown as HTMLElement;
     };
     this.#bendHandles = new BendHandlesOverlay(
-      getSvgLayer() as HTMLElement,
       viewer,
       () => this.#sceneCache,
       session,
