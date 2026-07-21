@@ -50,10 +50,10 @@ export const SHAPE_KEYS = [
   'Group',
 ] as const;
 
-// ─── Internal helpers ────────────────────────────────────────────────────────
+// ─── Shape lookup helpers ────────────────────────────────────────────────────
 
 /** Returns the variant record for a shape id, or null if not found. */
-function findVariant(scene: ScenePage[], id: SlotmapId): Record<string, unknown> | null {
+export function findShapeVariant(scene: ScenePage[], id: SlotmapId): Record<string, unknown> | null {
   for (const page of scene) {
     for (const elem of page.display_list) {
       if (!elem) continue;
@@ -75,6 +75,103 @@ function findVariant(scene: ScenePage[], id: SlotmapId): Record<string, unknown>
   return null;
 }
 
+/** Returns all shape SlotmapIds in z-order (top of stack first). */
+export function findAllShapeIds(scene: ScenePage[]): SlotmapId[] {
+  const result: SlotmapId[] = [];
+  for (const page of scene) {
+    for (const elem of page.display_list) {
+      if (!elem) continue;
+      const e = elem as Record<string, unknown>;
+      for (const key of SHAPE_KEYS) {
+        const variant = e[key] as Record<string, unknown> | undefined;
+        if (!variant) continue;
+        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+        if (!idField) continue;
+        result.push({ idx: idField.idx!, version: idField.version! });
+      }
+    }
+  }
+  return result;
+}
+
+/** Returns all shape bounds in z-order. */
+export function findAllBounds(scene: ScenePage[]): ShapeBounds[] {
+  const result: ShapeBounds[] = [];
+  for (const page of scene) {
+    for (const elem of page.display_list) {
+      if (!elem) continue;
+      const e = elem as Record<string, unknown>;
+      for (const key of SHAPE_KEYS) {
+        const variant = e[key] as Record<string, unknown> | undefined;
+        if (!variant) continue;
+        const bounds = variant['bounds'] as
+          | { origin?: Record<string, unknown>; size?: Record<string, unknown> }
+          | undefined;
+        if (!bounds?.origin || !bounds?.size) continue;
+        result.push({
+          x: (bounds.origin['x'] as number) ?? 0,
+          y: (bounds.origin['y'] as number) ?? 0,
+          width: (bounds.size['width'] as number) ?? 0,
+          height: (bounds.size['height'] as number) ?? 0,
+        });
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Returns all shapes with their id and bounds, excluding the shape with excludeId.
+ * Used by snapping logic.
+ */
+export function findAllShapesWithBounds(
+  scene: ScenePage[],
+  excludeId?: SlotmapId,
+): Array<{ id: SlotmapId; bounds: ShapeBounds }> {
+  const result: Array<{ id: SlotmapId; bounds: ShapeBounds }> = [];
+  for (const page of scene) {
+    for (const elem of page.display_list) {
+      if (!elem) continue;
+      const e = elem as Record<string, unknown>;
+      for (const key of SHAPE_KEYS) {
+        const variant = e[key] as Record<string, unknown> | undefined;
+        if (!variant) continue;
+        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+        if (!idField) continue;
+        const id = { idx: idField.idx!, version: idField.version! };
+        if (excludeId && id.idx === excludeId.idx && id.version === excludeId.version) continue;
+        const bounds = variant['bounds'] as
+          | { origin?: Record<string, unknown>; size?: Record<string, unknown> }
+          | undefined;
+        if (!bounds?.origin || !bounds?.size) continue;
+        result.push({
+          id,
+          bounds: {
+            x: (bounds.origin['x'] as number) ?? 0,
+            y: (bounds.origin['y'] as number) ?? 0,
+            width: (bounds.size['width'] as number) ?? 0,
+            height: (bounds.size['height'] as number) ?? 0,
+          },
+        });
+      }
+    }
+  }
+  return result;
+}
+
+/** Extract SlotmapId from a raw display list element. */
+export function extractIdFromElem(elem: unknown): SlotmapId | null {
+  const e = elem as Record<string, unknown>;
+  for (const key of SHAPE_KEYS) {
+    const variant = e[key] as Record<string, unknown> | undefined;
+    if (!variant) continue;
+    const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+    if (!idField) continue;
+    return { idx: idField.idx!, version: idField.version! };
+  }
+  return null;
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -82,7 +179,7 @@ function findVariant(scene: ScenePage[], id: SlotmapId): Record<string, unknown>
  * Works for all engine shape variants including 'Group'.
  */
 export function sceneBounds(scene: ScenePage[], id: SlotmapId): ShapeBounds | null {
-  const variant = findVariant(scene, id);
+  const variant = findShapeVariant(scene, id);
   if (!variant) return null;
 
   const bounds = variant['bounds'] as
@@ -104,7 +201,7 @@ export function sceneBounds(scene: ScenePage[], id: SlotmapId): ShapeBounds | nu
  * across resize without re-walking the scene.
  */
 export function sceneGeometry(scene: ScenePage[], id: SlotmapId): CellGeometry | null {
-  const variant = findVariant(scene, id);
+  const variant = findShapeVariant(scene, id);
   if (!variant) return null;
 
   const bounds = variant['bounds'] as
@@ -135,4 +232,113 @@ export function getZoom(svgLayer: HTMLElement): number {
     return parseFloat(match[1]!) || 1;
   }
   return 1;
+}
+
+/**
+ * Compute normalized (0-1) anchor coordinates from shape bounds and a document-space point.
+ * Projects the point onto the rectangle perimeter.
+ */
+export function perimeterNormalized(
+  bounds: ShapeBounds,
+  docX: number,
+  docY: number,
+): { nx: number; ny: number } {
+  const cx = bounds.x + bounds.width / 2;
+  const cy = bounds.y + bounds.height / 2;
+  const hw = bounds.width / 2;
+  const hh = bounds.height / 2;
+
+  const dx = docX - cx;
+  const dy = docY - cy;
+
+  let anchorX: number;
+  let anchorY: number;
+  let nx: number;
+  let ny: number;
+
+  if (Math.abs(dx) * hh > Math.abs(dy) * hw) {
+    if (dx > 0) {
+      anchorX = bounds.x + bounds.width;
+      anchorY = cy + (dy / Math.abs(dx || 1)) * hw;
+      anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
+      nx = 1.0;
+      ny = (anchorY - bounds.y) / bounds.height;
+    } else {
+      anchorX = bounds.x;
+      anchorY = cy - (dy / Math.abs(dx || 1)) * hw;
+      anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
+      nx = 0.0;
+      ny = (anchorY - bounds.y) / bounds.height;
+    }
+  } else {
+    if (dy > 0) {
+      anchorY = bounds.y + bounds.height;
+      anchorX = cx + (dx / Math.abs(dy || 1)) * hh;
+      anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
+      ny = 1.0;
+      nx = (anchorX - bounds.x) / bounds.width;
+    } else {
+      anchorY = bounds.y;
+      anchorX = cx - (dx / Math.abs(dy || 1)) * hh;
+      anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
+      ny = 0.0;
+      nx = (anchorX - bounds.x) / bounds.width;
+    }
+  }
+
+  nx = Math.max(0, Math.min(1, nx));
+  ny = Math.max(0, Math.min(1, ny));
+
+  return { nx, ny };
+}
+
+/** Anchor kind classification. */
+export type AnchorKind = 'north' | 'south' | 'east' | 'west' | 'normalized';
+
+/**
+ * Classify normalized anchor coordinates as a cardinal direction or "normalized".
+ * If within 5% of a cardinal axis, return that cardinal.
+ */
+export function classifyAnchorFromNormalized(
+  nx: number,
+  ny: number,
+): AnchorKind {
+  const threshold = 0.05;
+  if (ny <= threshold) return 'north';
+  if (ny >= 1 - threshold) return 'south';
+  if (nx >= 1 - threshold) return 'east';
+  if (nx <= threshold) return 'west';
+  return 'normalized';
+}
+
+/**
+ * Find a shape variant at a given document-space point (within tolerance).
+ * Returns the variant record or null if not found.
+ */
+export function findShapeVariantAtPoint(
+  scene: ScenePage[],
+  x: number,
+  y: number,
+  tolerance = 1,
+): Record<string, unknown> | null {
+  for (const page of scene) {
+    for (const elem of page.display_list) {
+      if (!elem) continue;
+      const e = elem as Record<string, unknown>;
+      for (const key of SHAPE_KEYS) {
+        const variant = e[key] as Record<string, unknown> | undefined;
+        if (!variant) continue;
+        const bounds = variant['bounds'] as
+          | { origin?: Record<string, unknown>; size?: Record<string, unknown> }
+          | undefined;
+        if (!bounds?.origin || !bounds?.size) continue;
+        const sx = (bounds.origin['x'] as number) ?? 0;
+        const sy = (bounds.origin['y'] as number) ?? 0;
+        if (Math.abs(sx - x) < tolerance && Math.abs(sy - y) < tolerance) {
+          return variant;
+        }
+      }
+    }
+  }
+  return null;
 }

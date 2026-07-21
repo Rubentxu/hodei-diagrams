@@ -12,7 +12,7 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
-import { sceneGeometry, sceneBounds } from './scene-bounds.js';
+import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeVariantAtPoint } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
@@ -559,30 +559,10 @@ export class Editor {
    * overlapping shapes (SEL-014).
    */
   #getIdsAtPoint(x: number, y: number): SlotmapId[] {
-    const result: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-          if (x >= sx && x <= sx + sw && y >= sy && y <= sy + sh) {
-            result.push({ idx: idField.idx!, version: idField.version! });
-          }
-        }
-      }
-    }
-    return result; // z-order: top of stack first
+    const all = findAllShapesWithBounds(this.#sceneCache);
+    return all
+      .filter(({ bounds }) => x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height)
+      .map(({ id }) => id);
   }
 
   /**
@@ -590,20 +570,7 @@ export class Editor {
    * Used by Tab/Shift+Tab to cycle selection (SEL-012).
    */
   #getAllShapeIdsZOrder(): SlotmapId[] {
-    const result: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          result.push({ idx: idField.idx!, version: idField.version! });
-        }
-      }
-    }
-    return result;
+    return findAllShapeIds(this.#sceneCache);
   }
 
   /**
@@ -636,7 +603,7 @@ export class Editor {
 
     const commands: string[] = [];
     for (const id of this.#selection) {
-      const orig = this.#findOriginalGeometry(id);
+      const orig = sceneGeometry(this.#sceneCache, id);
       if (!orig) continue;
       // Carry rotation/flip/relative through. Without these, the engine's
       // MoveVertex deserializer fails with "missing field `rotation`" and
@@ -861,13 +828,7 @@ export class Editor {
 
   /** Select all shapes in the current page. */
   selectAll(): void {
-    const allIds: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const id = this.#extractIdFromDisplayElem(elem);
-        if (id) allIds.push(id);
-      }
-    }
+    const allIds = findAllShapeIds(this.#sceneCache);
     this.#applySelection(new Set(allIds));
   }
 
@@ -1004,7 +965,7 @@ export class Editor {
 
     const ids = Array.from(this.#selection);
     const bounds = ids
-      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .map((id) => ({ id, geom: sceneGeometry(this.#sceneCache, id) }))
       .filter(
         (
           b,
@@ -1066,7 +1027,7 @@ export class Editor {
 
     const ids = Array.from(this.#selection);
     const bounds = ids
-      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .map((id) => ({ id, geom: sceneGeometry(this.#sceneCache, id) }))
       .filter(
         (
           b,
@@ -1132,7 +1093,7 @@ export class Editor {
 
     const ids = Array.from(this.#selection);
     const bounds = ids
-      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .map((id) => ({ id, geom: sceneGeometry(this.#sceneCache, id) }))
       .filter(
         (
           b,
@@ -1197,7 +1158,7 @@ export class Editor {
 
   /** Returns true if the shape's `locked` cell-style key is "1" or true. */
   isShapeLocked(id: SlotmapId): boolean {
-    const variant = this.#findShapeById(id);
+    const variant = findShapeVariant(this.#sceneCache, id);
     if (!variant) return false;
     const style = (variant['style'] as Record<string, unknown> | undefined) ?? {};
     const locked = style['locked'];
@@ -1237,7 +1198,7 @@ export class Editor {
 
   /** Get the `link` cell-style value for a shape (or empty string). */
   getShapeLink(id: SlotmapId): string {
-    const variant = this.#findShapeById(id);
+    const variant = findShapeVariant(this.#sceneCache, id);
     if (!variant) return '';
     const style = (variant['style'] as Record<string, unknown> | undefined) ?? {};
     const link = style['link'];
@@ -2435,31 +2396,7 @@ export class Editor {
     if (!this.#snapEnabled) return { x, y, guides: {} };
 
     // Collect all peer shape bounds (excluding the dragged one)
-    const peers: { id: SlotmapId; x: number; y: number; width: number; height: number }[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const id = { idx: idField.idx!, version: idField.version! };
-          if (id.idx === excludeId.idx && id.version === excludeId.version) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-          peers.push({
-            id,
-            x: (bounds.origin['x'] as number) ?? 0,
-            y: (bounds.origin['y'] as number) ?? 0,
-            width: (bounds.size['width'] as number) ?? 0,
-            height: (bounds.size['height'] as number) ?? 0,
-          });
-        }
-      }
-    }
+    const peers = findAllShapesWithBounds(this.#sceneCache, excludeId);
 
     if (peers.length === 0) return { x, y, guides: {} };
 
@@ -2469,10 +2406,9 @@ export class Editor {
     let bestDistY = this.#snapThreshold + 1;
 
     for (const peer of peers) {
-      // X-axis candidates: left, center, right
-      const peerLeft = peer.x;
-      const peerCenterX = peer.x + peer.width / 2;
-      const peerRight = peer.x + peer.width;
+      const peerLeft = peer.bounds.x;
+      const peerCenterX = peer.bounds.x + peer.bounds.width / 2;
+      const peerRight = peer.bounds.x + peer.bounds.width;
 
       const candX = [peerLeft, peerCenterX, peerRight];
       for (const cx of candX) {
@@ -2484,9 +2420,9 @@ export class Editor {
       }
 
       // Y-axis candidates: top, middle, bottom
-      const peerTop = peer.y;
-      const peerMiddleY = peer.y + peer.height / 2;
-      const peerBottom = peer.y + peer.height;
+      const peerTop = peer.bounds.y;
+      const peerMiddleY = peer.bounds.y + peer.bounds.height / 2;
+      const peerBottom = peer.bounds.y + peer.bounds.height;
 
       const candY = [peerTop, peerMiddleY, peerBottom];
       for (const cy of candY) {
@@ -2710,7 +2646,7 @@ export class Editor {
     // Validate each selected ID still exists in the scene
     const validIds = new Set<SlotmapId>();
     for (const id of this.#selection) {
-      const variant = this.#findShapeById(id);
+      const variant = findShapeVariant(this.#sceneCache, id);
       if (variant) {
         validIds.add(id);
       }
@@ -2979,46 +2915,26 @@ export class Editor {
     rect: { x: number; y: number; width: number; height: number },
     mode: 'contain' | 'intersect',
   ): SlotmapId[] {
-    const result: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-
-          let hit: boolean;
-          if (mode === 'contain') {
-            hit =
-              sx >= rect.x &&
-              sy >= rect.y &&
-              sx + sw <= rect.x + rect.width &&
-              sy + sh <= rect.y + rect.height;
-          } else {
-            hit =
-              sx < rect.x + rect.width &&
-              sx + sw > rect.x &&
-              sy < rect.y + rect.height &&
-              sy + sh > rect.y;
-          }
-          if (hit) {
-            result.push({ idx: idField.idx!, version: idField.version! });
-          }
+    const all = findAllShapesWithBounds(this.#sceneCache);
+    return all
+      .filter(({ bounds }) => {
+        if (mode === 'contain') {
+          return (
+            bounds.x >= rect.x &&
+            bounds.y >= rect.y &&
+            bounds.x + bounds.width <= rect.x + rect.width &&
+            bounds.y + bounds.height <= rect.y + rect.height
+          );
+        } else {
+          return (
+            bounds.x < rect.x + rect.width &&
+            bounds.x + bounds.width > rect.x &&
+            bounds.y < rect.y + rect.height &&
+            bounds.y + bounds.height > rect.y
+          );
         }
-      }
-    }
-    return result;
+      })
+      .map(({ id }) => id);
   }
 
   // ─── Drag FSM ────────────────────────────────────────────────────────────
@@ -3596,7 +3512,7 @@ export class Editor {
   /** Commit a move by computing new absolute geometry and dispatching MoveVertex. */
   #commitMove(vid: SlotmapId, dx: number, dy: number): void {
     // Look up original geometry from scene cache
-    const orig = this.#findOriginalGeometry(vid);
+    const orig = sceneGeometry(this.#sceneCache, vid);
     if (!orig) {
       this.#onError('Cannot find original geometry for moved vertex');
       return;
@@ -3635,126 +3551,31 @@ export class Editor {
     this.#applySelection(new Set([state.groupId]));
   }
 
-  /** Find original geometry for a vertex from the scene cache. */
-  /**
-   * Read the current full geometry of a vertex from the scene cache.
-   * Returns null if the shape is not in the cache (e.g., the user deleted
-   * it during a transaction).
-   *
-   * The returned object includes rotation, flip_h, flip_v, and relative.
-   * MoveVertex and other geometry commands require all CellGeometry
-   * fields, so callers that use this to build a new payload must pass
-   * everything through (not just x/y/width/height).
-   */
-  #findOriginalGeometry(vid: SlotmapId): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    rotation: number;
-    flip_h: boolean;
-    flip_v: boolean;
-    relative: boolean;
-  } | null {
-    return sceneGeometry(this.#sceneCache, vid);
-  }
 
-  // ─── Shape Lookup Helpers ─────────────────────────────────────────────────
-
-  /** Shape type keys used across scene-walk helpers. */
-  static readonly #SHAPE_KEYS = [
-    'Rect',
-    'RoundedRect',
-    'Ellipse',
-    'Diamond',
-    'Triangle',
-    'Hexagon',
-    'Cylinder',
-    'Cloud',
-    'Parallelogram',
-    'Trapezoid',
-    'Polygon',
-    'Group',
-  ] as const;
-
-  /**
-   * Find the display-list variant data for a shape by its SlotmapId.
-   * Returns the variant record (e.g. `{id, bounds, style}`) or null if not found.
-   * This is the single source of truth for scene-walking by ID.
-   */
-  #findShapeById(id: SlotmapId): Record<string, unknown> | null {
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        if (!elem) continue;
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key];
-          // Note: typeof null === 'object' in JavaScript, so we must check
-          // for null explicitly before the object check.
-          if (!variant || variant === null || typeof variant !== 'object') continue;
-          const v = variant as Record<string, unknown>;
-          const idField = v['id'];
-          if (idField === null || idField === undefined) continue;
-          if (typeof idField !== 'object') continue;
-          const idObj = idField as { idx?: unknown; version?: unknown };
-          if (typeof idObj.idx !== 'number' || typeof idObj.version !== 'number') continue;
-          if (idObj.idx === id.idx && idObj.version === id.version) {
-            return v;
-          }
-        }
-      }
-    }
-    return null;
-  }
 
   /** Get a vertex object by SlotmapId from the scene cache. */
   #getVertex(id: SlotmapId): Vertex | null {
-    const variant = this.#findShapeById(id);
+    const variant = findShapeVariant(this.#sceneCache, id);
     if (!variant) return null;
-    const bounds = variant['bounds'] as
-      | { origin?: Record<string, number>; size?: Record<string, number> }
-      | undefined;
-    if (!bounds?.origin || !bounds?.size) return null;
+    const bounds = sceneBounds(this.#sceneCache, id);
+    if (!bounds) return null;
     return {
-      geometry: {
-        x: (bounds.origin['x'] as number) ?? 0,
-        y: (bounds.origin['y'] as number) ?? 0,
-        width: (bounds.size['width'] as number) ?? 0,
-        height: (bounds.size['height'] as number) ?? 0,
-      },
+      geometry: bounds,
       style: (variant['style'] as Record<string, unknown>) ?? {},
     };
   }
 
   /** Find a vertex SlotmapId at the given document position (within tolerance). */
   #findVertexAt(x: number, y: number, tolerance = 5): SlotmapId | null {
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-
-          if (
-            x >= sx - tolerance &&
-            x <= sx + sw + tolerance &&
-            y >= sy - tolerance &&
-            y <= sy + sh + tolerance
-          ) {
-            return { idx: idField.idx!, version: idField.version! };
-          }
-        }
+    const all = findAllShapesWithBounds(this.#sceneCache);
+    for (const { id, bounds } of all) {
+      if (
+        x >= bounds.x - tolerance &&
+        x <= bounds.x + bounds.width + tolerance &&
+        y >= bounds.y - tolerance &&
+        y <= bounds.y + bounds.height + tolerance
+      ) {
+        return id;
       }
     }
     return null;
@@ -3762,15 +3583,7 @@ export class Editor {
 
   /** Extract SlotmapId from a display list element. */
   #extractIdFromDisplayElem(elem: unknown): SlotmapId | null {
-    const e = elem as Record<string, unknown>;
-    for (const key of Editor.#SHAPE_KEYS) {
-      const variant = e[key] as Record<string, unknown> | undefined;
-      if (!variant) continue;
-      const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-      if (!idField) continue;
-      return { idx: idField.idx!, version: idField.version! };
-    }
-    return null;
+    return extractIdFromElem(elem);
   }
 
   /** Deep clone a vertex object. */
@@ -3802,7 +3615,7 @@ export class Editor {
 
     if (!this.#connectState) {
       // First click: record source shape and start drag tracking
-      const geom = this.#findOriginalGeometry(hit);
+      const geom = sceneGeometry(this.#sceneCache, hit);
       if (!geom) return;
 
       // IP-C: Determine connect mode from modifiers (EDG-003..005)
@@ -3877,8 +3690,8 @@ export class Editor {
       targetAnchor = { kind: 'fixed', port: 'Center' };
     } else if (connectMode === 'anywhere') {
       // EDGE-003: Alt held → normalized anchor at cursor position on perimeter
-      const sourceBounds = this.#findOriginalGeometry(sourceId);
-      const targetBounds = this.#findOriginalGeometry(hit);
+      const sourceBounds = sceneGeometry(this.#sceneCache, sourceId);
+      const targetBounds = sceneGeometry(this.#sceneCache, hit);
       if (sourceBounds && targetBounds) {
         const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
         const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
@@ -3990,7 +3803,7 @@ export class Editor {
       }
 
       // Get target shape bounds
-      const targetBounds = this.#findOriginalGeometry(targetHit);
+      const targetBounds = sceneGeometry(this.#sceneCache, targetHit);
       if (!targetBounds) {
         this.#cancelConnectDrag();
         this.#cancelConnect();
@@ -4399,27 +4212,11 @@ export class Editor {
 
     // Find the newly created vertex by searching the scene cache for the
     // kind and position match.
-    const page = this.#sceneCache[this.#activePageIdx];
-    if (!page) return null;
-    const candidates: SlotmapId[] = [];
-    for (const elem of page.display_list) {
-      const e = elem as Record<string, unknown>;
-      for (const key of Editor.#SHAPE_KEYS) {
-        const variant = e[key] as Record<string, unknown> | undefined;
-        if (!variant) continue;
-        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-        const bounds = variant['bounds'] as
-          | { origin?: Record<string, number> }
-          | undefined;
-        if (!idField || !bounds?.origin) continue;
-        const sx = (bounds.origin['x'] as number) ?? 0;
-        const sy = (bounds.origin['y'] as number) ?? 0;
-        if (Math.abs(sx - x) < 1 && Math.abs(sy - y) < 1) {
-          candidates.push({ idx: idField.idx!, version: idField.version! });
-        }
-      }
-    }
-    return candidates[0] ?? null;
+    const variant = findShapeVariantAtPoint(this.#sceneCache, x, y, 1);
+    if (!variant) return null;
+    const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+    if (!idField) return null;
+    return { idx: idField.idx!, version: idField.version! };
   }
 
   /**
@@ -4501,31 +4298,15 @@ export class Editor {
 
   /** Compute the union bounding box of all shapes in the current page. */
   #getDiagramBBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    const allBounds = findAllBounds(this.#sceneCache);
+    if (allBounds.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let found = false;
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-          if (sx < minX) minX = sx;
-          if (sy < minY) minY = sy;
-          if (sx + sw > maxX) maxX = sx + sw;
-          if (sy + sh > maxY) maxY = sy + sh;
-          found = true;
-        }
-      }
+    for (const b of allBounds) {
+      if (b.x < minX) minX = b.x;
+      if (b.y < minY) minY = b.y;
+      if (b.x + b.width > maxX) maxX = b.x + b.width;
+      if (b.y + b.height > maxY) maxY = b.y + b.height;
     }
-    if (!found) return null;
     return { minX, minY, maxX, maxY };
   }
 

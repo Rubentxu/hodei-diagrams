@@ -9,16 +9,8 @@
  */
 
 import type { SlotmapId, ScenePage } from './types.js';
-import { sceneBounds, getZoom } from './scene-bounds.js';
+import { sceneBounds, getZoom, type ShapeBounds } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
-
-/** Shape bounds in document coordinates. */
-interface ShapeBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 /** Resize handle positions. */
 export type HandlePosition = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';

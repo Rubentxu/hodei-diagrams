@@ -9,22 +9,13 @@
 
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
-import { sceneBounds, getZoom } from './scene-bounds.js';
-import { } from './types.js';
+import { sceneBounds, getZoom, type ShapeBounds } from './scene-bounds.js';
 
 /** Anchor specification compatible with the WASM interface. */
 export interface AnchorSpec {
   kind: 'auto' | 'north' | 'south' | 'east' | 'west' | 'normalized';
   nx?: number;
   ny?: number;
-}
-
-/** Shape bounds in document coordinates. */
-interface ShapeBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 /** An anchor handle being dragged. */
