@@ -260,8 +260,11 @@ export class Editor {
       () => this.#sceneCache,
       (id, geom) => this.setVertexGeometry(id, geom),
       (id, angleDelta) => {
-        if (!this.isSelected(id)) this.selectOnly(id);
-        this.rotateSelection(angleDelta);
+        // Single-shape rotation: delegate directly to the engine command.
+        // No need to check selection — rotation handles only appear on
+        // single-selected shapes (multi-select hides them).
+        this.#session.rotateVertex(id, angleDelta);
+        this.#replay();
       },
     );
   }
