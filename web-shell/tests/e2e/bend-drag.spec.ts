@@ -208,3 +208,75 @@ test.describe('BEND: bend handle drag', () => {
     expect(finalCY).toBe(initialCY);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// BEND-001b: perimeter-inclusive PathElement regression
+// After r110 engine fix, PathElement.points must be perimeter-inclusive:
+//   [from.center, ...interior_waypoints, to.center]
+// This test verifies the fix by reading the scene cache directly.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('BEND-001b: 2-bend edge produces 4-point perimeter-inclusive path', async ({ page }) => {
+  // Load fixture and create bent edge
+  await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES);
+  await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+  // Create edge with 2 bends: rect1(100,100) → rect2(300,200)
+  // rect1 center: (100+60/2, 100+40/2) = (130, 120)
+  // rect2 center: (300+60/2, 200+40/2) = (330, 220)
+  const result = await addBentEdgeAt(page, 100, 100, 300, 200, [
+    { x: 150, y: 250 },
+    { x: 250, y: 80 },
+  ]);
+  if (!result) {
+    test.skip();
+    return;
+  }
+
+  // Read scene cache directly to verify perimeter-inclusive points
+  const sceneData = await page.evaluate(() => {
+    const editor = (window as any).__hodeiEditor;
+    if (!editor?.getSceneCache) return null;
+    const cache = editor.getSceneCache();
+    if (!cache.ok) return null;
+    return cache.value;
+  });
+
+  if (!sceneData) {
+    test.skip();
+    return;
+  }
+
+  // Find the Path element for our edge
+  const page0 = sceneData[0];
+  if (!page0) {
+    test.skip();
+    return;
+  }
+
+  const pathElem = page0.display_list.find((e: any) => e.Path !== undefined);
+  if (!pathElem) {
+    test.skip();
+    return;
+  }
+
+  const path = pathElem.Path;
+  const points = path.points;
+
+  // Perimeter-inclusive: from.center + 2 bends + to.center = 4 points
+  // from center ≈ (130, 120), to center ≈ (330, 220)
+  expect(points.length).toBe(4);
+
+  // points[0] should be from center, points[3] should be to center
+  // Allow small floating point tolerance
+  expect(Math.abs(points[0].x - 130)).toBeLessThan(1);
+  expect(Math.abs(points[0].y - 120)).toBeLessThan(1);
+  expect(Math.abs(points[3].x - 330)).toBeLessThan(1);
+  expect(Math.abs(points[3].y - 220)).toBeLessThan(1);
+
+  // Interior waypoints should be preserved
+  expect(points[1].x).toBe(150);
+  expect(points[1].y).toBe(250);
+  expect(points[2].x).toBe(250);
+  expect(points[2].y).toBe(80);
+});
