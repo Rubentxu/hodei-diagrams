@@ -136,7 +136,7 @@ export class ResizeHandlesOverlay {
     if (scene.length === 0) return;
 
     const vertexId = Array.from(selection)[0]!;
-    const bounds = this.#findShapeBounds(scene, vertexId);
+    const bounds = sceneBounds(scene, vertexId);
     if (!bounds) return;
 
     // Create 8 handles: corners + edge midpoints
@@ -572,13 +572,6 @@ export class ResizeHandlesOverlay {
     while (normalized > Math.PI) normalized -= Math.PI * 2;
     while (normalized < -Math.PI) normalized += Math.PI * 2;
     return normalized;
-  }
-
-  /**
-   * Find a shape's bounds in the scene.
-   */
-  #findShapeBounds(scene: ScenePage[], shapeId: SlotmapId): ShapeBounds | null {
-    return sceneBounds(scene, shapeId);
   }
 
   /** Clean up event listeners. Call when editor is detached. */
