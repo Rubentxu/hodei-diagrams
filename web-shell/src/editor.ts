@@ -61,11 +61,10 @@ export interface OverlayHitZone {
 
 /**
  * Narrow host surface overlays use to register pointer hit zones.
- * Editor implements this; overlays depend on the interface, not Editor.
- *
- * Bend handles stay as an inline Editor registration (not via attach())
- * because #startBendDrag consumes editor-private state. Full
- * BendHandlesOverlay extraction is r109+. See ponytail: marker in editor ctor.
+  * Editor implements this; overlays depend on the interface, not Editor.
+  *
+  * Bend handles are managed by BendHandlesOverlay (r109+), attached via
+  * BendHandlesOverlay.attach(this) in the Editor constructor.
  */
 export interface OverlayHost {
   /** Register an overlay's hit zone. Returns a disposer for symmetry. */
