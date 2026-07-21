@@ -302,6 +302,9 @@ export class Editor {
       },
     );
 
+    // Attach resize handles via OverlayHost (Pattern D 9c)
+    this.#resizeHandles.attach(this);
+
     // Register overlay hit zones for port and bend handles (Pattern D 9a)
     this.registerOverlayHitZone({
       selector: '.port-handle',
@@ -318,14 +321,6 @@ export class Editor {
         this.#startBendDrag(this.#selectedEdgeId, bendIndex, ev);
         return true;
       },
-    });
-
-    // Register resize + rotation zone (Pattern D 9c).
-    // The overlay owns the DOM contract; beginFromEvent extracts data attributes
-    // and routes to the appropriate drag starter.
-    this.registerOverlayHitZone({
-      selector: '.resize-handle, .rotation-handle',
-      handler: (target, ev) => this.#resizeHandles.beginFromEvent(target, ev),
     });
   }
 

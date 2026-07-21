@@ -11,6 +11,7 @@
 import type { SlotmapId, ScenePage } from './types.js';
 import { sceneBounds, getZoom, type ShapeBounds } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
+import type { OverlayHost } from './editor.js';
 
 /** Resize handle positions. */
 export type HandlePosition = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -62,6 +63,9 @@ export class ResizeHandlesOverlay {
   readonly #resizeSession: DragSession<ResizeDragState2>;
   readonly #rotationSession: DragSession<RotationDragState2>;
 
+  // Overlay registration disposers for attach/detach
+  #disposers: Array<() => void> = [];
+
   constructor(
     getSvgLayer: () => HTMLElement,
     sceneProvider: () => ScenePage[],
@@ -96,6 +100,25 @@ export class ResizeHandlesOverlay {
       },
       onCancel: (_e, _state) => {},
     });
+  }
+
+  /**
+   * Attach this overlay to the given host, registering its hit zones.
+   */
+  attach(host: OverlayHost): void {
+    const dispose = host.registerOverlayHitZone({
+      selector: '.resize-handle, .rotation-handle',
+      handler: (target, event) => this.beginFromEvent(target, event),
+    });
+    this.#disposers.push(dispose);
+  }
+
+  /**
+   * Detach this overlay from its host, removing all registered hit zones.
+   */
+  detach(): void {
+    for (const dispose of this.#disposers) dispose();
+    this.#disposers = [];
   }
 
   /**
@@ -560,6 +583,7 @@ export class ResizeHandlesOverlay {
 
   /** Clean up event listeners. Call when editor is detached. */
   dispose(): void {
+    this.detach();
     this.#resizeSession.dispose();
     this.#rotationSession.dispose();
     this.#clearHandles(this.#getSvgLayer());
