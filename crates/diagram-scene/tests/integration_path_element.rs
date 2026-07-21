@@ -429,3 +429,62 @@ fn edge_with_waypoints_and_label_offset() {
     assert!(has_path, "edge with waypoints should produce PathElement");
     assert!(has_text, "edge with label should produce TextElement");
 }
+
+// ─── Perimeter-Inclusive PathElement (r110) ─────────────────────────────────────
+
+/// RED test: PathElement.points must be perimeter-inclusive:
+///   [from.center, ...edge.waypoints, to.center]
+/// This test FAILS on the v0.50.0 contract (interior-only) and turns GREEN
+/// after the project_edge fix in C02.
+#[test]
+fn path_element_includes_vertex_centers() {
+    let (mut model, pid) = make_model_with_page();
+    // v1 at (0,0) size 100×60 → center (50, 30)
+    let v1 = make_vertex(&mut model, pid, 0.0, 0.0);
+    // v2 at (300,0) size 100×60 → center (350, 30)
+    let v2 = make_vertex(&mut model, pid, 300.0, 0.0);
+
+    // 1 interior waypoint
+    let waypoints = vec![Point { x: 150.0, y: 30.0 }];
+    let edge = Edge {
+        source: v1,
+        target: v2,
+        page_id: Some(pid),
+        waypoints,
+        ..Default::default()
+    };
+    model.store.insert_edge(edge);
+
+    let scene = SceneBuilder::new().build(&model).unwrap();
+    let path_elem = scene.pages[0]
+        .display_list
+        .iter()
+        .filter_map(|e| match e {
+            VisualElement::Path(p) => Some(p),
+            _ => None,
+        })
+        .next()
+        .expect("should have a PathElement");
+
+    // Perimeter-inclusive: from + 1 waypoint + to = 3 points
+    assert_eq!(
+        path_elem.points.len(),
+        3,
+        "perimeter-inclusive: from + 1 waypoint + to"
+    );
+    assert_eq!(
+        path_elem.points[0],
+        Point { x: 50.0, y: 30.0 },
+        "from = v1 center"
+    );
+    assert_eq!(
+        path_elem.points[1],
+        Point { x: 150.0, y: 30.0 },
+        "interior waypoint preserved"
+    );
+    assert_eq!(
+        path_elem.points[2],
+        Point { x: 350.0, y: 30.0 },
+        "to = v2 center"
+    );
+}
