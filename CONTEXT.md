@@ -56,6 +56,18 @@ _Avoid_: Raw number, parsing PageId shape in the shell
 The result of injecting an SVG string from the engine into the DOM via `innerHTML`. The engine is the trust boundary — SVG strings are treated as trusted content since the engine owns all rendering logic.
 _Avoid_: User-supplied innerHTML, client-side SVG parsing, DOM manipulation of engine output
 
+**CellGeometry**:
+A TypeScript interface in `scene-bounds.ts` representing the full geometry of a diagram cell: bounds (x, y, width, height), rotation angle, flip flags, and relative flag. Mirror of the Rust `CellGeometry` struct. Used by `Editor.setVertexGeometry` to preserve rotation and flip across resize operations.
+_Avoid_: Raw shape object, inferring rotation from visual transform
+
+**DragSession<T>**:
+A generic TypeScript class in `dom-drag.ts` managing the lifecycle of a single drag interaction (pointerdown → pointermove → pointerup/pointercancel). Parameterized on handle type (`'nw'|'n'|…|'rotate'`). Replaces the three separate FSMs that previously owned resize, rotation, and move-vertex drag state.
+_Avoid_: Separate boolean flags per interaction (isDragging, isRotating, etc.)
+
+**OverlayHitZone**:
+A typed region registered by an overlay (`ResizeHandlesOverlay`, `PortHandlesOverlay`) with the `Editor`'s hit-zone registry. Each zone implements `contains(x, y)`, `onPointerDown`, `onPointerMove`, and `onPointerUp`. The editor resolves pointer events to the correct zone by querying all registered zones, then dispatches the event. Overlays do not communicate via `data-*` attributes.
+_Avoid_: `data-*` DOM attributes for event routing, overlay-to-overlay direct coupling
+
 ## Layout Engines
 
 **TreeLayout**:
