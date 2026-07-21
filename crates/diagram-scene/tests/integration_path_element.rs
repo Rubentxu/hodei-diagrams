@@ -2,8 +2,7 @@
 //!
 //! Tests cover:
 //! - Edge with no waypoints → LineElement
-//! - Edge with waypoints → PathElement (routing engine provides full path)
-//! - PathElement does NOT prepend/append vertex centers
+//! - Edge with waypoints → PathElement (perimeter-inclusive: prepends from.center, appends to.center)
 //! - Edge label offset applies to midpoint anchor
 //! - Edge label offset None uses pure midpoint
 //!
@@ -133,17 +132,22 @@ fn edge_with_waypoints_produces_path_element() {
 }
 
 #[test]
-fn edge_path_does_not_prepend_append_centers() {
-    // Critical test: scene builder should NOT add center points to path
-    // because routing engine waypoints already include perimeter endpoints
-    // (fix from v0.50.0)
+fn edge_path_prepends_from_center_appends_to_center() {
+    // Perimeter-inclusive contract (r110): PathElement.points includes
+    // from.center at [0] and to.center at [len-1], with waypoints in between.
+    // v0.50.0 incorrectly assumed routing engine provided perimeter points.
     let (mut model, pid) = make_model_with_page();
     let v1 = make_vertex(&mut model, pid, 0.0, 0.0);
     let v2 = make_vertex(&mut model, pid, 300.0, 0.0);
 
-    // Create edge with known waypoints
+    // v1 center: (0 + 100/2, 0 + 60/2) = (50, 30)
+    // v2 center: (300 + 100/2, 0 + 60/2) = (350, 30)
+    let from_center = Point { x: 50.0, y: 30.0 };
+    let to_center = Point { x: 350.0, y: 30.0 };
+
+    // 3 interior waypoints
     let waypoints = vec![
-        Point { x: 100.0, y: 30.0 }, // Only these 3 waypoints
+        Point { x: 100.0, y: 30.0 },
         Point { x: 150.0, y: 30.0 },
         Point { x: 200.0, y: 30.0 },
     ];
@@ -156,12 +160,10 @@ fn edge_path_does_not_prepend_append_centers() {
     };
     model.store.insert_edge(edge);
 
-    // Build scene
     let builder = SceneBuilder::new();
     let scene = builder.build(&model).unwrap();
     let page = &scene.pages[0];
 
-    // Find the PathElement
     let path_elem = page
         .display_list
         .iter()
@@ -172,30 +174,36 @@ fn edge_path_does_not_prepend_append_centers() {
         .next()
         .expect("should have a PathElement");
 
-    // Path points should be EXACTLY the waypoints - no centers prepended or appended
+    // Perimeter-inclusive: from + 3 waypoints + to = 5 points
     assert_eq!(
         path_elem.points.len(),
-        waypoints.len(),
-        "PathElement should have exactly {} points (same as waypoints, no centers added)",
+        waypoints.len() + 2,
+        "perimeter-inclusive: from + {} waypoints + to",
         waypoints.len()
     );
-    for (i, (path_pt, wp)) in path_elem.points.iter().zip(waypoints.iter()).enumerate() {
+    assert_eq!(
+        path_elem.points[0], from_center,
+        "prepends source center"
+    );
+    assert_eq!(
+        path_elem.points[path_elem.points.len() - 1],
+        to_center,
+        "appends target center"
+    );
+    // Interior waypoints preserved
+    for (i, wp) in waypoints.iter().enumerate() {
         assert_eq!(
-            path_pt.x, wp.x,
-            "point[{}].x should equal waypoint[{}].x (no center prepend)",
-            i, i
-        );
-        assert_eq!(
-            path_pt.y, wp.y,
-            "point[{}].y should equal waypoint[{}].y",
+            path_elem.points[i + 1], *wp,
+            "interior waypoint[{}] preserved at index {}+1",
             i, i
         );
     }
 }
 
 #[test]
-fn edge_with_single_waypoint_produces_path_element() {
-    // Single waypoint should still produce PathElement
+fn edge_with_single_waypoint_produces_3_point_path() {
+    // Single interior waypoint → perimeter-inclusive path has 3 points:
+    // from.center + 1 waypoint + to.center
     let (mut model, pid) = make_model_with_page();
     let v1 = make_vertex(&mut model, pid, 0.0, 0.0);
     let v2 = make_vertex(&mut model, pid, 300.0, 0.0);
@@ -226,9 +234,13 @@ fn edge_with_single_waypoint_produces_path_element() {
 
     assert_eq!(
         path_elem.points.len(),
-        1,
-        "PathElement should have exactly 1 point"
+        3,
+        "from + 1 waypoint + to (perimeter-inclusive)"
     );
+    // v1 center: (50, 30), v2 center: (350, 30)
+    assert_eq!(path_elem.points[0], Point { x: 50.0, y: 30.0 });
+    assert_eq!(path_elem.points[1], Point { x: 150.0, y: 50.0 });
+    assert_eq!(path_elem.points[2], Point { x: 350.0, y: 30.0 });
 }
 
 // ─── Edge Label Offset ─────────────────────────────────────────────────────────

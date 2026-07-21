@@ -1204,7 +1204,7 @@ mod tests {
     }
 
     #[test]
-    fn build_edge_with_waypoints_produces_path_element() {
+    fn build_edge_with_waypoints_produces_perimeter_inclusive_path() {
         let mut model = DiagramModel::new();
 
         let page = Page::new(diagram_core::PageId::default());
@@ -1228,7 +1228,8 @@ mod tests {
         };
         let vid2 = model.store.insert_vertex(v2);
 
-        // Edge with waypoints
+        // v1 center = (40 + 80/2, 20 + 40/2) = (80, 40)
+        // v2 center = (120 + 80/2, 80 + 40/2) = (160, 100)
         let waypoints = vec![
             diagram_core::geometry::Point { x: 100.0, y: 50.0 },
             diagram_core::geometry::Point { x: 100.0, y: 70.0 },
@@ -1258,17 +1259,17 @@ mod tests {
             })
             .expect("Expected Path element");
 
-        // Waypoints are stored as-is (no center prepend/append).
-        // The routing engine already provides perimeter points.
-        assert_eq!(path_elem.points.len(), 2); // just the 2 waypoints
-
-        // Waypoint 1
-        assert_eq!(path_elem.points[0].x, 100.0);
-        assert_eq!(path_elem.points[0].y, 50.0);
-
-        // Waypoint 2
-        assert_eq!(path_elem.points[1].x, 100.0);
-        assert_eq!(path_elem.points[1].y, 70.0);
+        // Perimeter-inclusive: from + 2 waypoints + to = 4 points
+        // v1 center = (80, 40), v2 center = (160, 100)
+        assert_eq!(path_elem.points.len(), 4, "from + 2 waypoints + to");
+        assert_eq!(path_elem.points[0].x, 80.0);  // from (v1 center)
+        assert_eq!(path_elem.points[0].y, 40.0);
+        assert_eq!(path_elem.points[1].x, 100.0); // wp[0]
+        assert_eq!(path_elem.points[1].y, 50.0);
+        assert_eq!(path_elem.points[2].x, 100.0); // wp[1]
+        assert_eq!(path_elem.points[2].y, 70.0);
+        assert_eq!(path_elem.points[3].x, 160.0); // to (v2 center)
+        assert_eq!(path_elem.points[3].y, 100.0);
     }
 
     #[test]
