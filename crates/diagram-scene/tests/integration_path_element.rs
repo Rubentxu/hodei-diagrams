@@ -500,3 +500,80 @@ fn path_element_includes_vertex_centers() {
         "to = v2 center"
     );
 }
+
+/// Verifies the projection invariant after a simulated move_bend storage mutation.
+/// Simulates the storage state left by diagram-wasm::move_bend:
+///   1. move_bend reads interior waypoints
+///   2. builds full_path = [src, ...wps, tgt]
+///   3. mutates full_path[bend_index + 1]
+///   4. strips endpoints: new_wps = full_path[1..len-1]
+///   5. commits via set_edge_waypoints
+///
+/// After step 5: endpoints remain anchored to vertex centers, moved waypoint
+/// appears at correct index in PathElement.points.
+#[test]
+fn move_bend_preserves_semantics_on_perimeter_inclusive_path() {
+    let (mut model, pid) = make_model_with_page();
+    let v1 = make_vertex(&mut model, pid, 0.0, 0.0);  // center (50, 30)
+    let v2 = make_vertex(&mut model, pid, 300.0, 0.0); // center (350, 30)
+
+    // Initial: 2 interior waypoints (as if from 2x insert_bend)
+    let wps_initial = vec![
+        Point { x: 100.0, y: 30.0 },
+        Point { x: 200.0, y: 30.0 },
+    ];
+    let edge = Edge {
+        source: v1,
+        target: v2,
+        page_id: Some(pid),
+        waypoints: wps_initial.clone(),
+        ..Default::default()
+    };
+    let eid = model.store.insert_edge(edge);
+
+    // Verify initial projection: 4 points, from + 2 wps + to
+    let scene = SceneBuilder::new().build(&model).unwrap();
+    let path_elem = scene.pages[0]
+        .display_list
+        .iter()
+        .filter_map(|e| match e {
+            VisualElement::Path(p) => Some(p),
+            _ => None,
+        })
+        .next()
+        .expect("initial PathElement");
+    assert_eq!(path_elem.points.len(), 4);
+    assert_eq!(path_elem.points[0], Point { x: 50.0, y: 30.0 });   // from
+    assert_eq!(path_elem.points[3], Point { x: 350.0, y: 30.0 }); // to
+
+    // Simulate move_bend(edgeId, bend_index=1, x=100, y=200):
+    //   full_path before = [src(50,30), wp0(100,30), wp1(200,30), tgt(350,30)]
+    //   full_path[2] = (100, 200)  ← bend_index 1 → full_path index 2
+    //   new_wps = full_path[1..3] = [(100,30), (100,200)]
+    let new_wps = vec![
+        Point { x: 100.0, y: 30.0 },    // wp0 unchanged
+        Point { x: 100.0, y: 200.0 },   // wp1 moved
+    ];
+    let edge_ref = model.store.edge_mut(eid).expect("edge exists");
+    edge_ref.waypoints = new_wps;
+
+    // Rebuild scene; verify endpoints unchanged, interior updated.
+    let scene2 = SceneBuilder::new().build(&model).unwrap();
+    let path_elem2 = scene2.pages[0]
+        .display_list
+        .iter()
+        .filter_map(|e| match e {
+            VisualElement::Path(p) => Some(p),
+            _ => None,
+        })
+        .next()
+        .expect("post-move PathElement");
+
+    assert_eq!(path_elem2.points.len(), 4, "still 4 points after move_bend");
+    // Endpoints anchored to vertex centers (unchanged):
+    assert_eq!(path_elem2.points[0], Point { x: 50.0, y: 30.0 }, "from anchored");
+    assert_eq!(path_elem2.points[3], Point { x: 350.0, y: 30.0 }, "to anchored");
+    // Interior waypoints reflect the move:
+    assert_eq!(path_elem2.points[1], Point { x: 100.0, y: 30.0 }, "wp0 unchanged");
+    assert_eq!(path_elem2.points[2], Point { x: 100.0, y: 200.0 }, "wp1 moved");
+}
