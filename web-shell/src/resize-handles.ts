@@ -84,30 +84,36 @@ export class ResizeHandlesOverlay {
     // Resize drag session (T10)
     this.#resizeSession = new DragSession<ResizeDragState2>({
       threshold: 3,
-      onMove: (e, state) => this.#resizeOnMove(e, state),
+      onMove: (e, state) => {
+        this.#getSvgLayer().classList.add('is-dragging');
+        return this.#resizeOnMove(e, state);
+      },
       onCommit: (_e, state) => {
         this.#setVertexGeometry(state.vertexId, state.currentGeom);
-        this.#getSvgLayer().removeAttribute('data-active-handle');
+        this.#getSvgLayer().classList.remove('is-dragging');
         state.proportional = { aspectRatio: 1, dominant: 'width', locked: false };
       },
       onCancel: (_e, _state) => {
-        this.#getSvgLayer().removeAttribute('data-active-handle');
+        this.#getSvgLayer().classList.remove('is-dragging');
       },
     });
 
     // Rotation drag session (T10)
     this.#rotationSession = new DragSession<RotationDragState2>({
       threshold: 3,
-      onMove: (e, state) => this.#rotationOnMove(e, state),
+      onMove: (e, state) => {
+        this.#getSvgLayer().classList.add('is-dragging');
+        return this.#rotationOnMove(e, state);
+      },
       onCommit: (_e, state) => {
         const MIN_ANGLE = Math.PI / 180;
         if (Math.abs(state.currentAngleDelta) >= MIN_ANGLE) {
           this.#rotateVertex(state.vertexId, state.currentAngleDelta);
         }
-        this.#getSvgLayer().removeAttribute('data-rotating');
+        this.#getSvgLayer().classList.remove('is-dragging');
       },
       onCancel: (_e, _state) => {
-        this.#getSvgLayer().removeAttribute('data-rotating');
+        this.#getSvgLayer().classList.remove('is-dragging');
       },
     });
   }
@@ -171,18 +177,6 @@ export class ResizeHandlesOverlay {
     circle.setAttribute('stroke-width', '1.5');
     circle.style.cursor = this.#cursorForPosition(pos);
     circle.style.pointerEvents = 'all';
-
-    // Hover state — reads active handle from SVG layer data attribute (set during drag)
-    circle.addEventListener('mouseenter', () => {
-      circle.setAttribute('fill', '#2563eb');
-    });
-    circle.addEventListener('mouseleave', () => {
-      const svgLayer = this.#getSvgLayer();
-      const active = svgLayer.getAttribute('data-active-handle');
-      if (active !== pos) {
-        circle.setAttribute('fill', '#4a9eff');
-      }
-    });
 
     this.#getSvgLayer().appendChild(circle);
   }
@@ -264,7 +258,6 @@ export class ResizeHandlesOverlay {
 
   #resizeOnMove(e: PointerEvent, state: ResizeDragState2): ResizeDragState2 {
     const svgLayer = this.#getSvgLayer();
-    svgLayer.setAttribute('data-active-handle', state.handle);
     const rect = svgLayer.getBoundingClientRect();
     const zoom = this.#getZoom();
     const docX = (e.clientX - rect.left) / zoom;
@@ -303,7 +296,6 @@ export class ResizeHandlesOverlay {
   // ─── DragSession callbacks for rotation ──────────────────────────────────────
 
   #rotationOnMove(e: PointerEvent, state: RotationDragState2): RotationDragState2 {
-    this.#getSvgLayer().setAttribute('data-rotating', 'true');
     const angle = this.#angleFromCenter(state.centerX, state.centerY, e.clientX, e.clientY);
     state.currentAngleDelta = this.#normalizeAngleDelta(angle - state.startAngle);
 
@@ -351,17 +343,6 @@ export class ResizeHandlesOverlay {
     circle.setAttribute('stroke-width', '1.5');
     circle.style.cursor = 'grab';
     circle.style.pointerEvents = 'all';
-
-    circle.addEventListener('mouseenter', () => {
-      circle.setAttribute('fill', '#d97706');
-    });
-    circle.addEventListener('mouseleave', () => {
-      // Use a data attribute to track active rotation drag state
-      const svgLayer = this.#getSvgLayer();
-      if (svgLayer.getAttribute('data-rotating') !== 'true') {
-        circle.setAttribute('fill', '#f59e0b');
-      }
-    });
 
     const svgLayer = this.#getSvgLayer();
     svgLayer.appendChild(line);
@@ -577,7 +558,6 @@ export class ResizeHandlesOverlay {
     svgLayer
       .querySelectorAll('.resize-handle, .rotation-handle, .rotation-handle-link')
       .forEach((el) => el.remove());
-    svgLayer.removeAttribute('data-active-handle');
-    svgLayer.removeAttribute('data-rotating');
+    svgLayer.classList.remove('is-dragging');
   }
 }

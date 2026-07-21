@@ -133,16 +133,6 @@ export class PortHandlesOverlay {
     circle.style.cursor = 'grab';
     circle.style.pointerEvents = 'all';
 
-    // Hover state
-    circle.addEventListener('mouseenter', () => {
-      circle.setAttribute('fill', '#2563eb');
-    });
-    circle.addEventListener('mouseleave', () => {
-      if (this.#dragHandle?.handleEl !== circle) {
-        circle.setAttribute('fill', '#4a9eff');
-      }
-    });
-
     // Mousedown initiates drag
     circle.addEventListener('mousedown', (e: MouseEvent) => {
       e.preventDefault();
