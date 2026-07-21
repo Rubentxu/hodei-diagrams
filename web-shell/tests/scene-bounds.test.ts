@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sceneBounds, sceneGeometry, SHAPE_KEYS, CellGeometry } from '../src/scene-bounds.js';
+import { sceneBounds, sceneGeometry, SHAPE_KEYS, EDGE_KEYS, findEdgeVariant, CellGeometry } from '../src/scene-bounds.js';
 import type { SlotmapId, ScenePage } from '../src/types.js';
 
 function makeSlotmapId(idx: number, version = 1): SlotmapId {
@@ -198,5 +198,176 @@ describe('SHAPE_KEYS', () => {
 
   it('has 12 entries matching Editor.#SHAPE_KEYS', () => {
     expect(SHAPE_KEYS).toHaveLength(12);
+  });
+});
+
+describe('EDGE_KEYS', () => {
+  it("includes 'Line' and 'Path'", () => {
+    expect(EDGE_KEYS).toContain('Line');
+    expect(EDGE_KEYS).toContain('Path');
+  });
+
+  it('has exactly 2 entries', () => {
+    expect(EDGE_KEYS).toHaveLength(2);
+  });
+});
+
+// Helper functions for edge tests
+
+function makeLinePage(sourceId: SlotmapId, targetId: SlotmapId): ScenePage {
+  return {
+    page_id: { idx: 1, version: 1 },
+    name: 'Page 1',
+    width: 800,
+    height: 600,
+    display_list: [
+      {
+        Line: {
+          id: { idx: 100, version: 1 },
+          source: { Vertex: { idx: sourceId.idx, version: sourceId.version } },
+          target: { Vertex: { idx: targetId.idx, version: targetId.version } },
+        },
+      },
+    ],
+  };
+}
+
+function makePathPage(edgeId: SlotmapId, sourceId: SlotmapId, targetId: SlotmapId): ScenePage {
+  return {
+    page_id: { idx: 1, version: 1 },
+    name: 'Page 1',
+    width: 800,
+    height: 600,
+    display_list: [
+      {
+        Path: {
+          id: { idx: edgeId.idx, version: edgeId.version },
+          source: { Vertex: { idx: sourceId.idx, version: sourceId.version } },
+          target: { Vertex: { idx: targetId.idx, version: targetId.version } },
+        },
+      },
+    ],
+  };
+}
+
+function makeMixedPage(
+  shapeId: SlotmapId,
+  edgeId: SlotmapId,
+  sourceId: SlotmapId,
+  targetId: SlotmapId,
+): ScenePage {
+  return {
+    page_id: { idx: 1, version: 1 },
+    name: 'Page 1',
+    width: 800,
+    height: 600,
+    display_list: [
+      {
+        Rect: {
+          id: { idx: shapeId.idx, version: shapeId.version },
+          bounds: {
+            origin: { x: 0, y: 0 },
+            size: { width: 100, height: 100 },
+          },
+        },
+      },
+      {
+        Line: {
+          id: { idx: edgeId.idx, version: edgeId.version },
+          source: { Vertex: { idx: sourceId.idx, version: sourceId.version } },
+          target: { Vertex: { idx: targetId.idx, version: targetId.version } },
+        },
+      },
+    ],
+  };
+}
+
+describe('findEdgeVariant', () => {
+  it('returns the variant record for a Line edge', () => {
+    const sourceId = makeSlotmapId(1);
+    const targetId = makeSlotmapId(2);
+    const edgeId = { idx: 100, version: 1 };
+    const page = makeLinePage(sourceId, targetId);
+    const result = findEdgeVariant([page], edgeId);
+    expect(result).not.toBeNull();
+    // result IS the Line object (e[key]), verified by id match
+    const line = result as Record<string, unknown>;
+    expect(line['id']).toEqual({ idx: 100, version: 1 });
+    expect(line).toHaveProperty('source');
+    expect(line).toHaveProperty('target');
+  });
+
+  it('returns the variant record for a Path edge', () => {
+    const sourceId = makeSlotmapId(3);
+    const targetId = makeSlotmapId(4);
+    const edgeId = { idx: 200, version: 1 };
+    const page = makePathPage(edgeId, sourceId, targetId);
+    const result = findEdgeVariant([page], edgeId);
+    expect(result).not.toBeNull();
+    // result IS the Path object (e[key]), verified by id match
+    const path = result as Record<string, unknown>;
+    expect(path['id']).toEqual({ idx: 200, version: 1 });
+    expect(path).toHaveProperty('source');
+    expect(path).toHaveProperty('target');
+  });
+
+  it('returns null for an edgeId not present in any page', () => {
+    const sourceId = makeSlotmapId(1);
+    const targetId = makeSlotmapId(2);
+    const page = makeLinePage(sourceId, targetId);
+    const result = findEdgeVariant([page], { idx: 999, version: 1 });
+    expect(result).toBeNull();
+  });
+
+  it('returns the correct edge when multiple edges exist (filters by edge keys, not shape keys)', () => {
+    const sourceId1 = makeSlotmapId(1);
+    const targetId1 = makeSlotmapId(2);
+    const sourceId2 = makeSlotmapId(3);
+    const targetId2 = makeSlotmapId(4);
+    const edgeId1 = { idx: 100, version: 1 };
+    const edgeId2 = { idx: 200, version: 1 };
+    const page1 = makePathPage(edgeId1, sourceId1, targetId1);
+    const page2 = makePathPage(edgeId2, sourceId2, targetId2);
+    const result = findEdgeVariant([page1, page2], edgeId2);
+    expect(result).not.toBeNull();
+    // result IS the Path object
+    const path = result as Record<string, unknown>;
+    expect(path['id']).toEqual({ idx: 200, version: 1 });
+  });
+
+  it('does NOT match a shape variant with the same idx/version as an edge (filters by EDGE_KEYS only)', () => {
+    // Create a page with both a Rect and a Line that happen to share the same id
+    const sharedId = { idx: 50, version: 1 };
+    const page: ScenePage = {
+      page_id: { idx: 1, version: 1 },
+      name: 'Page 1',
+      width: 800,
+      height: 600,
+      display_list: [
+        {
+          Rect: {
+            id: { idx: sharedId.idx, version: sharedId.version },
+            bounds: {
+              origin: { x: 0, y: 0 },
+              size: { width: 100, height: 100 },
+            },
+          },
+        },
+        {
+          Line: {
+            id: { idx: sharedId.idx, version: sharedId.version },
+            source: { Vertex: { idx: 1, version: 1 } },
+            target: { Vertex: { idx: 2, version: 1 } },
+          },
+        },
+      ],
+    };
+    const result = findEdgeVariant([page], sharedId);
+    // findEdgeVariant returns the Line object directly (not a container with 'Line' key)
+    expect(result).not.toBeNull();
+    const line = result as Record<string, unknown>;
+    expect(line['id']).toEqual({ idx: 50, version: 1 });
+    expect(line).toHaveProperty('source');
+    expect(line).toHaveProperty('target');
   });
 });

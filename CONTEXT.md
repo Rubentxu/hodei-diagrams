@@ -151,3 +151,9 @@ Dev: Should we start with WebGPU because it sounds faster?
 Domain Expert: No. Start with an SVG Render Backend and keep WebGPU as a later acceleration path.
 Dev: So performance work starts in the model and scene generation, not in GPU hype?
 Domain Expert: Exactly.
+
+## OverlayHost
+
+The contract by which an overlay (resize-handles, port-handles, future shear-handles, etc.) registers its pointerdown hit zones with the Editor. The overlay calls `host.registerOverlayHitZone({selector, handler})` from its `attach(host)` method; Editor stores the zone and dispatches pointerdown events to matching handlers. Returns a disposer.
+
+Avoid: hard-private `#registerOverlayHitZone` + Editor ctor inlining the zone registrations (the r107 inverted Pattern D). Future overlay = new file + 1 `attach(this)` line in Editor ctor.

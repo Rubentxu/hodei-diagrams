@@ -11,6 +11,7 @@
 import type { SlotmapId, ScenePage } from './types.js';
 import { sceneBounds, getZoom, type ShapeBounds } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
+import type { OverlayHost } from './editor.js';
 
 /** Resize handle positions. */
 export type HandlePosition = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -62,6 +63,9 @@ export class ResizeHandlesOverlay {
   readonly #resizeSession: DragSession<ResizeDragState2>;
   readonly #rotationSession: DragSession<RotationDragState2>;
 
+  // Overlay registration disposers for attach/detach
+  #disposers: Array<() => void> = [];
+
   constructor(
     getSvgLayer: () => HTMLElement,
     sceneProvider: () => ScenePage[],
@@ -99,6 +103,25 @@ export class ResizeHandlesOverlay {
   }
 
   /**
+   * Attach this overlay to the given host, registering its hit zones.
+   */
+  attach(host: OverlayHost): void {
+    const dispose = host.registerOverlayHitZone({
+      selector: '.resize-handle, .rotation-handle',
+      handler: (target, event) => this.beginFromEvent(target, event),
+    });
+    this.#disposers.push(dispose);
+  }
+
+  /**
+   * Detach this overlay from its host, removing all registered hit zones.
+   */
+  detach(): void {
+    for (const dispose of this.#disposers) dispose();
+    this.#disposers = [];
+  }
+
+  /**
    * Render resize handles for single-shape selection.
    * @param selection Set of selected SlotmapIds (only renders for single shape)
    */
@@ -113,7 +136,7 @@ export class ResizeHandlesOverlay {
     if (scene.length === 0) return;
 
     const vertexId = Array.from(selection)[0]!;
-    const bounds = this.#findShapeBounds(scene, vertexId);
+    const bounds = sceneBounds(scene, vertexId);
     if (!bounds) return;
 
     // Create 8 handles: corners + edge midpoints
@@ -551,15 +574,9 @@ export class ResizeHandlesOverlay {
     return normalized;
   }
 
-  /**
-   * Find a shape's bounds in the scene.
-   */
-  #findShapeBounds(scene: ScenePage[], shapeId: SlotmapId): ShapeBounds | null {
-    return sceneBounds(scene, shapeId);
-  }
-
   /** Clean up event listeners. Call when editor is detached. */
   dispose(): void {
+    this.detach();
     this.#resizeSession.dispose();
     this.#rotationSession.dispose();
     this.#clearHandles(this.#getSvgLayer());
