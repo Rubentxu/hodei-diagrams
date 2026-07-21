@@ -106,7 +106,8 @@ export class PortHandlesOverlay {
     if (!edgeIdxStr || !edgeVersionStr || endStr === null) return false;
 
     const edgeId: SlotmapId = { idx: parseInt(edgeIdxStr), version: parseInt(edgeVersionStr) };
-    const end: 0 | 1 = endStr === '0' ? 0 : 1; // session.setEdgeAnchor takes 0|1, NOT 'source'|'target'
+    // session.setEdgeAnchor takes 0|1 (0=source, 1=target); see session.ts:1032
+    const end: 0 | 1 = endStr === '0' ? 0 : 1;
 
     this.#beginPortDrag(edgeId, end, vertexId, shapeBounds, portEl as SVGCircleElement, event.clientX, event.clientY);
     event.stopPropagation();
@@ -131,7 +132,9 @@ export class PortHandlesOverlay {
       const edgeVariant = findEdgeVariant(scene, edgeId);
       if (!edgeVariant) continue;
 
-      // Extract source and target vertex IDs from the edge variant
+      // Extract source and target vertex IDs from the edge variant.
+      // edgeVariant['source'] and edgeVariant['target'] are ENGINE variant keys
+      // (the raw keys from the display list), NOT our PortDragState end: 0|1.
       const source = edgeVariant['source'] as { Vertex?: { idx?: number; version?: number } } | undefined;
       const target = edgeVariant['target'] as { Vertex?: { idx?: number; version?: number } } | undefined;
       if (!source?.Vertex || !target?.Vertex) continue;
