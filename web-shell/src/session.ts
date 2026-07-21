@@ -636,8 +636,35 @@ export class DiagramEngineSession {
         sourcePort,
         targetPort,
       );
+      // Decode scene immediately to get the actual version assigned by the engine.
+      // The WASM binding only returns u32 (idx); version is managed internally.
+      // We must return the correct version so that findEdgeVariant lookups
+      // (used by bend overlay, port overlay, hit-testing) succeed.
+      // First write the scene buffer to ensure it's populated.
+      this.writeSceneBuffer();
+      const sceneResult = this.decodeSceneBuffer();
+      let actualVersion = 0;
+      if (sceneResult.ok) {
+        for (const page of sceneResult.value) {
+          for (const elem of page.display_list) {
+            if (!elem) continue;
+            const e = elem as Record<string, unknown>;
+            for (const key of ['Line', 'Path']) {
+              const variant = e[key] as Record<string, unknown> | undefined;
+              if (!variant) continue;
+              const idField = variant['id'] as { idx?: unknown; version?: unknown } | undefined;
+              if (idField?.idx === rawEdgeId && typeof idField?.version === 'number') {
+                actualVersion = idField.version;
+                break;
+              }
+            }
+            if (actualVersion !== 0) break;
+          }
+          if (actualVersion !== 0) break;
+        }
+      }
       this.#onStateChange?.();
-      return ok({ idx: rawEdgeId, version: 0 });
+      return ok({ idx: rawEdgeId, version: actualVersion });
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }

@@ -159,10 +159,8 @@ test.describe('Suite IP-C: Connector Modifiers', () => {
     await expect(addWaypoint).toBeVisible();
   });
 
-  // ponytail: EDGE-014 deferred until engine bend support lands.
-  //   connectVertices + insertBend don't produce bends visible to the overlay.
-  //   Track for r110+ with engine work.
-  test.fixme('EDGE-014: Right-click on waypoint shows "Remove Waypoint"', async ({ page }) => {
+  // Engine bend support lands in r110 (perimeter-inclusive PathElement.points).
+  test('EDGE-014: Right-click on waypoint shows "Remove Waypoint"', async ({ page }) => {
     // Load fixture to initialize the scene (prerequisite for addBentEdgeAt)
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
