@@ -12,11 +12,11 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
-import { sceneGeometry } from './scene-bounds.js';
+import { sceneGeometry, sceneBounds } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
-import { ResizeHandlesOverlay } from './resize-handles.js';
+import { ResizeHandlesOverlay, type HandlePosition } from './resize-handles.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -303,6 +303,50 @@ export class Editor {
         if (!this.#selectedEdgeId) return false;
         const bendIndex = parseInt(target.getAttribute('data-bend-index') || '0');
         this.#startBendDrag(this.#selectedEdgeId, bendIndex, ev);
+        return true;
+      },
+    });
+
+    // Register resize + rotation zone (Pattern D 9c).
+    // The zone handler reads vertex data from the circle's data attributes and
+    // delegates to the overlay. stopPropagation prevents the editor's #onPointerDown
+    // from misinterpreting the handle click as an empty-canvas click.
+    this.#registerOverlayHitZone({
+      selector: '.resize-handle, .rotation-handle',
+      handler: (target, ev) => {
+        const vidIdx = target.getAttribute('data-vertex-idx');
+        const vidVersion = target.getAttribute('data-vertex-version');
+        if (!vidIdx || !vidVersion) return false;
+        const vertexId = { idx: parseInt(vidIdx), version: parseInt(vidVersion) };
+
+        // Re-derive bounds from scene (same as what render() computed when creating handles)
+        const scene = this.#sceneCache;
+        const bounds = sceneBounds(scene, vertexId);
+        if (!bounds) return false;
+
+        const isResize = target.classList.contains('resize-handle');
+        if (isResize) {
+          const handle = target.getAttribute('data-handle') as HandlePosition;
+          this.#resizeHandles.beginResize(
+            vertexId,
+            bounds,
+            handle,
+            target as SVGCircleElement,
+            ev.clientX,
+            ev.clientY,
+          );
+        } else {
+          // rotation handle
+          this.#resizeHandles.beginRotationDrag(
+            vertexId,
+            bounds,
+            target as SVGCircleElement,
+            ev.clientX,
+            ev.clientY,
+          );
+        }
+        ev.stopPropagation();
+        ev.preventDefault();
         return true;
       },
     });

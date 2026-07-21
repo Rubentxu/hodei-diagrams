@@ -159,17 +159,36 @@ export class ResizeHandlesOverlay {
       }
     });
 
-    // Pointerdown initiates drag. This MUST stop propagation before the
-    // editor-level pointerdown handler sees the event, otherwise the handle
-    // click is interpreted as an empty-canvas click and clears selection.
-    circle.addEventListener('pointerdown', (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.#startDrag(vertexId, bounds, pos, circle, e.clientX, e.clientY);
-    });
-
     this.#getSvgLayer().appendChild(circle);
+  }
+
+  /**
+   * Begin a resize drag (Pattern D 9c — zone handler in editor calls this).
+   * Exposed publicly so the editor's OverlayHitZone registry can route events.
+   */
+  beginResize(
+    vertexId: SlotmapId,
+    origGeom: ShapeBounds,
+    handle: HandlePosition,
+    handleEl: SVGCircleElement,
+    clientX: number,
+    clientY: number,
+  ): void {
+    this.#startDrag(vertexId, origGeom, handle, handleEl, clientX, clientY);
+  }
+
+  /**
+   * Begin a rotation drag (Pattern D 9c — zone handler in editor calls this).
+   * Exposed publicly so the editor's OverlayHitZone registry can route events.
+   */
+  beginRotationDrag(
+    vertexId: SlotmapId,
+    bounds: ShapeBounds,
+    handleEl: SVGCircleElement,
+    clientX: number,
+    clientY: number,
+  ): void {
+    this.#startRotationDrag(vertexId, bounds, handleEl, clientX, clientY);
   }
 
   /** Create the rotation handle above the selected shape. */
@@ -208,13 +227,6 @@ export class ResizeHandlesOverlay {
       if (!this.#rotationDragState) {
         circle.setAttribute('fill', '#f59e0b');
       }
-    });
-
-    circle.addEventListener('pointerdown', (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.#startRotationDrag(vertexId, bounds, circle, e.clientX, e.clientY);
     });
 
     const svgLayer = this.#getSvgLayer();
