@@ -2498,3 +2498,15 @@ svg [data-editing='true'] text.vertex-label,
   background: var(--border-color, #444);
   margin: 4px 0;
 }
+
+/* ─── Transform Handles (r107 refactor) ─────────────────────────────────────── */
+
+/* Resize handle hover — blue highlight */
+.resize-handle:hover {
+  fill: #2563eb;
+}
+
+/* Rotation handle hover — amber highlight */
+.rotation-handle:hover {
+  fill: #d97706;
+}

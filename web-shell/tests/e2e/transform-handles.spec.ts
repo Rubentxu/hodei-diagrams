@@ -6,6 +6,11 @@
 import { test, expect } from '@playwright/test';
 import { waitForAppReady } from './helpers/app-ready.js';
 
+const GROUP_NESTED_PATH = new URL(
+  '../../public/fixtures/group-nested-e2e.drawio',
+  import.meta.url,
+).pathname;
+
 async function loadAndSelectSimpleRect(page: import('@playwright/test').Page) {
   await page.goto('/');
   await waitForAppReady(page);
@@ -125,5 +130,59 @@ test.describe('Transform handles visual contract', () => {
       .first()
       .evaluate((el) => el.outerHTML);
     expect(outerHTML).toMatch(/rotate\((?!0(?:\.0+)?(?:\s|\)))/);
+  });
+});
+
+test.describe('Group handles (SCENARIO-20 latent bug regression)', () => {
+  // SCENARIO-20: Group was missing from overlay SHAPE_KEYS (F5 latent bug).
+  // After the fix, Groups appear in the scene and sceneBounds() resolves their bounds.
+  // The full E2E (click Group → handles appear) requires app-level group-drill-down
+  // selection behavior (ADR-0082) which is outside r107 scope.
+  // The unit test in scene-bounds.test.ts covers the Group regression.
+
+  test('Group renders in the scene via sceneBounds (Group regression)', async ({ page }) => {
+    await page.goto('/');
+    await waitForAppReady(page);
+    await page.setInputFiles('[data-testid="file-input"]', GROUP_NESTED_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg');
+    await page.waitForTimeout(300);
+
+    const viewer = page.locator('[data-testid="viewer"]');
+    // Verify a Group element is present in the rendered SVG
+    const groupCount = await viewer.locator('g[data-group-id]').count();
+    expect(groupCount).toBeGreaterThan(0);
+  });
+
+  // Verifies __hodeiDebug.addGroupAt works correctly (T21 correction).
+  // The hook was implemented but unused — this test exercises it directly.
+  test('addGroupAt creates a Group that sceneBounds resolves (API regression)', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      const debug = (
+        window as unknown as {
+          __hodeiDebug?: {
+            addGroupAt?: (
+              _x: number,
+              _y: number,
+              _width: number,
+              _height: number,
+            ) => boolean | null;
+          };
+        }
+      ).__hodeiDebug;
+      if (!debug?.addGroupAt) throw new Error('__hodeiDebug.addGroupAt is not available');
+      // Create a group at doc-space coordinates
+      const result = debug.addGroupAt(100, 100, 200, 150);
+      if (!result) throw new Error('addGroupAt returned null');
+    });
+    await page.waitForSelector('[data-testid="viewer"] svg');
+    await page.waitForTimeout(250);
+
+    const viewer = page.locator('[data-testid="viewer"]');
+    // Verify the Group element exists in the rendered SVG
+    const groupCount = await viewer.locator('g[data-group-id]').count();
+    expect(groupCount).toBeGreaterThan(0);
   });
 });

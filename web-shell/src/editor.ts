@@ -12,6 +12,7 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
+import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeIdAtPoint, perimeterNormalized, classifyAnchorFromNormalized } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
@@ -42,6 +43,20 @@ export type ToolKind =
   | 'blockArrow-stencil'
   | 'connector'
   | null;
+
+/**
+ * A registered hit zone for overlay pointer events (Pattern D 9a).
+ * Zones are checked in registration order; the first matching zone handles the event.
+ */
+interface OverlayHitZone {
+  /** CSS selector to match against e.target. */
+  selector: string;
+  /**
+   * Handler called when a pointerdown event matches this zone.
+   * Return true to consume the event (stop propagation + prevent default).
+   */
+  handler: (target: Element, event: PointerEvent) => boolean;
+}
 
 /** Drag FSM state (single-shape drag). */
 interface DragState {
@@ -209,6 +224,13 @@ export class Editor {
   #onBendDragMoveBound: (_e: PointerEvent) => void;
   #onBendDragUpBound: (_e: PointerEvent) => void;
 
+  // ─── Overlay Hit Zone Registry (Pattern D 9a) ──────────────────────────────
+  /**
+   * Registered overlay hit zones. Each zone maps a CSS selector to a handler.
+   * Used to route pointerdown events to overlay handlers without tight coupling.
+   */
+  readonly #overlayHitZones: OverlayHitZone[] = [];
+
   // ─── Port Handles Overlay ──────────────────────────────────────────────────
   readonly #portHandles: PortHandlesOverlay;
 
@@ -259,10 +281,39 @@ export class Editor {
       () => this.#sceneCache,
       (id, geom) => this.setVertexGeometry(id, geom),
       (id, angleDelta) => {
-        if (!this.isSelected(id)) this.selectOnly(id);
-        this.rotateSelection(angleDelta);
+        // Single-shape rotation: delegate directly to the engine command.
+        // No need to check selection — rotation handles only appear on
+        // single-selected shapes (multi-select hides them).
+        this.#session.rotateVertex(id, angleDelta);
+        this.#replay();
       },
     );
+
+    // Register overlay hit zones for port and bend handles (Pattern D 9a)
+    this.#registerOverlayHitZone({
+      selector: '.port-handle',
+      handler: (_target, ev) => {
+        ev.stopPropagation();
+        return true;
+      },
+    });
+    this.#registerOverlayHitZone({
+      selector: '.bend-handle',
+      handler: (target, ev) => {
+        if (!this.#selectedEdgeId) return false;
+        const bendIndex = parseInt(target.getAttribute('data-bend-index') || '0');
+        this.#startBendDrag(this.#selectedEdgeId, bendIndex, ev);
+        return true;
+      },
+    });
+
+    // Register resize + rotation zone (Pattern D 9c).
+    // The overlay owns the DOM contract; beginFromEvent extracts data attributes
+    // and routes to the appropriate drag starter.
+    this.#registerOverlayHitZone({
+      selector: '.resize-handle, .rotation-handle',
+      handler: (target, ev) => this.#resizeHandles.beginFromEvent(target, ev),
+    });
   }
 
   // ─── Public Selection API ──────────────────────────────────────────────────
@@ -472,30 +523,10 @@ export class Editor {
    * overlapping shapes (SEL-014).
    */
   #getIdsAtPoint(x: number, y: number): SlotmapId[] {
-    const result: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-          if (x >= sx && x <= sx + sw && y >= sy && y <= sy + sh) {
-            result.push({ idx: idField.idx!, version: idField.version! });
-          }
-        }
-      }
-    }
-    return result; // z-order: top of stack first
+    const all = findAllShapesWithBounds(this.#sceneCache);
+    return all
+      .filter(({ bounds }) => x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height)
+      .map(({ id }) => id);
   }
 
   /**
@@ -503,20 +534,7 @@ export class Editor {
    * Used by Tab/Shift+Tab to cycle selection (SEL-012).
    */
   #getAllShapeIdsZOrder(): SlotmapId[] {
-    const result: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          result.push({ idx: idField.idx!, version: idField.version! });
-        }
-      }
-    }
-    return result;
+    return findAllShapeIds(this.#sceneCache);
   }
 
   /**
@@ -549,7 +567,7 @@ export class Editor {
 
     const commands: string[] = [];
     for (const id of this.#selection) {
-      const orig = this.#findOriginalGeometry(id);
+      const orig = sceneGeometry(this.#sceneCache, id);
       if (!orig) continue;
       // Carry rotation/flip/relative through. Without these, the engine's
       // MoveVertex deserializer fails with "missing field `rotation`" and
@@ -774,13 +792,7 @@ export class Editor {
 
   /** Select all shapes in the current page. */
   selectAll(): void {
-    const allIds: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const id = this.#extractIdFromDisplayElem(elem);
-        if (id) allIds.push(id);
-      }
-    }
+    const allIds = findAllShapeIds(this.#sceneCache);
     this.#applySelection(new Set(allIds));
   }
 
@@ -917,7 +929,7 @@ export class Editor {
 
     const ids = Array.from(this.#selection);
     const bounds = ids
-      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .map((id) => ({ id, geom: sceneGeometry(this.#sceneCache, id) }))
       .filter(
         (
           b,
@@ -979,7 +991,7 @@ export class Editor {
 
     const ids = Array.from(this.#selection);
     const bounds = ids
-      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .map((id) => ({ id, geom: sceneGeometry(this.#sceneCache, id) }))
       .filter(
         (
           b,
@@ -1045,7 +1057,7 @@ export class Editor {
 
     const ids = Array.from(this.#selection);
     const bounds = ids
-      .map((id) => ({ id, geom: this.#findOriginalGeometry(id) }))
+      .map((id) => ({ id, geom: sceneGeometry(this.#sceneCache, id) }))
       .filter(
         (
           b,
@@ -1110,7 +1122,7 @@ export class Editor {
 
   /** Returns true if the shape's `locked` cell-style key is "1" or true. */
   isShapeLocked(id: SlotmapId): boolean {
-    const variant = this.#findShapeById(id);
+    const variant = findShapeVariant(this.#sceneCache, id);
     if (!variant) return false;
     const style = (variant['style'] as Record<string, unknown> | undefined) ?? {};
     const locked = style['locked'];
@@ -1150,7 +1162,7 @@ export class Editor {
 
   /** Get the `link` cell-style value for a shape (or empty string). */
   getShapeLink(id: SlotmapId): string {
-    const variant = this.#findShapeById(id);
+    const variant = findShapeVariant(this.#sceneCache, id);
     if (!variant) return '';
     const style = (variant['style'] as Record<string, unknown> | undefined) ?? {};
     const link = style['link'];
@@ -1771,6 +1783,7 @@ export class Editor {
     this.#cancelConnect();
     this.#clearEdgeSelection();
     this.#portHandles.dispose();
+    this.#resizeHandles?.dispose();
   }
 
   /** Execute undo and replay. For toolbar button binding. */
@@ -2348,31 +2361,7 @@ export class Editor {
     if (!this.#snapEnabled) return { x, y, guides: {} };
 
     // Collect all peer shape bounds (excluding the dragged one)
-    const peers: { id: SlotmapId; x: number; y: number; width: number; height: number }[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const id = { idx: idField.idx!, version: idField.version! };
-          if (id.idx === excludeId.idx && id.version === excludeId.version) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-          peers.push({
-            id,
-            x: (bounds.origin['x'] as number) ?? 0,
-            y: (bounds.origin['y'] as number) ?? 0,
-            width: (bounds.size['width'] as number) ?? 0,
-            height: (bounds.size['height'] as number) ?? 0,
-          });
-        }
-      }
-    }
+    const peers = findAllShapesWithBounds(this.#sceneCache, excludeId);
 
     if (peers.length === 0) return { x, y, guides: {} };
 
@@ -2382,10 +2371,9 @@ export class Editor {
     let bestDistY = this.#snapThreshold + 1;
 
     for (const peer of peers) {
-      // X-axis candidates: left, center, right
-      const peerLeft = peer.x;
-      const peerCenterX = peer.x + peer.width / 2;
-      const peerRight = peer.x + peer.width;
+      const peerLeft = peer.bounds.x;
+      const peerCenterX = peer.bounds.x + peer.bounds.width / 2;
+      const peerRight = peer.bounds.x + peer.bounds.width;
 
       const candX = [peerLeft, peerCenterX, peerRight];
       for (const cx of candX) {
@@ -2397,9 +2385,9 @@ export class Editor {
       }
 
       // Y-axis candidates: top, middle, bottom
-      const peerTop = peer.y;
-      const peerMiddleY = peer.y + peer.height / 2;
-      const peerBottom = peer.y + peer.height;
+      const peerTop = peer.bounds.y;
+      const peerMiddleY = peer.bounds.y + peer.bounds.height / 2;
+      const peerBottom = peer.bounds.y + peer.bounds.height;
 
       const candY = [peerTop, peerMiddleY, peerBottom];
       for (const cy of candY) {
@@ -2623,7 +2611,7 @@ export class Editor {
     // Validate each selected ID still exists in the scene
     const validIds = new Set<SlotmapId>();
     for (const id of this.#selection) {
-      const variant = this.#findShapeById(id);
+      const variant = findShapeVariant(this.#sceneCache, id);
       if (variant) {
         validIds.add(id);
       }
@@ -2892,70 +2880,55 @@ export class Editor {
     rect: { x: number; y: number; width: number; height: number },
     mode: 'contain' | 'intersect',
   ): SlotmapId[] {
-    const result: SlotmapId[] = [];
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-
-          let hit: boolean;
-          if (mode === 'contain') {
-            hit =
-              sx >= rect.x &&
-              sy >= rect.y &&
-              sx + sw <= rect.x + rect.width &&
-              sy + sh <= rect.y + rect.height;
-          } else {
-            hit =
-              sx < rect.x + rect.width &&
-              sx + sw > rect.x &&
-              sy < rect.y + rect.height &&
-              sy + sh > rect.y;
-          }
-          if (hit) {
-            result.push({ idx: idField.idx!, version: idField.version! });
-          }
+    const all = findAllShapesWithBounds(this.#sceneCache);
+    return all
+      .filter(({ bounds }) => {
+        if (mode === 'contain') {
+          return (
+            bounds.x >= rect.x &&
+            bounds.y >= rect.y &&
+            bounds.x + bounds.width <= rect.x + rect.width &&
+            bounds.y + bounds.height <= rect.y + rect.height
+          );
+        } else {
+          return (
+            bounds.x < rect.x + rect.width &&
+            bounds.x + bounds.width > rect.x &&
+            bounds.y < rect.y + rect.height &&
+            bounds.y + bounds.height > rect.y
+          );
         }
-      }
-    }
-    return result;
+      })
+      .map(({ id }) => id);
   }
 
   // ─── Drag FSM ────────────────────────────────────────────────────────────
+
+  /**
+   * Register an overlay hit zone (Pattern D 9a).
+   * Returns a disposer — call it to remove the zone.
+   */
+  // ponytail: registerOverlayHitZone is hard-private + Editor ctor hardcodes zones; future overlays must add to Editor ctor; track OCP-friendly refactor for r108
+  #registerOverlayHitZone(zone: OverlayHitZone): () => void {
+    this.#overlayHitZones.push(zone);
+    return () => {
+      const idx = this.#overlayHitZones.indexOf(zone);
+      if (idx >= 0) this.#overlayHitZones.splice(idx, 1);
+    };
+  }
 
   #onPointerDown(e: PointerEvent): void {
     // Ignore non-primary button
     if (e.button !== 0) return;
 
-    // Check if clicking on a port handle FIRST (before any other hit testing)
-    // Port handles use data-edge-idx and data-end attributes
-    const portHandle = (e.target as Element)?.closest('.port-handle');
-    if (portHandle && this.#selectedEdgeId) {
-      // Port handle drag is handled entirely by the PortHandlesOverlay
-      // which registered its own mousedown listener — just stop propagation here
-      e.stopPropagation();
-      return;
-    }
-
-    // Check if clicking on a bend handle (before any other hit testing)
-    const bendHandle = (e.target as Element)?.closest('.bend-handle');
-    if (bendHandle && this.#selectedEdgeId) {
-      const bendIndex = parseInt(bendHandle.getAttribute('data-bend-index') || '0');
-      this.#startBendDrag(this.#selectedEdgeId, bendIndex, e);
-      return;
+    // Route to registered overlay hit zones (Pattern D 9a).
+    // Check in registration order; first match consumes the event.
+    const pointerTarget = e.target as Element | null;
+    for (const zone of this.#overlayHitZones) {
+      const matched = pointerTarget?.closest(zone.selector);
+      if (matched && zone.handler(matched, e)) {
+        return;
+      }
     }
 
     // Label placement mode: create a label shape and immediately open text editor
@@ -3208,16 +3181,7 @@ export class Editor {
     if (el) {
       el.style.transform = `translate(${dx}px, ${dy}px)`;
     }
-    this.#setTransformHandlesPreview(dx, dy);
-  }
-
-  #setTransformHandlesPreview(dx: number, dy: number): void {
-    const transform = dx === 0 && dy === 0 ? '' : `translate(${dx}px, ${dy}px)`;
-    this.#viewer
-      .querySelectorAll('.resize-handle, .rotation-handle, .rotation-handle-link')
-      .forEach((handle) => {
-        (handle as SVGElement).style.transform = transform;
-      });
+    this.#resizeHandles.applyDragOffset(dx, dy);
   }
 
   #onPointerUp(_e: PointerEvent): void {
@@ -3259,7 +3223,7 @@ export class Editor {
     if (el) {
       el.style.transform = '';
     }
-    this.#setTransformHandlesPreview(0, 0);
+    this.#resizeHandles.applyDragOffset(0, 0);
 
     // Commit move if threshold exceeded
     if (distance >= 3) {
@@ -3276,14 +3240,17 @@ export class Editor {
    * Dispatches a MoveVertex command using absolute geometry.
    * Clamps non-positive width/height and ignores NaN inputs.
    *
-   * The caller MAY pass only {x, y, width, height}; rotation/flip_h/flip_v
-   * will be inherited from the current scene-cache geometry of the same
-   * vertex. This preserves rotation and flips when the inspector or
-   * resize handles adjust position or size.
-   */
+    * The caller MAY pass only {x, y, width, height}; rotation/flip_h/flip_v
+    * will be inherited from the current scene-cache geometry of the same
+    * vertex. This preserves rotation and flips when the inspector or
+    * resize handles adjust position or size.
+    *
+    * Alternatively, the caller can pass the full CellGeometry (x, y, width, height,
+    * rotation, flip_h, flip_v, relative) to bypass the scene lookup entirely.
+    */
   setVertexGeometry(
     id: SlotmapId,
-    geom: { x: number; y: number; width: number; height: number },
+    geom: { x: number; y: number; width: number; height: number; rotation?: number; flip_h?: boolean; flip_v?: boolean; relative?: boolean },
   ): void {
     // Guard: clamp/reject invalid
     if (
@@ -3296,9 +3263,11 @@ export class Editor {
     ) {
       return; // ignore invalid — UI should clamp before calling
     }
-    // Inherit rotation/flip from the existing geometry so that a drag
-    // (or an inspector position edit) doesn't accidentally clear them.
-    const current = this.#findOriginalGeometry(id);
+    // If the caller passed full geometry, use it directly (T07 path: resize overlay
+    // passes rotation/flip so we skip the scene re-walk). Otherwise inherit from scene.
+    const current = geom.rotation !== undefined
+      ? null
+      : sceneGeometry(this.#sceneCache, id);
     const fullGeom =
       current !== null
         ? {
@@ -3316,10 +3285,10 @@ export class Editor {
             y: geom.y,
             width: geom.width,
             height: geom.height,
-            rotation: 0,
-            flip_h: false,
-            flip_v: false,
-            relative: false,
+            rotation: geom.rotation ?? 0,
+            flip_h: geom.flip_h ?? false,
+            flip_v: geom.flip_v ?? false,
+            relative: geom.relative ?? false,
           };
     this.#session.executeCommands([this.#buildMoveVertexCmd(id, fullGeom)]);
     this.#replay();
@@ -3509,7 +3478,7 @@ export class Editor {
   /** Commit a move by computing new absolute geometry and dispatching MoveVertex. */
   #commitMove(vid: SlotmapId, dx: number, dy: number): void {
     // Look up original geometry from scene cache
-    const orig = this.#findOriginalGeometry(vid);
+    const orig = sceneGeometry(this.#sceneCache, vid);
     if (!orig) {
       this.#onError('Cannot find original geometry for moved vertex');
       return;
@@ -3548,145 +3517,31 @@ export class Editor {
     this.#applySelection(new Set([state.groupId]));
   }
 
-  /** Find original geometry for a vertex from the scene cache. */
-  /**
-   * Read the current full geometry of a vertex from the scene cache.
-   * Returns null if the shape is not in the cache (e.g., the user deleted
-   * it during a transaction).
-   *
-   * The returned object includes rotation, flip_h, flip_v, and relative.
-   * MoveVertex and other geometry commands require all CellGeometry
-   * fields, so callers that use this to build a new payload must pass
-   * everything through (not just x/y/width/height).
-   */
-  #findOriginalGeometry(
-    vid: SlotmapId,
-  ):
-    | {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-        rotation: number;
-        flip_h: boolean;
-        flip_v: boolean;
-        relative: boolean;
-      }
-    | null {
-    const variant = this.#findShapeById(vid);
-    if (!variant) return null;
-    const bounds = variant['bounds'] as
-      | { origin?: Record<string, number>; size?: Record<string, number> }
-      | undefined;
-    if (!bounds?.origin || !bounds?.size) return null;
-    return {
-      x: (bounds.origin['x'] as number) ?? 0,
-      y: (bounds.origin['y'] as number) ?? 0,
-      width: (bounds.size['width'] as number) ?? 0,
-      height: (bounds.size['height'] as number) ?? 0,
-      rotation: (variant['rotation'] as number) ?? 0,
-      flip_h: (variant['flip_h'] as boolean) ?? false,
-      flip_v: (variant['flip_v'] as boolean) ?? false,
-      relative: false,
-    };
-  }
 
-  // ─── Shape Lookup Helpers ─────────────────────────────────────────────────
-
-  /** Shape type keys used across scene-walk helpers. */
-  static readonly #SHAPE_KEYS = [
-    'Rect',
-    'RoundedRect',
-    'Ellipse',
-    'Diamond',
-    'Triangle',
-    'Hexagon',
-    'Cylinder',
-    'Cloud',
-    'Parallelogram',
-    'Trapezoid',
-    'Polygon',
-    'Group',
-  ] as const;
-
-  /**
-   * Find the display-list variant data for a shape by its SlotmapId.
-   * Returns the variant record (e.g. `{id, bounds, style}`) or null if not found.
-   * This is the single source of truth for scene-walking by ID.
-   */
-  #findShapeById(id: SlotmapId): Record<string, unknown> | null {
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        if (!elem) continue;
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key];
-          // Note: typeof null === 'object' in JavaScript, so we must check
-          // for null explicitly before the object check.
-          if (!variant || variant === null || typeof variant !== 'object') continue;
-          const v = variant as Record<string, unknown>;
-          const idField = v['id'];
-          if (idField === null || idField === undefined) continue;
-          if (typeof idField !== 'object') continue;
-          const idObj = idField as { idx?: unknown; version?: unknown };
-          if (typeof idObj.idx !== 'number' || typeof idObj.version !== 'number') continue;
-          if (idObj.idx === id.idx && idObj.version === id.version) {
-            return v;
-          }
-        }
-      }
-    }
-    return null;
-  }
 
   /** Get a vertex object by SlotmapId from the scene cache. */
   #getVertex(id: SlotmapId): Vertex | null {
-    const variant = this.#findShapeById(id);
+    const variant = findShapeVariant(this.#sceneCache, id);
     if (!variant) return null;
-    const bounds = variant['bounds'] as
-      | { origin?: Record<string, number>; size?: Record<string, number> }
-      | undefined;
-    if (!bounds?.origin || !bounds?.size) return null;
+    const bounds = sceneBounds(this.#sceneCache, id);
+    if (!bounds) return null;
     return {
-      geometry: {
-        x: (bounds.origin['x'] as number) ?? 0,
-        y: (bounds.origin['y'] as number) ?? 0,
-        width: (bounds.size['width'] as number) ?? 0,
-        height: (bounds.size['height'] as number) ?? 0,
-      },
+      geometry: bounds,
       style: (variant['style'] as Record<string, unknown>) ?? {},
     };
   }
 
   /** Find a vertex SlotmapId at the given document position (within tolerance). */
   #findVertexAt(x: number, y: number, tolerance = 5): SlotmapId | null {
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-
-          if (
-            x >= sx - tolerance &&
-            x <= sx + sw + tolerance &&
-            y >= sy - tolerance &&
-            y <= sy + sh + tolerance
-          ) {
-            return { idx: idField.idx!, version: idField.version! };
-          }
-        }
+    const all = findAllShapesWithBounds(this.#sceneCache);
+    for (const { id, bounds } of all) {
+      if (
+        x >= bounds.x - tolerance &&
+        x <= bounds.x + bounds.width + tolerance &&
+        y >= bounds.y - tolerance &&
+        y <= bounds.y + bounds.height + tolerance
+      ) {
+        return id;
       }
     }
     return null;
@@ -3694,15 +3549,7 @@ export class Editor {
 
   /** Extract SlotmapId from a display list element. */
   #extractIdFromDisplayElem(elem: unknown): SlotmapId | null {
-    const e = elem as Record<string, unknown>;
-    for (const key of Editor.#SHAPE_KEYS) {
-      const variant = e[key] as Record<string, unknown> | undefined;
-      if (!variant) continue;
-      const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-      if (!idField) continue;
-      return { idx: idField.idx!, version: idField.version! };
-    }
-    return null;
+    return extractIdFromElem(elem);
   }
 
   /** Deep clone a vertex object. */
@@ -3734,7 +3581,7 @@ export class Editor {
 
     if (!this.#connectState) {
       // First click: record source shape and start drag tracking
-      const geom = this.#findOriginalGeometry(hit);
+      const geom = sceneGeometry(this.#sceneCache, hit);
       if (!geom) return;
 
       // IP-C: Determine connect mode from modifiers (EDG-003..005)
@@ -3809,13 +3656,13 @@ export class Editor {
       targetAnchor = { kind: 'fixed', port: 'Center' };
     } else if (connectMode === 'anywhere') {
       // EDGE-003: Alt held → normalized anchor at cursor position on perimeter
-      const sourceBounds = this.#findOriginalGeometry(sourceId);
-      const targetBounds = this.#findOriginalGeometry(hit);
+      const sourceBounds = sceneGeometry(this.#sceneCache, sourceId);
+      const targetBounds = sceneGeometry(this.#sceneCache, hit);
       if (sourceBounds && targetBounds) {
         const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
         const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
-        const sourceNorm = this.#computePerimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
-        const targetNorm = this.#computePerimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
+        const sourceNorm = perimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
+        const targetNorm = perimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
         sourceAnchor = { kind: 'normalized', nx: sourceNorm.nx, ny: sourceNorm.ny };
         targetAnchor = { kind: 'normalized', nx: targetNorm.nx, ny: targetNorm.ny };
       }
@@ -3922,7 +3769,7 @@ export class Editor {
       }
 
       // Get target shape bounds
-      const targetBounds = this.#findOriginalGeometry(targetHit);
+      const targetBounds = sceneGeometry(this.#sceneCache, targetHit);
       if (!targetBounds) {
         this.#cancelConnectDrag();
         this.#cancelConnect();
@@ -3933,13 +3780,13 @@ export class Editor {
       const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
       const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
 
-      const sourceNorm = this.#computePerimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
-      const targetNorm = this.#computePerimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
+      const sourceNorm = perimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
+      const targetNorm = perimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
 
-      const sourceKind = this.#classifyAnchorKind(sourceNorm.nx, sourceNorm.ny);
+      const sourceKind = classifyAnchorFromNormalized(sourceNorm.nx, sourceNorm.ny);
       // EDGE-003: Alt held → 'anywhere' mode forces normalized anchor at cursor position
       const isAnywhere = this.#connectState!.mode === 'anywhere';
-      const targetKind = isAnywhere ? 'normalized' : this.#classifyAnchorKind(targetNorm.nx, targetNorm.ny);
+      const targetKind = isAnywhere ? 'normalized' : classifyAnchorFromNormalized(targetNorm.nx, targetNorm.ny);
 
       const sourceAnchor =
         sourceKind === 'normalized'
@@ -4331,27 +4178,7 @@ export class Editor {
 
     // Find the newly created vertex by searching the scene cache for the
     // kind and position match.
-    const page = this.#sceneCache[this.#activePageIdx];
-    if (!page) return null;
-    const candidates: SlotmapId[] = [];
-    for (const elem of page.display_list) {
-      const e = elem as Record<string, unknown>;
-      for (const key of Editor.#SHAPE_KEYS) {
-        const variant = e[key] as Record<string, unknown> | undefined;
-        if (!variant) continue;
-        const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-        const bounds = variant['bounds'] as
-          | { origin?: Record<string, number> }
-          | undefined;
-        if (!idField || !bounds?.origin) continue;
-        const sx = (bounds.origin['x'] as number) ?? 0;
-        const sy = (bounds.origin['y'] as number) ?? 0;
-        if (Math.abs(sx - x) < 1 && Math.abs(sy - y) < 1) {
-          candidates.push({ idx: idField.idx!, version: idField.version! });
-        }
-      }
-    }
-    return candidates[0] ?? null;
+    return findShapeIdAtPoint(this.#sceneCache, x, y, 1);
   }
 
   /**
@@ -4433,31 +4260,15 @@ export class Editor {
 
   /** Compute the union bounding box of all shapes in the current page. */
   #getDiagramBBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    const allBounds = findAllBounds(this.#sceneCache);
+    if (allBounds.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let found = false;
-    for (const page of this.#sceneCache) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of Editor.#SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const bounds = variant['bounds'] as
-            | { origin?: Record<string, number>; size?: Record<string, number> }
-            | undefined;
-          if (!bounds?.origin || !bounds?.size) continue;
-          const sx = (bounds.origin['x'] as number) ?? 0;
-          const sy = (bounds.origin['y'] as number) ?? 0;
-          const sw = (bounds.size['width'] as number) ?? 0;
-          const sh = (bounds.size['height'] as number) ?? 0;
-          if (sx < minX) minX = sx;
-          if (sy < minY) minY = sy;
-          if (sx + sw > maxX) maxX = sx + sw;
-          if (sy + sh > maxY) maxY = sy + sh;
-          found = true;
-        }
-      }
+    for (const b of allBounds) {
+      if (b.x < minX) minX = b.x;
+      if (b.y < minY) minY = b.y;
+      if (b.x + b.width > maxX) maxX = b.x + b.width;
+      if (b.y + b.height > maxY) maxY = b.y + b.height;
     }
-    if (!found) return null;
     return { minX, minY, maxX, maxY };
   }
 
@@ -5295,82 +5106,4 @@ export class Editor {
 
   // ─── Connect Anchor Helpers ─────────────────────────────────────────────────
 
-  /**
-   * Compute normalized (0-1) anchor coordinates from shape bounds and a document-space point.
-   * Projects the point onto the rectangle perimeter.
-   */
-  #computePerimeterNormalized(
-    bounds: { x: number; y: number; width: number; height: number },
-    docX: number,
-    docY: number,
-  ): { nx: number; ny: number } {
-    const cx = bounds.x + bounds.width / 2;
-    const cy = bounds.y + bounds.height / 2;
-    const hw = bounds.width / 2;
-    const hh = bounds.height / 2;
-
-    // Direction from center to point
-    const dx = docX - cx;
-    const dy = docY - cy;
-
-    // Determine which side we exit
-    let anchorX: number;
-    let anchorY: number;
-    let nx: number;
-    let ny: number;
-
-    if (Math.abs(dx) * hh > Math.abs(dy) * hw) {
-      // Exiting left or right
-      if (dx > 0) {
-        anchorX = bounds.x + bounds.width;
-        anchorY = cy + (dy / Math.abs(dx || 1)) * hw;
-        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
-        nx = 1.0;
-        ny = (anchorY - bounds.y) / bounds.height;
-      } else {
-        anchorX = bounds.x;
-        anchorY = cy - (dy / Math.abs(dx || 1)) * hw;
-        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
-        nx = 0.0;
-        ny = (anchorY - bounds.y) / bounds.height;
-      }
-    } else {
-      // Exiting top or bottom
-      if (dy > 0) {
-        anchorY = bounds.y + bounds.height;
-        anchorX = cx + (dx / Math.abs(dy || 1)) * hh;
-        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
-        ny = 1.0;
-        nx = (anchorX - bounds.x) / bounds.width;
-      } else {
-        anchorY = bounds.y;
-        anchorX = cx - (dx / Math.abs(dy || 1)) * hh;
-        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
-        ny = 0.0;
-        nx = (anchorX - bounds.x) / bounds.width;
-      }
-    }
-
-    // Clamp to [0, 1]
-    nx = Math.max(0, Math.min(1, nx));
-    ny = Math.max(0, Math.min(1, ny));
-
-    return { nx, ny };
-  }
-
-  /**
-   * Classify normalized anchor coordinates as a cardinal direction or "normalized".
-   * If within 5% of a cardinal axis, return that cardinal.
-   */
-  #classifyAnchorKind(
-    nx: number,
-    ny: number,
-  ): 'north' | 'south' | 'east' | 'west' | 'normalized' {
-    const threshold = 0.05;
-    if (ny <= threshold) return 'north';
-    if (ny >= 1 - threshold) return 'south';
-    if (nx >= 1 - threshold) return 'east';
-    if (nx <= threshold) return 'west';
-    return 'normalized';
-  }
 }

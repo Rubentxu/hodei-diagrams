@@ -2044,6 +2044,49 @@ async function bootstrap(): Promise<void> {
       activeEditor?.refreshScene?.();
       return true;
     },
+    /**
+     * Add a Group cell at exact SVG (doc-space) coordinates. Used by
+     * E2E tests to set up a Group fixture for handle rendering tests.
+     * The Group is created empty (no children) with clip=true. */
+    addGroupAt: (x: number, y: number, width: number, height: number) => {
+      if (!activeSession) return null;
+      const cache = activeEditor?.getSceneCache?.();
+      if (!cache || !cache.ok || cache.value.length === 0) return null;
+      const activePageSlot = cache.value[0]!.page_id;
+      const w = width > 0 ? width : 200;
+      const h = height > 0 ? height : 150;
+      const r = activeSession.executeCommand(
+        JSON.stringify({
+          AddGroup: {
+            group: {
+              geometry: {
+                x,
+                y,
+                width: w,
+                height: h,
+                relative: false,
+                rotation: 0,
+                flip_h: false,
+                flip_v: false,
+              },
+              label: null,
+              style_id: null,
+              parent: null,
+              page_id: { idx: activePageSlot.idx, version: activePageSlot.version },
+              layer_id: null,
+              clip: true,
+              locked: false,
+              visible: true,
+              z_order: 0,
+              children: [],
+            },
+          },
+        }),
+      );
+      if (!r.ok) return null;
+      activeEditor?.refreshScene?.();
+      return true;
+    },
     manualSaveVersion,
   };
 
