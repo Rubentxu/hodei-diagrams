@@ -12,7 +12,7 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
-import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeIdAtPoint, perimeterNormalized, classifyAnchorFromNormalized } from './scene-bounds.js';
+import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeIdAtPoint, perimeterNormalized, classifyAnchorFromNormalized, clientToDoc } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
@@ -2311,33 +2311,7 @@ export class Editor {
 
   /** Convert screen client coordinates to document-space coordinates, accounting for zoom and SVG viewBox. */
   #clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
-    const rect = this.#viewer.getBoundingClientRect();
-    const zoom = this.#getZoom();
-    // Get SVG viewBox to handle non-uniform scaling (preserveAspectRatio="none")
-    const svg = this.#viewer.querySelector('svg');
-    if (svg) {
-      const viewBox = svg.getAttribute('viewBox');
-      if (viewBox) {
-        const parts = viewBox.trim().split(/[\s,]+/).map(Number);
-        if (parts.length === 4) {
-          const vbX = parts[0]!;
-          const vbY = parts[1]!;
-          const vbW = parts[2]!;
-          const vbH = parts[3]!;
-          const svgRect = svg.getBoundingClientRect();
-          const scaleX = vbW / svgRect.width;
-          const scaleY = vbH / svgRect.height;
-          return {
-            x: vbX + (clientX - svgRect.left) * scaleX,
-            y: vbY + (clientY - svgRect.top) * scaleY,
-          };
-        }
-      }
-    }
-    return {
-      x: (clientX - rect.left) / zoom,
-      y: (clientY - rect.top) / zoom,
-    };
+    return clientToDoc(this.#viewer, clientX, clientY);
   }
 
   // ─── Snap Math ────────────────────────────────────────────────────────────
