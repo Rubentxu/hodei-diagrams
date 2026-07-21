@@ -139,6 +139,7 @@ test.describe('Group handles (SCENARIO-20 latent bug regression)', () => {
   // The full E2E (click Group → handles appear) requires app-level group-drill-down
   // selection behavior (ADR-0082) which is outside r107 scope.
   // The unit test in scene-bounds.test.ts covers the Group regression.
+
   test('Group renders in the scene via sceneBounds (Group regression)', async ({ page }) => {
     await page.goto('/');
     await waitForAppReady(page);
@@ -148,6 +149,39 @@ test.describe('Group handles (SCENARIO-20 latent bug regression)', () => {
 
     const viewer = page.locator('[data-testid="viewer"]');
     // Verify a Group element is present in the rendered SVG
+    const groupCount = await viewer.locator('g[data-group-id]').count();
+    expect(groupCount).toBeGreaterThan(0);
+  });
+
+  // Verifies __hodeiDebug.addGroupAt works correctly (T21 correction).
+  // The hook was implemented but unused — this test exercises it directly.
+  test('addGroupAt creates a Group that sceneBounds resolves (API regression)', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      const debug = (
+        window as unknown as {
+          __hodeiDebug?: {
+            addGroupAt?: (
+              _x: number,
+              _y: number,
+              _width: number,
+              _height: number,
+            ) => boolean | null;
+          };
+        }
+      ).__hodeiDebug;
+      if (!debug?.addGroupAt) throw new Error('__hodeiDebug.addGroupAt is not available');
+      // Create a group at doc-space coordinates
+      const result = debug.addGroupAt(100, 100, 200, 150);
+      if (!result) throw new Error('addGroupAt returned null');
+    });
+    await page.waitForSelector('[data-testid="viewer"] svg');
+    await page.waitForTimeout(250);
+
+    const viewer = page.locator('[data-testid="viewer"]');
+    // Verify the Group element exists in the rendered SVG
     const groupCount = await viewer.locator('g[data-group-id]').count();
     expect(groupCount).toBeGreaterThan(0);
   });
