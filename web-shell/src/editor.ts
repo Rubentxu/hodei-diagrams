@@ -293,6 +293,7 @@ export class Editor {
       return svgEl as unknown as HTMLElement;
     };
     this.#resizeHandles = new ResizeHandlesOverlay(
+      viewer,
       getSvgLayer as () => HTMLElement,
       () => this.#sceneCache,
       (id, geom) => this.setVertexGeometry(id, geom),
