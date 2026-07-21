@@ -3299,16 +3299,7 @@ export class Editor {
     if (el) {
       el.style.transform = `translate(${dx}px, ${dy}px)`;
     }
-    this.#setTransformHandlesPreview(dx, dy);
-  }
-
-  #setTransformHandlesPreview(dx: number, dy: number): void {
-    const transform = dx === 0 && dy === 0 ? '' : `translate(${dx}px, ${dy}px)`;
-    this.#viewer
-      .querySelectorAll('.resize-handle, .rotation-handle, .rotation-handle-link')
-      .forEach((handle) => {
-        (handle as SVGElement).style.transform = transform;
-      });
+    this.#resizeHandles.applyDragOffset(dx, dy);
   }
 
   #onPointerUp(_e: PointerEvent): void {
@@ -3350,7 +3341,7 @@ export class Editor {
     if (el) {
       el.style.transform = '';
     }
-    this.#setTransformHandlesPreview(0, 0);
+    this.#resizeHandles.applyDragOffset(0, 0);
 
     // Commit move if threshold exceeded
     if (distance >= 3) {

@@ -246,6 +246,20 @@ export class ResizeHandlesOverlay {
     });
   }
 
+  /**
+   * Apply a CSS translate offset to all handles (used during drag-to-move preview).
+   * Exposed publicly so the editor's move FSM can preview handle movement without
+   * committing a vertex move command.
+   */
+  applyDragOffset(dx: number, dy: number): void {
+    const transform = dx === 0 && dy === 0 ? '' : `translate(${dx}px, ${dy}px)`;
+    this.#getSvgLayer()
+      .querySelectorAll('.resize-handle, .rotation-handle, .rotation-handle-link')
+      .forEach((handle) => {
+        (handle as SVGElement).style.transform = transform;
+      });
+  }
+
   // ─── DragSession callbacks for resize ────────────────────────────────────────
 
   #resizeOnMove(e: PointerEvent, state: ResizeDragState2): ResizeDragState2 {
