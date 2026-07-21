@@ -233,6 +233,45 @@ export class ResizeHandlesOverlay {
   }
 
   /**
+   * Route a pointer event from the overlay hit zone to the appropriate drag starter.
+   * Returns true if the event was consumed, false otherwise.
+   */
+  beginFromEvent(target: Element, event: PointerEvent): boolean {
+    const resizeTarget = target.closest('.resize-handle');
+    if (resizeTarget) {
+      const vidIdx = resizeTarget.getAttribute('data-vertex-idx');
+      const vidVersion = resizeTarget.getAttribute('data-vertex-version');
+      const handle = resizeTarget.getAttribute('data-handle') as HandlePosition | null;
+      if (!vidIdx || !vidVersion || !handle) return false;
+      const vertexId = { idx: parseInt(vidIdx), version: parseInt(vidVersion) };
+      const scene = this.#sceneProvider();
+      const bounds = sceneBounds(scene, vertexId);
+      if (!bounds) return false;
+      this.beginResize(vertexId, bounds, handle, target as SVGCircleElement, event.clientX, event.clientY);
+      event.stopPropagation();
+      event.preventDefault();
+      return true;
+    }
+
+    const rotationTarget = target.closest('.rotation-handle');
+    if (rotationTarget) {
+      const vidIdx = rotationTarget.getAttribute('data-vertex-idx');
+      const vidVersion = rotationTarget.getAttribute('data-vertex-version');
+      if (!vidIdx || !vidVersion) return false;
+      const vertexId = { idx: parseInt(vidIdx), version: parseInt(vidVersion) };
+      const scene = this.#sceneProvider();
+      const bounds = sceneBounds(scene, vertexId);
+      if (!bounds) return false;
+      this.beginRotationDrag(vertexId, bounds, target as SVGCircleElement, event.clientX, event.clientY);
+      event.stopPropagation();
+      event.preventDefault();
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Apply a CSS translate offset to all handles (used during drag-to-move preview).
    * Exposed publicly so the editor's move FSM can preview handle movement without
    * committing a vertex move command.

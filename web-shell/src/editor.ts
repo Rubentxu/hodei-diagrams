@@ -12,7 +12,7 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
-import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeVariantAtPoint } from './scene-bounds.js';
+import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeVariantAtPoint, perimeterNormalized, classifyAnchorFromNormalized } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
@@ -308,47 +308,11 @@ export class Editor {
     });
 
     // Register resize + rotation zone (Pattern D 9c).
-    // The zone handler reads vertex data from the circle's data attributes and
-    // delegates to the overlay. stopPropagation prevents the editor's #onPointerDown
-    // from misinterpreting the handle click as an empty-canvas click.
+    // The overlay owns the DOM contract; beginFromEvent extracts data attributes
+    // and routes to the appropriate drag starter.
     this.#registerOverlayHitZone({
       selector: '.resize-handle, .rotation-handle',
-      handler: (target, ev) => {
-        const vidIdx = target.getAttribute('data-vertex-idx');
-        const vidVersion = target.getAttribute('data-vertex-version');
-        if (!vidIdx || !vidVersion) return false;
-        const vertexId = { idx: parseInt(vidIdx), version: parseInt(vidVersion) };
-
-        // Re-derive bounds from scene (same as what render() computed when creating handles)
-        const scene = this.#sceneCache;
-        const bounds = sceneBounds(scene, vertexId);
-        if (!bounds) return false;
-
-        const isResize = target.classList.contains('resize-handle');
-        if (isResize) {
-          const handle = target.getAttribute('data-handle') as HandlePosition;
-          this.#resizeHandles.beginResize(
-            vertexId,
-            bounds,
-            handle,
-            target as SVGCircleElement,
-            ev.clientX,
-            ev.clientY,
-          );
-        } else {
-          // rotation handle
-          this.#resizeHandles.beginRotationDrag(
-            vertexId,
-            bounds,
-            target as SVGCircleElement,
-            ev.clientX,
-            ev.clientY,
-          );
-        }
-        ev.stopPropagation();
-        ev.preventDefault();
-        return true;
-      },
+      handler: (target, ev) => this.#resizeHandles.beginFromEvent(target, ev),
     });
   }
 
@@ -3695,8 +3659,8 @@ export class Editor {
       if (sourceBounds && targetBounds) {
         const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
         const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
-        const sourceNorm = this.#computePerimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
-        const targetNorm = this.#computePerimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
+        const sourceNorm = perimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
+        const targetNorm = perimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
         sourceAnchor = { kind: 'normalized', nx: sourceNorm.nx, ny: sourceNorm.ny };
         targetAnchor = { kind: 'normalized', nx: targetNorm.nx, ny: targetNorm.ny };
       }
@@ -3814,13 +3778,13 @@ export class Editor {
       const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
       const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
 
-      const sourceNorm = this.#computePerimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
-      const targetNorm = this.#computePerimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
+      const sourceNorm = perimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
+      const targetNorm = perimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
 
-      const sourceKind = this.#classifyAnchorKind(sourceNorm.nx, sourceNorm.ny);
+      const sourceKind = classifyAnchorFromNormalized(sourceNorm.nx, sourceNorm.ny);
       // EDGE-003: Alt held → 'anywhere' mode forces normalized anchor at cursor position
       const isAnywhere = this.#connectState!.mode === 'anywhere';
-      const targetKind = isAnywhere ? 'normalized' : this.#classifyAnchorKind(targetNorm.nx, targetNorm.ny);
+      const targetKind = isAnywhere ? 'normalized' : classifyAnchorFromNormalized(targetNorm.nx, targetNorm.ny);
 
       const sourceAnchor =
         sourceKind === 'normalized'
@@ -5144,82 +5108,4 @@ export class Editor {
 
   // ─── Connect Anchor Helpers ─────────────────────────────────────────────────
 
-  /**
-   * Compute normalized (0-1) anchor coordinates from shape bounds and a document-space point.
-   * Projects the point onto the rectangle perimeter.
-   */
-  #computePerimeterNormalized(
-    bounds: { x: number; y: number; width: number; height: number },
-    docX: number,
-    docY: number,
-  ): { nx: number; ny: number } {
-    const cx = bounds.x + bounds.width / 2;
-    const cy = bounds.y + bounds.height / 2;
-    const hw = bounds.width / 2;
-    const hh = bounds.height / 2;
-
-    // Direction from center to point
-    const dx = docX - cx;
-    const dy = docY - cy;
-
-    // Determine which side we exit
-    let anchorX: number;
-    let anchorY: number;
-    let nx: number;
-    let ny: number;
-
-    if (Math.abs(dx) * hh > Math.abs(dy) * hw) {
-      // Exiting left or right
-      if (dx > 0) {
-        anchorX = bounds.x + bounds.width;
-        anchorY = cy + (dy / Math.abs(dx || 1)) * hw;
-        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
-        nx = 1.0;
-        ny = (anchorY - bounds.y) / bounds.height;
-      } else {
-        anchorX = bounds.x;
-        anchorY = cy - (dy / Math.abs(dx || 1)) * hw;
-        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
-        nx = 0.0;
-        ny = (anchorY - bounds.y) / bounds.height;
-      }
-    } else {
-      // Exiting top or bottom
-      if (dy > 0) {
-        anchorY = bounds.y + bounds.height;
-        anchorX = cx + (dx / Math.abs(dy || 1)) * hh;
-        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
-        ny = 1.0;
-        nx = (anchorX - bounds.x) / bounds.width;
-      } else {
-        anchorY = bounds.y;
-        anchorX = cx - (dx / Math.abs(dy || 1)) * hh;
-        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
-        ny = 0.0;
-        nx = (anchorX - bounds.x) / bounds.width;
-      }
-    }
-
-    // Clamp to [0, 1]
-    nx = Math.max(0, Math.min(1, nx));
-    ny = Math.max(0, Math.min(1, ny));
-
-    return { nx, ny };
-  }
-
-  /**
-   * Classify normalized anchor coordinates as a cardinal direction or "normalized".
-   * If within 5% of a cardinal axis, return that cardinal.
-   */
-  #classifyAnchorKind(
-    nx: number,
-    ny: number,
-  ): 'north' | 'south' | 'east' | 'west' | 'normalized' {
-    const threshold = 0.05;
-    if (ny <= threshold) return 'north';
-    if (ny >= 1 - threshold) return 'south';
-    if (nx >= 1 - threshold) return 'east';
-    if (nx <= threshold) return 'west';
-    return 'normalized';
-  }
 }

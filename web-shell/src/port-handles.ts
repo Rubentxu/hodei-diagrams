@@ -9,7 +9,7 @@
 
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
-import { sceneBounds, getZoom, type ShapeBounds } from './scene-bounds.js';
+import { sceneBounds, getZoom, perimeterNormalized, classifyAnchorFromNormalized, type ShapeBounds } from './scene-bounds.js';
 
 /** Anchor specification compatible with the WASM interface. */
 export interface AnchorSpec {
@@ -247,8 +247,8 @@ export class PortHandlesOverlay {
     const docY = (e.clientY - rect.top) / zoom;
 
     // Compute normalized anchor
-    const { nx, ny } = this.#computePerimeterNormalized(shapeBounds, docX, docY);
-    const anchorKind = this.classifyAnchorFromNormalized(nx, ny);
+    const { nx, ny } = perimeterNormalized(shapeBounds, docX, docY);
+    const anchorKind = classifyAnchorFromNormalized(nx, ny);
 
     // Call WASM to set the anchor
     const anchor: AnchorSpec =
@@ -297,94 +297,6 @@ export class PortHandlesOverlay {
         return { x: centerX, y: bounds.y };
       }
     }
-  }
-
-  /**
-   * Project a mouse point onto the rectangle perimeter, returning normalized
-   * (0-1) coordinates relative to the source point on that perimeter.
-   *
-   * If the projected point is outside the perimeter projection, returns the
-   * closest point on the perimeter.
-   */
-  computePerimeterNormalized(
-    shapeBounds: ShapeBounds,
-    mouseX: number,
-    mouseY: number,
-  ): { nx: number; ny: number } {
-    return this.#computePerimeterNormalized(shapeBounds, mouseX, mouseY);
-  }
-
-  #computePerimeterNormalized(
-    bounds: ShapeBounds,
-    mouseX: number,
-    mouseY: number,
-  ): { nx: number; ny: number } {
-    const cx = bounds.x + bounds.width / 2;
-    const cy = bounds.y + bounds.height / 2;
-    const hw = bounds.width / 2;
-    const hh = bounds.height / 2;
-
-    // Direction from center to mouse
-    const dx = mouseX - cx;
-    const dy = mouseY - cy;
-
-    // Determine which side we exit
-    let anchorX: number;
-    let anchorY: number;
-    let nx: number;
-    let ny: number;
-
-    if (Math.abs(dx) * hh > Math.abs(dy) * hw) {
-      // Exiting left or right
-      if (dx > 0) {
-        anchorX = bounds.x + bounds.width;
-        anchorY = cy + (dy / Math.abs(dx || 1)) * hw;
-        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
-        nx = 1.0;
-        ny = (anchorY - bounds.y) / bounds.height;
-      } else {
-        anchorX = bounds.x;
-        anchorY = cy - (dy / Math.abs(dx || 1)) * hw;
-        anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
-        nx = 0.0;
-        ny = (anchorY - bounds.y) / bounds.height;
-      }
-    } else {
-      // Exiting top or bottom
-      if (dy > 0) {
-        anchorY = bounds.y + bounds.height;
-        anchorX = cx + (dx / Math.abs(dy || 1)) * hh;
-        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
-        ny = 1.0;
-        nx = (anchorX - bounds.x) / bounds.width;
-      } else {
-        anchorY = bounds.y;
-        anchorX = cx - (dx / Math.abs(dy || 1)) * hh;
-        anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
-        ny = 0.0;
-        nx = (anchorX - bounds.x) / bounds.width;
-      }
-    }
-
-    // Clamp to [0, 1]
-    nx = Math.max(0, Math.min(1, nx));
-    ny = Math.max(0, Math.min(1, ny));
-
-    return { nx, ny };
-  }
-
-  /**
-   * Classify an anchor from normalized (0-1) coordinates.
-   * If within 5% of a cardinal axis, return that cardinal.
-   * Otherwise return "normalized".
-   */
-  classifyAnchorFromNormalized(nx: number, ny: number): 'north' | 'south' | 'east' | 'west' | 'normalized' {
-    const threshold = 0.05;
-    if (ny <= threshold) return 'north';
-    if (ny >= 1 - threshold) return 'south';
-    if (nx >= 1 - threshold) return 'east';
-    if (nx <= threshold) return 'west';
-    return 'normalized';
   }
 
   /** Project a mouse point onto the perimeter of a rectangle. */

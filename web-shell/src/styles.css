@@ -2510,13 +2510,3 @@ svg [data-editing='true'] text.vertex-label,
 .rotation-handle:hover {
   fill: #d97706;
 }
-
-/* During drag, handles keep their hover color when hovered (no "reset" on leave
-   because the pointer is captured — CSS hover still applies normally) */
-.is-dragging .resize-handle:hover {
-  fill: #2563eb;
-}
-
-.is-dragging .rotation-handle:hover {
-  fill: #d97706;
-}
