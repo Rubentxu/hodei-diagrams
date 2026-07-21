@@ -76,37 +76,25 @@ export class ResizeHandlesOverlay {
     // Resize drag session (T10)
     this.#resizeSession = new DragSession<ResizeDragState2>({
       threshold: 3,
-      onMove: (e, state) => {
-        this.#getSvgLayer().classList.add('is-dragging');
-        return this.#resizeOnMove(e, state);
-      },
+      onMove: (e, state) => this.#resizeOnMove(e, state),
       onCommit: (_e, state) => {
         this.#setVertexGeometry(state.vertexId, state.currentGeom);
-        this.#getSvgLayer().classList.remove('is-dragging');
         state.proportional = { aspectRatio: 1, dominant: 'width', locked: false };
       },
-      onCancel: (_e, _state) => {
-        this.#getSvgLayer().classList.remove('is-dragging');
-      },
+      onCancel: (_e, _state) => {},
     });
 
     // Rotation drag session (T10)
     this.#rotationSession = new DragSession<RotationDragState2>({
       threshold: 3,
-      onMove: (e, state) => {
-        this.#getSvgLayer().classList.add('is-dragging');
-        return this.#rotationOnMove(e, state);
-      },
+      onMove: (e, state) => this.#rotationOnMove(e, state),
       onCommit: (_e, state) => {
         const MIN_ANGLE = Math.PI / 180;
         if (Math.abs(state.currentAngleDelta) >= MIN_ANGLE) {
           this.#rotateVertex(state.vertexId, state.currentAngleDelta);
         }
-        this.#getSvgLayer().classList.remove('is-dragging');
       },
-      onCancel: (_e, _state) => {
-        this.#getSvgLayer().classList.remove('is-dragging');
-      },
+      onCancel: (_e, _state) => {},
     });
   }
 
@@ -581,6 +569,5 @@ export class ResizeHandlesOverlay {
     svgLayer
       .querySelectorAll('.resize-handle, .rotation-handle, .rotation-handle-link')
       .forEach((el) => el.remove());
-    svgLayer.classList.remove('is-dragging');
   }
 }

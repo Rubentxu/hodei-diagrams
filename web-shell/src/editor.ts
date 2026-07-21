@@ -12,11 +12,11 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
-import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeVariantAtPoint, perimeterNormalized, classifyAnchorFromNormalized } from './scene-bounds.js';
+import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeIdAtPoint, perimeterNormalized, classifyAnchorFromNormalized } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
-import { ResizeHandlesOverlay, type HandlePosition } from './resize-handles.js';
+import { ResizeHandlesOverlay } from './resize-handles.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -1783,6 +1783,7 @@ export class Editor {
     this.#cancelConnect();
     this.#clearEdgeSelection();
     this.#portHandles.dispose();
+    this.#resizeHandles?.dispose();
   }
 
   /** Execute undo and replay. For toolbar button binding. */
@@ -4177,11 +4178,7 @@ export class Editor {
 
     // Find the newly created vertex by searching the scene cache for the
     // kind and position match.
-    const variant = findShapeVariantAtPoint(this.#sceneCache, x, y, 1);
-    if (!variant) return null;
-    const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-    if (!idField) return null;
-    return { idx: idField.idx!, version: idField.version! };
+    return findShapeIdAtPoint(this.#sceneCache, x, y, 1);
   }
 
   /**

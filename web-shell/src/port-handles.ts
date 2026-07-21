@@ -307,48 +307,11 @@ export class PortHandlesOverlay {
     mouseX: number,
     mouseY: number,
   ): { x: number; y: number } {
-    const cx = bounds.x + bounds.width / 2;
-    const cy = bounds.y + bounds.height / 2;
-    const hw = bounds.width / 2;
-    const hh = bounds.height / 2;
-
-    // Direction from center to mouse
-    const dx = mouseX - cx;
-    const dy = mouseY - cy;
-
-    // Avoid division by zero
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    let anchorX: number;
-    let anchorY: number;
-
-    // Determine exit side
-    if (absDx * hh > absDy * hw) {
-      // Exits left or right
-      if (dx > 0) {
-        anchorX = bounds.x + bounds.width;
-        anchorY = cy + (dy / absDx) * hw;
-      } else {
-        anchorX = bounds.x;
-        anchorY = cy - (dy / absDx) * hw;
-      }
-    } else {
-      // Exits top or bottom
-      if (dy > 0) {
-        anchorY = bounds.y + bounds.height;
-        anchorX = cx + (dx / absDy) * hh;
-      } else {
-        anchorY = bounds.y;
-        anchorX = cx - (dx / absDy) * hh;
-      }
-    }
-
-    // Clamp to bounds
-    anchorX = Math.max(bounds.x, Math.min(bounds.x + bounds.width, anchorX));
-    anchorY = Math.max(bounds.y, Math.min(bounds.y + bounds.height, anchorY));
-
-    return { x: anchorX, y: anchorY };
+    const { nx, ny } = perimeterNormalized(bounds, mouseX, mouseY);
+    return {
+      x: bounds.x + nx * bounds.width,
+      y: bounds.y + ny * bounds.height,
+    };
   }
 
   /** Find an edge in the scene and return its source/target IDs. */

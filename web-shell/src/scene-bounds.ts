@@ -237,6 +237,8 @@ export function getZoom(svgLayer: HTMLElement): number {
 /**
  * Compute normalized (0-1) anchor coordinates from shape bounds and a document-space point.
  * Projects the point onto the rectangle perimeter.
+ * Returns {nx: 0.5, ny: 0.5} when the point is at the shape center (avoids NaN from
+ * division by zero in the ray-projection math).
  */
 export function perimeterNormalized(
   bounds: ShapeBounds,
@@ -250,6 +252,11 @@ export function perimeterNormalized(
 
   const dx = docX - cx;
   const dy = docY - cy;
+
+  // Guard: point at shape center produces NaN in the projection math — return center default.
+  if (dx === 0 && dy === 0) {
+    return { nx: 0.5, ny: 0.5 };
+  }
 
   let anchorX: number;
   let anchorY: number;
@@ -341,4 +348,22 @@ export function findShapeVariantAtPoint(
     }
   }
   return null;
+}
+
+/**
+ * Find a shape id at a given document-space point (within tolerance).
+ * Returns the SlotmapId or null if not found.
+ */
+export function findShapeIdAtPoint(
+  scene: ScenePage[],
+  x: number,
+  y: number,
+  tolerance = 1,
+): SlotmapId | null {
+  const variant = findShapeVariantAtPoint(scene, x, y, tolerance);
+  if (!variant) return null;
+  const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+  if (!idField) return null;
+  if (typeof idField.idx !== 'number' || typeof idField.version !== 'number') return null;
+  return { idx: idField.idx, version: idField.version };
 }
