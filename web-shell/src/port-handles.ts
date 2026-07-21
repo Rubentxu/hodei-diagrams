@@ -10,6 +10,7 @@
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
 import { sceneBounds, getZoom, perimeterNormalized, classifyAnchorFromNormalized, type ShapeBounds } from './scene-bounds.js';
+import type { OverlayHost } from './editor.js';
 
 /** Anchor specification compatible with the WASM interface. */
 export interface AnchorSpec {
@@ -53,7 +54,8 @@ export class PortHandlesOverlay {
   #onMoveBound: (_e: PointerEvent) => void;
   #onUpBound: (_e: PointerEvent) => void;
 
-  // ponytail: DragSession<T> migration deferred — port FSM still owns manual listeners; track for r108
+  // Overlay registration disposers for attach/detach
+  #disposers: Array<() => void> = [];
 
   constructor(
     svgLayer: HTMLElement,
@@ -65,6 +67,25 @@ export class PortHandlesOverlay {
     this.#session = session;
     this.#onMoveBound = (e: PointerEvent) => this.#onDragMove(e);
     this.#onUpBound = (e: PointerEvent) => this.#onDragEnd(e);
+  }
+
+  /**
+   * Attach this overlay to the given host, registering its hit zones.
+   */
+  attach(host: OverlayHost): void {
+    const dispose = host.registerOverlayHitZone({
+      selector: '.port-handle',
+      handler: (target, event) => this.beginFromEvent(target, event),
+    });
+    this.#disposers.push(dispose);
+  }
+
+  /**
+   * Detach this overlay from its host, removing all registered hit zones.
+   */
+  detach(): void {
+    for (const dispose of this.#disposers) dispose();
+    this.#disposers = [];
   }
 
   /**
@@ -162,14 +183,8 @@ export class PortHandlesOverlay {
     circle.style.cursor = 'grab';
     circle.style.pointerEvents = 'all';
 
-    // Mousedown initiates drag
-    circle.addEventListener('mousedown', (e: MouseEvent) => {
-      e.preventDefault();
-      // No stopPropagation here — editor.ts's OverlayHitZone registry routes port-handle
-      // clicks via the '.port-handle' selector, and that handler calls ev.stopPropagation().
-      // The overlay hit zone handler is registered in editor.ts constructor (Pattern D 9a).
-      this.#startDrag(edgeId, end, vertexId, shapeBounds, circle, e.clientX, e.clientY);
-    });
+    // Event routing is handled via OverlayHost attach/detach pattern (commit 5).
+    // The zone handler in editor.ts delegates to beginFromEvent, which calls #startDrag.
 
     this.#svgLayer.appendChild(circle);
   }
@@ -400,6 +415,7 @@ export class PortHandlesOverlay {
 
   /** Clean up event listeners. Call when editor is detached. */
   dispose(): void {
+    this.detach();
     document.removeEventListener('pointermove', this.#onMoveBound);
     document.removeEventListener('pointerup', this.#onUpBound);
     this.#dragHandle = null;

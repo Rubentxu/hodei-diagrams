@@ -282,6 +282,9 @@ export class Editor {
     // Initialize port handles overlay
     this.#portHandles = new PortHandlesOverlay(viewer, () => this.#sceneCache, session);
 
+    // Attach port handles via OverlayHost (Pattern D 9a)
+    this.#portHandles.attach(this);
+
     // Initialize resize handles overlay — use SVG element so handles are in SVG coordinate space
     // Note: we must look up the SVG dynamically because mountSvg replaces viewer.innerHTML
     const getSvgLayer = () => {
@@ -305,14 +308,9 @@ export class Editor {
     // Attach resize handles via OverlayHost (Pattern D 9c)
     this.#resizeHandles.attach(this);
 
-    // Register overlay hit zones for port and bend handles (Pattern D 9a)
-    this.registerOverlayHitZone({
-      selector: '.port-handle',
-      handler: (_target, ev) => {
-        ev.stopPropagation();
-        return true;
-      },
-    });
+    // Register bend handle zone inline (Pattern D 9a).
+    // Note: bend stays inline because #startBendDrag consumes editor-private state.
+    // Full BendHandlesOverlay extraction is r109+. See ponytail: marker above.
     this.registerOverlayHitZone({
       selector: '.bend-handle',
       handler: (target, ev) => {
