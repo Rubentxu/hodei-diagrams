@@ -636,11 +636,44 @@ export class DiagramEngineSession {
         sourcePort,
         targetPort,
       );
+      // Decode scene immediately to get the actual version assigned by the engine.
+      const actualVersion = this.#decodeEdgeVersion(rawEdgeId);
       this.#onStateChange?.();
-      return ok({ idx: rawEdgeId, version: 0 });
+      return ok({ idx: rawEdgeId, version: actualVersion });
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * Decode the actual version of an edge by scanning the scene cache.
+   * Used after connectVertices / connectVerticesAnchored because the WASM
+   * bindings only return u32 (idx); the version is managed internally.
+   * Returning the correct version is required for findEdgeVariant lookups
+   * (used by bend overlay, port overlay, hit-testing).
+   *
+   * Returns 0 if the edge is not found in the current scene (which should
+   * not happen if writeSceneBuffer was called first).
+   */
+  #decodeEdgeVersion(idx: number): number {
+    this.writeSceneBuffer();
+    const sceneResult = this.decodeSceneBuffer();
+    if (!sceneResult.ok) return 0;
+    for (const page of sceneResult.value) {
+      for (const elem of page.display_list) {
+        if (!elem) continue;
+        const e = elem as Record<string, unknown>;
+        for (const key of ['Line', 'Path']) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant) continue;
+          const idField = variant['id'] as { idx?: unknown; version?: unknown } | undefined;
+          if (idField?.idx === idx && typeof idField?.version === 'number') {
+            return idField.version;
+          }
+        }
+      }
+    }
+    return 0;
   }
 
   /**
@@ -1017,7 +1050,8 @@ export class DiagramEngineSession {
         targetAnchor.ny ?? 0,
       );
       this.#onStateChange?.();
-      return ok({ idx: rawEdgeId, version: 0 });
+      const actualVersion = this.#decodeEdgeVersion(rawEdgeId);
+      return ok({ idx: rawEdgeId, version: actualVersion });
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }
