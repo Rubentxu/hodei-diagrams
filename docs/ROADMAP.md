@@ -371,7 +371,18 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
 
 ### In Progress
 
-_(none — IP-G closed in v0.100.0; Campaign A–G ended)_
+- **v0.107.0 — transform handles structural cleanup**: `refactor/transform-handles-r107` (pending PR merge + tag).
+  - 12 structural findings resolved (F1–F12; F13 deferred to r108 as out-of-scope)
+  - 1 latent bug fixed: `SHAPE_KEYS` now includes `'Group'`, so single-selected Groups render 8 resize + 1 rotation handle
+  - 3 new modules: `dom-drag.ts` (DragSession<T> pointer lifecycle), `scene-bounds.ts` (canonical SHAPE_KEYS + sceneBounds + sceneGeometry), OverlayHitZone registry on `Editor`
+  - Net LOC delta: +769 / −431 (target was −350; off by +1,119 — concentrated in editor.ts +184 and resize-handles.ts +105)
+  - Tests: 245 unit (+25 new: dom-drag 12 + scene-bounds 11 + editor 2) + 22 E2E (all pass)
+  - 21 atomic commits on `refactor/transform-handles-r107` (incl. 2 correction cycles + 1 cleanup pass)
+  - **Deferred**: ADRs 0083/0084/0085 not committed — `docs/` is gitignored and ADRs described a non-existent API; correct contracts saved to engram (`sddk/refactor-transform-handles-r107/api-contracts`)
+  - **r108 follow-ups (ponytail: markers in code)**:
+    - `port-handles.ts:56`: DragSession<T> migration deferred — port FSM still owns manual listeners
+    - `editor.ts:2910`: `#registerOverlayHitZone` hard-private + Editor ctor hardcodes zones — OCP-friendly refactor needed for future overlays
+  - Archive: `sddk/refactor-transform-handles-r107/archive-report.md`
 
 ## 🎯 Recently Closed Tracks
 
