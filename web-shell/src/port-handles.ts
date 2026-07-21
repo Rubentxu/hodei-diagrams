@@ -10,6 +10,7 @@
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
 import { sceneBounds, getZoom, perimeterNormalized, classifyAnchorFromNormalized, type ShapeBounds } from './scene-bounds.js';
+import { DragSession, type DragStateBase } from './dom-drag.js';
 import type { OverlayHost } from './editor.js';
 
 /** Anchor specification compatible with the WASM interface. */
@@ -19,21 +20,14 @@ export interface AnchorSpec {
   ny?: number;
 }
 
-/** An anchor handle being dragged. */
-interface DragHandle {
+/** Port drag state extending DragStateBase for DragSession<T>. */
+interface PortDragState extends DragStateBase {
   edgeId: SlotmapId;
   end: 0 | 1; // 0 = source, 1 = target
   vertexId: SlotmapId;
   shapeBounds: ShapeBounds;
   handleEl: SVGCircleElement;
-  startMouseX: number;
-  startMouseY: number;
-}
-
-/** State for Shift-axis-constrained drag. */
-interface ShiftDragState {
-  axis: 'H' | 'V' | null;
-  locked: boolean;
+  shift: { axis: 'H' | 'V' | null; locked: boolean };
 }
 
 /**
@@ -49,10 +43,9 @@ export class PortHandlesOverlay {
   readonly #svgLayer: HTMLElement;
   readonly #sceneProvider: () => ScenePage[];
   readonly #session: DiagramEngineSession;
-  #dragHandle: DragHandle | null = null;
-  #shiftDragState: ShiftDragState = { axis: null, locked: false };
-  #onMoveBound: (_e: PointerEvent) => void;
-  #onUpBound: (_e: PointerEvent) => void;
+
+  // Port drag session using DragSession FSM
+  readonly #portDragSession: DragSession<PortDragState>;
 
   // Overlay registration disposers for attach/detach
   #disposers: Array<() => void> = [];
@@ -65,8 +58,14 @@ export class PortHandlesOverlay {
     this.#svgLayer = svgLayer;
     this.#sceneProvider = sceneProvider;
     this.#session = session;
-    this.#onMoveBound = (e: PointerEvent) => this.#onDragMove(e);
-    this.#onUpBound = (e: PointerEvent) => this.#onDragEnd(e);
+
+    // Initialize DragSession for port drag FSM
+    this.#portDragSession = new DragSession<PortDragState>({
+      threshold: 3,
+      onMove: (e, state) => this.#portOnMove(e, state),
+      onCommit: (e, state) => this.#portOnCommit(e, state),
+      onCancel: (_e, state) => this.#portOnCancel(state),
+    });
   }
 
   /**
@@ -116,7 +115,7 @@ export class PortHandlesOverlay {
     const edgeId: SlotmapId = { idx: parseInt(edgeIdxStr), version: parseInt(edgeVersionStr) };
     const end: 0 | 1 = endStr === '0' ? 0 : 1; // session.setEdgeAnchor takes 0|1, NOT 'source'|'target'
 
-    this.#startDrag(edgeId, end, vertexId, shapeBounds, portEl as SVGCircleElement, event.clientX, event.clientY);
+    this.#beginPortDrag(edgeId, end, vertexId, shapeBounds, portEl as SVGCircleElement, event.clientX, event.clientY);
     event.stopPropagation();
     event.preventDefault();
     return true;
@@ -190,9 +189,9 @@ export class PortHandlesOverlay {
   }
 
   /**
-   * Start dragging a port handle.
+   * Begin a port drag session.
    */
-  #startDrag(
+  #beginPortDrag(
     edgeId: SlotmapId,
     end: 0 | 1,
     vertexId: SlotmapId,
@@ -201,30 +200,24 @@ export class PortHandlesOverlay {
     clientX: number,
     clientY: number,
   ): void {
-    this.#dragHandle = {
+    handleEl.style.cursor = 'grabbing';
+    this.#portDragSession.begin({
       edgeId,
       end,
       vertexId,
       shapeBounds,
       handleEl,
-      startMouseX: clientX,
-      startMouseY: clientY,
-    };
-
-    this.#shiftDragState = { axis: null, locked: false };
-
-    handleEl.style.cursor = 'grabbing';
-    document.addEventListener('pointermove', this.#onMoveBound);
-    document.addEventListener('pointerup', this.#onUpBound);
+      shift: { axis: null, locked: false },
+      startClientX: clientX,
+      startClientY: clientY,
+    });
   }
 
   /**
-   * Handle pointer move during a port drag.
+   * DragSession onMove callback for port drag.
    */
-  #onDragMove(e: PointerEvent): void {
-    if (!this.#dragHandle) return;
-
-    const { shapeBounds, handleEl, startMouseX, startMouseY } = this.#dragHandle;
+  #portOnMove(e: PointerEvent, state: PortDragState): PortDragState {
+    const { shapeBounds, handleEl, shift } = state;
 
     // Get current document position from client
     const rect = this.#svgLayer.getBoundingClientRect();
@@ -234,27 +227,27 @@ export class PortHandlesOverlay {
 
     // Apply Shift-axis constraint: after 3px, lock to dominant axis (H or V)
     if (e.shiftKey) {
-      const dx = e.clientX - startMouseX;
-      const dy = e.clientY - startMouseY;
+      const dx = e.clientX - state.startClientX;
+      const dy = e.clientY - state.startClientY;
       const absDx = Math.abs(dx);
       const absDy = Math.abs(dy);
 
-      if (!this.#shiftDragState.locked) {
+      if (!shift.locked) {
         const THRESHOLD = 3;
         if (absDx > THRESHOLD || absDy > THRESHOLD) {
-          this.#shiftDragState.axis = absDx >= absDy ? 'H' : 'V';
-          this.#shiftDragState.locked = true;
+          shift.axis = absDx >= absDy ? 'H' : 'V';
+          shift.locked = true;
         }
       }
 
-      if (this.#shiftDragState.locked) {
-        if (this.#shiftDragState.axis === 'H') {
+      if (shift.locked) {
+        if (shift.axis === 'H') {
           // Lock vertical: keep docY at start position
-          const startDocY = (startMouseY - rect.top) / zoom;
+          const startDocY = (state.startClientY - rect.top) / zoom;
           docY = this.#projectOntoPerimeter(shapeBounds, docX, startDocY).y;
         } else {
           // Lock horizontal: keep docX at start position
-          const startDocX = (startMouseX - rect.left) / zoom;
+          const startDocX = (state.startClientX - rect.left) / zoom;
           docX = this.#projectOntoPerimeter(shapeBounds, startDocX, docY).x;
         }
       }
@@ -266,32 +259,19 @@ export class PortHandlesOverlay {
     // Update handle visual position
     handleEl.setAttribute('cx', String(anchorPos.x));
     handleEl.setAttribute('cy', String(anchorPos.y));
+
+    return state;
   }
 
   /**
-   * Handle pointer up to end port drag.
+   * DragSession onCommit callback for port drag.
    */
-  #onDragEnd(e: PointerEvent): void {
-    if (!this.#dragHandle) return;
+  #portOnCommit(e: PointerEvent, state: PortDragState): void {
+    const { edgeId, end, shapeBounds, handleEl } = state;
 
-    const { edgeId, end, shapeBounds, handleEl, startMouseX, startMouseY } = this.#dragHandle;
-
-    document.removeEventListener('pointermove', this.#onMoveBound);
-    document.removeEventListener('pointerup', this.#onUpBound);
-
-    // Check if drag actually moved (threshold)
-    const dx = e.clientX - startMouseX;
-    const dy = e.clientY - startMouseY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
+    // Reset cursor/fill
     handleEl.style.cursor = 'grab';
     handleEl.setAttribute('fill', '#4a9eff');
-
-    if (dist < 3) {
-      // Small movement, cancel
-      this.#dragHandle = null;
-      return;
-    }
 
     // Get final document position
     const rect = this.#svgLayer.getBoundingClientRect();
@@ -313,9 +293,15 @@ export class PortHandlesOverlay {
     if (!result.ok) {
       console.error('[port-handles] Failed to set edge anchor:', result.error);
     }
+  }
 
-    this.#dragHandle = null;
-    this.#shiftDragState = { axis: null, locked: false };
+  /**
+   * DragSession onCancel callback for port drag.
+   */
+  #portOnCancel(state: PortDragState): void {
+    // Reset cursor/fill only — no command issued
+    state.handleEl.style.cursor = 'grab';
+    state.handleEl.setAttribute('fill', '#4a9eff');
   }
 
   /**
@@ -416,9 +402,7 @@ export class PortHandlesOverlay {
   /** Clean up event listeners. Call when editor is detached. */
   dispose(): void {
     this.detach();
-    document.removeEventListener('pointermove', this.#onMoveBound);
-    document.removeEventListener('pointerup', this.#onUpBound);
-    this.#dragHandle = null;
+    this.#portDragSession.dispose();
     this.#svgLayer.querySelectorAll('.port-handle').forEach((el) => el.remove());
   }
 }
