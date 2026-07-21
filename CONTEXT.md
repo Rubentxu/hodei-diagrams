@@ -154,6 +154,18 @@ Domain Expert: Exactly.
 
 ## OverlayHost
 
-The contract by which an overlay (resize-handles, port-handles, future shear-handles, etc.) registers its pointerdown hit zones with the Editor. The overlay calls `host.registerOverlayHitZone({selector, handler})` from its `attach(host)` method; Editor stores the zone and dispatches pointerdown events to matching handlers. Returns a disposer.
+The contract by which an overlay (resize-handles, port-handles, **BendHandlesOverlay**, etc.) registers its pointerdown hit zones with the Editor. The overlay calls `host.registerOverlayHitZone({selector, handler})` from its `attach(host)` method; Editor stores the zone and dispatches pointerdown events to matching handlers. Returns a disposer.
 
 Avoid: hard-private `#registerOverlayHitZone` + Editor ctor inlining the zone registrations (the r107 inverted Pattern D). Future overlay = new file + 1 `attach(this)` line in Editor ctor.
+
+**BendHandlesOverlay**:
+Overlay that renders draggable waypoint circles on selected edges with bends. Mirrors `PortHandlesOverlay` (r108) — same `attach/detach/render/dispose` shape, same `DragSession<BendDragState>` FSM, same `OverlayHost` contract. Drag semantics: LIVE-COMMIT — `moveBend` fires on every `pointermove`; the DragSession 3px threshold only gates `onCommit` vs `onCancel` (both cursor-cleanup no-ops). Uses `clientToDoc` from `scene-bounds.ts` for coordinate transformation.
+_Avoid_: inline bend rendering in Editor, hard-coupled DOM manipulation outside overlay
+
+**PortHandlesOverlay**:
+Overlay that renders draggable port handles on selected vertices. Attaches via `OverlayHost`, uses `DragSession` for port-drag FSM, delegates anchor changes to `DiagramEngineSession.setEdgeAnchor()`. Lives in `port-handles.ts` (r108).
+_Avoid_: port logic inline in Editor
+
+**ResizeHandlesOverlay**:
+Overlay that renders resize handles (corner + mid-edge) on selected shapes. Uses SVG-coordinate-space handles, delegates geometry changes to `Editor.setVertexGeometry()`. Lives in `resize-handles.ts` (r108+).
+_Avoid_: resize logic inline in Editor

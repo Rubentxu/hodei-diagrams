@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { sceneBounds, sceneGeometry, SHAPE_KEYS, EDGE_KEYS, findEdgeVariant, CellGeometry } from '../src/scene-bounds.js';
+import { describe, it, expect, vi } from 'vitest';
+import { sceneBounds, sceneGeometry, SHAPE_KEYS, EDGE_KEYS, findEdgeVariant, CellGeometry, clientToDoc } from '../src/scene-bounds.js';
 import type { SlotmapId, ScenePage } from '../src/types.js';
 
 function makeSlotmapId(idx: number, version = 1): SlotmapId {
@@ -369,5 +369,101 @@ describe('findEdgeVariant', () => {
     expect(line['id']).toEqual({ idx: 50, version: 1 });
     expect(line).toHaveProperty('source');
     expect(line).toHaveProperty('target');
+  });
+});
+
+// ─── clientToDoc tests ─────────────────────────────────────────────────────────
+
+describe('clientToDoc', () => {
+  /**
+   * CD-001: zero origin viewBox — result must be byte-identical to the editor's
+   * existing #clientToDoc for viewBox="0 0 W H" (all current fixtures).
+   * Simulates: viewer at viewport (0,0), SVG viewBox="0 0 400 300",
+   * SVG rect same size as viewer, no zoom CSS transform.
+   * clientX=100, clientY=60 → doc (100, 60)
+   */
+  it('CD-001: zero origin viewBox returns client-offset scaled by viewBox ratio', () => {
+    const viewer = document.createElement('div');
+    viewer.style.position = 'absolute';
+    viewer.style.left = '0px';
+    viewer.style.top = '0px';
+    viewer.style.width = '400px';
+    viewer.style.height = '300px';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 400 300');
+    svg.style.width = '400px';
+    svg.style.height = '300px';
+    // getBoundingClientRect for SVG: 0,0,400,300
+    Object.defineProperty(svg, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, width: 400, height: 300 }),
+    });
+    viewer.appendChild(svg);
+
+    // Mock getZoom to return 1 (no CSS transform)
+    vi.stubGlobal('getComputedStyle', () => ({ transform: '' }));
+
+    const result = clientToDoc(viewer, 100, 60);
+    expect(result.x).toBeCloseTo(100, 5);
+    expect(result.y).toBeCloseTo(60, 5);
+  });
+
+  /**
+   * CD-002: non-zero origin viewBox — math must correctly subtract the viewBox
+   * origin. viewBox="100 200 800 600", client at SVG-relative (0,0) → doc (100, 200).
+   * This is the critical regression test: the naive (clientX-rect.left)/zoom formula
+   * would give (0-0)/scale = 0, but the correct answer is 100.
+   */
+  it('CD-002: non-zero origin viewBox subtracts viewBox origin from coordinates', () => {
+    const viewer = document.createElement('div');
+    viewer.style.position = 'absolute';
+    viewer.style.left = '50px';
+    viewer.style.top = '50px';
+    viewer.style.width = '800px';
+    viewer.style.height = '600px';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    // viewBox origin is (100, 200) — not zero
+    svg.setAttribute('viewBox', '100 200 800 600');
+    svg.style.width = '800px';
+    svg.style.height = '600px';
+    // SVG rect: left=50, top=50, width=800, height=600
+    // viewBox width/height = 800/800=1, 600/600=1 (uniform scale)
+    Object.defineProperty(svg, 'getBoundingClientRect', {
+      value: () => ({ left: 50, top: 50, width: 800, height: 600 }),
+    });
+    viewer.appendChild(svg);
+
+    vi.stubGlobal('getComputedStyle', () => ({ transform: '' }));
+
+    // Client at SVG-relative (0,0) means clientX=50, clientY=50
+    // Correct: x = 100 + (50-50)*1 = 100, y = 200 + (50-50)*1 = 200
+    const result = clientToDoc(viewer, 50, 50);
+    expect(result.x).toBeCloseTo(100, 5);
+    expect(result.y).toBeCloseTo(200, 5);
+  });
+
+  /**
+   * CD-003: no SVG — falls back to zoom-only math using viewer rect.
+   * Simulates a viewer without an embedded SVG (e.g., during initial render).
+   */
+  it('CD-003: no SVG falls back to zoom-only math with viewer rect', () => {
+    const viewer = document.createElement('div');
+    viewer.style.position = 'absolute';
+    viewer.style.left = '0px';
+    viewer.style.top = '0px';
+    viewer.style.width = '400px';
+    viewer.style.height = '300px';
+    viewer.style.transform = 'scale(2)'; // 2x zoom
+
+    Object.defineProperty(viewer, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, width: 400, height: 300 }),
+    });
+
+    // getZoom reads style.transform → returns 2
+    const zoomResult = clientToDoc(viewer, 100, 60);
+    // Fallback: x = (100-0)/2 = 50, y = (60-0)/2 = 30
+    expect(zoomResult.x).toBeCloseTo(50, 5);
+    expect(zoomResult.y).toBeCloseTo(30, 5);
   });
 });

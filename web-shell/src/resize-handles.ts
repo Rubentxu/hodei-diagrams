@@ -9,7 +9,7 @@
  */
 
 import type { SlotmapId, ScenePage } from './types.js';
-import { sceneBounds, getZoom, type ShapeBounds } from './scene-bounds.js';
+import { sceneBounds, getZoom, clientToDoc, type ShapeBounds } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
 import type { OverlayHost } from './editor.js';
 
@@ -52,6 +52,8 @@ interface RotationDragState2 extends DragStateBase {
  * Edge handles: N, E, S, W
  */
 export class ResizeHandlesOverlay {
+  // Viewer element — needed for clientToDoc coordinate conversion
+  readonly #viewer: HTMLElement;
   // Getter instead of direct reference — re-queries DOM on each call so we always
   // get the current SVG element (avoids stale reference after mountSvg replaces innerHTML)
   readonly #getSvgLayer: () => HTMLElement;
@@ -67,11 +69,13 @@ export class ResizeHandlesOverlay {
   #disposers: Array<() => void> = [];
 
   constructor(
+    viewer: HTMLElement,
     getSvgLayer: () => HTMLElement,
     sceneProvider: () => ScenePage[],
     setVertexGeometry: (_id: SlotmapId, _geom: ShapeBounds) => void,
     rotateVertex: (_id: SlotmapId, _angleDelta: number) => void,
   ) {
+    this.#viewer = viewer;
     this.#getSvgLayer = getSvgLayer;
     this.#sceneProvider = sceneProvider;
     this.#setVertexGeometry = setVertexGeometry;
@@ -197,17 +201,14 @@ export class ResizeHandlesOverlay {
     clientY: number,
   ): void {
     handleEl.style.cursor = 'grabbing';
-    const rect = this.#getSvgLayer().getBoundingClientRect();
-    const zoom = getZoom(this.#getSvgLayer());
-    const startDocX = (clientX - rect.left) / zoom;
-    const startDocY = (clientY - rect.top) / zoom;
+    const startDoc = this.#clientToDoc(clientX, clientY);
     this.#resizeSession.begin({
       handle,
       vertexId,
       startGeom: origGeom,
       currentGeom: { ...origGeom },
-      startDocX,
-      startDocY,
+      startDocX: startDoc.x,
+      startDocY: startDoc.y,
       startClientX: clientX,
       startClientY: clientY,
       proportional: {
@@ -299,11 +300,9 @@ export class ResizeHandlesOverlay {
   // ─── DragSession callbacks for resize ────────────────────────────────────────
 
   #resizeOnMove(e: PointerEvent, state: ResizeDragState2): ResizeDragState2 {
-    const svgLayer = this.#getSvgLayer();
-    const rect = svgLayer.getBoundingClientRect();
-    const zoom = getZoom(this.#getSvgLayer());
-    const docX = (e.clientX - rect.left) / zoom;
-    const docY = (e.clientY - rect.top) / zoom;
+    const doc = clientToDoc(this.#getSvgLayer(), e.clientX, e.clientY);
+    const docX = doc.x;
+    const docY = doc.y;
     let dx = docX - state.startDocX;
     let dy = docY - state.startDocY;
 
@@ -552,14 +551,9 @@ export class ResizeHandlesOverlay {
     }
   }
 
-  /** Convert a browser point to document coordinates using the same model as resize. */
+  /** Convert a browser point to document coordinates using the shared clientToDoc helper. */
   #clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
-    const rect = this.#getSvgLayer().getBoundingClientRect();
-    const zoom = getZoom(this.#getSvgLayer());
-    return {
-      x: (clientX - rect.left) / zoom,
-      y: (clientY - rect.top) / zoom,
-    };
+    return clientToDoc(this.#viewer, clientX, clientY);
   }
 
   #angleFromCenter(centerX: number, centerY: number, clientX: number, clientY: number): number {

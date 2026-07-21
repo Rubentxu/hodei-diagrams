@@ -2087,6 +2087,47 @@ async function bootstrap(): Promise<void> {
       activeEditor?.refreshScene?.();
       return true;
     },
+    /**
+     * Build an edge between two new rect vertices with explicit bend waypoints.
+     * Used by bend-drag.spec.ts and EDGE-014 to set up a known bent-edge fixture
+     * without going through the connector tool (which depends on hit-testing).
+     */
+    addBentEdgeAt: (
+      x1: number, y1: number, x2: number, y2: number,
+      bends: Array<{ x: number; y: number }>,
+    ) => {
+      if (!activeSession || !activeEditor) return null;
+      const cache = activeEditor.getSceneCache?.();
+      if (!cache || !cache.ok || cache.value.length === 0) return null;
+      // 1. Create source + target rects via existing addRectAt
+      const w = 60, h = 40;
+      (window as any).__hodeiDebug.addRectAt(x1, y1, w, h);
+      (window as any).__hodeiDebug.addRectAt(x2, y2, w, h);
+      activeEditor.refreshScene?.();
+      // 2. Read back the two new vertex ids from the scene
+      const fresh = activeEditor.getSceneCache?.();
+      if (!fresh || !fresh.ok) return null;
+      const shapes = fresh.value[0]!.display_list.filter((e: unknown) => {
+        const rec = e as Record<string, unknown>;
+        return 'Rect' in rec;
+      });
+      if (shapes.length < 2) return null;
+      const lastTwo = shapes.slice(-2);
+      const fromId = (lastTwo[0] as any).Rect.id;
+      const toId = (lastTwo[1] as any).Rect.id;
+      // 3. Connect with a straight edge
+      const r = activeSession.connectVertices(fromId, toId, 'straight');
+      if (!r.ok) return null;
+      const edgeId = r.value;
+      // 4. Insert each bend at segmentIndex = i (grows as list expands)
+      for (let i = 0; i < bends.length; i++) {
+        const b = bends[i]!;
+        const br = activeSession.insertBend(edgeId, i, b.x, b.y);
+        if (!br.ok) return null;
+      }
+      activeEditor.refreshScene?.();
+      return { edgeId, fromId, toId };
+    },
     manualSaveVersion,
   };
 

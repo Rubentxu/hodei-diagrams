@@ -9,7 +9,7 @@
 
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
-import { sceneBounds, findEdgeVariant, getZoom, perimeterNormalized, classifyAnchorFromNormalized, type ShapeBounds } from './scene-bounds.js';
+import { sceneBounds, findEdgeVariant, getZoom, clientToDoc, perimeterNormalized, classifyAnchorFromNormalized, type ShapeBounds } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
 import type { OverlayHost } from './editor.js';
 
@@ -221,11 +221,10 @@ export class PortHandlesOverlay {
   #portOnMove(e: PointerEvent, state: PortDragState): PortDragState {
     const { shapeBounds, handleEl, shift } = state;
 
-    // Get current document position from client
-    const rect = this.#svgLayer.getBoundingClientRect();
-    const zoom = getZoom(this.#svgLayer);
-    let docX = (e.clientX - rect.left) / zoom;
-    let docY = (e.clientY - rect.top) / zoom;
+    // Get current document position from client using shared helper
+    const doc = clientToDoc(this.#svgLayer, e.clientX, e.clientY);
+    let docX = doc.x;
+    let docY = doc.y;
 
     // Apply Shift-axis constraint: after 3px, lock to dominant axis (H or V)
     if (e.shiftKey) {
@@ -245,12 +244,12 @@ export class PortHandlesOverlay {
       if (shift.locked) {
         if (shift.axis === 'H') {
           // Lock vertical: keep docY at start position
-          const startDocY = (state.startClientY - rect.top) / zoom;
-          docY = this.#projectOntoPerimeter(shapeBounds, docX, startDocY).y;
+          const startDoc = clientToDoc(this.#svgLayer, state.startClientX, state.startClientY);
+          docY = this.#projectOntoPerimeter(shapeBounds, docX, startDoc.y).y;
         } else {
           // Lock horizontal: keep docX at start position
-          const startDocX = (state.startClientX - rect.left) / zoom;
-          docX = this.#projectOntoPerimeter(shapeBounds, startDocX, docY).x;
+          const startDoc = clientToDoc(this.#svgLayer, state.startClientX, state.startClientY);
+          docX = this.#projectOntoPerimeter(shapeBounds, startDoc.x, docY).x;
         }
       }
     }
@@ -276,13 +275,10 @@ export class PortHandlesOverlay {
     handleEl.setAttribute('fill', '#4a9eff');
 
     // Get final document position
-    const rect = this.#svgLayer.getBoundingClientRect();
-    const zoom = getZoom(this.#svgLayer);
-    const docX = (e.clientX - rect.left) / zoom;
-    const docY = (e.clientY - rect.top) / zoom;
+    const doc = clientToDoc(this.#svgLayer, e.clientX, e.clientY);
 
     // Compute normalized anchor
-    const { nx, ny } = perimeterNormalized(shapeBounds, docX, docY);
+    const { nx, ny } = perimeterNormalized(shapeBounds, doc.x, doc.y);
     const anchorKind = classifyAnchorFromNormalized(nx, ny);
 
     // Call WASM to set the anchor

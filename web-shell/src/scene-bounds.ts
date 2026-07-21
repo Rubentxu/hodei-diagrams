@@ -269,6 +269,43 @@ export function getZoom(svgLayer: HTMLElement): number {
 }
 
 /**
+ * Convert browser client coordinates to document-space coordinates,
+ * accounting for the SVG viewBox origin AND the zoom CSS transform.
+ *
+ * Canonical implementation — editor, port-handles, resize-handles,
+ * bend-handles, and any future overlay MUST use this. Inlining the
+ * math is a debt marker.
+ *
+ * Byte-identical to editor.ts:2313-2341 for viewBox="0 0 W H".
+ */
+export function clientToDoc(
+  viewer: HTMLElement,
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } {
+  const rect = viewer.getBoundingClientRect();
+  const zoom = getZoom(viewer);
+  const svg = viewer.querySelector('svg');
+  if (svg) {
+    const viewBox = svg.getAttribute('viewBox');
+    if (viewBox) {
+      const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+      if (parts.length === 4) {
+        const [vbX, vbY, vbW, vbH] = parts as [number, number, number, number];
+        const svgRect = svg.getBoundingClientRect();
+        const scaleX = vbW / svgRect.width;
+        const scaleY = vbH / svgRect.height;
+        return {
+          x: vbX + (clientX - svgRect.left) * scaleX,
+          y: vbY + (clientY - svgRect.top) * scaleY,
+        };
+      }
+    }
+  }
+  return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom };
+}
+
+/**
  * Compute normalized (0-1) anchor coordinates from shape bounds and a document-space point.
  * Projects the point onto the rectangle perimeter.
  * Returns {nx: 0.5, ny: 0.5} when the point is at the shape center (avoids NaN from
