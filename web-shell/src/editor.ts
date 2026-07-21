@@ -48,7 +48,7 @@ export type ToolKind =
  * A registered hit zone for overlay pointer events (Pattern D 9a).
  * Zones are checked in registration order; the first matching zone handles the event.
  */
-interface OverlayHitZone {
+export interface OverlayHitZone {
   /** CSS selector to match against e.target. */
   selector: string;
   /**
@@ -56,6 +56,19 @@ interface OverlayHitZone {
    * Return true to consume the event (stop propagation + prevent default).
    */
   handler: (target: Element, event: PointerEvent) => boolean;
+}
+
+/**
+ * Narrow host surface overlays use to register pointer hit zones.
+ * Editor implements this; overlays depend on the interface, not Editor.
+ *
+ * Bend handles stay as an inline Editor registration (not via attach())
+ * because #startBendDrag consumes editor-private state. Full
+ * BendHandlesOverlay extraction is r109+. See ponytail: marker in editor ctor.
+ */
+export interface OverlayHost {
+  /** Register an overlay's hit zone. Returns a disposer for symmetry. */
+  registerOverlayHitZone(zone: OverlayHitZone): () => void;
 }
 
 /** Drag FSM state (single-shape drag). */
@@ -290,14 +303,14 @@ export class Editor {
     );
 
     // Register overlay hit zones for port and bend handles (Pattern D 9a)
-    this.#registerOverlayHitZone({
+    this.registerOverlayHitZone({
       selector: '.port-handle',
       handler: (_target, ev) => {
         ev.stopPropagation();
         return true;
       },
     });
-    this.#registerOverlayHitZone({
+    this.registerOverlayHitZone({
       selector: '.bend-handle',
       handler: (target, ev) => {
         if (!this.#selectedEdgeId) return false;
@@ -310,7 +323,7 @@ export class Editor {
     // Register resize + rotation zone (Pattern D 9c).
     // The overlay owns the DOM contract; beginFromEvent extracts data attributes
     // and routes to the appropriate drag starter.
-    this.#registerOverlayHitZone({
+    this.registerOverlayHitZone({
       selector: '.resize-handle, .rotation-handle',
       handler: (target, ev) => this.#resizeHandles.beginFromEvent(target, ev),
     });
@@ -2908,8 +2921,7 @@ export class Editor {
    * Register an overlay hit zone (Pattern D 9a).
    * Returns a disposer — call it to remove the zone.
    */
-  // ponytail: registerOverlayHitZone is hard-private + Editor ctor hardcodes zones; future overlays must add to Editor ctor; track OCP-friendly refactor for r108
-  #registerOverlayHitZone(zone: OverlayHitZone): () => void {
+  registerOverlayHitZone(zone: OverlayHitZone): () => void {
     this.#overlayHitZones.push(zone);
     return () => {
       const idx = this.#overlayHitZones.indexOf(zone);
