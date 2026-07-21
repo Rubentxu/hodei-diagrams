@@ -9,7 +9,7 @@
 
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
-import { sceneBounds } from './scene-bounds.js';
+import { sceneBounds, getZoom } from './scene-bounds.js';
 import { } from './types.js';
 
 /** Anchor specification compatible with the WASM interface. */
@@ -182,7 +182,7 @@ export class PortHandlesOverlay {
 
     // Get current document position from client
     const rect = this.#svgLayer.getBoundingClientRect();
-    const zoom = this.#getZoom();
+    const zoom = getZoom(this.#svgLayer);
     let docX = (e.clientX - rect.left) / zoom;
     let docY = (e.clientY - rect.top) / zoom;
 
@@ -249,7 +249,7 @@ export class PortHandlesOverlay {
 
     // Get final document position
     const rect = this.#svgLayer.getBoundingClientRect();
-    const zoom = this.#getZoom();
+    const zoom = getZoom(this.#svgLayer);
     const docX = (e.clientX - rect.left) / zoom;
     const docY = (e.clientY - rect.top) / zoom;
 
@@ -490,16 +490,6 @@ export class PortHandlesOverlay {
   /** Find a shape's bounds in the scene. */
   #findShapeBounds(scene: ScenePage[], shapeId: SlotmapId): ShapeBounds | null {
     return sceneBounds(scene, shapeId);
-  }
-
-  /** Get current zoom level from the SVG layer's transform. */
-  #getZoom(): number {
-    const style = this.#svgLayer.style.transform;
-    const match = style.match(/scale\(([^)]+)\)/);
-    if (match) {
-      return parseFloat(match[1]!) || 1;
-    }
-    return 1;
   }
 
   /** Clean up event listeners. Call when editor is detached. */

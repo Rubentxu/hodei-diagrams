@@ -9,7 +9,7 @@
  */
 
 import type { SlotmapId, ScenePage } from './types.js';
-import { sceneBounds } from './scene-bounds.js';
+import { sceneBounds, getZoom } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
 
 /** Shape bounds in document coordinates. */
@@ -195,7 +195,7 @@ export class ResizeHandlesOverlay {
   ): void {
     handleEl.style.cursor = 'grabbing';
     const rect = this.#getSvgLayer().getBoundingClientRect();
-    const zoom = this.#getZoom();
+    const zoom = getZoom(this.#getSvgLayer());
     const startDocX = (clientX - rect.left) / zoom;
     const startDocY = (clientY - rect.top) / zoom;
     this.#resizeSession.begin({
@@ -259,7 +259,7 @@ export class ResizeHandlesOverlay {
   #resizeOnMove(e: PointerEvent, state: ResizeDragState2): ResizeDragState2 {
     const svgLayer = this.#getSvgLayer();
     const rect = svgLayer.getBoundingClientRect();
-    const zoom = this.#getZoom();
+    const zoom = getZoom(this.#getSvgLayer());
     const docX = (e.clientX - rect.left) / zoom;
     const docY = (e.clientY - rect.top) / zoom;
     let dx = docX - state.startDocX;
@@ -362,12 +362,14 @@ export class ResizeHandlesOverlay {
     const offset = Math.max(28, Math.min(44, bounds.height * 0.35));
     const handleX = centerX;
     const handleY = bounds.y - offset;
+    // handleX === centerX always, so the distance is just |handleY - centerY|
+    const radius = offset + bounds.height / 2;
     return {
       centerX,
       centerY,
       handleX,
       handleY,
-      radius: Math.hypot(handleX - centerX, handleY - centerY),
+      radius,
     };
   }
 
@@ -511,7 +513,7 @@ export class ResizeHandlesOverlay {
   /** Convert a browser point to document coordinates using the same model as resize. */
   #clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
     const rect = this.#getSvgLayer().getBoundingClientRect();
-    const zoom = this.#getZoom();
+    const zoom = getZoom(this.#getSvgLayer());
     return {
       x: (clientX - rect.left) / zoom,
       y: (clientY - rect.top) / zoom,
@@ -535,16 +537,6 @@ export class ResizeHandlesOverlay {
    */
   #findShapeBounds(scene: ScenePage[], shapeId: SlotmapId): ShapeBounds | null {
     return sceneBounds(scene, shapeId);
-  }
-
-  /** Get current zoom level from the SVG layer's transform. */
-  #getZoom(): number {
-    const style = this.#getSvgLayer().style.transform;
-    const match = style.match(/scale\(([^)]+)\)/);
-    if (match) {
-      return parseFloat(match[1]!) || 1;
-    }
-    return 1;
   }
 
   /** Clean up event listeners. Call when editor is detached. */

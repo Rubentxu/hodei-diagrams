@@ -123,3 +123,16 @@ export function sceneGeometry(scene: ScenePage[], id: SlotmapId): CellGeometry |
     relative: false,
   };
 }
+
+/**
+ * Get the current zoom level from an SVG layer's CSS transform.
+ * Handles both `scale(x)` and `scale(x, y)` formats.
+ */
+export function getZoom(svgLayer: HTMLElement): number {
+  const style = svgLayer.style.transform;
+  const match = style.match(/scale\(([^)]+)\)/);
+  if (match) {
+    return parseFloat(match[1]!) || 1;
+  }
+  return 1;
+}
