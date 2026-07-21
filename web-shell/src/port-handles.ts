@@ -136,7 +136,9 @@ export class PortHandlesOverlay {
     // Mousedown initiates drag
     circle.addEventListener('mousedown', (e: MouseEvent) => {
       e.preventDefault();
-      e.stopPropagation();
+      // No stopPropagation here — editor.ts's OverlayHitZone registry routes port-handle
+      // clicks via the '.port-handle' selector, and that handler calls ev.stopPropagation().
+      // The overlay hit zone handler is registered in editor.ts constructor (Pattern D 9a).
       this.#startDrag(edgeId, end, vertexId, shapeBounds, circle, e.clientX, e.clientY);
     });
 
