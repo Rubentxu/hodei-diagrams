@@ -9,6 +9,7 @@
  */
 
 import type { SlotmapId, ScenePage } from './types.js';
+import { sceneBounds } from './scene-bounds.js';
 
 /** Shape bounds in document coordinates. */
 interface ShapeBounds {
@@ -588,44 +589,7 @@ export class ResizeHandlesOverlay {
    * Find a shape's bounds in the scene.
    */
   #findShapeBounds(scene: ScenePage[], shapeId: SlotmapId): ShapeBounds | null {
-    const SHAPE_KEYS = [
-      'Rect',
-      'RoundedRect',
-      'Ellipse',
-      'Diamond',
-      'Triangle',
-      'Hexagon',
-      'Cylinder',
-      'Cloud',
-      'Parallelogram',
-      'Trapezoid',
-      'Polygon',
-    ] as const;
-
-    for (const page of scene) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        for (const key of SHAPE_KEYS) {
-          const variant = e[key] as Record<string, unknown> | undefined;
-          if (!variant) continue;
-          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
-          if (!idField) continue;
-          if (idField.idx === shapeId.idx && idField.version === shapeId.version) {
-            const bounds = variant['bounds'] as
-              | { origin?: Record<string, number>; size?: Record<string, number> }
-              | undefined;
-            if (!bounds?.origin || !bounds?.size) continue;
-            return {
-              x: (bounds.origin['x'] as number) ?? 0,
-              y: (bounds.origin['y'] as number) ?? 0,
-              width: (bounds.size['width'] as number) ?? 0,
-              height: (bounds.size['height'] as number) ?? 0,
-            };
-          }
-        }
-      }
-    }
-    return null;
+    return sceneBounds(scene, shapeId);
   }
 
   /** Get current zoom level from the SVG layer's transform. */
