@@ -3277,14 +3277,17 @@ export class Editor {
    * Dispatches a MoveVertex command using absolute geometry.
    * Clamps non-positive width/height and ignores NaN inputs.
    *
-   * The caller MAY pass only {x, y, width, height}; rotation/flip_h/flip_v
-   * will be inherited from the current scene-cache geometry of the same
-   * vertex. This preserves rotation and flips when the inspector or
-   * resize handles adjust position or size.
-   */
+    * The caller MAY pass only {x, y, width, height}; rotation/flip_h/flip_v
+    * will be inherited from the current scene-cache geometry of the same
+    * vertex. This preserves rotation and flips when the inspector or
+    * resize handles adjust position or size.
+    *
+    * Alternatively, the caller can pass the full CellGeometry (x, y, width, height,
+    * rotation, flip_h, flip_v, relative) to bypass the scene lookup entirely.
+    */
   setVertexGeometry(
     id: SlotmapId,
-    geom: { x: number; y: number; width: number; height: number },
+    geom: { x: number; y: number; width: number; height: number; rotation?: number; flip_h?: boolean; flip_v?: boolean; relative?: boolean },
   ): void {
     // Guard: clamp/reject invalid
     if (
@@ -3297,9 +3300,11 @@ export class Editor {
     ) {
       return; // ignore invalid — UI should clamp before calling
     }
-    // Inherit rotation/flip from the existing geometry so that a drag
-    // (or an inspector position edit) doesn't accidentally clear them.
-    const current = this.#findOriginalGeometry(id);
+    // If the caller passed full geometry, use it directly (T07 path: resize overlay
+    // passes rotation/flip so we skip the scene re-walk). Otherwise inherit from scene.
+    const current = geom.rotation !== undefined
+      ? null
+      : sceneGeometry(this.#sceneCache, id);
     const fullGeom =
       current !== null
         ? {
@@ -3317,10 +3322,10 @@ export class Editor {
             y: geom.y,
             width: geom.width,
             height: geom.height,
-            rotation: 0,
-            flip_h: false,
-            flip_v: false,
-            relative: false,
+            rotation: geom.rotation ?? 0,
+            flip_h: geom.flip_h ?? false,
+            flip_v: geom.flip_v ?? false,
+            relative: geom.relative ?? false,
           };
     this.#session.executeCommands([this.#buildMoveVertexCmd(id, fullGeom)]);
     this.#replay();
