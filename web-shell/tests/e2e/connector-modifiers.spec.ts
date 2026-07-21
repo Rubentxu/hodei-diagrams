@@ -160,55 +160,49 @@ test.describe('Suite IP-C: Connector Modifiers', () => {
   });
 
   test('EDGE-014: Right-click on waypoint shows "Remove Waypoint"', async ({ page }) => {
+    // Load fixture to initialize the scene (prerequisite for addBentEdgeAt)
     await page.setInputFiles('[data-testid="file-input"]', TWO_SHAPES_PATH);
     await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-    // The two-shapes fixture may not have waypoints, so this test is mostly
-    // verifying that the context menu structure handles waypoints correctly.
-    // We can directly create a waypoint by inserting a bend programmatically
-    // via the editor API, then right-click on the bend handle.
-
-    const viewer = page.locator('[data-testid="viewer"]');
-    const edge = page.locator('[data-edge-id]').first();
-    if (await edge.count() === 0) {
-      test.skip();
-      return;
-    }
-
-    // Select the edge
-    await edge.click({ force: true });
-    await page.waitForTimeout(100);
-
-    // Insert a waypoint via API (this is the "Add Waypoint" path under test)
-    const insertResult = await page.evaluate(() => {
-      const editor = (window as any).__hodeiDebug?.getEditor?.();
-      if (!editor) return null;
-      // Get the first edge
-      const edges = document.querySelectorAll('[data-edge-id]');
-      if (edges.length === 0) return null;
-      const firstEdge = edges[0] as Element;
-      const rect = firstEdge.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      const midY = rect.top + rect.height / 2;
-      // Convert to document coords
-      const session = (window as any).__hodeiDebug.getSession?.();
-      // Use the editor's clearAllWaypoints or similar — simpler: use the edge ID
-      // For this test, just verify the context menu shows "Remove Waypoint"
-      // when right-clicking on a bend handle (which is rendered when an edge
-      // with waypoints is selected).
-      return { midX, midY };
+    // Create a bent edge with one waypoint via the debug API
+    const result = await page.evaluate(() => {
+      const addBentEdgeAt = (window as any).__hodeiDebug?.addBentEdgeAt;
+      if (!addBentEdgeAt) return null;
+      // x1=100,y1=100 → rect1 center; x2=300,y2=100 → rect2 center
+      // One bend at (200, 150) — midpoint with a vertical offset
+      return addBentEdgeAt(100, 100, 300, 100, [{ x: 200, y: 150 }]);
     });
-    if (!insertResult) {
+
+    if (!result) {
       test.skip();
       return;
     }
 
-    // Without a waypoint, the context menu shows "Add Waypoint".
-    // Verifying "Remove Waypoint" requires a waypoint to exist, which
-    // requires programmatic insertion. The two-shapes fixture has no waypoints.
-    // The wiring is in editor.ts (#onContextMenu + #findSegmentAtPoint).
-    // Skip the actual right-click since there's no waypoint to click.
-    test.skip();
+    // Wait for scene to update
+    await page.waitForTimeout(200);
+
+    // Find the edge element — addBentEdgeAt creates an edge with bends
+    const viewer = page.locator('[data-testid="viewer"]');
+    const edge = viewer.locator('[data-edge-id]').first();
+    await expect(edge).toBeAttached();
+
+    // Select the edge to render its bend handles
+    await edge.click({ force: true });
+    await page.waitForTimeout(300);
+
+    // Find a bend handle (created for intermediate waypoints)
+    const bendHandle = viewer.locator('.bend-handle').first();
+    await expect(bendHandle).toBeAttached();
+
+    // Right-click on the bend handle to open context menu
+    await bendHandle.click({ button: 'right' });
+    await page.waitForTimeout(200);
+
+    // Verify context menu shows "Remove Waypoint"
+    const contextMenu = page.locator('.context-menu');
+    await expect(contextMenu).toBeVisible({ timeout: 2000 });
+    const removeWaypoint = contextMenu.locator('text=Remove Waypoint');
+    await expect(removeWaypoint).toBeVisible();
   });
 
   test('EDGE-003: Alt+connect anywhere creates edge with normalized anchor on target', async ({ page }) => {
