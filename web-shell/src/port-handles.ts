@@ -9,7 +9,7 @@
 
 import type { SlotmapId, ScenePage } from './types.js';
 import type { DiagramEngineSession } from './session.js';
-import { sceneBounds, getZoom, perimeterNormalized, classifyAnchorFromNormalized, type ShapeBounds } from './scene-bounds.js';
+import { sceneBounds, findEdgeVariant, getZoom, perimeterNormalized, classifyAnchorFromNormalized, type ShapeBounds } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
 import type { OverlayHost } from './editor.js';
 
@@ -135,10 +135,16 @@ export class PortHandlesOverlay {
     if (scene.length === 0) return;
 
     for (const edgeId of selection) {
-      const edgeData = this.#findEdgeInScene(scene, edgeId);
-      if (!edgeData) continue;
+      const edgeVariant = findEdgeVariant(scene, edgeId);
+      if (!edgeVariant) continue;
 
-      const { sourceId, targetId } = edgeData;
+      // Extract source and target vertex IDs from the edge variant
+      const source = edgeVariant['source'] as { Vertex?: { idx?: number; version?: number } } | undefined;
+      const target = edgeVariant['target'] as { Vertex?: { idx?: number; version?: number } } | undefined;
+      if (!source?.Vertex || !target?.Vertex) continue;
+
+      const sourceId: SlotmapId = { idx: source.Vertex.idx!, version: source.Vertex.version! };
+      const targetId: SlotmapId = { idx: target.Vertex.idx!, version: target.Vertex.version! };
       const sourceBounds = sceneBounds(scene, sourceId);
       const targetBounds = sceneBounds(scene, targetId);
 
@@ -349,49 +355,6 @@ export class PortHandlesOverlay {
       x: bounds.x + nx * bounds.width,
       y: bounds.y + ny * bounds.height,
     };
-  }
-
-  /** Find an edge in the scene and return its source/target IDs. */
-  #findEdgeInScene(
-    scene: ScenePage[],
-    edgeId: SlotmapId,
-  ): { sourceId: SlotmapId; targetId: SlotmapId } | null {
-    for (const page of scene) {
-      for (const elem of page.display_list) {
-        const e = elem as Record<string, unknown>;
-        // Check for LineElement
-        const line = e['Line'] as Record<string, unknown> | undefined;
-        if (line) {
-          const idField = line['id'] as { idx?: number; version?: number } | undefined;
-          if (idField?.idx === edgeId.idx && idField?.version === edgeId.version) {
-            const source = line['source'] as { Vertex?: { idx?: number; version?: number } } | undefined;
-            const target = line['target'] as { Vertex?: { idx?: number; version?: number } } | undefined;
-            if (source?.Vertex && target?.Vertex) {
-              return {
-                sourceId: { idx: source.Vertex.idx!, version: source.Vertex.version! },
-                targetId: { idx: target.Vertex.idx!, version: target.Vertex.version! },
-              };
-            }
-          }
-        }
-        // Check for PathElement
-        const path = e['Path'] as Record<string, unknown> | undefined;
-        if (path) {
-          const idField = path['id'] as { idx?: number; version?: number } | undefined;
-          if (idField?.idx === edgeId.idx && idField?.version === edgeId.version) {
-            const source = path['source'] as { Vertex?: { idx?: number; version?: number } } | undefined;
-            const target = path['target'] as { Vertex?: { idx?: number; version?: number } } | undefined;
-            if (source?.Vertex && target?.Vertex) {
-              return {
-                sourceId: { idx: source.Vertex.idx!, version: source.Vertex.version! },
-                targetId: { idx: target.Vertex.idx!, version: target.Vertex.version! },
-              };
-            }
-          }
-        }
-      }
-    }
-    return null;
   }
 
   /** Clean up event listeners. Call when editor is detached. */
