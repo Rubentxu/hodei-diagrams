@@ -50,6 +50,11 @@ export const SHAPE_KEYS = [
   'Group',
 ] as const;
 
+/**
+ * Canonical edge-key list. Matches the display-element variants the engine emits for edges.
+ */
+export const EDGE_KEYS = ['Line', 'Path'] as const;
+
 // ─── Shape lookup helpers ────────────────────────────────────────────────────
 
 /** Returns the variant record for a shape id, or null if not found. */
@@ -67,6 +72,35 @@ export function findShapeVariant(scene: ScenePage[], id: SlotmapId): Record<stri
         const idObj = idField as { idx?: unknown; version?: unknown };
         if (typeof idObj.idx !== 'number' || typeof idObj.version !== 'number') continue;
         if (idObj.idx === id.idx && idObj.version === id.version) {
+          return v;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns the variant record for an edge id, or null if not found.
+ * Mirrors findShapeVariant but iterates EDGE_KEYS instead of SHAPE_KEYS.
+ * Callers extract `source`/`target` from the returned variant:
+ *   const v = findEdgeVariant(scene, edgeId);
+ *   const s = v?.['source'] as { Vertex?: { idx?: number; version?: number } };
+ */
+export function findEdgeVariant(scene: ScenePage[], edgeId: SlotmapId): Record<string, unknown> | null {
+  for (const page of scene) {
+    for (const elem of page.display_list) {
+      if (!elem) continue;
+      const e = elem as Record<string, unknown>;
+      for (const key of EDGE_KEYS) {
+        const variant = e[key];
+        if (!variant || typeof variant !== 'object') continue;
+        const v = variant as Record<string, unknown>;
+        const idField = v['id'];
+        if (!idField || typeof idField !== 'object') continue;
+        const idObj = idField as { idx?: unknown; version?: unknown };
+        if (typeof idObj.idx !== 'number' || typeof idObj.version !== 'number') continue;
+        if (idObj.idx === edgeId.idx && idObj.version === edgeId.version) {
           return v;
         }
       }
