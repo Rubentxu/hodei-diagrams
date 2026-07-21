@@ -68,6 +68,40 @@ export class PortHandlesOverlay {
   }
 
   /**
+   * Route a pointer event from the overlay hit zone to the port drag starter.
+   * Returns true if the event was consumed, false otherwise.
+   * Mirrors ResizeHandlesOverlay.beginFromEvent (resize-handles.ts L227-260).
+   */
+  beginFromEvent(target: Element, event: PointerEvent): boolean {
+    const portEl = target.closest('.port-handle');
+    if (!portEl) return false;
+
+    // data-vertex-idx/version added in commit 3 (REQUIRED for bounds resolution)
+    const vidIdx = portEl.getAttribute('data-vertex-idx');
+    const vidVersion = portEl.getAttribute('data-vertex-version');
+    if (!vidIdx || !vidVersion) return false;
+    const vertexId: SlotmapId = { idx: parseInt(vidIdx), version: parseInt(vidVersion) };
+
+    const scene = this.#sceneProvider();
+    const shapeBounds = sceneBounds(scene, vertexId);
+    if (!shapeBounds) return false;
+
+    // data-edge-idx/version + data-end already written on circle (commit 3)
+    const edgeIdxStr = portEl.getAttribute('data-edge-idx');
+    const edgeVersionStr = portEl.getAttribute('data-edge-version');
+    const endStr = portEl.getAttribute('data-end');
+    if (!edgeIdxStr || !edgeVersionStr || endStr === null) return false;
+
+    const edgeId: SlotmapId = { idx: parseInt(edgeIdxStr), version: parseInt(edgeVersionStr) };
+    const end: 0 | 1 = endStr === '0' ? 0 : 1; // session.setEdgeAnchor takes 0|1, NOT 'source'|'target'
+
+    this.#startDrag(edgeId, end, vertexId, shapeBounds, portEl as SVGCircleElement, event.clientX, event.clientY);
+    event.stopPropagation();
+    event.preventDefault();
+    return true;
+  }
+
+  /**
    * Render port handles for all selected edges.
    * @param selection Set of selected edge SlotmapIds
    */
