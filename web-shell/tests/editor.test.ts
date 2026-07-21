@@ -586,11 +586,11 @@ describe('Editor', () => {
     });
 
     it('the disposer returned by registerOverlayHitZone actually removes the zone', () => {
-      let handlerCalled = false;
+      let _handlerCalled = false;
       const zone = {
         selector: '.test-dispose-zone',
         handler: (_target: Element, _event: PointerEvent) => {
-          handlerCalled = true;
+          _handlerCalled = true;
           return false;
         },
       };
