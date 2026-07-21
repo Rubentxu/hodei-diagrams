@@ -120,6 +120,8 @@ export class PortHandlesOverlay {
     circle.setAttribute('data-edge-idx', String(edgeId.idx));
     circle.setAttribute('data-edge-version', String(edgeId.version));
     circle.setAttribute('data-end', String(end));
+    circle.setAttribute('data-vertex-idx', String(vertexId.idx));
+    circle.setAttribute('data-vertex-version', String(vertexId.version));
     circle.setAttribute('fill', '#4a9eff');
     circle.setAttribute('stroke', '#fff');
     circle.setAttribute('stroke-width', '1.5');
