@@ -13,13 +13,6 @@ import { sceneBounds, findEdgeVariant, getZoom, perimeterNormalized, classifyAnc
 import { DragSession, type DragStateBase } from './dom-drag.js';
 import type { OverlayHost } from './editor.js';
 
-/** Anchor specification compatible with the WASM interface. */
-export interface AnchorSpec {
-  kind: 'auto' | 'north' | 'south' | 'east' | 'west' | 'normalized';
-  nx?: number;
-  ny?: number;
-}
-
 /** Port drag state extending DragStateBase for DragSession<T>. */
 interface PortDragState extends DragStateBase {
   edgeId: SlotmapId;
@@ -290,7 +283,7 @@ export class PortHandlesOverlay {
     const anchorKind = classifyAnchorFromNormalized(nx, ny);
 
     // Call WASM to set the anchor
-    const anchor: AnchorSpec =
+    const anchor =
       anchorKind === 'normalized'
         ? { kind: 'normalized', nx, ny }
         : { kind: anchorKind };
