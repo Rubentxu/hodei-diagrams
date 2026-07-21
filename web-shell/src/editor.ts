@@ -17,6 +17,7 @@ import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
 import { ResizeHandlesOverlay } from './resize-handles.js';
+import { BendHandlesOverlay } from './bend-handles.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -232,10 +233,7 @@ export class Editor {
 
   // ─── Edge / Bend Editing ───────────────────────────────────────────────────
   #selectedEdgeId: SlotmapId | null = null;
-  #selectedBendIndex: number | null = null;
   #bendDrag: { edgeId: SlotmapId; bendIndex: number } | null = null;
-  #onBendDragMoveBound: (_e: PointerEvent) => void;
-  #onBendDragUpBound: (_e: PointerEvent) => void;
 
   // ─── Overlay Hit Zone Registry (Pattern D 9a) ──────────────────────────────
   /**
@@ -246,6 +244,9 @@ export class Editor {
 
   // ─── Port Handles Overlay ──────────────────────────────────────────────────
   readonly #portHandles: PortHandlesOverlay;
+
+  // ─── Bend Handles Overlay ──────────────────────────────────────────────
+  readonly #bendHandles: BendHandlesOverlay;
 
   // ─── Resize Handles Overlay ──────────────────────────────────────────────
   readonly #resizeHandles: ResizeHandlesOverlay;
@@ -275,23 +276,33 @@ export class Editor {
     this.#onToolChange = onToolChange ?? (() => {});
     this.#getZoom = getZoom ?? (() => 1);
 
-    // Initialize bound event handlers for bend dragging
-    this.#onBendDragMoveBound = (e: PointerEvent) => this.#onBendDragMove(e);
-    this.#onBendDragUpBound = () => this.#onBendDragUp();
-
     // Initialize port handles overlay
     this.#portHandles = new PortHandlesOverlay(viewer, () => this.#sceneCache, session);
 
     // Attach port handles via OverlayHost (Pattern D 9a)
     this.#portHandles.attach(this);
 
-    // Initialize resize handles overlay — use SVG element so handles are in SVG coordinate space
-    // Note: we must look up the SVG dynamically because mountSvg replaces viewer.innerHTML
+    // Initialize bend handles overlay
     const getSvgLayer = () => {
       const svgEl = viewer.querySelector('svg');
       if (!svgEl) throw new Error('SVG element not found in viewer');
       return svgEl as unknown as HTMLElement;
     };
+    this.#bendHandles = new BendHandlesOverlay(
+      getSvgLayer() as HTMLElement,
+      viewer,
+      () => this.#sceneCache,
+      session,
+      (x, y) => this.#snapToGrid(x, y),
+      (msg) => this.#onError(msg),
+      (edgeId, _bendIndex) => {
+        this.#selectedEdgeId = edgeId;
+      },
+    );
+    this.#bendHandles.attach(this);
+
+    // Initialize resize handles overlay — use SVG element so handles are in SVG coordinate space
+    // Note: we must look up the SVG dynamically because mountSvg replaces viewer.innerHTML
     this.#resizeHandles = new ResizeHandlesOverlay(
       viewer,
       getSvgLayer as () => HTMLElement,
@@ -308,19 +319,6 @@ export class Editor {
 
     // Attach resize handles via OverlayHost (Pattern D 9c)
     this.#resizeHandles.attach(this);
-
-    // Register bend handle zone inline (Pattern D 9a).
-    // Note: bend stays inline because #startBendDrag consumes editor-private state.
-    // Full BendHandlesOverlay extraction is r109+. See ponytail: marker above.
-    this.registerOverlayHitZone({
-      selector: '.bend-handle',
-      handler: (target, ev) => {
-        if (!this.#selectedEdgeId) return false;
-        const bendIndex = parseInt(target.getAttribute('data-bend-index') || '0');
-        this.#startBendDrag(this.#selectedEdgeId, bendIndex, ev);
-        return true;
-      },
-    });
   }
 
   // ─── Public Selection API ──────────────────────────────────────────────────
@@ -1780,16 +1778,13 @@ export class Editor {
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
-    // Clean up bend drag listeners
-    this.#viewer.removeEventListener('pointermove', this.#onBendDragMoveBound);
-    this.#viewer.removeEventListener('pointerup', this.#onBendDragUpBound);
-    this.#viewer.removeEventListener('pointercancel', this.#onBendDragUpBound);
     this.#dragState = null;
     this.#bendDrag = null;
     this.#cancelMarquee();
     this.#cancelConnect();
     this.#clearEdgeSelection();
     this.#portHandles.dispose();
+    this.#bendHandles.dispose();
     this.#resizeHandles?.dispose();
   }
 
@@ -2484,9 +2479,10 @@ export class Editor {
 
     // Re-render bend handles and port handles if an edge is selected
     if (this.#selectedEdgeId) {
-      this.#renderBendHandles();
+      this.#bendHandles.render(this.#selectedEdgeId);
       this.#portHandles.render(new Set([this.#selectedEdgeId]));
     } else {
+      this.#bendHandles.render(null);
       this.#portHandles.render(new Set());
     }
 
@@ -2665,15 +2661,14 @@ export class Editor {
     this.#selectedEdgeId = edgeId;
     // Clear vertex selection
     this.#selection.clear();
-    this.#renderBendHandles();
+    this.#bendHandles.render(edgeId);
     this.#notifySelectionChange();
   }
 
   /** Clear edge selection and remove bend handles. */
   #clearEdgeSelection(): void {
     this.#selectedEdgeId = null;
-    this.#selectedBendIndex = null;
-    this.#viewer.querySelectorAll('.bend-handle').forEach((el) => el.remove());
+    this.#bendHandles.render(null);
     // Clear port handles
     this.#viewer.querySelectorAll('.port-handle').forEach((el) => el.remove());
   }
@@ -4252,40 +4247,6 @@ export class Editor {
     return { minX, minY, maxX, maxY };
   }
 
-  // ─── Bend Handle Rendering ───────────────────────────────────────────────
-
-  /** Render bend handles for the currently selected edge. */
-  #renderBendHandles(): void {
-    // Remove old handles
-    this.#viewer.querySelectorAll('.bend-handle').forEach((el) => el.remove());
-
-    if (!this.#selectedEdgeId) return;
-
-    // Find the edge's path element in the SVG
-    const edgeSelector = `[data-edge-id="${this.#selectedEdgeId.idx}:${this.#selectedEdgeId.version}"]`;
-    const pathEl = this.#viewer.querySelector(edgeSelector);
-    if (!pathEl) return;
-
-    // Get the edge's waypoints from the scene
-    const pts = this.#getEdgeWaypoints(this.#selectedEdgeId);
-    // For each intermediate waypoint (not first/last which are source/target centers),
-    // create a circle handle
-    for (let i = 1; i < pts.length - 1; i++) {
-      const pt = pts[i]!;
-      const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      handle.setAttribute('cx', String(pt.x));
-      handle.setAttribute('cy', String(pt.y));
-      handle.setAttribute('r', '5');
-      handle.setAttribute('class', 'bend-handle');
-      handle.setAttribute('data-bend-index', String(i));
-      handle.setAttribute('fill', '#4a9eff');
-      handle.setAttribute('stroke', '#fff');
-      handle.setAttribute('stroke-width', '1.5');
-      handle.style.cursor = 'move';
-      this.#viewer.appendChild(handle);
-    }
-  }
-
   /** Get waypoints for an edge from the scene cache. */
   #getEdgeWaypoints(edgeId: SlotmapId): Array<{ x: number; y: number }> {
     for (const page of this.#sceneCache) {
@@ -4358,33 +4319,6 @@ export class Editor {
       }
     }
     return nearest;
-  }
-
-  // ─── Bend Drag FSM ───────────────────────────────────────────────────────
-
-  /** Start dragging a bend handle. */
-  #startBendDrag(edgeId: SlotmapId, bendIndex: number, _e: PointerEvent): void {
-    this.#bendDrag = { edgeId, bendIndex };
-    this.#selectedBendIndex = bendIndex;
-    this.#viewer.addEventListener('pointermove', this.#onBendDragMoveBound);
-    this.#viewer.addEventListener('pointerup', this.#onBendDragUpBound);
-    this.#viewer.addEventListener('pointercancel', this.#onBendDragUpBound);
-  }
-
-  /** Handle pointer move during bend drag. */
-  #onBendDragMove(e: PointerEvent): void {
-    if (!this.#bendDrag) return;
-    const docPoint = this.#clientToDoc(e.clientX, e.clientY);
-    const snapped = this.#snapToGrid(docPoint.x, docPoint.y);
-    this.moveBend(this.#bendDrag.edgeId, this.#bendDrag.bendIndex, snapped.x, snapped.y);
-  }
-
-  /** Handle pointer up to end bend drag. */
-  #onBendDragUp(): void {
-    this.#bendDrag = null;
-    this.#viewer.removeEventListener('pointermove', this.#onBendDragMoveBound);
-    this.#viewer.removeEventListener('pointerup', this.#onBendDragUpBound);
-    this.#viewer.removeEventListener('pointercancel', this.#onBendDragUpBound);
   }
 
   // ─── Double-Click Text Edit ───────────────────────────────────────────────
@@ -4625,9 +4559,10 @@ export class Editor {
     // Delete / Backspace → delete selection or bend
     if (e.key === 'Delete' || e.key === 'Backspace') {
       // Delete selected bend first
-      if (this.#selectedBendIndex !== null && this.#selectedEdgeId) {
-        this.removeBend(this.#selectedEdgeId, this.#selectedBendIndex);
-        this.#selectedBendIndex = null;
+      const selectedBend = this.#bendHandles.getSelectedBend();
+      if (selectedBend !== null && this.#selectedEdgeId) {
+        this.removeBend(selectedBend.edgeId, selectedBend.bendIndex);
+        this.#bendHandles.render(this.#selectedEdgeId);
         e.preventDefault();
         return;
       }
@@ -4772,7 +4707,7 @@ export class Editor {
     ) {
       e.preventDefault();
       this.clearAllWaypoints(this.#selectedEdgeId);
-      this.#renderBendHandles();
+      this.#bendHandles.render(this.#selectedEdgeId);
       return;
     }
 

@@ -16,7 +16,8 @@ if (typeof PointerEvent === 'undefined') {
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BendHandlesOverlay } from '../src/bend-handles.js';
-import type { SlotmapId, ScenePage, DiagramEngineSession } from '../src/types.js';
+import type { SlotmapId, ScenePage } from '../src/types.js';
+import type { DiagramEngineSession } from '../src/session.js';
 
 // ─── Mock types ────────────────────────────────────────────────────────────────
 

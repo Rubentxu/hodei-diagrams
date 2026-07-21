@@ -47,6 +47,9 @@ export class BendHandlesOverlay {
   // Overlay registration disposers for attach/detach
   #disposers: Array<() => void> = [];
 
+  // Currently selected bend (updated via onBendSelect callback)
+  #selectedBend: { edgeId: SlotmapId; bendIndex: number } | null = null;
+
   constructor(
     svgLayer: HTMLElement,
     viewer: HTMLElement,
@@ -111,6 +114,9 @@ export class BendHandlesOverlay {
     const startBend = this.#readBendCoords(edgeId, bendIndex);
     if (!startBend) return false;
 
+    // Track selected bend locally for Delete-key queries
+    this.#selectedBend = { edgeId, bendIndex };
+
     // Notify editor of bend selection (Delete-key coupling)
     this.#onBendSelect(edgeId, bendIndex);
 
@@ -133,7 +139,10 @@ export class BendHandlesOverlay {
    */
   render(selectedEdgeId: SlotmapId | null): void {
     this.#viewer.querySelectorAll('.bend-handle').forEach((el) => el.remove());
-    if (!selectedEdgeId) return;
+    if (!selectedEdgeId) {
+      this.#selectedBend = null;
+      return;
+    }
 
     const pts = this.#getEdgeWaypoints(selectedEdgeId);
     for (let i = 1; i < pts.length - 1; i++) {
@@ -194,10 +203,19 @@ export class BendHandlesOverlay {
     return pts[bendIndex] ?? null;
   }
 
+  /**
+   * Get the currently selected bend, if any.
+   * Used by the Delete key handler to remove the selected bend.
+   */
+  getSelectedBend(): { edgeId: SlotmapId; bendIndex: number } | null {
+    return this.#selectedBend;
+  }
+
   /** Clean up event listeners and DOM. Call when editor is detached. */
   dispose(): void {
     this.#bendDragSession.dispose();
     this.detach();
+    this.#selectedBend = null;
     this.#viewer.querySelectorAll('.bend-handle').forEach((el) => el.remove());
   }
 }
