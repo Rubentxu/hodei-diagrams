@@ -181,10 +181,7 @@ fn edge_path_prepends_from_center_appends_to_center() {
         "perimeter-inclusive: from + {} waypoints + to",
         waypoints.len()
     );
-    assert_eq!(
-        path_elem.points[0], from_center,
-        "prepends source center"
-    );
+    assert_eq!(path_elem.points[0], from_center, "prepends source center");
     assert_eq!(
         path_elem.points[path_elem.points.len() - 1],
         to_center,
@@ -193,9 +190,11 @@ fn edge_path_prepends_from_center_appends_to_center() {
     // Interior waypoints preserved
     for (i, wp) in waypoints.iter().enumerate() {
         assert_eq!(
-            path_elem.points[i + 1], *wp,
+            path_elem.points[i + 1],
+            *wp,
             "interior waypoint[{}] preserved at index {}+1",
-            i, i
+            i,
+            i
         );
     }
 }
@@ -514,14 +513,11 @@ fn path_element_includes_vertex_centers() {
 #[test]
 fn move_bend_preserves_semantics_on_perimeter_inclusive_path() {
     let (mut model, pid) = make_model_with_page();
-    let v1 = make_vertex(&mut model, pid, 0.0, 0.0);  // center (50, 30)
+    let v1 = make_vertex(&mut model, pid, 0.0, 0.0); // center (50, 30)
     let v2 = make_vertex(&mut model, pid, 300.0, 0.0); // center (350, 30)
 
     // Initial: 2 interior waypoints (as if from 2x insert_bend)
-    let wps_initial = vec![
-        Point { x: 100.0, y: 30.0 },
-        Point { x: 200.0, y: 30.0 },
-    ];
+    let wps_initial = vec![Point { x: 100.0, y: 30.0 }, Point { x: 200.0, y: 30.0 }];
     let edge = Edge {
         source: v1,
         target: v2,
@@ -543,7 +539,7 @@ fn move_bend_preserves_semantics_on_perimeter_inclusive_path() {
         .next()
         .expect("initial PathElement");
     assert_eq!(path_elem.points.len(), 4);
-    assert_eq!(path_elem.points[0], Point { x: 50.0, y: 30.0 });   // from
+    assert_eq!(path_elem.points[0], Point { x: 50.0, y: 30.0 }); // from
     assert_eq!(path_elem.points[3], Point { x: 350.0, y: 30.0 }); // to
 
     // Simulate move_bend(edgeId, bend_index=1, x=100, y=200):
@@ -551,8 +547,8 @@ fn move_bend_preserves_semantics_on_perimeter_inclusive_path() {
     //   full_path[2] = (100, 200)  ← bend_index 1 → full_path index 2
     //   new_wps = full_path[1..3] = [(100,30), (100,200)]
     let new_wps = vec![
-        Point { x: 100.0, y: 30.0 },    // wp0 unchanged
-        Point { x: 100.0, y: 200.0 },   // wp1 moved
+        Point { x: 100.0, y: 30.0 },  // wp0 unchanged
+        Point { x: 100.0, y: 200.0 }, // wp1 moved
     ];
     let edge_ref = model.store.edge_mut(eid).expect("edge exists");
     edge_ref.waypoints = new_wps;
@@ -571,9 +567,25 @@ fn move_bend_preserves_semantics_on_perimeter_inclusive_path() {
 
     assert_eq!(path_elem2.points.len(), 4, "still 4 points after move_bend");
     // Endpoints anchored to vertex centers (unchanged):
-    assert_eq!(path_elem2.points[0], Point { x: 50.0, y: 30.0 }, "from anchored");
-    assert_eq!(path_elem2.points[3], Point { x: 350.0, y: 30.0 }, "to anchored");
+    assert_eq!(
+        path_elem2.points[0],
+        Point { x: 50.0, y: 30.0 },
+        "from anchored"
+    );
+    assert_eq!(
+        path_elem2.points[3],
+        Point { x: 350.0, y: 30.0 },
+        "to anchored"
+    );
     // Interior waypoints reflect the move:
-    assert_eq!(path_elem2.points[1], Point { x: 100.0, y: 30.0 }, "wp0 unchanged");
-    assert_eq!(path_elem2.points[2], Point { x: 100.0, y: 200.0 }, "wp1 moved");
+    assert_eq!(
+        path_elem2.points[1],
+        Point { x: 100.0, y: 30.0 },
+        "wp0 unchanged"
+    );
+    assert_eq!(
+        path_elem2.points[2],
+        Point { x: 100.0, y: 200.0 },
+        "wp1 moved"
+    );
 }

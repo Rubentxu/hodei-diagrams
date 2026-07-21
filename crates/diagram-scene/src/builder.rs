@@ -1262,7 +1262,7 @@ mod tests {
         // Perimeter-inclusive: from + 2 waypoints + to = 4 points
         // v1 center = (80, 40), v2 center = (160, 100)
         assert_eq!(path_elem.points.len(), 4, "from + 2 waypoints + to");
-        assert_eq!(path_elem.points[0].x, 80.0);  // from (v1 center)
+        assert_eq!(path_elem.points[0].x, 80.0); // from (v1 center)
         assert_eq!(path_elem.points[0].y, 40.0);
         assert_eq!(path_elem.points[1].x, 100.0); // wp[0]
         assert_eq!(path_elem.points[1].y, 50.0);
