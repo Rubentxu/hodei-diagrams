@@ -12,6 +12,7 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
+import { sceneGeometry } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
@@ -3559,36 +3560,17 @@ export class Editor {
    * fields, so callers that use this to build a new payload must pass
    * everything through (not just x/y/width/height).
    */
-  #findOriginalGeometry(
-    vid: SlotmapId,
-  ):
-    | {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-        rotation: number;
-        flip_h: boolean;
-        flip_v: boolean;
-        relative: boolean;
-      }
-    | null {
-    const variant = this.#findShapeById(vid);
-    if (!variant) return null;
-    const bounds = variant['bounds'] as
-      | { origin?: Record<string, number>; size?: Record<string, number> }
-      | undefined;
-    if (!bounds?.origin || !bounds?.size) return null;
-    return {
-      x: (bounds.origin['x'] as number) ?? 0,
-      y: (bounds.origin['y'] as number) ?? 0,
-      width: (bounds.size['width'] as number) ?? 0,
-      height: (bounds.size['height'] as number) ?? 0,
-      rotation: (variant['rotation'] as number) ?? 0,
-      flip_h: (variant['flip_h'] as boolean) ?? false,
-      flip_v: (variant['flip_v'] as boolean) ?? false,
-      relative: false,
-    };
+  #findOriginalGeometry(vid: SlotmapId): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    flip_h: boolean;
+    flip_v: boolean;
+    relative: boolean;
+  } | null {
+    return sceneGeometry(this.#sceneCache, vid);
   }
 
   // ─── Shape Lookup Helpers ─────────────────────────────────────────────────
