@@ -44,6 +44,20 @@ export type ToolKind =
   | 'connector'
   | null;
 
+/**
+ * A registered hit zone for overlay pointer events (Pattern D 9a).
+ * Zones are checked in registration order; the first matching zone handles the event.
+ */
+interface OverlayHitZone {
+  /** CSS selector to match against e.target. */
+  selector: string;
+  /**
+   * Handler called when a pointerdown event matches this zone.
+   * Return true to consume the event (stop propagation + prevent default).
+   */
+  handler: (target: Element, event: PointerEvent) => boolean;
+}
+
 /** Drag FSM state (single-shape drag). */
 interface DragState {
   vertexId: SlotmapId;
@@ -210,6 +224,13 @@ export class Editor {
   #onBendDragMoveBound: (_e: PointerEvent) => void;
   #onBendDragUpBound: (_e: PointerEvent) => void;
 
+  // ─── Overlay Hit Zone Registry (Pattern D 9a) ──────────────────────────────
+  /**
+   * Registered overlay hit zones. Each zone maps a CSS selector to a handler.
+   * Used to route pointerdown events to overlay handlers without tight coupling.
+   */
+  readonly #overlayHitZones: OverlayHitZone[] = [];
+
   // ─── Port Handles Overlay ──────────────────────────────────────────────────
   readonly #portHandles: PortHandlesOverlay;
 
@@ -267,6 +288,24 @@ export class Editor {
         this.#replay();
       },
     );
+
+    // Register overlay hit zones for port and bend handles (Pattern D 9a)
+    this.#registerOverlayHitZone({
+      selector: '.port-handle',
+      handler: (_target, ev) => {
+        ev.stopPropagation();
+        return true;
+      },
+    });
+    this.#registerOverlayHitZone({
+      selector: '.bend-handle',
+      handler: (target, ev) => {
+        if (!this.#selectedEdgeId) return false;
+        const bendIndex = parseInt(target.getAttribute('data-bend-index') || '0');
+        this.#startBendDrag(this.#selectedEdgeId, bendIndex, ev);
+        return true;
+      },
+    });
   }
 
   // ─── Public Selection API ──────────────────────────────────────────────────
@@ -2940,26 +2979,30 @@ export class Editor {
 
   // ─── Drag FSM ────────────────────────────────────────────────────────────
 
+  /**
+   * Register an overlay hit zone (Pattern D 9a).
+   * Returns a disposer — call it to remove the zone.
+   */
+  #registerOverlayHitZone(zone: OverlayHitZone): () => void {
+    this.#overlayHitZones.push(zone);
+    return () => {
+      const idx = this.#overlayHitZones.indexOf(zone);
+      if (idx >= 0) this.#overlayHitZones.splice(idx, 1);
+    };
+  }
+
   #onPointerDown(e: PointerEvent): void {
     // Ignore non-primary button
     if (e.button !== 0) return;
 
-    // Check if clicking on a port handle FIRST (before any other hit testing)
-    // Port handles use data-edge-idx and data-end attributes
-    const portHandle = (e.target as Element)?.closest('.port-handle');
-    if (portHandle && this.#selectedEdgeId) {
-      // Port handle drag is handled entirely by the PortHandlesOverlay
-      // which registered its own mousedown listener — just stop propagation here
-      e.stopPropagation();
-      return;
-    }
-
-    // Check if clicking on a bend handle (before any other hit testing)
-    const bendHandle = (e.target as Element)?.closest('.bend-handle');
-    if (bendHandle && this.#selectedEdgeId) {
-      const bendIndex = parseInt(bendHandle.getAttribute('data-bend-index') || '0');
-      this.#startBendDrag(this.#selectedEdgeId, bendIndex, e);
-      return;
+    // Route to registered overlay hit zones (Pattern D 9a).
+    // Check in registration order; first match consumes the event.
+    const pointerTarget = e.target as Element | null;
+    for (const zone of this.#overlayHitZones) {
+      const matched = pointerTarget?.closest(zone.selector);
+      if (matched && zone.handler(matched, e)) {
+        return;
+      }
     }
 
     // Label placement mode: create a label shape and immediately open text editor
