@@ -543,12 +543,19 @@ impl SceneBuilder {
                 style: resolved_style,
             }))
         } else {
-            // Waypoints from the routing engine already start at the source
-            // perimeter and end at the target perimeter. Do NOT prepend/append
-            // vertex centers — that would place the arrowhead inside the shape.
+            // Waypoints are interior-only (draw.io XML `<Array as="points">`
+            // convention + insert_bend/move_bend/remove_bend strip endpoints).
+            // Materialise the perimeter-inclusive path so every consumer (SVG
+            // renderer, bend overlay, hit-testing) sees a connected path from
+            // source to target. v1 uses vertex centers; anchor-aware perimeter
+            // projection (exitX/entryY) is r111+. See ADR-0083.
+            let mut points = Vec::with_capacity(edge.waypoints.len() + 2);
+            points.push(from);
+            points.extend(edge.waypoints.iter().copied());
+            points.push(to);
             Ok(VisualElement::Path(PathElement {
                 id: eid,
-                points: edge.waypoints.to_vec(),
+                points,
                 style: resolved_style,
             }))
         }
