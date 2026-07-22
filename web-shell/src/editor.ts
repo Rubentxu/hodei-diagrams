@@ -18,6 +18,7 @@ import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
 import { ResizeHandlesOverlay } from './resize-handles.js';
 import { BendHandlesOverlay } from './bend-handles.js';
+import { TransformPreview } from './transform-preview.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -208,6 +209,10 @@ export class Editor {
 
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
   #textEdit: TextEditState = null;
+
+  // ─── Transform Preview ──────────────────────────────────────────────────
+  /** Live transform preview for move/resize/rotation drag gestures. */
+  readonly #transformPreview: TransformPreview = new TransformPreview();
 
   get isTextEditing(): boolean {
     return this.#textEdit !== null;
@@ -3097,6 +3102,12 @@ export class Editor {
         currentX: docPos.x,
         currentY: docPos.y,
       };
+      // Capture element for transform preview before any preview is applied
+      const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
+      const el = this.#viewer.querySelector(selector) as SVGElement | null;
+      if (el) {
+        this.#transformPreview.capture(el, id);
+      }
     }
 
     // Add drag-specific listeners (stored references for cleanup)
@@ -3148,13 +3159,12 @@ export class Editor {
     const dx = this.#dragState.currentX - this.#dragState.startX;
     const dy = this.#dragState.currentY - this.#dragState.startY;
 
-    // Apply CSS transform for visual feedback — only to the dragged shape
-    const selector = `[data-vertex-id="${this.#dragState.vertexId.idx}:${this.#dragState.vertexId.version}"]`;
-    const el = this.#viewer.querySelector(selector) as HTMLElement | null;
-    if (el) {
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
+    // Apply SVG document-space translate preview — correct at all zoom levels.
+    // TransformPreview captures original state and composes preview with it.
+    if (dx !== 0 || dy !== 0) {
+      this.#transformPreview.applyTranslate(this.#dragState.vertexId, dx, dy);
+      this.#resizeHandles.applyDragOffset(dx, dy);
     }
-    this.#resizeHandles.applyDragOffset(dx, dy);
   }
 
   #onPointerUp(_e: PointerEvent): void {
@@ -3190,12 +3200,8 @@ export class Editor {
     const dy = this.#dragState.currentY - this.#dragState.startY;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Remove CSS transform from the dragged element
-    const selector = `[data-vertex-id="${this.#dragState.vertexId.idx}:${this.#dragState.vertexId.version}"]`;
-    const el = this.#viewer.querySelector(selector) as HTMLElement | null;
-    if (el) {
-      el.style.transform = '';
-    }
+    // Restore all transform previews (shapes and handles)
+    this.#transformPreview.restoreAll();
     this.#resizeHandles.applyDragOffset(0, 0);
 
     // Commit move if threshold exceeded
@@ -3203,6 +3209,8 @@ export class Editor {
       this.#commitMove(this.#dragState.vertexId, dx, dy);
     }
 
+    // Clean up captures after restore/commit
+    this.#transformPreview.commitAll();
     this.#dragState = null;
   }
 
