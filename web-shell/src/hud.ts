@@ -26,6 +26,8 @@ export interface HudControls {
   setSelectionCount: (_n: number) => void;
   setSaveStatus: (_status: SaveStatus) => void;
   setLoading: (_state: LoadingState) => void;
+  /** R2b: Set HUD density tier. 'compact' hides tertiary items; 'full' shows all. */
+  setDensity: (_density: 'full' | 'compact') => void;
 }
 
 export function buildHud(): HudControls {
@@ -268,6 +270,9 @@ export function buildHud(): HudControls {
           saveStatusValue.textContent = 'Auto-saved';
           break;
       }
+    },
+    setDensity: (density: 'full' | 'compact') => {
+      container.dataset['hudDensity'] = density;
     },
     setLoading: (state: LoadingState) => {
       const isLoading = state.wasm || state.stencil;

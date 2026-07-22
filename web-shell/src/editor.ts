@@ -215,6 +215,10 @@ export class Editor {
   #cursorMoveCb: ((_p: { x: number; y: number }) => void) | null = null;
   #cursorMoveRafId: number | null = null;
 
+  // ─── Interaction State Callback (R2b: HUD density seam) ───────────────────
+  /** Fires when isDragging or isTextEditing transitions. Disposable. */
+  #interactionStateCb: ((_state: { isDragging: boolean; isTextEditing: boolean }) => void) | null = null;
+
   // ─── Snap ────────────────────────────────────────────────────────────────
   #snapEnabled: boolean = false;
   #snapThreshold: number = 8;
@@ -1680,6 +1684,28 @@ export class Editor {
     this.#cursorMoveCb = cb;
   }
 
+  // ─── Interaction State Callback (R2b HUD density seam) ────────────────────────
+
+  /**
+   * Register a callback that fires when isDragging or isTextEditing transitions.
+   * This is the single read-only seam between the Editor and HUD density logic.
+   * Returns an unsubscribe function.
+   */
+  onInteractionStateChange(
+    cb: (_state: { isDragging: boolean; isTextEditing: boolean }) => void,
+  ): () => void {
+    this.#interactionStateCb = cb;
+    return () => { this.#interactionStateCb = null; };
+  }
+
+  /** Fire the interaction state callback if registered. */
+  #notifyInteractionState(): void {
+    this.#interactionStateCb?.({
+      isDragging: this.#dragState !== null || this.#moveArea !== null,
+      isTextEditing: this.#textEdit !== null,
+    });
+  }
+
   // ─── Coordinate Conversion (public for HUD wiring) ────────────────────────
 
   /**
@@ -2128,6 +2154,7 @@ export class Editor {
     shapeEl.setAttribute('data-editing', 'true');
 
     this.#textEdit = { vertexId, isEdge: false, input, originalLabel };
+    this.#notifyInteractionState();
 
     // Debounced label dispatch on input
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2212,6 +2239,7 @@ export class Editor {
 
     input.remove();
     this.#textEdit = null;
+    this.#notifyInteractionState();
   }
 
   /** Get the label text for a vertex from the scene cache. */
@@ -2307,6 +2335,7 @@ export class Editor {
     edgeEl.setAttribute('data-editing', 'true');
 
     this.#textEdit = { vertexId: edgeId, isEdge: true, input, originalLabel: currentLabel };
+    this.#notifyInteractionState();
 
     // Debounced label dispatch on input
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2772,6 +2801,7 @@ export class Editor {
    */
   #startMoveArea(x: number, y: number): void {
     this.#moveArea = { originX: x, originY: y, currentX: x, currentY: y };
+    this.#notifyInteractionState();
   }
 
   /** Update the move-area endpoint. */
@@ -2790,6 +2820,7 @@ export class Editor {
     if (!this.#moveArea) return;
     const { originX, originY, currentX, currentY } = this.#moveArea;
     this.#moveArea = null;
+    this.#notifyInteractionState();
     const dx = currentX - originX;
     const dy = currentY - originY;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
@@ -3036,6 +3067,7 @@ export class Editor {
               currentX: docPos.x,
               currentY: docPos.y,
             };
+            this.#notifyInteractionState();
             this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
             this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
             this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
@@ -3144,6 +3176,7 @@ export class Editor {
         currentX: docPos.x,
         currentY: docPos.y,
       };
+      this.#notifyInteractionState();
       // Capture element for transform preview before any preview is applied
       const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
       const el = this.#viewer.querySelector(selector) as SVGElement | null;
@@ -3225,6 +3258,7 @@ export class Editor {
         this.#resizeHandles.applyDragOffset(0, 0);
         this.#transformPreview.commitAll();
         this.#dragState = null;
+        this.#notifyInteractionState();
       }
       return;
     }
@@ -3265,6 +3299,7 @@ export class Editor {
     // Clean up captures after restore/commit
     this.#transformPreview.commitAll();
     this.#dragState = null;
+    this.#notifyInteractionState();
   }
 
   // ─── Public Facade: Geometry Mutation ─────────────────────────────────────

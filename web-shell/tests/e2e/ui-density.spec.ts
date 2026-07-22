@@ -760,3 +760,70 @@ test.describe('R2a: Navbar 44px + Contextual Toolbar', () => {
     await expect(toolbar).toHaveCSS('display', 'none');
   });
 });
+
+// R2b: HUD density tiers
+test.describe('HUD Density Tiers (R2b)', () => {
+  test('HUD starts with compact density (data-hud-density="compact")', async ({ page }) => {
+    await waitForAppReady(page);
+
+    const hud = page.locator('[data-testid="hud"]');
+    await expect(hud).toBeVisible();
+    await expect(hud).toHaveAttribute('data-hud-density', 'compact');
+  });
+
+  test('HUD shows cursor and page items in compact mode (they exist in DOM)', async ({ page }) => {
+    await waitForAppReady(page);
+
+    const hud = page.locator('[data-testid="hud"]');
+    // In compact mode, tertiary items are hidden via CSS but exist in DOM
+    const hudDensity = await hud.getAttribute('data-hud-density');
+    expect(hudDensity).toBe('compact');
+  });
+
+  test('HUD compact hides tertiary items via CSS (cursor, page)', async ({ page }) => {
+    await waitForAppReady(page);
+
+    const hud = page.locator('[data-testid="hud"]');
+    // Compact mode should hide cursor and page items
+    const cursorItem = hud.locator('.hud-cursor');
+    const pageItem = hud.locator('.hud-page');
+
+    // In compact mode, these should be display:none
+    await expect(cursorItem).toHaveCSS('display', 'none');
+    await expect(pageItem).toHaveCSS('display', 'none');
+  });
+
+  test('HUD density switches to full during drag', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Import a diagram with a shape
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    const hud = page.locator('[data-testid="hud"]');
+    const canvas = page.locator('[data-testid="canvas-container"]');
+
+    // Initial state should be compact
+    await expect(hud).toHaveAttribute('data-hud-density', 'compact');
+
+    // Start a drag on the shape
+    const shape = page.locator('[data-vertex-id]').first();
+    const shapeBox = await shape.boundingBox();
+    if (shapeBox) {
+      // Pointer down on shape
+      await page.mouse.move(shapeBox.x + shapeBox.width / 2, shapeBox.y + shapeBox.height / 2);
+      await page.mouse.down();
+      await page.waitForTimeout(100);
+
+      // During drag, HUD should be in full density
+      await expect(hud).toHaveAttribute('data-hud-density', 'full');
+
+      // Release
+      await page.mouse.up();
+      await page.waitForTimeout(100);
+
+      // After drag, HUD should return to compact
+      await expect(hud).toHaveAttribute('data-hud-density', 'compact');
+    }
+  });
+});

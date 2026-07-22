@@ -625,6 +625,9 @@ async function bootstrap(): Promise<void> {
   // Make hud accessible to module-level save functions
   hud = ui.hud;
 
+  // R2b: Initialize HUD density to compact at startup
+  ui.hud.setDensity('compact');
+
   // Start loading stencil libraries — HUD is now ready to receive callbacks
   stencilManager.startAutoLoad();
 
@@ -912,6 +915,15 @@ async function bootstrap(): Promise<void> {
       gridVisible: ui.canvasContainer.classList.contains('show-grid'),
       isEditing: false,
     });
+
+    // R2b: Also update HUD density hasSelection
+    workbenchController.updateHudDensity({
+      hasSelection: ids.length > 0,
+      isDragging: false,
+      snapEnabled: activeEditor?.snapEnabled ?? false,
+      gridVisible: ui.canvasContainer.classList.contains('show-grid'),
+      isEditing: false,
+    });
   };
 
   // Tool change → UI update (remove active-tool class)
@@ -1012,6 +1024,22 @@ async function bootstrap(): Promise<void> {
   });
 
   activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
+
+  // R2b: Wire editor interaction state → controller → HUD density
+  const unsubInteraction = activeEditor.onInteractionStateChange((state) => {
+    workbenchController.updateHudDensity({
+      hasSelection: false, // will be updated by onSelectionChange
+      isDragging: state.isDragging,
+      snapEnabled: activeEditor?.snapEnabled ?? false,
+      gridVisible: ui.canvasContainer.classList.contains('show-grid'),
+      isEditing: state.isTextEditing,
+    });
+  });
+
+  // R2b: Subscribe controller hudDensity → HUD setDensity
+  workbenchController.subscribe((state) => {
+    ui.hud.setDensity(state.hudDensity);
+  });
 
   // Snap menu wiring
   const snapMenuItem = document.getElementById('menu-item-snap');

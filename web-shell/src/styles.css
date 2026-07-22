@@ -1309,7 +1309,14 @@ button:disabled {
   animation: spin 0.8s linear infinite;
 }
 
-/* ─── WASM init loading overlay ─────────────────────────────────────────── */
+/* ─── HUD density tiers (R2b) ──────────────────────────────────────────────── */
+/* Compact: hide tertiary items (cursor, page) to reduce visual noise */
+[data-hud-density='compact'] .hud-cursor,
+[data-hud-density='compact'] .hud-page {
+  display: none;
+}
+
+/* WASM init loading overlay ─────────────────────────────────────────── */
 .loading-overlay {
   position: absolute;
   inset: 0;
