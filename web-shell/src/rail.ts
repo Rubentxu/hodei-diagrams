@@ -6,6 +6,7 @@
  */
 
 import { ICONS } from './icon.js';
+import type { DockMode } from './workbench-controller.js';
 
 export type RailToolId = 'select' | 'shapes' | 'connector' | 'text' | 'zoom-fit' | 'help';
 
@@ -24,6 +25,8 @@ export interface RailControls {
   textBtn: HTMLButtonElement;
   zoomFitBtn: HTMLButtonElement;
   helpBtn: HTMLButtonElement;
+  dockLayersBtn: HTMLButtonElement;
+  dockHistoryBtn: HTMLButtonElement;
 }
 
 export interface RailCallbacks {
@@ -33,6 +36,7 @@ export interface RailCallbacks {
   onTextTool: () => void;
   onZoomFit: () => void;
   onHelp: () => void;
+  onDockMode?: (_mode: DockMode) => void;
 }
 
 const RAIL_ICONS = {
@@ -47,6 +51,15 @@ const RAIL_ICONS = {
     <circle cx="13" cy="8" r="1.5"/>
     <line x1="4.5" y1="8" x2="11.5" y2="8"/>
     <line x1="8" y1="6" x2="8" y2="10"/>
+  </svg>`,
+  layers: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 2L14 6L8 10L2 6Z"/>
+    <path d="M2 10L8 14L14 10"/>
+    <path d="M2 6L8 10L14 6"/>
+  </svg>`,
+  history: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="8" cy="8" r="6"/>
+    <path d="M8 5V8L10 10"/>
   </svg>`,
 };
 
@@ -67,7 +80,7 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
   });
   container.appendChild(selectBtn);
 
-  // Shapes tool
+  // Shapes tool (also triggers dock mode)
   const shapesBtn = document.createElement('button');
   shapesBtn.className = 'rail-btn';
   shapesBtn.title = 'Shapes (R)';
@@ -76,6 +89,7 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
   shapesBtn.addEventListener('click', () => {
     setActiveTool('shapes');
     callbacks.onShapesTool();
+    callbacks.onDockMode?.('shapes');
   });
   container.appendChild(shapesBtn);
 
@@ -126,6 +140,40 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
   sep2.setAttribute('data-testid', 'rail-separator');
   container.appendChild(sep2);
 
+  // Dock layers trigger
+  const dockLayersBtn = document.createElement('button');
+  dockLayersBtn.className = 'rail-btn';
+  dockLayersBtn.title = 'Layers (L)';
+  dockLayersBtn.setAttribute('data-testid', 'rail-dock-layers-btn');
+  dockLayersBtn.innerHTML = RAIL_ICONS.layers;
+  dockLayersBtn.addEventListener('click', () => {
+    callbacks.onDockMode?.('layers');
+  });
+  dockLayersBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      callbacks.onDockMode?.('layers');
+    }
+  });
+  container.appendChild(dockLayersBtn);
+
+  // Dock history trigger
+  const dockHistoryBtn = document.createElement('button');
+  dockHistoryBtn.className = 'rail-btn';
+  dockHistoryBtn.title = 'History (H)';
+  dockHistoryBtn.setAttribute('data-testid', 'rail-dock-history-btn');
+  dockHistoryBtn.innerHTML = RAIL_ICONS.history;
+  dockHistoryBtn.addEventListener('click', () => {
+    callbacks.onDockMode?.('history');
+  });
+  dockHistoryBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      callbacks.onDockMode?.('history');
+    }
+  });
+  container.appendChild(dockHistoryBtn);
+
   // Spacer to push Help to bottom
   const spacer = document.createElement('div');
   spacer.style.flex = '1';
@@ -160,5 +208,7 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
     textBtn,
     zoomFitBtn,
     helpBtn,
+    dockLayersBtn,
+    dockHistoryBtn,
   };
 }

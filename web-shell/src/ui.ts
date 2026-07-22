@@ -11,6 +11,7 @@ import { buildNavbar, type ToolbarControls, type NavbarControls } from './navbar
 import { buildSidebar } from './sidebar.js';
 import { buildRail, type RailCallbacks } from './rail.js';
 import type { StencilLibraryManager } from './stencil-library-manager.js';
+import type { DockMode } from './workbench-controller.js';
 import { buildHud, type HudControls } from './hud.js';
 import { ICONS } from './icon.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
@@ -81,6 +82,7 @@ export interface UiElements {
   navbar: HTMLElement;
   toolbar: ToolbarControls;
   sidebar: HTMLElement;
+  setDockMode: (_mode: DockMode) => void;
 }
 
 /**
@@ -308,6 +310,7 @@ export function buildEmptyUi(
     navbar: navbar.container,
     toolbar: navbar.toolbar,
     sidebar: sidebar.container,
+    setDockMode: sidebar.setDockMode,
   };
 }
 
