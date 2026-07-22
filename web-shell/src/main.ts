@@ -784,7 +784,8 @@ async function bootstrap(): Promise<void> {
   const historyPanelContainer = document.createElement('div');
   historyPanelContainer.className = 'history-panel-container';
   historyPanelContainer.setAttribute('data-testid', 'history-panel-container');
-  ui.sidebar.appendChild(historyPanelContainer);
+  // R1c: Mount into dock-history container so it shows when dock mode is 'history'
+  ui.dockHistory.appendChild(historyPanelContainer);
 
   // HistoryPanel instance — lives for the lifetime of the session
   const historyPanel = new HistoryPanel(historyPanelContainer, activeSession, versionStore);
