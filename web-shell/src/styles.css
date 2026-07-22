@@ -651,10 +651,9 @@ button:disabled {
 }
 
 /* ─── Dock Mode Containers (R1b/R1c) ─────────────────────────────────── */
+/* R1c: Attribute-based visibility — data-dock-mode on sidebar controls visibility */
 .dock-mode {
   display: none;
-  opacity: 0;
-  transition: opacity 0.15s ease-in-out;
 }
 
 .dock-mode-shapes,
@@ -664,12 +663,39 @@ button:disabled {
   flex-direction: column;
   flex: 1;
   overflow-y: auto;
-  opacity: 1;
 }
 
-/* When a dock mode becomes visible, ensure opacity is 1 */
-.dock-mode:not([style*="display: none"]) {
-  opacity: 1;
+/* R1c: Attribute-based visibility — replaces inline-style inference */
+.dock-mode-shapes {
+  display: flex;
+}
+.dock-mode-layers,
+.dock-mode-history {
+  display: none;
+}
+
+.sidebar[data-dock-mode="layers"] .dock-mode-layers {
+  display: flex;
+}
+.sidebar[data-dock-mode="layers"] .dock-mode-shapes,
+.sidebar[data-dock-mode="layers"] .dock-mode-history {
+  display: none;
+}
+
+.sidebar[data-dock-mode="history"] .dock-mode-history {
+  display: flex;
+}
+.sidebar[data-dock-mode="history"] .dock-mode-shapes,
+.sidebar[data-dock-mode="history"] .dock-mode-layers {
+  display: none;
+}
+
+.sidebar[data-dock-mode="shapes"] .dock-mode-shapes {
+  display: flex;
+}
+.sidebar[data-dock-mode="shapes"] .dock-mode-layers,
+.sidebar[data-dock-mode="shapes"] .dock-mode-history {
+  display: none;
 }
 
 .sidebar-header {

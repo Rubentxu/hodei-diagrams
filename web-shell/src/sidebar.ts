@@ -160,6 +160,8 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   const container = document.createElement('div');
   container.className = 'sidebar';
   container.setAttribute('data-testid', 'sidebar');
+  // R1c: Observable dock mode state marker for E2E testing
+  container.setAttribute('data-dock-mode', 'shapes');
 
   // ─── Header + collapse toggle ─────────────────────────────────────────────
   const header = document.createElement('div');
@@ -632,8 +634,10 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
     }
   });
 
-  // ─── Dock Mode Switching (R1b) ─────────────────────────────────────────────
+  // ─── Dock Mode Switching (R1b/R1c) ───────────────────────────────────────
   function setDockMode(mode: DockMode): void {
+    // R1c: Use data-dock-mode attribute as observable state marker
+    container.setAttribute('data-dock-mode', mode);
     dockShapes.style.display = mode === 'shapes' ? '' : 'none';
     dockLayers.style.display = mode === 'layers' ? '' : 'none';
     dockHistory.style.display = mode === 'history' ? '' : 'none';
