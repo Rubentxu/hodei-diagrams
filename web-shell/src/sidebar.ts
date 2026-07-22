@@ -13,6 +13,7 @@ import type { DockMode } from './workbench-controller.js';
 export interface SidebarControls {
   container: HTMLElement;
   layersPanel: HTMLElement;
+  dockHistory: HTMLElement;
   addLayerBtn: HTMLButtonElement;
   setDockMode: (_mode: DockMode) => void;
   rectToolBtn: HTMLButtonElement;
@@ -644,6 +645,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   return {
     container,
     layersPanel,
+    dockHistory,
     addLayerBtn,
     setDockMode,
     rectToolBtn: controls.rectToolBtn,

@@ -650,30 +650,26 @@ button:disabled {
   pointer-events: none;
 }
 
-/* ─── Dock Mode Containers (R1b) ─────────────────────────────────────── */
+/* ─── Dock Mode Containers (R1b/R1c) ─────────────────────────────────── */
 .dock-mode {
   display: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
 }
 
-.dock-mode-shapes {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.dock-mode-layers {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  overflow-y: auto;
-}
-
+.dock-mode-shapes,
+.dock-mode-layers,
 .dock-mode-history {
   display: flex;
   flex-direction: column;
   flex: 1;
   overflow-y: auto;
+  opacity: 1;
+}
+
+/* When a dock mode becomes visible, ensure opacity is 1 */
+.dock-mode:not([style*="display: none"]) {
+  opacity: 1;
 }
 
 .sidebar-header {

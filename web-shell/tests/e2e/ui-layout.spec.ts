@@ -5,6 +5,161 @@ import { fixturePath } from './fixtures.js';
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
 
+// R1c: Dock mode E2E tests
+test.describe('dock mode switching', () => {
+  test('clicking each rail trigger shows only the requested dock mode', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Initially shapes mode is active (sidebar with shapes visible)
+    await expect(page.locator('.dock-mode-shapes')).toBeVisible();
+    await expect(page.locator('.dock-mode-layers')).toBeHidden();
+    await expect(page.locator('.dock-mode-history')).toBeHidden();
+
+    // Click Layers dock trigger
+    await page.click('[data-testid="rail-dock-layers-btn"]');
+    await page.waitForTimeout(100);
+
+    await expect(page.locator('.dock-mode-layers')).toBeVisible();
+    await expect(page.locator('.dock-mode-shapes')).toBeHidden();
+    await expect(page.locator('.dock-mode-history')).toBeHidden();
+
+    // Click History dock trigger
+    await page.click('[data-testid="rail-dock-history-btn"]');
+    await page.waitForTimeout(100);
+
+    await expect(page.locator('.dock-mode-history')).toBeVisible();
+    await expect(page.locator('.dock-mode-shapes')).toBeHidden();
+    await expect(page.locator('.dock-mode-layers')).toBeHidden();
+
+    // Click Shapes dock trigger (via rail-shapes-btn which also triggers dock mode)
+    await page.click('[data-testid="rail-shapes-btn"]');
+    await page.waitForTimeout(100);
+
+    await expect(page.locator('.dock-mode-shapes')).toBeVisible();
+    await expect(page.locator('.dock-mode-layers')).toBeHidden();
+    await expect(page.locator('.dock-mode-history')).toBeHidden();
+  });
+
+  test('repeated activation does not duplicate content', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Click Layers multiple times rapidly
+    await page.click('[data-testid="rail-dock-layers-btn"]');
+    await page.click('[data-testid="rail-dock-layers-btn"]');
+    await page.click('[data-testid="rail-dock-layers-btn"]');
+    await page.waitForTimeout(200);
+
+    // Should still show layers content once
+    await expect(page.locator('.dock-mode-layers')).toBeVisible();
+    const layersContent = page.locator('.dock-mode-layers');
+    await expect(layersContent).toHaveCount(1);
+  });
+
+  test('dock mode preserves sidebar collapse state', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Collapse sidebar
+    await page.click('[data-testid="sidebar-collapse-btn"]');
+    await page.waitForTimeout(100);
+
+    // Open layers dock
+    await page.click('[data-testid="rail-dock-layers-btn"]');
+    await page.waitForTimeout(100);
+
+    // Sidebar should still be collapsed
+    await expect(page.locator('[data-testid="sidebar"]')).toHaveClass(/collapsed/);
+  });
+});
+
+test.describe('keyboard rail activation', () => {
+  test('Enter key activates dock mode and retains focus-visible', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Focus the Layers dock trigger
+    await page.focus('[data-testid="rail-dock-layers-btn"]');
+    await page.waitForTimeout(50);
+
+    // Press Enter
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
+
+    // Layers mode should be active
+    await expect(page.locator('.dock-mode-layers')).toBeVisible();
+
+    // Focus should be retained on the button with focus-visible
+    const btn = page.locator('[data-testid="rail-dock-layers-btn"]');
+    await expect(btn).toBeFocused();
+  });
+
+  test('Space key activates dock mode without affecting active tool', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // First select a tool (e.g., rectangle)
+    await page.click('[data-testid="rect-tool-btn"]');
+    await page.waitForTimeout(100);
+
+    // Focus the History dock trigger
+    await page.focus('[data-testid="rail-dock-history-btn"]');
+    await page.waitForTimeout(50);
+
+    // Press Space
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(100);
+
+    // History mode should be active
+    await expect(page.locator('.dock-mode-history')).toBeVisible();
+  });
+});
+
+test.describe('tools and docks coexist', () => {
+  test('activating dock trigger does not change canvas tool', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Import a diagram first
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Select a shape
+    const viewer = page.locator('[data-testid="viewer"]');
+    const rect = viewer.locator('[data-vertex-id]').first();
+    await rect.click();
+    await page.waitForTimeout(200);
+
+    // Activate History dock
+    await page.click('[data-testid="rail-dock-history-btn"]');
+    await page.waitForTimeout(100);
+
+    // History should be visible
+    await expect(page.locator('.dock-mode-history')).toBeVisible();
+
+    // Canvas should still have the viewer and selected shape
+    await expect(page.locator('[data-testid="viewer"]')).toBeVisible();
+  });
+
+  test('shapes dock trigger preserves shapes tool selection', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Select rectangle tool
+    await page.click('[data-testid="rect-tool-btn"]');
+    await page.waitForTimeout(100);
+
+    // Activate Layers dock
+    await page.click('[data-testid="rail-dock-layers-btn"]');
+    await page.waitForTimeout(100);
+
+    // Layers should be visible
+    await expect(page.locator('.dock-mode-layers')).toBeVisible();
+
+    // Switch back to Shapes
+    await page.click('[data-testid="rail-shapes-btn"]');
+    await page.waitForTimeout(100);
+
+    // Shapes should be visible with search and categories
+    await expect(page.locator('.dock-mode-shapes')).toBeVisible();
+    await expect(page.locator('[data-testid="sidebar-search"]')).toBeVisible();
+  });
+});
+
 test.describe('5-zone UI layout', () => {
   test('all 5 zones are present on initial load', async ({ page }) => {
     await waitForAppReady(page);

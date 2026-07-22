@@ -82,6 +82,7 @@ export interface UiElements {
   navbar: HTMLElement;
   toolbar: ToolbarControls;
   sidebar: HTMLElement;
+  dockHistory: HTMLElement;
   setDockMode: (_mode: DockMode) => void;
 }
 
@@ -310,6 +311,7 @@ export function buildEmptyUi(
     navbar: navbar.container,
     toolbar: navbar.toolbar,
     sidebar: sidebar.container,
+    dockHistory: sidebar.dockHistory,
     setDockMode: sidebar.setDockMode,
   };
 }
