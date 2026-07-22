@@ -690,3 +690,73 @@ test.describe('Slice B: Professional Density UI', () => {
     });
   });
 });
+
+test.describe('R2a: Navbar 44px + Contextual Toolbar', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('compact keyboard navigation — navbar is 44px at viewport ≥1024px', async ({ page }) => {
+    // Set desktop viewport
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    const navbar = page.locator('[data-testid="navbar"]');
+    await expect(navbar).toBeVisible();
+
+    // Measure navbar height — should be 44px ± 1px
+    const height = await navbar.evaluate((el) => (el as HTMLElement).offsetHeight);
+    expect(height).toBeGreaterThanOrEqual(43);
+    expect(height).toBeLessThanOrEqual(45);
+  });
+
+  test('selector compatibility — all preserved navbar testids resolve', async ({ page }) => {
+    // Preserved selectors from spec §transition contract
+    const preservedSelectors = [
+      'navbar',
+      'menu-file',
+      'menu-edit',
+      'menu-view',
+      'menu-insert',
+      'menu-arrange',
+      'menu-layers',
+      'undo-btn',
+      'redo-btn',
+      'zoom-display',
+      'save-btn',
+      'navbar-brand',
+    ];
+
+    for (const sel of preservedSelectors) {
+      const locator = page.locator(`[data-testid="${sel}"]`);
+      await expect(locator).toBeAttached();
+    }
+  });
+
+  test('contextual toolbar appears on selection, hides on clear', async ({ page }) => {
+    const app = page.locator('#app');
+    const toolbar = page.locator('[data-testid="toolbar"]');
+
+    // Initially inactive — no selection on empty canvas
+    await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
+    await expect(toolbar).toHaveCSS('display', 'none');
+
+    // Load a diagram with shapes
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Click a shape to create selection — toolbar should activate
+    const shape = page.locator('[data-vertex-id]').first();
+    await shape.click();
+    await page.waitForTimeout(200);
+
+    await expect(app).toHaveAttribute('data-context-toolbar', 'active');
+    await expect(toolbar).toHaveCSS('display', 'flex');
+
+    // Deselect by pressing Escape — toolbar should hide again
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
+    await expect(toolbar).toHaveCSS('display', 'none');
+  });
+});

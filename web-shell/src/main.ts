@@ -618,6 +618,10 @@ async function bootstrap(): Promise<void> {
     });
   }
 
+  // R2a: Initialize app attributes at startup
+  const appEl = document.getElementById('app');
+  appEl?.setAttribute('data-context-toolbar', 'inactive');
+
   // Make hud accessible to module-level save functions
   hud = ui.hud;
 
@@ -899,6 +903,15 @@ async function bootstrap(): Promise<void> {
     ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
     // Update HUD zoom
     ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+
+    // R2a: Update contextual toolbar via controller
+    workbenchController.updateContextualToolbar({
+      hasSelection: ids.length > 0,
+      isDragging: false,
+      snapEnabled: false,
+      gridVisible: ui.canvasContainer.classList.contains('show-grid'),
+      isEditing: false,
+    });
   };
 
   // Tool change → UI update (remove active-tool class)

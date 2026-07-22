@@ -725,7 +725,8 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
 
   navbarTopRow.appendChild(quickControls);
 
-  // ─── Toolbar (Zone 1.5) ───────────────────────────────────────────────────
+  // ─── Toolbar (Zone 1.5) — contextual, inside navbar-top-row ─────────────────
+  // R2: Toolbar is inside the single 44px row, hidden when no selection
   const toolbarContainer = document.createElement('div');
   toolbarContainer.className = 'toolbar';
   toolbarContainer.setAttribute('data-testid', 'toolbar');
@@ -879,7 +880,11 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   toolbarContainer.appendChild(frontBtn);
   toolbarContainer.appendChild(backBtn);
 
-  container.appendChild(toolbarContainer);
+  // R2: Toolbar is inside navbar-top-row, not appended separately
+  navbarTopRow.appendChild(toolbarContainer);
+
+  // Append the single navbar row to the container
+  container.appendChild(navbarTopRow);
 
   // Toolbar controls object
   const toolbarControls: ToolbarControls = {
