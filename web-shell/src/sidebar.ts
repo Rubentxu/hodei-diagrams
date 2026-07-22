@@ -8,6 +8,8 @@
 
 import type { StencilLibraryManager } from './stencil-library-manager.js';
 
+export type DockMode = 'shapes' | 'layers' | 'history';
+
 export interface SidebarControls {
   container: HTMLElement;
   layersPanel: HTMLElement;
@@ -34,6 +36,7 @@ export interface SidebarControls {
   trapezoidStencilBtn: HTMLButtonElement;
   blockArrowStencilBtn: HTMLButtonElement;
   collapseBtn: HTMLButtonElement;
+  setDockMode: (mode: DockMode) => void;
 }
 
 const LS_KEY = 'hodei:sidebar-collapsed';
@@ -186,11 +189,24 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
     // localStorage unavailable (test environments)
   }
 
+  // ─── Dock Mode Containers ──────────────────────────────────────────────────
+  // All three containers are created upfront; setDockMode controls which is visible
+  const dockModeShapes = document.createElement('div');
+  dockModeShapes.className = 'dock-mode dock-mode-shapes';
+
+  const dockModeLayers = document.createElement('div');
+  dockModeLayers.className = 'dock-mode dock-mode-layers';
+  dockModeLayers.setAttribute('data-testid', 'dock-layers');
+
+  const dockModeHistory = document.createElement('div');
+  dockModeHistory.className = 'dock-mode dock-mode-history';
+  dockModeHistory.setAttribute('data-testid', 'dock-history');
+
   // ─── Layers Panel (IP-F PR5) ──────────────────────────────────────────────
   const layersPanel = document.createElement('div');
   layersPanel.className = 'layers-panel';
   layersPanel.setAttribute('data-testid', 'layers-panel');
-  layersPanel.hidden = true; // shown when Layers menu is opened
+  // Layers panel is always in the dock; hidden via dock mode visibility
 
   // Add Layer button
   const addLayerBtn = document.createElement('button');
@@ -199,12 +215,24 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   addLayerBtn.setAttribute('data-testid', 'layers-add-layer');
   layersPanel.appendChild(addLayerBtn);
 
-  // Layers list container (populated dynamically)
+  // Layers list container (populated dynamically by dock-layers.ts)
   const layersList = document.createElement('div');
   layersList.className = 'layers-list';
   layersPanel.appendChild(layersList);
 
-  container.appendChild(layersPanel);
+  // Layers panel goes into dock mode layers container
+  dockModeLayers.appendChild(layersPanel);
+
+  // History container is empty; main.ts mounts HistoryPanel into it
+  // Dock mode history container starts empty
+
+  // Shapes content goes into dock mode shapes container (see below)
+  // We'll append shapes content to dockModeShapes throughout the rest of the function
+
+  // Initially show shapes dock mode
+  dockModeShapes.style.display = '';
+  dockModeLayers.style.display = 'none';
+  dockModeHistory.style.display = 'none';
 
   // ─── Search bar ──────────────────────────────────────────────────────────
   const searchWrap = document.createElement('div');
@@ -224,7 +252,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   searchInput.placeholder = 'Search shapes…';
   searchInput.setAttribute('data-testid', 'sidebar-search');
   searchWrap.appendChild(searchInput);
-  container.appendChild(searchWrap);
+  dockModeShapes.appendChild(searchWrap);
 
   // ─── Search filter logic ────────────────────────────────────────────────
   searchInput.addEventListener('input', () => {
@@ -371,13 +399,13 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   }
 
   generalCat.appendChild(shapeGrid);
-  container.appendChild(generalCat);
+  dockModeShapes.appendChild(generalCat);
 
   // ─── Dynamic stencil categories ─────────────────────────────────────────
   // Container for dynamically rendered library categories (replaced on manager changes)
   const dynamicStencilContainer = document.createElement('div');
   dynamicStencilContainer.setAttribute('data-testid', 'dynamic-stencil-categories');
-  container.appendChild(dynamicStencilContainer);
+  dockModeShapes.appendChild(dynamicStencilContainer);
 
   // Hidden file input for loading additional stencil libraries
   const hiddenFileInput = document.createElement('input');
@@ -560,7 +588,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   }
 
   moreShapesDetails.appendChild(moreShapesContent);
-  container.appendChild(moreShapesDetails);
+  dockModeShapes.appendChild(moreShapesDetails);
 
   // Wire accordion open/close + chevron rotation + localStorage
   function updateMoreShapesState(open: boolean) {
@@ -591,7 +619,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   const loadStencilsLink = document.createElement('button');
   loadStencilsLink.className = 'load-stencils-btn';
   loadStencilsLink.textContent = 'Load stencils from file…';
-  container.appendChild(loadStencilsLink);
+  dockModeShapes.appendChild(loadStencilsLink);
 
   loadStencilsLink.addEventListener('click', () => {
     hiddenFileInput.value = '';
@@ -610,6 +638,31 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
       window.alert(`Failed to load stencil library: ${e instanceof Error ? e.message : String(e)}`);
     }
   });
+
+  // ─── Dock Mode Switching ──────────────────────────────────────────────────
+  // Append dock containers to sidebar container
+  container.appendChild(dockModeShapes);
+  container.appendChild(dockModeLayers);
+  container.appendChild(dockModeHistory);
+
+  /**
+   * Switch between dock modes (shapes, layers, history).
+   * Only one mode is visible at a time.
+   */
+  function setDockMode(mode: DockMode): void {
+    dockModeShapes.style.display = mode === 'shapes' ? '' : 'none';
+    dockModeLayers.style.display = mode === 'layers' ? '' : 'none';
+    dockModeHistory.style.display = mode === 'history' ? '' : 'none';
+
+    // Update sidebar title to reflect current mode
+    if (mode === 'layers') {
+      title.textContent = 'Layers';
+    } else if (mode === 'history') {
+      title.textContent = 'History';
+    } else {
+      title.textContent = 'Shapes';
+    }
+  }
 
   return {
     container,
@@ -637,5 +690,6 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
     trapezoidStencilBtn: controls.trapezoidStencilBtn,
     blockArrowStencilBtn: controls.blockArrowStencilBtn,
     collapseBtn,
+    setDockMode,
   };
 }

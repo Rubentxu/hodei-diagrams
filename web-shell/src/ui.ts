@@ -8,7 +8,7 @@
 import type { PageRender } from './types.js';
 import type { DiagramEngineSession } from './session.js';
 import { buildNavbar, type ToolbarControls, type NavbarControls } from './navbar.js';
-import { buildSidebar } from './sidebar.js';
+import { buildSidebar, type DockMode } from './sidebar.js';
 import { buildRail, type RailCallbacks } from './rail.js';
 import type { StencilLibraryManager } from './stencil-library-manager.js';
 import { buildHud, type HudControls } from './hud.js';
@@ -81,6 +81,7 @@ export interface UiElements {
   navbar: HTMLElement;
   toolbar: ToolbarControls;
   sidebar: HTMLElement;
+  setSidebarDockMode: (mode: DockMode) => void;
 }
 
 /**
@@ -107,6 +108,7 @@ export function buildEmptyUi(
         onTextTool: () => {},
         onZoomFit: () => {},
         onHelp: () => {},
+        onDockMode: () => {},
       });
 
   // ─── Zone 1: Navbar ──────────────────────────────────────────────────────
@@ -308,6 +310,7 @@ export function buildEmptyUi(
     navbar: navbar.container,
     toolbar: navbar.toolbar,
     sidebar: sidebar.container,
+    setSidebarDockMode: sidebar.setDockMode,
   };
 }
 

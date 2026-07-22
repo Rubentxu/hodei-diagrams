@@ -24,6 +24,8 @@ export interface RailControls {
   textBtn: HTMLButtonElement;
   zoomFitBtn: HTMLButtonElement;
   helpBtn: HTMLButtonElement;
+  dockLayersBtn: HTMLButtonElement;
+  dockHistoryBtn: HTMLButtonElement;
 }
 
 export interface RailCallbacks {
@@ -33,6 +35,7 @@ export interface RailCallbacks {
   onTextTool: () => void;
   onZoomFit: () => void;
   onHelp: () => void;
+  onDockMode: (mode: 'shapes' | 'layers' | 'history') => void;
 }
 
 const RAIL_ICONS = {
@@ -76,6 +79,7 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
   shapesBtn.addEventListener('click', () => {
     setActiveTool('shapes');
     callbacks.onShapesTool();
+    callbacks.onDockMode('shapes');
   });
   container.appendChild(shapesBtn);
 
@@ -126,6 +130,39 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
   sep2.setAttribute('data-testid', 'rail-separator');
   container.appendChild(sep2);
 
+  // Dock mode: Layers
+  const dockLayersBtn = document.createElement('button');
+  dockLayersBtn.className = 'rail-btn';
+  dockLayersBtn.title = 'Layers (L)';
+  dockLayersBtn.setAttribute('data-testid', 'rail-dock-layers-btn');
+  dockLayersBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="3" width="12" height="3" rx="0.5"/>
+    <rect x="2" y="7" width="12" height="3" rx="0.5"/>
+    <rect x="2" y="11" width="12" height="2" rx="0.5"/>
+  </svg>`;
+  dockLayersBtn.addEventListener('click', () => {
+    // Note: dock activation does NOT change activeTool (rail retains existing tools)
+    callbacks.onDockMode('layers');
+  });
+  // Keyboard activatable (Enter/Space) - native button behavior
+  container.appendChild(dockLayersBtn);
+
+  // Dock mode: History
+  const dockHistoryBtn = document.createElement('button');
+  dockHistoryBtn.className = 'rail-btn';
+  dockHistoryBtn.title = 'History (H)';
+  dockHistoryBtn.setAttribute('data-testid', 'rail-dock-history-btn');
+  dockHistoryBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="8" cy="8" r="6"/>
+    <polyline points="8,4 8,8 11,10"/>
+  </svg>`;
+  dockHistoryBtn.addEventListener('click', () => {
+    // Note: dock activation does NOT change activeTool (rail retains existing tools)
+    callbacks.onDockMode('history');
+  });
+  // Keyboard activatable (Enter/Space) - native button behavior
+  container.appendChild(dockHistoryBtn);
+
   // Spacer to push Help to bottom
   const spacer = document.createElement('div');
   spacer.style.flex = '1';
@@ -160,5 +197,7 @@ export function buildRail(callbacks: RailCallbacks): RailControls {
     textBtn,
     zoomFitBtn,
     helpBtn,
+    dockLayersBtn,
+    dockHistoryBtn,
   };
 }
