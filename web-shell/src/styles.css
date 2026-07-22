@@ -650,6 +650,32 @@ button:disabled {
   pointer-events: none;
 }
 
+/* ─── Dock Mode Containers (R1b) ─────────────────────────────────────── */
+.dock-mode {
+  display: none;
+}
+
+.dock-mode-shapes {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dock-mode-layers {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dock-mode-history {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+}
+
 .sidebar-header {
   display: flex;
   align-items: center;

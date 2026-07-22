@@ -27,6 +27,8 @@ import type { PageToken, PageRender, SlotmapId, ScenePage } from './types.js';
 import { EMPTY_METADATA } from './types.js';
 import { VersionStore } from './version-store.js';
 import { HistoryPanel } from './history-panel.js';
+import { WorkbenchController } from './workbench-controller.js';
+import { buildDockLayers } from './dock-layers.js';
 import { runMathOverlay } from './math/math-overlay.js';
 import { openMathInsertDialog } from './math/math-dialog.js';
 import { showEditXmlDialog } from './edit-xml-dialog.js';
@@ -489,6 +491,9 @@ async function bootstrap(): Promise<void> {
   zoomPan = setupZoomPan(zoomPanPlaceholder, viewerPlaceholder);
 
   // ─── 5. Build 5-zone UI with inspector ────────────────────────────────────
+  // R1b: WorkbenchController instance for dock-mode state
+  const workbenchController = new WorkbenchController();
+
   const ui = buildEmptyUi(root, activeSession, inspector.container, {
     onSelectTool: () => {
       activeEditor?.setActiveTool(null);
@@ -518,7 +523,100 @@ async function bootstrap(): Promise<void> {
     onHelp: () => {
       toggleShortcutsOverlay();
     },
+    onDockMode: (mode) => {
+      workbenchController.setState({ dockMode: mode });
+    },
   }, stencilManager);
+
+  // R1b: Subscribe sidebar dock mode to controller state
+  workbenchController.subscribe((state) => {
+    ui.setDockMode(state.dockMode);
+  });
+
+  // R1b: Wire buildDockLayers into .dock-mode-layers container
+  const dockLayersContainer = ui.sidebar.querySelector('.dock-mode-layers') as HTMLElement | null;
+  if (dockLayersContainer && activeSession) {
+    const dockLayers = buildDockLayers(dockLayersContainer, activeSession, {
+      onToggleVisibility: (layerIdx, layerVersion, currentVisible) => {
+        if (!activeSession) return;
+        const cmd = JSON.stringify({
+          SetLayerVisible: { layer_id: { idx: layerIdx, version: layerVersion }, visible: !currentVisible },
+        });
+        const r = activeSession.executeCommand(cmd);
+        if (!r.ok) { ui.setDiagnostics('error', `Set visibility failed: ${r.error}`); }
+        else { activeEditor?.refreshScene(); dockLayers.refresh(); }
+      },
+      onToggleLock: (layerIdx, layerVersion, currentLocked) => {
+        if (!activeSession) return;
+        const cmd = JSON.stringify({
+          SetLayerLocked: { layer_id: { idx: layerIdx, version: layerVersion }, locked: !currentLocked },
+        });
+        const r = activeSession.executeCommand(cmd);
+        if (!r.ok) { ui.setDiagnostics('error', `Set lock failed: ${r.error}`); }
+        else { activeEditor?.refreshScene(); dockLayers.refresh(); }
+      },
+      onRename: (layerIdx, layerVersion, currentName) => {
+        if (!activeSession) return;
+        const layerItem = document.querySelector(`[data-testid="layer-item-${currentName}"]`) as HTMLElement | null;
+        if (!layerItem) return;
+        const nameSpan = layerItem.querySelector('.layer-name') as HTMLElement | null;
+        if (!nameSpan) return;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.setAttribute('data-testid', `layer-rename-input-${currentName}`);
+        input.value = currentName;
+        input.className = 'layer-rename-input';
+        input.style.cssText = 'width: 80px; font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px;';
+        nameSpan.replaceWith(input);
+        input.focus();
+        input.select();
+        const finishRename = (confirm: boolean) => {
+          const newName = input.value.trim();
+          input.remove();
+          if (!confirm || newName === currentName || newName === '') {
+            const restoredSpan = document.createElement('span');
+            restoredSpan.className = 'layer-name';
+            restoredSpan.textContent = currentName;
+            layerItem.insertBefore(restoredSpan, layerItem.firstChild);
+            return;
+          }
+          const cmd = JSON.stringify({
+            RenameLayer: { layer_id: { idx: layerIdx, version: layerVersion }, name: { text: newName } },
+          });
+          const r = activeSession!.executeCommand(cmd);
+          if (!r.ok) { ui.setDiagnostics('error', `Rename failed: ${r.error}`); }
+          else { activeEditor?.refreshScene(); dockLayers.refresh(); }
+        };
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.stopPropagation(); finishRename(true); }
+          else if (e.key === 'Escape') { e.stopPropagation(); finishRename(false); }
+        });
+        input.addEventListener('blur', () => finishRename(true));
+        input.addEventListener('click', (e) => e.stopPropagation());
+      },
+      onRemove: (layerIdx, layerVersion) => {
+        if (!activeSession) return;
+        const cmd = JSON.stringify({ RemoveLayer: { layer_id: { idx: layerIdx, version: layerVersion } } });
+        const r = activeSession.executeCommand(cmd);
+        if (!r.ok) { ui.setDiagnostics('error', `Remove layer failed: ${r.error}`); }
+        else { activeEditor?.refreshScene(); dockLayers.refresh(); }
+      },
+      onMoveToLayer: (layerIdx, layerVersion) => {
+        if (!activeSession || !activeEditor) return;
+        const pageIdx = activeEditorIdx ?? 0;
+        const cmd = JSON.stringify({ MoveToLayer: { layer_id: { idx: layerIdx, version: layerVersion } } });
+        const r = activeSession.executeCommand(cmd);
+        if (!r.ok) { ui.setDiagnostics('error', `Move to layer failed: ${r.error}`); }
+        else { activeEditor.refreshScene(); dockLayers.refresh(); }
+        void pageIdx;
+      },
+    });
+
+    // Refresh layers when dock mode switches to 'layers'
+    workbenchController.subscribe((state) => {
+      if (state.dockMode === 'layers') dockLayers.refresh();
+    });
+  }
 
   // Make hud accessible to module-level save functions
   hud = ui.hud;
@@ -975,7 +1073,7 @@ async function bootstrap(): Promise<void> {
       shiftKey: boolean;
       altKey: boolean;
     }>;
-    const { library, name, shiftKey, altKey } = event.detail;
+    const { library, name, shiftKey: _shiftKey, altKey: _altKey } = event.detail;
     const pageId = activeEditor?.getActivePageSlotId() ?? undefined;
     const result = activeSession.addStencilVertex(library, name, 400, 300, pageId);
     if (result.ok) {

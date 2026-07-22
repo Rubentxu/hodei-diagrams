@@ -8,10 +8,13 @@
 
 import type { StencilLibraryManager } from './stencil-library-manager.js';
 
+import type { DockMode } from './workbench-controller.js';
+
 export interface SidebarControls {
   container: HTMLElement;
   layersPanel: HTMLElement;
   addLayerBtn: HTMLButtonElement;
+  setDockMode: (_mode: DockMode) => void;
   rectToolBtn: HTMLButtonElement;
   roundedRectToolBtn: HTMLButtonElement;
   ellipseToolBtn: HTMLButtonElement;
@@ -186,11 +189,25 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
     // localStorage unavailable (test environments)
   }
 
-  // ─── Layers Panel (IP-F PR5) ──────────────────────────────────────────────
+  // ─── Dock Mode Containers (R1b) ─────────────────────────────────────────
+  // .dock-mode-shapes: shapes/search/stencils content (default visible)
+  const dockShapes = document.createElement('div');
+  dockShapes.className = 'dock-mode-shapes dock-mode';
+
+  // .dock-mode-layers: layers panel content
+  const dockLayers = document.createElement('div');
+  dockLayers.className = 'dock-mode-layers dock-mode';
+  dockLayers.setAttribute('data-testid', 'dock-layers');
+
+  // .dock-mode-history: history panel (R1c)
+  const dockHistory = document.createElement('div');
+  dockHistory.className = 'dock-mode-history dock-mode';
+  dockHistory.setAttribute('data-testid', 'dock-history');
+
+  // Layers Panel (IP-F PR5) — lives inside dock-mode-layers
   const layersPanel = document.createElement('div');
   layersPanel.className = 'layers-panel';
   layersPanel.setAttribute('data-testid', 'layers-panel');
-  layersPanel.hidden = true; // shown when Layers menu is opened
 
   // Add Layer button
   const addLayerBtn = document.createElement('button');
@@ -199,12 +216,15 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   addLayerBtn.setAttribute('data-testid', 'layers-add-layer');
   layersPanel.appendChild(addLayerBtn);
 
-  // Layers list container (populated dynamically)
+  // Layers list container (populated dynamically via buildDockLayers)
   const layersList = document.createElement('div');
   layersList.className = 'layers-list';
   layersPanel.appendChild(layersList);
 
-  container.appendChild(layersPanel);
+  dockLayers.appendChild(layersPanel);
+  container.appendChild(dockShapes);
+  container.appendChild(dockLayers);
+  container.appendChild(dockHistory);
 
   // ─── Search bar ──────────────────────────────────────────────────────────
   const searchWrap = document.createElement('div');
@@ -224,7 +244,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   searchInput.placeholder = 'Search shapes…';
   searchInput.setAttribute('data-testid', 'sidebar-search');
   searchWrap.appendChild(searchInput);
-  container.appendChild(searchWrap);
+  dockShapes.appendChild(searchWrap);
 
   // ─── Search filter logic ────────────────────────────────────────────────
   searchInput.addEventListener('input', () => {
@@ -371,13 +391,13 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   }
 
   generalCat.appendChild(shapeGrid);
-  container.appendChild(generalCat);
+  dockShapes.appendChild(generalCat);
 
   // ─── Dynamic stencil categories ─────────────────────────────────────────
   // Container for dynamically rendered library categories (replaced on manager changes)
   const dynamicStencilContainer = document.createElement('div');
   dynamicStencilContainer.setAttribute('data-testid', 'dynamic-stencil-categories');
-  container.appendChild(dynamicStencilContainer);
+  dockShapes.appendChild(dynamicStencilContainer);
 
   // Hidden file input for loading additional stencil libraries
   const hiddenFileInput = document.createElement('input');
@@ -560,7 +580,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   }
 
   moreShapesDetails.appendChild(moreShapesContent);
-  container.appendChild(moreShapesDetails);
+  dockShapes.appendChild(moreShapesDetails);
 
   // Wire accordion open/close + chevron rotation + localStorage
   function updateMoreShapesState(open: boolean) {
@@ -591,7 +611,7 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   const loadStencilsLink = document.createElement('button');
   loadStencilsLink.className = 'load-stencils-btn';
   loadStencilsLink.textContent = 'Load stencils from file…';
-  container.appendChild(loadStencilsLink);
+  dockShapes.appendChild(loadStencilsLink);
 
   loadStencilsLink.addEventListener('click', () => {
     hiddenFileInput.value = '';
@@ -611,10 +631,21 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
     }
   });
 
+  // ─── Dock Mode Switching (R1b) ─────────────────────────────────────────────
+  function setDockMode(mode: DockMode): void {
+    dockShapes.style.display = mode === 'shapes' ? '' : 'none';
+    dockLayers.style.display = mode === 'layers' ? '' : 'none';
+    dockHistory.style.display = mode === 'history' ? '' : 'none';
+  }
+
+  // Initially show shapes mode
+  setDockMode('shapes');
+
   return {
     container,
     layersPanel,
     addLayerBtn,
+    setDockMode,
     rectToolBtn: controls.rectToolBtn,
     roundedRectToolBtn: controls.roundedRectToolBtn,
     ellipseToolBtn: controls.ellipseToolBtn,
