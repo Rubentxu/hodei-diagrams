@@ -54,7 +54,7 @@
   --motion-slow: 280ms ease;
 
   /* Layout */
-  --navbar-h: 76px;
+  --navbar-h: 44px;
   --sidebar-w: 220px;
   --inspector-w: 230px;
   --bottom-h: 36px;
@@ -260,15 +260,16 @@ button:disabled {
   }
 }
 
-/* ─── Zone 1: Navbar ──────────────────────────────────────────────────────── */
+/* ─── Zone 1: Navbar (R2: single 44px row) ──────────────────────────────── */
 .navbar {
   grid-area: navbar;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--bg-surface);
   z-index: 10;
-  min-height: 0;
+  height: var(--navbar-h);
   overflow: hidden;
 }
 
@@ -276,11 +277,11 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: var(--md);
-  flex: 1;
-  min-height: 0;
+  height: 44px;
+  min-width: 0;
   overflow: hidden;
   padding: 0 var(--lg);
-  height: 44px;
+  flex: 1;
 }
 
 /* ─── Mobile Panel Toggle Buttons ─────────────────────────────────────────── */
@@ -331,6 +332,15 @@ button:disabled {
   margin-left: var(--xs);
   height: 32px;
   flex-shrink: 0;
+}
+
+/* R2: Contextual toolbar — hidden when no selection context */
+[data-context-toolbar="inactive"] .toolbar {
+  display: none;
+}
+
+[data-context-toolbar="active"] .toolbar {
+  display: flex;
 }
 
 .toolbar-btn {
@@ -1234,6 +1244,15 @@ button:disabled {
   height: 14px;
   background: var(--bg-surface);
   flex-shrink: 0;
+}
+
+/* R2: HUD contextual tier visibility via data-hud-density */
+[data-hud-density="compact"] [data-hud-tier="contextual"] {
+  display: none;
+}
+
+[data-hud-density="full"] [data-hud-tier="contextual"] {
+  display: flex;
 }
 
 .hud-spacer {

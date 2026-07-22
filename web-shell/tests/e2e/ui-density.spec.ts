@@ -14,7 +14,7 @@ test.describe('Slice B: Professional Density UI', () => {
       await expect(hud).toBeVisible();
     });
 
-    test('HUD shows initial state: no selection, page 1/1, zoom 100%, Edit mode', async ({ page }) => {
+    test('HUD shows initial state: no selection, zoom 100%, data-hud-density=compact', async ({ page }) => {
       await waitForAppReady(page);
 
       const hud = page.locator('[data-testid="hud"]');
@@ -24,27 +24,13 @@ test.describe('Slice B: Professional Density UI', () => {
       const selValue = page.locator('[data-testid="hud-selection"]');
       await expect(selValue).toHaveText('Nothing selected');
 
-      // Page: 1/1
-      const pageValue = page.locator('[data-testid="hud-page"]');
-      await expect(pageValue).toHaveText('1/1');
-
       // Zoom: 100%
       const zoomValue = page.locator('[data-testid="hud-zoom"]');
       await expect(zoomValue).toHaveText('100%');
 
-      // Mode: Edit
-      const modeValue = page.locator('[data-testid="hud-mode"]');
-      await expect(modeValue).toHaveText('Edit');
-    });
-
-    test('HUD updates page count after import', async ({ page }) => {
-      await waitForAppReady(page);
-
-      await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
-      await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
-
-      const pageValue = page.locator('[data-testid="hud-page"]');
-      await expect(pageValue).toHaveText('1/1');
+      // R2a: HUD density starts compact (no selection)
+      const app = page.locator('#app');
+      await expect(app).toHaveAttribute('data-hud-density', 'compact');
     });
 
     test('HUD zoom reset button resets zoom to 100%', async ({ page }) => {
@@ -443,14 +429,14 @@ test.describe('Slice B: Professional Density UI', () => {
       expect(height).toBeLessThanOrEqual(29);
     });
 
-    test('9 HUD items present — wraps to multiple lines at 800px narrow viewport', async ({ page }) => {
-      // Set narrow viewport to verify 9 items wrap to multiple lines
+    test('8 HUD items present (R2a: hud-page+hud-mode removed, hud-geometry added) — wraps to multiple lines at 800px narrow viewport', async ({ page }) => {
+      // Set narrow viewport to verify 8 items wrap to multiple lines
       await page.setViewportSize({ width: 800, height: 600 });
       await waitForAppReady(page);
 
-      // Count hud-item children
+      // Count hud-item children: selection, loading, snap, grid, cursor, zoom, geometry, save-status = 8
       const itemCount = await page.locator('[data-testid="hud"] > .hud-item').count();
-      expect(itemCount).toBe(9);
+      expect(itemCount).toBe(8);
 
       // Verify items wrap (scrollHeight > clientHeight indicates multi-line layout)
       const hudInfo = await page.locator('[data-testid="hud"]').evaluate((el) => ({
@@ -688,5 +674,92 @@ test.describe('Slice B: Professional Density UI', () => {
       await rotateBtn.click();
       await page.waitForTimeout(300);
     });
+  });
+});
+
+test.describe('R2a: Idle and Active HUD Density', () => {
+  test('at idle (no selection), only default HUD items visible', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // #app should have data-hud-density="compact" at idle
+    const app = page.locator('#app');
+    await expect(app).toHaveAttribute('data-hud-density', 'compact');
+
+    // Default items should be visible
+    await expect(page.locator('[data-testid="hud-selection"]')).toBeVisible();
+    await expect(page.locator('[data-testid="hud-zoom"]')).toBeVisible();
+    await expect(page.locator('[data-testid="hud-save-status"]')).toBeVisible();
+
+    // Contextual items should be hidden (display: none via CSS)
+    const snapItem = page.locator('[data-hud-tier="contextual"]').first();
+    await expect(snapItem).toBeHidden();
+  });
+
+  test('contextual toolbar hidden when no selection', async ({ page }) => {
+    await waitForAppReady(page);
+
+    const app = page.locator('#app');
+    // Should have inactive state
+    await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
+
+    // Toolbar should be hidden
+    await expect(page.locator('[data-testid="toolbar"]')).toBeHidden();
+  });
+
+  test('selecting a shape shows contextual toolbar', async ({ page }) => {
+    await waitForAppReady(page);
+
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Click on a shape to select it
+    const shape = page.locator('[data-vertex-id]').first();
+    await shape.click();
+    await page.waitForTimeout(300);
+
+    // Toolbar should now be visible
+    await expect(page.locator('[data-testid="toolbar"]')).toBeVisible();
+  });
+
+  test('navbar height is 44px at desktop viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await waitForAppReady(page);
+
+    const navbar = page.locator('.navbar');
+    const height = await navbar.evaluate((el: HTMLElement) => el.offsetHeight);
+    expect(height).toBe(44);
+  });
+});
+
+test.describe('R2a: Contextual Toolbar Visibility', () => {
+  test('toolbar appears on selection, clears on deselection', async ({ page }) => {
+    await waitForAppReady(page);
+
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    const app = page.locator('#app');
+    const toolbar = page.locator('[data-testid="toolbar"]');
+
+    // Initially toolbar hidden (no selection)
+    await expect(toolbar).toBeHidden();
+    await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
+
+    // Select a shape
+    const shape = page.locator('[data-vertex-id]').first();
+    await shape.click();
+    await page.waitForTimeout(300);
+
+    // Toolbar should be visible
+    await expect(toolbar).toBeVisible();
+    await expect(app).toHaveAttribute('data-context-toolbar', 'active');
+
+    // Press Escape to deselect
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Toolbar should be hidden again
+    await expect(toolbar).toBeHidden();
+    await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
   });
 });

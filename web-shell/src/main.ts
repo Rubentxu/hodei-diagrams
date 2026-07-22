@@ -616,7 +616,18 @@ async function bootstrap(): Promise<void> {
     workbenchController.subscribe((state) => {
       if (state.dockMode === 'layers') dockLayers.refresh();
     });
+
+    // R2a: Subscribe to hud density changes and set data-hud-density on #app
+    workbenchController.subscribe((state) => {
+      const appEl = document.getElementById('app');
+      appEl?.setAttribute('data-hud-density', state.hudDensity);
+    });
   }
+
+  // R2a: Initialize app attributes at startup (after ui.buildEmptyUi but before editor attach)
+  const appEl = document.getElementById('app');
+  appEl?.setAttribute('data-hud-density', workbenchController.getState().hudDensity);
+  appEl?.setAttribute('data-context-toolbar', 'inactive');
 
   // Make hud accessible to module-level save functions
   hud = ui.hud;
@@ -879,7 +890,7 @@ async function bootstrap(): Promise<void> {
     ui.hud.setSaveStatus('unsaved');
   };
 
-  // Selection change → inspector update + HUD update
+  // Selection change → inspector update + HUD update + controller density
   const onSelectionChange = (ids: SlotmapId[]) => {
     // Update inspector with current selection and scene data
     if (activeEditor) {
@@ -890,10 +901,26 @@ async function bootstrap(): Promise<void> {
       inspector.setSelectionSize(ids.length);
       // Update HUD selection label
       ui.hud.setSelection(getSelectionLabel(ids, sceneData));
-      // Update HUD selection count
-      ui.hud.setSelectionCount(ids.length);
+      // Update HUD geometry readout
+      ui.hud.setGeometry(getSelectionLabel(ids, sceneData));
       // Update toolbar buttons
       ui.toolbar.update(ids);
+
+      // R2a: Update HUD density and contextual toolbar via controller
+      workbenchController.updateContextualToolbar({
+        hasSelection: ids.length > 0,
+        isDragging: false,
+        snapEnabled: false,
+        gridVisible: ui.canvasContainer.classList.contains('show-grid'),
+        isEditing: false,
+      });
+      workbenchController.updateHudDensity({
+        hasSelection: ids.length > 0,
+        isDragging: false,
+        snapEnabled: false,
+        gridVisible: ui.canvasContainer.classList.contains('show-grid'),
+        isEditing: false,
+      });
     }
     // Update zoom display
     ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
