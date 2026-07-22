@@ -650,6 +650,17 @@ button:disabled {
   pointer-events: none;
 }
 
+/* ─── Dock Mode Containers (R1) ──────────────────────────────────────────── */
+.dock-mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Dock mode visibility is controlled via style.display by sidebar.setDockMode() */
+/* .dock-mode-shapes, .dock-mode-layers, .dock-mode-history */
+
 .sidebar-header {
   display: flex;
   align-items: center;
