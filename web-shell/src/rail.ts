@@ -35,7 +35,7 @@ export interface RailCallbacks {
   onTextTool: () => void;
   onZoomFit: () => void;
   onHelp: () => void;
-  onDockMode: (mode: 'shapes' | 'layers' | 'history') => void;
+  onDockMode: (_mode: 'shapes' | 'layers' | 'history') => void;
 }
 
 const RAIL_ICONS = {

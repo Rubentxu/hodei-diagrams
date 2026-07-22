@@ -19,15 +19,15 @@ export interface LayerItem {
 }
 
 export interface DockLayersCallbacks {
-  onToggleVisibility: (layerIdx: number, layerVersion: number, currentVisible: boolean) => void;
-  onToggleLock: (layerIdx: number, layerVersion: number, currentLocked: boolean) => void;
-  onRename: (layerIdx: number, layerVersion: number, currentName: string) => void;
-  onRemove: (layerIdx: number, layerVersion: number) => void;
-  onMoveToLayer: (layerIdx: number, layerVersion: number) => void;
+  onToggleVisibility: (_layerIdx: number, _layerVersion: number, _currentVisible: boolean) => void;
+  onToggleLock: (_layerIdx: number, _layerVersion: number, _currentLocked: boolean) => void;
+  onRename: (_layerIdx: number, _layerVersion: number, _currentName: string) => void;
+  onRemove: (_layerIdx: number, _layerVersion: number) => void;
+  onMoveToLayer: (_layerIdx: number, _layerVersion: number) => void;
 }
 
 export interface DockLayers {
-  setItems: (items: LayerItem[]) => void;
+  setItems: (_items: LayerItem[]) => void;
   refresh: () => void;
 }
 

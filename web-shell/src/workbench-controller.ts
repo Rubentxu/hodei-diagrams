@@ -32,7 +32,7 @@ export interface LayoutContext {
   isEditing: boolean;
 }
 
-type WorkbenchListener = (state: WorkbenchState) => void;
+type WorkbenchListener = (_state: WorkbenchState) => void;
 
 // ─── Boundary Guard ───────────────────────────────────────────────────────────
 

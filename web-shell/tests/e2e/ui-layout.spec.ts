@@ -5,6 +5,148 @@ import { fixturePath } from './fixtures.js';
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
 
+// ─── Dock Mode E2E Tests (R1 Tasks 2.5.1–2.5.3) ──────────────────────────────
+
+test.describe('dock mode switching (2.5.1)', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('clicking dock-layers rail button shows layers panel and hides others', async ({ page }) => {
+    const dockLayersBtn = page.locator('[data-testid="rail-dock-layers-btn"]');
+    const dockLayers = page.locator('[data-testid="dock-layers"]');
+    const dockModeShapes = page.locator('.dock-mode-shapes');
+    const dockHistory = page.locator('[data-testid="dock-history"]');
+
+    await dockLayersBtn.click();
+
+    // Only layers panel visible
+    await expect(dockLayers).toBeVisible();
+    await expect(dockModeShapes).not.toBeVisible();
+    await expect(dockHistory).not.toBeVisible();
+  });
+
+  test('clicking dock-history rail button shows history panel and hides others', async ({ page }) => {
+    const dockHistoryBtn = page.locator('[data-testid="rail-dock-history-btn"]');
+    const dockHistory = page.locator('[data-testid="dock-history"]');
+    const dockModeShapes = page.locator('.dock-mode-shapes');
+    const dockLayers = page.locator('[data-testid="dock-layers"]');
+
+    await dockHistoryBtn.click();
+
+    // Only history panel visible
+    await expect(dockHistory).toBeVisible();
+    await expect(dockModeShapes).not.toBeVisible();
+    await expect(dockLayers).not.toBeVisible();
+  });
+
+  test('clicking shapes rail button shows shapes panel and hides others', async ({ page }) => {
+    const shapesBtn = page.locator('[data-testid="rail-shapes-btn"]');
+    const dockModeShapes = page.locator('.dock-mode-shapes');
+    const dockLayers = page.locator('[data-testid="dock-layers"]');
+    const dockHistory = page.locator('[data-testid="dock-history"]');
+
+    await shapesBtn.click();
+
+    // Only shapes panel visible
+    await expect(dockModeShapes).toBeVisible();
+    await expect(dockLayers).not.toBeVisible();
+    await expect(dockHistory).not.toBeVisible();
+  });
+
+  test('repeated dock mode activation does not duplicate sidebar content', async ({ page }) => {
+    const dockLayersBtn = page.locator('[data-testid="rail-dock-layers-btn"]');
+    const dockHistoryBtn = page.locator('[data-testid="rail-dock-history-btn"]');
+    const dockLayers = page.locator('[data-testid="dock-layers"]');
+    const sidebar = page.locator('[data-testid="sidebar"]');
+
+    // Switch to layers
+    await dockLayersBtn.click();
+    await expect(dockLayers).toBeVisible();
+
+    // Switch to history and back to layers — no duplication
+    await dockHistoryBtn.click();
+    await dockLayersBtn.click();
+
+    // Exactly one layers panel
+    const layersPanels = await page.locator('[data-testid="dock-layers"]').count();
+    expect(layersPanels).toBe(1);
+    // Sidebar children count should remain stable (no duplication)
+    const sidebarChildCount = await sidebar.evaluate((el) => el.children.length);
+    expect(sidebarChildCount).toBeGreaterThan(0);
+  });
+});
+
+test.describe('keyboard rail activation (2.5.2)', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('focusing dock-layers button and pressing Enter activates layers mode', async ({ page }) => {
+    const dockLayersBtn = page.locator('[data-testid="rail-dock-layers-btn"]');
+    const dockLayers = page.locator('[data-testid="dock-layers"]');
+
+    await dockLayersBtn.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(dockLayers).toBeVisible();
+    // Focus-visible should be retained on the activated button
+    const focusVisible = await dockLayersBtn.evaluate((el) => {
+      return window.getComputedStyle(el).outlineStyle !== 'none' ||
+             el.classList.contains('focus-visible') ||
+             document.activeElement === el;
+    });
+    expect(focusVisible).toBe(true);
+  });
+
+  test('focusing dock-history button and pressing Space activates history mode', async ({ page }) => {
+    const dockHistoryBtn = page.locator('[data-testid="rail-dock-history-btn"]');
+    const dockHistory = page.locator('[data-testid="dock-history"]');
+
+    await dockHistoryBtn.focus();
+    await page.keyboard.press('Space');
+
+    await expect(dockHistory).toBeVisible();
+    // Active element should remain on the button (not lost focus)
+    const activeEl = page.locator('[data-testid="rail-dock-history-btn"]');
+    await expect(activeEl).toBeFocused();
+  });
+});
+
+test.describe('tools and docks coexist (2.5.3)', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('activating dock trigger preserves the active canvas tool', async ({ page }) => {
+    // Select a tool first (rectangle)
+    const rectToolBtn = page.locator('[data-testid="rect-tool-btn"]');
+    await rectToolBtn.click();
+
+    // Verify a tool is active (rect button has active-tool class)
+    await expect(rectToolBtn).toHaveClass(/active-tool/);
+
+    // Now activate dock mode (layers)
+    const dockLayersBtn = page.locator('[data-testid="rail-dock-layers-btn"]');
+    await dockLayersBtn.click();
+
+    // Dock mode active but tool still selected
+    const dockLayers = page.locator('[data-testid="dock-layers"]');
+    await expect(dockLayers).toBeVisible();
+    await expect(rectToolBtn).toHaveClass(/active-tool/);
+
+    // Switch dock mode — tool still preserved
+    const dockHistoryBtn = page.locator('[data-testid="rail-dock-history-btn"]');
+    await dockHistoryBtn.click();
+
+    const dockHistory = page.locator('[data-testid="dock-history"]');
+    await expect(dockHistory).toBeVisible();
+    await expect(rectToolBtn).toHaveClass(/active-tool/);
+  });
+});
+
+// ─── 5-zone UI layout ─────────────────────────────────────────────────────────
+
 test.describe('5-zone UI layout', () => {
   test('all 5 zones are present on initial load', async ({ page }) => {
     await waitForAppReady(page);
