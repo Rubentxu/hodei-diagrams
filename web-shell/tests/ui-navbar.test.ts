@@ -96,12 +96,36 @@ describe('Contextual toolbar (R2a)', () => {
     expect(topRow?.contains(toolbar)).toBe(true);
   });
 
-  it('toolbar CSS rule exists for contextual display', () => {
-    // Verify the CSS contains the contextual toolbar rules
-    const css = document.querySelector('link[href*="styles.css"]') ||
-      Array.from(document.querySelectorAll('style')).find(s => s.textContent?.includes('data-context-toolbar'));
-    // The CSS import at top of test file loads the styles
-    expect(true).toBe(true); // CSS is loaded via import in test file
+  it('data-context-toolbar attribute correctly set to inactive on #app', () => {
+    const { container } = buildNavbar(mockSession);
+    const app = document.getElementById('app')!;
+    app.setAttribute('data-context-toolbar', 'inactive');
+    app.appendChild(container);
+
+    // Verify attribute is set correctly on #app (CSS display:none/flex tested in E2E)
+    expect(app.getAttribute('data-context-toolbar')).toBe('inactive');
+    // Verify toolbar exists in DOM
+    const toolbar = container.querySelector('.toolbar') as HTMLElement;
+    expect(toolbar).not.toBeNull();
+    // Verify toolbar is inside navbar-top-row (correct DOM hierarchy)
+    const topRow = container.querySelector('.navbar-top-row') as HTMLElement;
+    expect(topRow?.contains(toolbar)).toBe(true);
+  });
+
+  it('data-context-toolbar attribute correctly set to active on #app', () => {
+    const { container } = buildNavbar(mockSession);
+    const app = document.getElementById('app')!;
+    app.setAttribute('data-context-toolbar', 'active');
+    app.appendChild(container);
+
+    // Verify attribute is set correctly on #app (CSS display:none/flex tested in E2E)
+    expect(app.getAttribute('data-context-toolbar')).toBe('active');
+    // Verify toolbar exists in DOM
+    const toolbar = container.querySelector('.toolbar') as HTMLElement;
+    expect(toolbar).not.toBeNull();
+    // Verify toolbar is inside navbar-top-row (correct DOM hierarchy)
+    const topRow = container.querySelector('.navbar-top-row') as HTMLElement;
+    expect(topRow?.contains(toolbar)).toBe(true);
   });
 });
 

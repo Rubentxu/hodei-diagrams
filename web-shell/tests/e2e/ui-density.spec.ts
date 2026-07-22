@@ -732,13 +732,31 @@ test.describe('R2a: Navbar 44px + Contextual Toolbar', () => {
     }
   });
 
-  test('contextual toolbar hidden when no selection', async ({ page }) => {
-    // Verify toolbar exists but is hidden (display: none via CSS)
-    const toolbar = page.locator('[data-testid="toolbar"]');
-    await expect(toolbar).toBeAttached();
-
-    // data-context-toolbar should be "inactive" at startup
+  test('contextual toolbar appears on selection, hides on clear', async ({ page }) => {
     const app = page.locator('#app');
+    const toolbar = page.locator('[data-testid="toolbar"]');
+
+    // Initially inactive — no selection on empty canvas
     await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
+    await expect(toolbar).toHaveCSS('display', 'none');
+
+    // Load a diagram with shapes
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Click a shape to create selection — toolbar should activate
+    const shape = page.locator('[data-vertex-id]').first();
+    await shape.click();
+    await page.waitForTimeout(200);
+
+    await expect(app).toHaveAttribute('data-context-toolbar', 'active');
+    await expect(toolbar).toHaveCSS('display', 'flex');
+
+    // Deselect by pressing Escape — toolbar should hide again
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
+    await expect(toolbar).toHaveCSS('display', 'none');
   });
 });
