@@ -30,6 +30,8 @@ import { HistoryPanel } from './history-panel.js';
 import { runMathOverlay } from './math/math-overlay.js';
 import { openMathInsertDialog } from './math/math-dialog.js';
 import { showEditXmlDialog } from './edit-xml-dialog.js';
+import { WorkbenchController } from './workbench-controller.js';
+import { buildDockLayers } from './dock-layers.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
@@ -481,7 +483,12 @@ async function bootstrap(): Promise<void> {
     }
   });
 
-  // ─── 4.5. Create zoom/pan controls early so rail callbacks can reference them ─
+  // ─── 4.5. Workbench Controller (R1) ───────────────────────────────────────
+  // Thin layout-state FSM for dock modes, HUD density, and responsive breakpoints.
+  // Owns exactly 5 fields: dockMode, panelVisibility, breakpoint, hudDensity, overlayActive.
+  const workbenchController = new WorkbenchController();
+
+  // ─── 4.6. Create zoom/pan controls early so rail callbacks can reference them ─
   // We create a minimal container just for zoom/pan, then rebuild properly in buildEmptyUi
   const zoomPanPlaceholder = document.createElement('div');
   const viewerPlaceholder = document.createElement('div');
@@ -518,10 +525,22 @@ async function bootstrap(): Promise<void> {
     onHelp: () => {
       toggleShortcutsOverlay();
     },
+    onDockMode: (mode) => {
+      workbenchController.setState({ dockMode: mode });
+    },
   }, stencilManager);
 
   // Make hud accessible to module-level save functions
   hud = ui.hud;
+
+  // ─── 5.1. Wire WorkbenchController to sidebar dock mode (R1) ─────────────────
+  // When controller dock mode changes, update the sidebar DOM
+  workbenchController.subscribe((state) => {
+    ui.setSidebarDockMode(state.dockMode);
+  });
+
+  // ─── 5.2. Initialize breakpoint detection ──────────────────────────────────
+  workbenchController.detectBreakpoint();
 
   // Start loading stencil libraries — HUD is now ready to receive callbacks
   stencilManager.startAutoLoad();
@@ -682,25 +701,22 @@ async function bootstrap(): Promise<void> {
   });
 
   // ─── 4.6. Mount Version History panel in Zone 2 sidebar (Task 3.5) ───────
-  // Create a container inside the sidebar for the history panel
-  const historyPanelContainer = document.createElement('div');
-  historyPanelContainer.className = 'history-panel-container';
-  historyPanelContainer.setAttribute('data-testid', 'history-panel-container');
-  ui.sidebar.appendChild(historyPanelContainer);
+  // Mount history panel into the dock-history container (R1)
+  const historyPanelContainer = ui.sidebar.querySelector('.dock-mode-history') as HTMLElement | null;
 
   // HistoryPanel instance — lives for the lifetime of the session
-  const historyPanel = new HistoryPanel(historyPanelContainer, activeSession, versionStore);
+  const historyPanel = new HistoryPanel(historyPanelContainer!, activeSession, versionStore);
 
   // Initial render of the panel
   historyPanel.render();
 
   // Wire history-save: manual save triggered from panel button
-  historyPanelContainer.addEventListener('history-save', () => {
+  historyPanelContainer?.addEventListener('history-save', () => {
     manualSaveVersion().then(() => historyPanel.render());
   });
 
   // Wire history-restore: Q9 default — auto-save before restore (transparent preservation)
-  historyPanelContainer.addEventListener('history-restore', async (e) => {
+  historyPanelContainer?.addEventListener('history-restore', async (e) => {
     const event = e as CustomEvent<{ id: string }>;
     const { id } = event.detail;
     if (!activeSession) return;
@@ -746,7 +762,7 @@ async function bootstrap(): Promise<void> {
   });
 
   // Wire history-delete: remove version from store, re-render panel (Task 3.4)
-  historyPanelContainer.addEventListener('history-delete', async (e) => {
+  historyPanelContainer?.addEventListener('history-delete', async (e) => {
     const event = e as CustomEvent<{ id: string }>;
     const { id } = event.detail;
     await versionStore.delete(id);
@@ -1653,258 +1669,142 @@ async function bootstrap(): Promise<void> {
     }
   });
 
-  // ─── 13.9. Wire Layers menu (IP-F PR5) ─────────────────────────────────────
-  // Show/hide layers panel when Layers menu is toggled
-  const menuLayers = document.querySelector('[data-testid="menu-layers"]') as HTMLDetailsElement | null;
-  const layersPanel = ui.sidebar.querySelector('[data-testid="layers-panel"]') as HTMLElement | null;
-  const layersListEl = layersPanel?.querySelector('.layers-list') as HTMLElement | null;
-  const addLayerBtn = layersPanel?.querySelector('[data-testid="layers-add-layer"]') as HTMLButtonElement | null;
+  // ─── 13.9. Wire Layers via dock-layers (R1) ─────────────────────────────────
+  // Mount layers panel into the dock-layers container and wire up dock-layers.ts
+  const dockLayersContainer = ui.sidebar.querySelector('.dock-mode-layers') as HTMLElement | null;
+  if (dockLayersContainer && activeSession) {
+    const dockLayers = buildDockLayers(
+      dockLayersContainer,
+      activeSession,
+      {
+        onToggleVisibility: (layerIdx, layerVersion, currentVisible) => {
+          if (!activeSession) return;
+          const cmd = JSON.stringify({
+            SetLayerVisible: { layer_id: { idx: layerIdx, version: layerVersion }, visible: !currentVisible },
+          });
+          const r = activeSession.executeCommand(cmd);
+          if (!r.ok) {
+            ui.setDiagnostics('error', `Set visibility failed: ${r.error}`);
+          } else {
+            activeEditor?.refreshScene();
+            dockLayers.refresh();
+          }
+        },
+        onToggleLock: (layerIdx, layerVersion, currentLocked) => {
+          if (!activeSession) return;
+          const cmd = JSON.stringify({
+            SetLayerLocked: { layer_id: { idx: layerIdx, version: layerVersion }, locked: !currentLocked },
+          });
+          const r = activeSession.executeCommand(cmd);
+          if (!r.ok) {
+            ui.setDiagnostics('error', `Set locked failed: ${r.error}`);
+          } else {
+            activeEditor?.refreshScene();
+            dockLayers.refresh();
+          }
+        },
+        onRename: (layerIdx, layerVersion, currentName) => {
+          if (!activeSession) return;
+          // Find the layer item and show inline rename input
+          const layerItem = dockLayersContainer.querySelector(`[data-testid="layer-item-${currentName}"]`) as HTMLElement | null;
+          if (!layerItem) return;
+          const nameSpan = layerItem.querySelector('.layer-name') as HTMLElement | null;
+          if (!nameSpan) return;
 
-  function populateLayersPanel(): void {
-    if (!layersPanel || !layersListEl || !activeSession) return;
-    layersPanel.hidden = false;
-    layersListEl.innerHTML = '';
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.setAttribute('data-testid', `layer-rename-input-${currentName}`);
+          input.value = currentName;
+          input.className = 'layer-rename-input';
+          input.style.cssText = 'width: 80px; font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px;';
+          nameSpan.replaceWith(input);
+          input.focus();
+          input.select();
 
-    const pageIdx = activeEditorIdx ?? 0;
-    const result = activeSession.getLayers(pageIdx);
-    if (!result.ok) return;
-
-    const { layers } = result.value;
-    for (const layer of layers) {
-      const layerName = layer.name ?? '(default)';
-      const item = document.createElement('div');
-      item.className = 'layer-item';
-      item.setAttribute('data-testid', `layer-item-${layerName}`);
-
-      // Name
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'layer-name';
-      nameSpan.textContent = layerName;
-      item.appendChild(nameSpan);
-
-      // Visibility toggle
-      const visBtn = document.createElement('button');
-      visBtn.className = 'layer-toggle';
-      visBtn.setAttribute('data-testid', `layer-visibility-${layerName}`);
-      visBtn.setAttribute('data-state', layer.visible ? 'visible' : 'hidden');
-      visBtn.textContent = layer.visible ? '👁' : '🙈';
-      visBtn.title = layer.visible ? 'Hide layer' : 'Show layer';
-      visBtn.addEventListener('click', () => {
-        handleLayerToggleVisibility(layer.idx, layer.version, layer.visible);
-      });
-      item.appendChild(visBtn);
-
-      // Lock toggle
-      const lockBtn = document.createElement('button');
-      lockBtn.className = 'layer-toggle';
-      lockBtn.setAttribute('data-testid', `layer-lock-${layerName}`);
-      lockBtn.setAttribute('data-state', layer.locked ? 'locked' : 'unlocked');
-      lockBtn.textContent = layer.locked ? '🔒' : '🔓';
-      lockBtn.title = layer.locked ? 'Unlock layer' : 'Lock layer';
-      lockBtn.addEventListener('click', () => {
-        handleLayerToggleLock(layer.idx, layer.version, layer.locked);
-      });
-      item.appendChild(lockBtn);
-
-      // Rename button
-      const renameBtn = document.createElement('button');
-      renameBtn.className = 'layer-toggle';
-      renameBtn.setAttribute('data-testid', `layer-rename-${layerName}`);
-      renameBtn.textContent = '✏️';
-      renameBtn.title = 'Rename layer';
-      renameBtn.addEventListener('click', () => {
-        handleLayerRename(layer.idx, layer.version, layerName);
-      });
-      item.appendChild(renameBtn);
-
-      // Remove button (only for non-default layers)
-      if (layer.name !== null) {
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'layer-toggle';
-        removeBtn.setAttribute('data-testid', `layer-remove-${layerName}`);
-        removeBtn.textContent = '🗑';
-        removeBtn.title = 'Remove layer';
-        removeBtn.addEventListener('click', () => {
-          handleLayerRemove(layer.idx, layer.version);
-        });
-        item.appendChild(removeBtn);
+          const session = activeSession;
+          const finishRename = (confirm: boolean) => {
+            const newName = input.value.trim();
+            input.remove();
+            if (!confirm || newName === currentName || newName === '') {
+              const restoredSpan = document.createElement('span');
+              restoredSpan.className = 'layer-name';
+              restoredSpan.textContent = currentName;
+              layerItem.insertBefore(restoredSpan, layerItem.firstChild);
+              return;
+            }
+            const cmd = JSON.stringify({
+              RenameLayer: { layer_id: { idx: layerIdx, version: layerVersion }, name: { text: newName } },
+            });
+            const r = session.executeCommand(cmd);
+            if (!r.ok) {
+              ui.setDiagnostics('error', `Rename failed: ${r.error}`);
+            } else {
+              activeEditor?.refreshScene();
+              dockLayers.refresh();
+            }
+          };
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.stopPropagation(); finishRename(true); }
+            else if (e.key === 'Escape') { e.stopPropagation(); finishRename(false); }
+          });
+          input.addEventListener('blur', () => finishRename(true));
+          input.addEventListener('click', (e) => e.stopPropagation());
+        },
+        onRemove: (layerIdx, layerVersion) => {
+          if (!activeSession) return;
+          const cmd = JSON.stringify({
+            RemoveLayer: { layer_id: { idx: layerIdx, version: layerVersion } },
+          });
+          const r = activeSession.executeCommand(cmd);
+          if (!r.ok) {
+            ui.setDiagnostics('error', `Remove layer failed: ${r.error}`);
+          } else {
+            activeEditor?.refreshScene();
+            dockLayers.refresh();
+          }
+        },
+        onMoveToLayer: (layerIdx, layerVersion) => {
+          if (!activeSession || !activeEditor) return;
+          const selected = activeEditor.selection;
+          if (selected.length === 0) return;
+          const cmd = JSON.stringify({
+            MoveShapeToLayer: {
+              vertex_ids: selected.map((id) => ({ idx: id.idx, version: id.version })),
+              edge_ids: [],
+              layer_id: { idx: layerIdx, version: layerVersion },
+            },
+          });
+          const r = activeSession.executeCommand(cmd);
+          if (!r.ok) {
+            ui.setDiagnostics('error', `Move to layer failed: ${r.error}`);
+          } else {
+            activeEditor.refreshScene();
+            dockLayers.refresh();
+          }
+        },
       }
+    );
+    // Initial population of layers
+    dockLayers.refresh();
 
-      // Move-to-layer: clicking the layer row (not a button) moves selected shapes here
-      item.style.cursor = 'pointer';
-      item.addEventListener('click', (e) => {
-        // Don't trigger move if clicking a button inside the row
-        if ((e.target as HTMLElement).tagName === 'BUTTON') return;
-        handleMoveToLayer(layer.idx, layer.version);
+    // Add Layer button handler
+    const addLayerBtn = dockLayersContainer.querySelector('[data-testid="layers-add-layer"]') as HTMLButtonElement | null;
+    addLayerBtn?.addEventListener('click', () => {
+      if (!activeSession || !activeEditor) return;
+      const pageIdx = activeEditorIdx ?? 0;
+      const pageSlotId = activePages[pageIdx]?.slotmapId;
+      if (!pageSlotId) return;
+      const cmd = JSON.stringify({
+        AddLayer: { page_id: pageSlotId, name: { text: 'New Layer' } },
       });
-
-      layersListEl.appendChild(item);
-    }
-  }
-
-  menuLayers?.addEventListener('toggle', () => {
-    if (menuLayers?.open) {
-      populateLayersPanel();
-    }
-  });
-
-  // Add Layer button in layers panel
-  addLayerBtn?.addEventListener('click', () => {
-    if (!activeSession || !activeEditor) return;
-    const pageIdx = activeEditorIdx ?? 0;
-    const pageSlotId = activePages[pageIdx]?.slotmapId;
-    if (!pageSlotId) return;
-    const cmd = JSON.stringify({
-      AddLayer: { page_id: pageSlotId, name: { text: 'New Layer' } },
+      const r = activeSession.executeCommand(cmd);
+      if (!r.ok) {
+        ui.setDiagnostics('error', `Add Layer failed: ${r.error}`);
+      } else {
+        activeEditor.refreshScene();
+        dockLayers.refresh();
+      }
     });
-    const r = activeSession.executeCommand(cmd);
-    if (!r.ok) {
-      ui.setDiagnostics('error', `Add Layer failed: ${r.error}`);
-    } else {
-      activeEditor.refreshScene();
-      populateLayersPanel();
-    }
-  });
-
-  // ─── Layer interaction handlers (populated per layer item) ─────────────────
-
-  /**
-   * Rename a layer: show inline input, then dispatch RenameLayer command.
-   */
-  function handleLayerRename(layerIdx: number, layerVersion: number, currentName: string): void {
-    if (!activeSession) return;
-
-    // Create inline input for renaming
-    const layerItem = document.querySelector(`[data-testid="layer-item-${currentName}"]`) as HTMLElement | null;
-    if (!layerItem) return;
-
-    // Replace the name span with an input
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.setAttribute('data-testid', `layer-rename-input-${currentName}`);
-    input.value = currentName;
-    input.className = 'layer-rename-input';
-    input.style.cssText = 'width: 80px; font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px;';
-
-    // Replace name span with input
-    const nameSpan = layerItem.querySelector('.layer-name') as HTMLElement | null;
-    if (nameSpan) {
-      nameSpan.replaceWith(input);
-      input.focus();
-      input.select();
-
-      // Capture activeSession in a local to satisfy TypeScript's closure analysis
-      const session = activeSession;
-
-      const finishRename = (confirm: boolean) => {
-        const newName = input.value.trim();
-        input.remove();
-        if (!confirm || newName === currentName || newName === '') {
-          // Restore original name span
-          const restoredSpan = document.createElement('span');
-          restoredSpan.className = 'layer-name';
-          restoredSpan.textContent = currentName;
-          layerItem.insertBefore(restoredSpan, layerItem.firstChild);
-          return;
-        }
-        const cmd = JSON.stringify({
-          RenameLayer: { layer_id: { idx: layerIdx, version: layerVersion }, name: { text: newName } },
-        });
-        const r = session.executeCommand(cmd);
-        if (!r.ok) {
-          ui.setDiagnostics('error', `Rename failed: ${r.error}`);
-        } else {
-          activeEditor?.refreshScene();
-          populateLayersPanel();
-        }
-      };
-
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.stopPropagation();
-          finishRename(true);
-        } else if (e.key === 'Escape') {
-          e.stopPropagation();
-          finishRename(false);
-        }
-      });
-      input.addEventListener('blur', () => finishRename(true));
-      input.addEventListener('click', (e) => e.stopPropagation());
-    }
-  }
-
-  /**
-   * Remove a non-default layer via RemoveLayer command.
-   */
-  function handleLayerRemove(layerIdx: number, layerVersion: number): void {
-    if (!activeSession) return;
-    const cmd = JSON.stringify({
-      RemoveLayer: { layer_id: { idx: layerIdx, version: layerVersion } },
-    });
-    const r = activeSession.executeCommand(cmd);
-    if (!r.ok) {
-      ui.setDiagnostics('error', `Remove layer failed: ${r.error}`);
-    } else {
-      activeEditor?.refreshScene();
-      populateLayersPanel();
-    }
-  }
-
-  /**
-   * Toggle layer visibility via SetLayerVisible command.
-   */
-  function handleLayerToggleVisibility(layerIdx: number, layerVersion: number, currentlyVisible: boolean): void {
-    if (!activeSession) return;
-    const cmd = JSON.stringify({
-      SetLayerVisible: { layer_id: { idx: layerIdx, version: layerVersion }, visible: !currentlyVisible },
-    });
-    const r = activeSession.executeCommand(cmd);
-    if (!r.ok) {
-      ui.setDiagnostics('error', `Set visibility failed: ${r.error}`);
-    } else {
-      activeEditor?.refreshScene();
-      populateLayersPanel();
-    }
-  }
-
-  /**
-   * Toggle layer locked state via SetLayerLocked command.
-   */
-  function handleLayerToggleLock(layerIdx: number, layerVersion: number, currentlyLocked: boolean): void {
-    if (!activeSession) return;
-    const cmd = JSON.stringify({
-      SetLayerLocked: { layer_id: { idx: layerIdx, version: layerVersion }, locked: !currentlyLocked },
-    });
-    const r = activeSession.executeCommand(cmd);
-    if (!r.ok) {
-      ui.setDiagnostics('error', `Set locked failed: ${r.error}`);
-    } else {
-      activeEditor?.refreshScene();
-      populateLayersPanel();
-    }
-  }
-
-  /**
-   * Move selected shapes to a target layer via MoveShapeToLayer command.
-   */
-  function handleMoveToLayer(targetLayerIdx: number, targetLayerVersion: number): void {
-    if (!activeSession || !activeEditor) return;
-    const selected = activeEditor.selection;
-    if (selected.length === 0) return;
-    const cmd = JSON.stringify({
-      MoveShapeToLayer: {
-        vertex_ids: selected.map((id) => ({ idx: id.idx, version: id.version })),
-        edge_ids: [],
-        layer_id: { idx: targetLayerIdx, version: targetLayerVersion },
-      },
-    });
-    const r = activeSession.executeCommand(cmd);
-    if (!r.ok) {
-      ui.setDiagnostics('error', `Move to layer failed: ${r.error}`);
-    } else {
-      activeEditor.refreshScene();
-      populateLayersPanel();
-    }
   }
 
   // ─── 13.8. Wire Help > Keyboard Shortcuts ───────────────────────────────────
