@@ -65,8 +65,11 @@ export interface UiElements {
   // Zone 4: Inspector
   inspectorContainer: HTMLElement;
 
-  // Zone 5: Bottom
-  bottomBar: HTMLElement;
+  // Zone 5: Bottom-left cluster (R2)
+  bottomLeftCluster: HTMLElement;
+  bottomBar: HTMLElement; // alias for backward compatibility
+  zoomDisplayCluster: HTMLSpanElement;
+  saveBtnCluster: HTMLButtonElement;
   errorBanner: HTMLElement;
   errorMessage: HTMLElement;
   dismissButton: HTMLButtonElement;
@@ -138,15 +141,18 @@ export function buildEmptyUi(
     inspContainer.setAttribute('data-testid', 'inspector');
   }
 
-  // ─── Zone 5: Bottom bar ──────────────────────────────────────────────────
-  const bottomBar = document.createElement('div');
-  bottomBar.className = 'bottom-bar';
-  bottomBar.setAttribute('data-testid', 'bottom-bar');
+  // ─── Zone 5: Bottom-left cluster (R2 floating) ─────────────────────────────
+  // R2: Creates floating cluster instead of grid row
+  // Contains: page tabs + zoom display + save button + error/diagnostics
+  const bottomLeftCluster = document.createElement('div');
+  bottomLeftCluster.className = 'bottom-left-cluster';
+  // Preserve legacy testid alias
+  bottomLeftCluster.setAttribute('data-testid', 'bottom-bar');
 
   const pageTabContainer = document.createElement('div');
   pageTabContainer.className = 'page-tabs';
   pageTabContainer.setAttribute('data-testid', 'page-tabs');
-  bottomBar.appendChild(pageTabContainer);
+  bottomLeftCluster.appendChild(pageTabContainer);
 
   // Page add button
   const addPageBtn = document.createElement('button');
@@ -154,12 +160,23 @@ export function buildEmptyUi(
   addPageBtn.setAttribute('data-testid', 'page-tab-add');
   addPageBtn.textContent = '+';
   addPageBtn.title = 'Add page';
+  bottomLeftCluster.appendChild(addPageBtn);
 
-  bottomBar.appendChild(addPageBtn);
+  // R2: Zoom display in cluster (moved from navbar quick controls)
+  const zoomDisplayCluster = document.createElement('span');
+  zoomDisplayCluster.className = 'zoom-display zoom-display-cluster';
+  zoomDisplayCluster.textContent = '100%';
+  zoomDisplayCluster.setAttribute('data-testid', 'zoom-display');
+  bottomLeftCluster.appendChild(zoomDisplayCluster);
 
-  const bottomSpacer = document.createElement('div');
-  bottomSpacer.className = 'bottom-spacer';
-  bottomBar.appendChild(bottomSpacer);
+  // R2: Save button in cluster (moved from navbar quick controls)
+  const saveBtnCluster = document.createElement('button');
+  saveBtnCluster.className = 'quick-btn save-btn-cluster';
+  saveBtnCluster.textContent = 'Save';
+  saveBtnCluster.title = 'Save .drawio';
+  saveBtnCluster.disabled = true;
+  saveBtnCluster.setAttribute('data-testid', 'save-btn');
+  bottomLeftCluster.appendChild(saveBtnCluster);
 
   // Diagnostics / error area
   const errorBanner = document.createElement('div');
@@ -186,7 +203,7 @@ export function buildEmptyUi(
   errorBanner.appendChild(errorMessage);
   errorBanner.appendChild(dismissButton);
   errorBanner.appendChild(diagnosticsBadge);
-  bottomBar.appendChild(errorBanner);
+  bottomLeftCluster.appendChild(errorBanner);
 
   // ─── Assemble into grid ──────────────────────────────────────────────────
   root.appendChild(_rail.container);
@@ -195,7 +212,7 @@ export function buildEmptyUi(
   root.appendChild(canvasContainer);
   root.appendChild(hud.container);
   root.appendChild(inspContainer);
-  root.appendChild(bottomBar);
+  root.appendChild(bottomLeftCluster);
 
   // ─── Sidebar collapse toggle ────────────────────────────────────────────
   sidebar.collapseBtn.addEventListener('click', () => {
@@ -295,7 +312,10 @@ export function buildEmptyUi(
     inspectorContainer: inspContainer,
 
     // Zone 5
-    bottomBar,
+    bottomLeftCluster,
+    bottomBar: bottomLeftCluster, // alias for backward compatibility
+    zoomDisplayCluster,
+    saveBtnCluster,
     errorBanner,
     errorMessage,
     dismissButton,

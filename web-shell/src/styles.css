@@ -54,7 +54,7 @@
   --motion-slow: 280ms ease;
 
   /* Layout */
-  --navbar-h: 76px;
+  --navbar-h: 44px;
   --sidebar-w: 220px;
   --inspector-w: 230px;
   --bottom-h: 36px;
@@ -142,10 +142,9 @@ button:disabled {
   grid-template-areas:
     'rail navbar  navbar   navbar'
     'rail sidebar canvas   inspector'
-    'rail sidebar hud      inspector'
-    'rail sidebar bottom   bottom';
+    'rail sidebar hud      inspector';
   grid-template-columns: var(--rail-w) var(--sidebar-w) 1fr var(--inspector-w);
-  grid-template-rows: var(--navbar-h) 1fr var(--hud-h) var(--bottom-h);
+  grid-template-rows: var(--navbar-h) 1fr var(--hud-h);
   overflow: hidden;
 }
 
@@ -203,13 +202,12 @@ button:disabled {
 @media (max-width: 767px) {
   #app {
     grid-template-columns: var(--rail-w) 0px 1fr 0px;
-    grid-template-rows: var(--navbar-h) 1fr 0px 0px;
+    grid-template-rows: var(--navbar-h) 1fr 0px;
   }
 
   .sidebar,
   .inspector,
-  .hud,
-  .bottom-bar {
+  .hud {
     display: none !important;
   }
 
@@ -223,17 +221,26 @@ button:disabled {
   .mobile-panel-toggle {
     display: flex !important;
   }
+
+  /* Bottom-left cluster floats but hidden on mobile */
+  .bottom-left-cluster {
+    display: none !important;
+  }
 }
 
 /* ─── Responsive: Narrow Mobile (<480px) ───────────────────────────────────── */
 @media (max-width: 479px) {
   /* Maximize canvas even further — hide HUD and compress navbar */
   #app {
-    grid-template-rows: var(--navbar-h) 1fr 0px 0px;
+    grid-template-rows: var(--navbar-h) 1fr 0px;
   }
 
-  .hud,
-  .bottom-bar {
+  .hud {
+    display: none !important;
+  }
+
+  /* Bottom-left cluster hidden on narrow mobile */
+  .bottom-left-cluster {
     display: none !important;
   }
 
@@ -260,15 +267,16 @@ button:disabled {
   }
 }
 
-/* ─── Zone 1: Navbar ──────────────────────────────────────────────────────── */
+/* ─── Zone 1: Navbar (R2: single 44px row) ──────────────────────────────── */
 .navbar {
   grid-area: navbar;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--bg-surface);
   z-index: 10;
-  min-height: 0;
+  height: var(--navbar-h);
   overflow: hidden;
 }
 
@@ -276,11 +284,11 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: var(--md);
-  flex: 1;
-  min-height: 0;
+  height: 44px;
+  min-width: 0;
   overflow: hidden;
   padding: 0 var(--lg);
-  height: 44px;
+  flex: 1;
 }
 
 /* ─── Mobile Panel Toggle Buttons ─────────────────────────────────────────── */
@@ -331,6 +339,15 @@ button:disabled {
   margin-left: var(--xs);
   height: 32px;
   flex-shrink: 0;
+}
+
+/* R2: Contextual toolbar — hidden when no selection context */
+[data-context-toolbar="inactive"] .toolbar {
+  display: none;
+}
+
+[data-context-toolbar="active"] .toolbar {
+  display: flex;
 }
 
 .toolbar-btn {
@@ -1269,6 +1286,17 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* ─── R2: HUD contextual tier visibility via data-hud-density ──────────────── */
+/* When compact (idle): hide contextual items */
+[data-hud-density="compact"] [data-hud-tier="contextual"] {
+  display: none;
+}
+
+/* When full (active interaction): show contextual items */
+[data-hud-density="full"] [data-hud-tier="contextual"] {
+  display: flex;
+}
+
 /* ─── Save status indicator ──────────────────────────────────────────────── */
 .hud-save-status[data-status='saving'],
 .hud-save-status[data-status='auto-saved'] {
@@ -1929,6 +1957,28 @@ button:disabled {
   gap: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+/* R2: Bottom-left floating cluster (replaces bottom-bar grid row) */
+.bottom-left-cluster {
+  position: fixed;
+  bottom: var(--md);
+  left: calc(var(--rail-w) + var(--sidebar-w) + var(--md));
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: var(--xs) var(--sm);
+  z-index: 50;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.bottom-left-cluster .page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .page-tabs {

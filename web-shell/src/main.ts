@@ -890,6 +890,8 @@ async function bootstrap(): Promise<void> {
       inspector.setSelectionSize(ids.length);
       // Update HUD selection label
       ui.hud.setSelection(getSelectionLabel(ids, sceneData));
+      // Update HUD geometry readout (R2: contextual)
+      ui.hud.setGeometry(getSelectionLabel(ids, sceneData));
       // Update HUD selection count
       ui.hud.setSelectionCount(ids.length);
       // Update toolbar buttons

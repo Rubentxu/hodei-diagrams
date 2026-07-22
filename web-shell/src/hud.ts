@@ -1,13 +1,14 @@
 /**
- * hud.ts — Zone 3.5: Status Strip / HUD
+ * hud.ts — Zone 3.5: Status Strip / HUD (R2)
  *
  * 28px strip between canvas and bottom bar showing:
- * - Selection info (shape type + dimensions)
- * - Page info (Page X/Y)
- * - Zoom level (clickable to reset)
- * - Mode indicator (Edit / Read Only / Present)
+ * - Selection info (shape type + dimensions) — DEFAULT tier
+ * - Zoom level (clickable to reset) — DEFAULT tier
+ * - Save status — DEFAULT tier
+ * - Cursor, snap, grid, geometry — CONTEXTUAL tier (shown when density=full)
  *
- * Monospace font, subtle text, minimal visual weight.
+ * R2 changes: hud-page removed (redundant with page-tabs cluster),
+ * hud-mode relocated to contextual toolbar, hud-geometry added as contextual.
  */
 
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'auto-saved';
@@ -16,14 +17,14 @@ export type LoadingState = { wasm: boolean; stencil: boolean };
 export interface HudControls {
   container: HTMLElement;
   setSelection: (_label: string) => void;
-  setPage: (_current: number, _total: number) => void;
+  setPage: (_current: number, _total: number) => void; // no-op: page info now in page-tabs cluster
   setZoom: (_percent: number) => void;
-  setMode: (_mode: 'Edit' | 'Read Only' | 'Present') => void;
+  setMode: (_mode: 'Edit' | 'Read Only' | 'Present') => void; // no-op: mode now in contextual toolbar
   onZoomClick: (_handler: () => void) => void;
   setSnap: (_enabled: boolean) => void;
   setGrid: (_visible: boolean) => void;
   setCursor: (_x: number, _y: number) => void;
-  setSelectionCount: (_n: number) => void;
+  setGeometry: (_label: string) => void;
   setSaveStatus: (_status: SaveStatus) => void;
   setLoading: (_state: LoadingState) => void;
 }
@@ -33,9 +34,10 @@ export function buildHud(): HudControls {
   container.className = 'hud hud-weighted';
   container.setAttribute('data-testid', 'hud');
 
-  // ─── Selection info ────────────────────────────────────────────────────────
+  // ─── Selection info — DEFAULT tier ─────────────────────────────────────────
   const selItem = document.createElement('div');
   selItem.className = 'hud-item hud-primary';
+  selItem.setAttribute('data-hud-tier', 'default');
 
   const selLabel = document.createElement('span');
   selLabel.className = 'hud-label';
@@ -73,9 +75,15 @@ export function buildHud(): HudControls {
   loadingItem.appendChild(loadingValue);
   container.appendChild(loadingItem);
 
-  // ─── Snap indicator ────────────────────────────────────────────────────────
+  // ─── Separator ────────────────────────────────────────────────────────────
+  const sep1 = document.createElement('div');
+  sep1.className = 'hud-sep';
+  container.appendChild(sep1);
+
+  // ─── Snap indicator — CONTEXTUAL tier ────────────────────────────────────
   const snapItem = document.createElement('div');
   snapItem.className = 'hud-item hud-snap';
+  snapItem.setAttribute('data-hud-tier', 'contextual');
 
   const snapLabel = document.createElement('span');
   snapLabel.className = 'hud-label';
@@ -90,9 +98,10 @@ export function buildHud(): HudControls {
   snapItem.appendChild(snapValue);
   container.appendChild(snapItem);
 
-  // ─── Grid indicator ───────────────────────────────────────────────────────
+  // ─── Grid indicator — CONTEXTUAL tier ─────────────────────────────────────
   const gridItem = document.createElement('div');
   gridItem.className = 'hud-item hud-grid';
+  gridItem.setAttribute('data-hud-tier', 'contextual');
 
   const gridLabel = document.createElement('span');
   gridLabel.className = 'hud-label';
@@ -107,11 +116,10 @@ export function buildHud(): HudControls {
   gridItem.appendChild(gridValue);
   container.appendChild(gridItem);
 
-  // ─── Cursor position + selection count ──────────────────────────────────────
-  // Single compact "cursor" item showing X / Y, plus selection count.
-  // Kept narrow so all HUD items fit in a 28px row at 1280px viewport.
+  // ─── Cursor position — CONTEXTUAL tier ────────────────────────────────────
   const cursorItem = document.createElement('div');
   cursorItem.className = 'hud-item hud-cursor';
+  cursorItem.setAttribute('data-hud-tier', 'contextual');
 
   const cursorLabel = document.createElement('span');
   cursorLabel.className = 'hud-label';
@@ -127,35 +135,14 @@ export function buildHud(): HudControls {
   container.appendChild(cursorItem);
 
   // ─── Separator ────────────────────────────────────────────────────────────
-  const sep1 = document.createElement('div');
-  sep1.className = 'hud-sep';
-  container.appendChild(sep1);
-
-  // ─── Page info ─────────────────────────────────────────────────────────────
-  const pageItem = document.createElement('div');
-  pageItem.className = 'hud-item hud-page';
-
-  const pageLabel = document.createElement('span');
-  pageLabel.className = 'hud-label';
-  pageLabel.textContent = 'Page:';
-
-  const pageValue = document.createElement('span');
-  pageValue.className = 'hud-value';
-  pageValue.setAttribute('data-testid', 'hud-page');
-  pageValue.textContent = '1/1';
-
-  pageItem.appendChild(pageLabel);
-  pageItem.appendChild(pageValue);
-  container.appendChild(pageItem);
-
-  // ─── Separator ────────────────────────────────────────────────────────────
   const sep2 = document.createElement('div');
   sep2.className = 'hud-sep';
   container.appendChild(sep2);
 
-  // ─── Zoom ─────────────────────────────────────────────────────────────────
+  // ─── Zoom — DEFAULT tier ─────────────────────────────────────────────────
   const zoomItem = document.createElement('div');
   zoomItem.className = 'hud-item';
+  zoomItem.setAttribute('data-hud-tier', 'default');
 
   const zoomLabel = document.createElement('span');
   zoomLabel.className = 'hud-label';
@@ -176,26 +163,28 @@ export function buildHud(): HudControls {
   spacer.className = 'hud-spacer';
   container.appendChild(spacer);
 
-  // ─── Mode ─────────────────────────────────────────────────────────────────
-  const modeItem = document.createElement('div');
-  modeItem.className = 'hud-item';
+  // ─── Geometry readout — CONTEXTUAL tier (R2 new) ─────────────────────────
+  const geometryItem = document.createElement('div');
+  geometryItem.className = 'hud-item hud-geometry';
+  geometryItem.setAttribute('data-hud-tier', 'contextual');
 
-  const modeLabel = document.createElement('span');
-  modeLabel.className = 'hud-label';
-  modeLabel.textContent = 'Mode:';
+  const geometryLabel = document.createElement('span');
+  geometryLabel.className = 'hud-label';
+  geometryLabel.textContent = 'Geo:';
 
-  const modeValue = document.createElement('span');
-  modeValue.className = 'hud-value';
-  modeValue.setAttribute('data-testid', 'hud-mode');
-  modeValue.textContent = 'Edit';
+  const geometryValue = document.createElement('span');
+  geometryValue.className = 'hud-value';
+  geometryValue.setAttribute('data-testid', 'hud-geometry');
+  geometryValue.textContent = '';
 
-  modeItem.appendChild(modeLabel);
-  modeItem.appendChild(modeValue);
-  container.appendChild(modeItem);
+  geometryItem.appendChild(geometryLabel);
+  geometryItem.appendChild(geometryValue);
+  container.appendChild(geometryItem);
 
-  // ─── Save-status indicator (persistent, right side) ─────────────────────────
+  // ─── Save-status indicator — DEFAULT tier ───────────────────────────────────
   const saveStatusItem = document.createElement('div');
   saveStatusItem.className = 'hud-item hud-save-status';
+  saveStatusItem.setAttribute('data-hud-tier', 'default');
 
   const saveStatusLabel = document.createElement('span');
   saveStatusLabel.className = 'hud-label';
@@ -227,14 +216,14 @@ export function buildHud(): HudControls {
         selItem.classList.remove('hud-item--empty');
       }
     },
-    setPage: (current: number, total: number) => {
-      pageValue.textContent = `${current}/${total}`;
+    setPage: () => {
+      // no-op: page info now lives in page-tabs cluster (bottom-left)
     },
     setZoom: (percent: number) => {
       zoomBtn.textContent = `${Math.round(percent)}%`;
     },
-    setMode: (mode: 'Edit' | 'Read Only' | 'Present') => {
-      modeValue.textContent = mode;
+    setMode: () => {
+      // no-op: mode info now lives in contextual toolbar
     },
     onZoomClick: (handler: () => void) => {
       zoomClickHandler = handler;
@@ -248,9 +237,9 @@ export function buildHud(): HudControls {
     setCursor: (x: number, y: number) => {
       cursorXValue.textContent = `${Math.round(x)},${Math.round(y)}`;
     },
-    setSelectionCount: (_n: number) => {
-      // Selection count is now reflected in the Selection label
-      // ("Rect: 0:0 (3 selected)"); the HUD has no separate counter.
+    setGeometry: (label: string) => {
+      geometryValue.textContent = label;
+      geometryItem.style.display = label ? '' : 'none';
     },
     setSaveStatus: (status: SaveStatus) => {
       saveStatusItem.dataset['status'] = status;
