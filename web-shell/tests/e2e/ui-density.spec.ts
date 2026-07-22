@@ -690,3 +690,55 @@ test.describe('Slice B: Professional Density UI', () => {
     });
   });
 });
+
+test.describe('R2a: Navbar 44px + Contextual Toolbar', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('compact keyboard navigation — navbar is 44px at viewport ≥1024px', async ({ page }) => {
+    // Set desktop viewport
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    const navbar = page.locator('[data-testid="navbar"]');
+    await expect(navbar).toBeVisible();
+
+    // Measure navbar height — should be 44px ± 1px
+    const height = await navbar.evaluate((el) => (el as HTMLElement).offsetHeight);
+    expect(height).toBeGreaterThanOrEqual(43);
+    expect(height).toBeLessThanOrEqual(45);
+  });
+
+  test('selector compatibility — all preserved navbar testids resolve', async ({ page }) => {
+    // Preserved selectors from spec §transition contract
+    const preservedSelectors = [
+      'navbar',
+      'menu-file',
+      'menu-edit',
+      'menu-view',
+      'menu-insert',
+      'menu-arrange',
+      'menu-layers',
+      'undo-btn',
+      'redo-btn',
+      'zoom-display',
+      'save-btn',
+      'navbar-brand',
+    ];
+
+    for (const sel of preservedSelectors) {
+      const locator = page.locator(`[data-testid="${sel}"]`);
+      await expect(locator).toBeAttached();
+    }
+  });
+
+  test('contextual toolbar hidden when no selection', async ({ page }) => {
+    // Verify toolbar exists but is hidden (display: none via CSS)
+    const toolbar = page.locator('[data-testid="toolbar"]');
+    await expect(toolbar).toBeAttached();
+
+    // data-context-toolbar should be "inactive" at startup
+    const app = page.locator('#app');
+    await expect(app).toHaveAttribute('data-context-toolbar', 'inactive');
+  });
+});
