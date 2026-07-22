@@ -2,7 +2,7 @@
  * resize-coord-transform.spec.ts — Regression suite for the resize coordinate-
  * space bug (fix-resize-coord-transform, SDDK).
  *
- * Bug: `#resizeOnMove` (via port-handles) passed the SVG element to `clientToDoc`
+ * Bug: `ResizeHandlesOverlay.#resizeOnMove` passed the SVG element to `clientToDoc`
  * instead of the viewer container, bypassing the viewBox transform and the CSS
  * zoom transform and falling back to raw CSS coordinates. This caused committed
  * width/height to drift by the viewBox/zoom scale factor on every resize drag.
