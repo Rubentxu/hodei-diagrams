@@ -16,49 +16,43 @@ import { waitForAppReady } from './helpers/app-ready.js';
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
 
 /** Read committed (fresh) geometry from WASM engine. */
-async function fetchCommittedGeometry(
-  page: import('@playwright/test').Page,
-  vertexIdx: number,
-) {
-  return await page.evaluate(
-    (idx) => {
-      const scene = (
-        window as unknown as {
-          __hodeiDebug?: {
-            fetchSceneFresh?: () => {
-              pages?: Array<{ display_list?: Array<Record<string, unknown>> }>;
-            };
+async function fetchCommittedGeometry(page: import('@playwright/test').Page, vertexIdx: number) {
+  return await page.evaluate((idx) => {
+    const scene = (
+      window as unknown as {
+        __hodeiDebug?: {
+          fetchSceneFresh?: () => {
+            pages?: Array<{ display_list?: Array<Record<string, unknown>> }>;
           };
-        }
-      ).__hodeiDebug?.fetchSceneFresh?.();
-      if (!scene?.pages?.length) return null;
-      for (const page of scene.pages) {
-        if (!page.display_list) continue;
-        for (const item of page.display_list) {
-          const key = Object.keys(item)[0]!;
-          const variant = item[key] as {
-            id?: { idx?: number };
-            bounds?: {
-              origin?: { x?: number; y?: number };
-              size?: { width?: number; height?: number };
-            };
-            rotation?: number;
+        };
+      }
+    ).__hodeiDebug?.fetchSceneFresh?.();
+    if (!scene?.pages?.length) return null;
+    for (const page of scene.pages) {
+      if (!page.display_list) continue;
+      for (const item of page.display_list) {
+        const key = Object.keys(item)[0]!;
+        const variant = item[key] as {
+          id?: { idx?: number };
+          bounds?: {
+            origin?: { x?: number; y?: number };
+            size?: { width?: number; height?: number };
           };
-          if (variant?.id?.idx === idx && variant?.bounds) {
-            return {
-              x: variant.bounds.origin?.x ?? 0,
-              y: variant.bounds.origin?.y ?? 0,
-              width: variant.bounds.size?.width ?? 0,
-              height: variant.bounds.size?.height ?? 0,
-              rotation: variant.rotation ?? 0,
-            };
-          }
+          rotation?: number;
+        };
+        if (variant?.id?.idx === idx && variant?.bounds) {
+          return {
+            x: variant.bounds.origin?.x ?? 0,
+            y: variant.bounds.origin?.y ?? 0,
+            width: variant.bounds.size?.width ?? 0,
+            height: variant.bounds.size?.height ?? 0,
+            rotation: variant.rotation ?? 0,
+          };
         }
       }
-      return null;
-    },
-    vertexIdx,
-  );
+    }
+    return null;
+  }, vertexIdx);
 }
 
 /** Get the DOM bounding box of a shape element (visual preview state). */
@@ -66,17 +60,14 @@ async function getShapeBoundingBox(
   page: import('@playwright/test').Page,
   vertexIdx: number,
 ): Promise<{ x: number; y: number; width: number; height: number } | null> {
-  return await page.evaluate(
-    (idx) => {
-      // Find the shape with matching vertex idx (version may vary)
-      const els = document.querySelectorAll(`[data-vertex-id^="${idx}:"]`);
-      if (els.length === 0) return null;
-      const el = els[els.length - 1]!;
-      const bbox = el.getBoundingClientRect();
-      return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
-    },
-    vertexIdx,
-  );
+  return await page.evaluate((idx) => {
+    // Find the shape with matching vertex idx (version may vary)
+    const els = document.querySelectorAll(`[data-vertex-id^="${idx}:"]`);
+    if (els.length === 0) return null;
+    const el = els[els.length - 1]!;
+    const bbox = el.getBoundingClientRect();
+    return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
+  }, vertexIdx);
 }
 
 /** Get the SVG transform attribute of a shape element. */
@@ -84,15 +75,12 @@ async function getShapeTransform(
   page: import('@playwright/test').Page,
   vertexIdx: number,
 ): Promise<string | null> {
-  return await page.evaluate(
-    (idx) => {
-      const els = document.querySelectorAll(`[data-vertex-id^="${idx}:"]`);
-      if (els.length === 0) return null;
-      const el = els[els.length - 1]!;
-      return (el as SVGElement).getAttribute('transform');
-    },
-    vertexIdx,
-  );
+  return await page.evaluate((idx) => {
+    const els = document.querySelectorAll(`[data-vertex-id^="${idx}:"]`);
+    if (els.length === 0) return null;
+    const el = els[els.length - 1]!;
+    return (el as SVGElement).getAttribute('transform');
+  }, vertexIdx);
 }
 
 // ─── Setup Helper ─────────────────────────────────────────────────────────────
@@ -340,6 +328,7 @@ test.describe('Live transform preview (fix-resize-coord-transform)', () => {
 
   /**
    * TP-005: pointercancel restores original DOM state without commit.
+   * Dispatches pointercancel on the viewer (the actual listener target) after a >3px drag.
    */
   test('TP-005: pointercancel restores without committing', async ({ page }) => {
     const { vertexIdx, box } = await setupForTransform(page);
@@ -348,7 +337,10 @@ test.describe('Live transform preview (fix-resize-coord-transform)', () => {
     const beforeEngine = await fetchCommittedGeometry(page, vertexIdx);
     expect(beforeEngine).not.toBeNull();
 
-    // Start a move drag
+    const beforeBBox = await getShapeBoundingBox(page, vertexIdx);
+    expect(beforeBBox).not.toBeNull();
+
+    // Start a move drag (>3px threshold)
     const startX = box.x + box.width / 2;
     const startY = box.y + box.height / 2;
     const dragX = 50;
@@ -357,17 +349,35 @@ test.describe('Live transform preview (fix-resize-coord-transform)', () => {
     await page.mouse.move(startX, startY);
     await page.mouse.down();
     await page.mouse.move(startX + dragX, startY + dragY, { steps: 5 });
+    await page.waitForTimeout(50); // Allow preview to apply
 
-    // Simulate pointercancel
+    // Verify preview is active (shape bbox moved)
+    const duringBBox = await getShapeBoundingBox(page, vertexIdx);
+    expect(duringBBox).not.toBeNull();
+    expect(duringBBox!.x).toBeGreaterThan(beforeBBox!.x + 20);
+
+    // Engine geometry should still be unchanged during preview
+    const duringEngine = await fetchCommittedGeometry(page, vertexIdx);
+    expect(duringEngine!.x).toBeCloseTo(beforeEngine!.x, 1);
+    expect(duringEngine!.y).toBeCloseTo(beforeEngine!.y, 1);
+
+    // Dispatch pointercancel on the viewer (the actual listener target)
     await page.evaluate(() => {
-      document.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }));
+      const viewer = document.querySelector('[data-testid="viewer"]') as HTMLElement;
+      viewer.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }));
     });
     await page.waitForTimeout(200);
 
-    // Engine geometry should be unchanged (canceled)
+    // Engine geometry should be unchanged (canceled, not committed)
     const afterEngine = await fetchCommittedGeometry(page, vertexIdx);
     expect(afterEngine!.x).toBeCloseTo(beforeEngine!.x, 1);
     expect(afterEngine!.y).toBeCloseTo(beforeEngine!.y, 1);
+
+    // Preview transform should be restored (bbox back to original)
+    const afterBBox = await getShapeBoundingBox(page, vertexIdx);
+    expect(afterBBox).not.toBeNull();
+    expect(afterBBox!.x).toBeCloseTo(beforeBBox!.x, 1);
+    expect(afterBBox!.y).toBeCloseTo(beforeBBox!.y, 1);
   });
 
   /**
@@ -389,23 +399,24 @@ test.describe('Live transform preview (fix-resize-coord-transform)', () => {
     await page.waitForTimeout(100);
 
     // Refresh box after zoom using page.evaluate
-    const boxAfterZoom = await page.evaluate(
-      (idx) => {
-        const el = document.querySelector(`[data-vertex-id^="${idx}:"]`);
-        if (!el) return null;
-        const bbox = el.getBoundingClientRect();
-        return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
-      },
-      vertexIdx,
-    );
+    const boxAfterZoom = await page.evaluate((idx) => {
+      const el = document.querySelector(`[data-vertex-id^="${idx}:"]`);
+      if (!el) return null;
+      const bbox = el.getBoundingClientRect();
+      return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
+    }, vertexIdx);
     expect(boxAfterZoom).not.toBeNull();
 
     const beforeEngine = await fetchCommittedGeometry(page, vertexIdx);
     expect(beforeEngine).not.toBeNull();
 
     // Start move drag
-    const startX = (boxAfterZoom as { x: number; y: number; width: number; height: number }).x + (boxAfterZoom as { x: number; y: number; width: number; height: number }).width / 2;
-    const startY = (boxAfterZoom as { x: number; y: number; width: number; height: number }).y + (boxAfterZoom as { x: number; y: number; width: number; height: number }).height / 2;
+    const startX =
+      (boxAfterZoom as { x: number; y: number; width: number; height: number }).x +
+      (boxAfterZoom as { x: number; y: number; width: number; height: number }).width / 2;
+    const startY =
+      (boxAfterZoom as { x: number; y: number; width: number; height: number }).y +
+      (boxAfterZoom as { x: number; y: number; width: number; height: number }).height / 2;
     const dragX = 30;
     const dragY = 20;
 
