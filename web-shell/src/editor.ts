@@ -216,8 +216,8 @@ export class Editor {
   #cursorMoveRafId: number | null = null;
 
   // ─── Interaction State Callback (R2b: HUD density seam) ───────────────────
-  /** Fires when isDragging or isTextEditing transitions. Disposable. */
-  #interactionStateCb: ((_state: { isDragging: boolean; isTextEditing: boolean }) => void) | null = null;
+  /** Fires when isDragging or isTextEditing transitions. Disposable, supports multiple listeners. */
+  #interactionStateListeners = new Set<(state: { isDragging: boolean; isTextEditing: boolean }) => void>();
 
   // ─── Snap ────────────────────────────────────────────────────────────────
   #snapEnabled: boolean = false;
@@ -1689,21 +1689,22 @@ export class Editor {
   /**
    * Register a callback that fires when isDragging or isTextEditing transitions.
    * This is the single read-only seam between the Editor and HUD density logic.
-   * Returns an unsubscribe function.
+   * Returns an unsubscribe function. Supports multiple listeners (Set pattern).
    */
   onInteractionStateChange(
-    cb: (_state: { isDragging: boolean; isTextEditing: boolean }) => void,
+    cb: (state: { isDragging: boolean; isTextEditing: boolean }) => void,
   ): () => void {
-    this.#interactionStateCb = cb;
-    return () => { this.#interactionStateCb = null; };
+    this.#interactionStateListeners.add(cb);
+    return () => { this.#interactionStateListeners.delete(cb); };
   }
 
-  /** Fire the interaction state callback if registered. */
+  /** Fire all interaction state listeners. */
   #notifyInteractionState(): void {
-    this.#interactionStateCb?.({
+    const state = {
       isDragging: this.#dragState !== null || this.#moveArea !== null,
       isTextEditing: this.#textEdit !== null,
-    });
+    };
+    for (const cb of this.#interactionStateListeners) cb(state);
   }
 
   // ─── Coordinate Conversion (public for HUD wiring) ────────────────────────
@@ -1851,7 +1852,7 @@ export class Editor {
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
-    this.#dragState = null;
+    if (this.#dragState !== null) { this.#dragState = null; this.#notifyInteractionState(); }
     this.#bendDrag = null;
     this.#cancelMarquee();
     this.#cancelConnect();
@@ -3281,24 +3282,24 @@ export class Editor {
       return;
     }
 
-    if (!this.#dragState) return;
-
-    const dx = this.#dragState.currentX - this.#dragState.startX;
-    const dy = this.#dragState.currentY - this.#dragState.startY;
+    const hadDragState = this.#dragState !== null;
+    const dx = hadDragState ? this.#dragState!.currentX - this.#dragState!.startX : 0;
+    const dy = hadDragState ? this.#dragState!.currentY - this.#dragState!.startY : 0;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Restore all transform previews (shapes and handles)
-    this.#transformPreview.restoreAll();
-    this.#resizeHandles.applyDragOffset(0, 0);
-
-    // Commit move if threshold exceeded
-    if (distance >= 3) {
-      this.#commitMove(this.#dragState.vertexId, dx, dy);
+    // Restore all transform previews (shapes and handles) only if we had a drag
+    if (hadDragState) {
+      this.#transformPreview.restoreAll();
+      this.#resizeHandles.applyDragOffset(0, 0);
+      // Commit move if threshold exceeded
+      if (distance >= 3) {
+        this.#commitMove(this.#dragState!.vertexId, dx, dy);
+      }
+      this.#transformPreview.commitAll();
     }
 
-    // Clean up captures after restore/commit
-    this.#transformPreview.commitAll();
     this.#dragState = null;
+    // Always notify on pointerup — ensures HUD returns to 'default' tier after any drag
     this.#notifyInteractionState();
   }
 

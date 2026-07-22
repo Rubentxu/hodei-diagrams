@@ -1310,9 +1310,9 @@ button:disabled {
 }
 
 /* ─── HUD density tiers (R2b) ──────────────────────────────────────────────── */
-/* Compact: hide tertiary items (cursor, page) to reduce visual noise */
-[data-hud-density='compact'] .hud-cursor,
-[data-hud-density='compact'] .hud-page {
+/* 'default': hide tertiary items (cursor XY) to reduce visual noise */
+/* 'contextual': show all items during active interaction */
+[data-hud-tier='default'] .hud-cursor {
   display: none;
 }
 

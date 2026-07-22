@@ -16,7 +16,7 @@ export type LoadingState = { wasm: boolean; stencil: boolean };
 export interface HudControls {
   container: HTMLElement;
   setSelection: (_label: string) => void;
-  setPage: (_current: number, _total: number) => void;
+  setPage: (_current: number, _total: number) => void; // kept for compatibility; no-op when HUD has no page item
   setZoom: (_percent: number) => void;
   setMode: (_mode: 'Edit' | 'Read Only' | 'Present') => void;
   onZoomClick: (_handler: () => void) => void;
@@ -26,8 +26,8 @@ export interface HudControls {
   setSelectionCount: (_n: number) => void;
   setSaveStatus: (_status: SaveStatus) => void;
   setLoading: (_state: LoadingState) => void;
-  /** R2b: Set HUD density tier. 'compact' hides tertiary items; 'full' shows all. */
-  setDensity: (_density: 'full' | 'compact') => void;
+  /** R2b: Set HUD tier. 'default' hides tertiary; 'contextual' shows all. */
+  setTier: (_tier: 'default' | 'contextual') => void;
 }
 
 export function buildHud(): HudControls {
@@ -133,28 +133,6 @@ export function buildHud(): HudControls {
   sep1.className = 'hud-sep';
   container.appendChild(sep1);
 
-  // ─── Page info ─────────────────────────────────────────────────────────────
-  const pageItem = document.createElement('div');
-  pageItem.className = 'hud-item hud-page';
-
-  const pageLabel = document.createElement('span');
-  pageLabel.className = 'hud-label';
-  pageLabel.textContent = 'Page:';
-
-  const pageValue = document.createElement('span');
-  pageValue.className = 'hud-value';
-  pageValue.setAttribute('data-testid', 'hud-page');
-  pageValue.textContent = '1/1';
-
-  pageItem.appendChild(pageLabel);
-  pageItem.appendChild(pageValue);
-  container.appendChild(pageItem);
-
-  // ─── Separator ────────────────────────────────────────────────────────────
-  const sep2 = document.createElement('div');
-  sep2.className = 'hud-sep';
-  container.appendChild(sep2);
-
   // ─── Zoom ─────────────────────────────────────────────────────────────────
   const zoomItem = document.createElement('div');
   zoomItem.className = 'hud-item';
@@ -229,8 +207,8 @@ export function buildHud(): HudControls {
         selItem.classList.remove('hud-item--empty');
       }
     },
-    setPage: (current: number, total: number) => {
-      pageValue.textContent = `${current}/${total}`;
+    setPage: (_current: number, _total: number) => {
+      // No-op: hud-page removed per R2b spec
     },
     setZoom: (percent: number) => {
       zoomBtn.textContent = `${Math.round(percent)}%`;
@@ -271,8 +249,8 @@ export function buildHud(): HudControls {
           break;
       }
     },
-    setDensity: (density: 'full' | 'compact') => {
-      container.dataset['hudDensity'] = density;
+    setTier: (tier: 'default' | 'contextual') => {
+      container.dataset['hudTier'] = tier;
     },
     setLoading: (state: LoadingState) => {
       const isLoading = state.wasm || state.stencil;

@@ -16,13 +16,13 @@ describe('WorkbenchController', () => {
       expect(s).toHaveProperty('overlayActive');
     });
     it('isWorkbenchState returns true for valid state', () => {
-      expect(isWorkbenchState({ dockMode: 'shapes', panelVisibility: { sidebar: true, inspector: false }, breakpoint: 'desktop', hudDensity: 'compact', overlayActive: null })).toBe(true);
+      expect(isWorkbenchState({ dockMode: 'shapes', panelVisibility: { sidebar: true, inspector: false }, breakpoint: 'desktop', hudDensity: 'default', overlayActive: null })).toBe(true);
     });
     it('isWorkbenchState returns false for extra fields', () => {
-      expect(isWorkbenchState({ dockMode: 'shapes', panelVisibility: { sidebar: true, inspector: false }, breakpoint: 'desktop', hudDensity: 'compact', overlayActive: null, extra: true } as unknown as WorkbenchState)).toBe(false);
+      expect(isWorkbenchState({ dockMode: 'shapes', panelVisibility: { sidebar: true, inspector: false }, breakpoint: 'desktop', hudDensity: 'default', overlayActive: null, extra: true } as unknown as WorkbenchState)).toBe(false);
     });
     it('assertControllerBoundary throws on extra fields', () => {
-      expect(() => assertControllerBoundary({ dockMode: 'shapes', panelVisibility: { sidebar: true, inspector: false }, breakpoint: 'desktop', hudDensity: 'compact', overlayActive: null, extra: true } as unknown as WorkbenchState)).toThrow('Boundary violation');
+      expect(() => assertControllerBoundary({ dockMode: 'shapes', panelVisibility: { sidebar: true, inspector: false }, breakpoint: 'desktop', hudDensity: 'default', overlayActive: null, extra: true } as unknown as WorkbenchState)).toThrow('Boundary violation');
     });
   });
 
@@ -50,25 +50,25 @@ describe('WorkbenchController', () => {
 
   // task 1.1.6: updateHudDensity
   describe('updateHudDensity', () => {
-    it('compact when idle', () => {
+    it('default when idle', () => {
       controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: false, gridVisible: false, isEditing: false });
-      expect(controller.getState().hudDensity).toBe('compact');
+      expect(controller.getState().hudDensity).toBe('default');
     });
-    it('full when dragging', () => {
+    it('contextual when dragging', () => {
       controller.updateHudDensity({ hasSelection: false, isDragging: true, snapEnabled: false, gridVisible: false, isEditing: false });
-      expect(controller.getState().hudDensity).toBe('full');
+      expect(controller.getState().hudDensity).toBe('contextual');
     });
-    it('full when snapEnabled', () => {
+    it('contextual when snapEnabled', () => {
       controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: true, gridVisible: false, isEditing: false });
-      expect(controller.getState().hudDensity).toBe('full');
+      expect(controller.getState().hudDensity).toBe('contextual');
     });
-    it('full when gridVisible', () => {
+    it('contextual when gridVisible', () => {
       controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: false, gridVisible: true, isEditing: false });
-      expect(controller.getState().hudDensity).toBe('full');
+      expect(controller.getState().hudDensity).toBe('contextual');
     });
-    it('full when isEditing', () => {
+    it('contextual when isEditing', () => {
       controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: false, gridVisible: false, isEditing: true });
-      expect(controller.getState().hudDensity).toBe('full');
+      expect(controller.getState().hudDensity).toBe('contextual');
     });
   });
 
