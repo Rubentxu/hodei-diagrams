@@ -11,6 +11,75 @@ const GROUP_NESTED_PATH = new URL(
   import.meta.url,
 ).pathname;
 
+/** Read committed geometry from the WASM engine via __hodeiDebug.fetchSceneFresh() */
+async function fetchCommittedGeometry(
+  page: import('@playwright/test').Page,
+  vertexIdx: number,
+) {
+  return await page.evaluate(
+    (idx) => {
+      const scene = (
+        window as unknown as {
+          __hodeiDebug?: {
+            fetchSceneFresh?: () => {
+              pages?: Array<{ display_list?: Array<Record<string, unknown>> }>;
+            };
+          };
+        }
+      ).__hodeiDebug?.fetchSceneFresh?.();
+      if (!scene?.pages?.length) return null;
+      for (const page of scene.pages) {
+        if (!page.display_list) continue;
+        for (const item of page.display_list) {
+          const key = Object.keys(item)[0]!;
+          const variant = item[key] as {
+            id?: { idx?: number };
+            bounds?: {
+              origin?: { x?: number; y?: number };
+              size?: { width?: number; height?: number };
+            };
+          };
+          if (variant?.id?.idx === idx && variant?.bounds) {
+            return {
+              x: variant.bounds.origin?.x ?? 0,
+              y: variant.bounds.origin?.y ?? 0,
+              width: variant.bounds.size?.width ?? 0,
+              height: variant.bounds.size?.height ?? 0,
+            };
+          }
+        }
+      }
+      return null;
+    },
+    vertexIdx,
+  );
+}
+
+/**
+ * Compute CSS→doc scale from the live SVG viewBox and svgRect.
+ * Throws if data is missing (fail-closed oracle).
+ */
+async function getCssToDocScale(
+  page: import('@playwright/test').Page,
+): Promise<{ scaleX: number; scaleY: number }> {
+  return await page.evaluate(() => {
+    const viewer = document.querySelector('[data-testid="viewer"]') as HTMLElement;
+    const svg = viewer?.querySelector('svg') as SVGSVGElement | null;
+    if (!viewer || !svg) throw new Error('viewer or svg not found');
+    const viewBox = svg.getAttribute('viewBox');
+    if (!viewBox) throw new Error('viewBox not found');
+    const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+    if (parts.length !== 4) throw new Error(`Invalid viewBox: ${viewBox}`);
+    const [vbX, vbY, vbW, vbH] = parts as [number, number, number, number];
+    const svgRect = svg.getBoundingClientRect();
+    if (svgRect.width === 0 || svgRect.height === 0)
+      throw new Error('SVG bounding rect has zero size');
+    void vbX;
+    void vbY;
+    return { scaleX: vbW / svgRect.width, scaleY: vbH / svgRect.height };
+  });
+}
+
 async function loadAndSelectSimpleRect(page: import('@playwright/test').Page) {
   await page.goto('/');
   await waitForAppReady(page);
@@ -35,10 +104,17 @@ async function loadAndSelectSimpleRect(page: import('@playwright/test').Page) {
   const rect = viewer.locator('[data-vertex-id]').first();
   const box = await rect.boundingBox();
   if (!box) throw new Error('simple rect not visible');
+
+  // Extract vertex index for committed geometry checks
+  const idAttr = await rect.getAttribute('data-vertex-id');
+  expect(idAttr).toMatch(/^\d+:\d+$/);
+  const [idxStr] = idAttr!.split(':');
+  const vertexIdx = parseInt(idxStr!);
+
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(rect).toHaveClass(/selected/);
   await expect(viewer.locator('.resize-handle')).toHaveCount(8);
-  return { viewer, rect };
+  return { viewer, rect, vertexIdx };
 }
 
 test.describe('Transform handles visual contract', () => {
@@ -78,27 +154,53 @@ test.describe('Transform handles visual contract', () => {
   test('dragging a resize handle keeps transform handles visible and commits size change', async ({
     page,
   }) => {
-    const { viewer, rect } = await loadAndSelectSimpleRect(page);
+    const { viewer, rect, vertexIdx } = await loadAndSelectSimpleRect(page);
+
+    // Resize handles should be visible when shape is selected
+    await expect(viewer.locator('.resize-handle')).toHaveCount(8);
+
+    // East handle should be visible
     const eastHandle = viewer.locator('.resize-handle[data-handle="e"]');
+    await expect(eastHandle).toBeVisible();
 
-    const beforeWidth = Number(await rect.getAttribute('width'));
     const handleBox = await eastHandle.boundingBox();
-    if (!Number.isFinite(beforeWidth) || !handleBox)
-      throw new Error('shape or east handle not visible before resize');
+    expect(handleBox).not.toBeNull();
 
-    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    // Get CSS→doc scale for computing expected delta
+    const { scaleX } = await getCssToDocScale(page);
+    expect(scaleX).toBeGreaterThan(0);
+
+    // Read committed geometry BEFORE drag
+    const before = await fetchCommittedGeometry(page, vertexIdx);
+    expect(before).not.toBeNull();
+    expect(before!.width).toBeCloseTo(80, 1);
+
+    // Drag the east handle rightward by 35px
+    const CSS_DRAG_PX = 35;
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
     await page.mouse.down();
     await page.mouse.move(
-      handleBox.x + handleBox.width / 2 + 35,
-      handleBox.y + handleBox.height / 2,
+      handleBox!.x + handleBox!.width / 2 + CSS_DRAG_PX,
+      handleBox!.y + handleBox!.height / 2,
       { steps: 5 },
     );
     await page.mouse.up();
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(300);
 
+    // Read committed geometry AFTER drag
+    const after = await fetchCommittedGeometry(page, vertexIdx);
+    expect(after).not.toBeNull();
+
+    // Assert the committed width delta matches the expected doc-space delta
+    const expectedWidthDelta = CSS_DRAG_PX * scaleX;
+    const actualWidthDelta = after!.width - before!.width;
+    expect(actualWidthDelta).toBeCloseTo(expectedWidthDelta, 1);
+
+    // Height should be unchanged for an east (horizontal) handle
+    expect(after!.height).toBeCloseTo(before!.height, 1);
+
+    // After drag, resize handles should still be visible (shape stayed selected)
     await expect(viewer.locator('.resize-handle')).toHaveCount(8);
-    const afterWidth = Number(await rect.getAttribute('width'));
-    expect(afterWidth).toBeGreaterThan(beforeWidth + 15);
   });
 
   test('single-shape selection shows a rotation handle and dragging it rotates the shape', async ({

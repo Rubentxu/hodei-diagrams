@@ -12,12 +12,25 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
-import { sceneGeometry, sceneBounds, findAllShapeIds, findShapeVariant, findAllBounds, findAllShapesWithBounds, extractIdFromElem, findShapeIdAtPoint, perimeterNormalized, classifyAnchorFromNormalized, clientToDoc } from './scene-bounds.js';
+import {
+  sceneGeometry,
+  sceneBounds,
+  findAllShapeIds,
+  findShapeVariant,
+  findAllBounds,
+  findAllShapesWithBounds,
+  extractIdFromElem,
+  findShapeIdAtPoint,
+  perimeterNormalized,
+  classifyAnchorFromNormalized,
+  clientToDoc,
+} from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
 import { PortHandlesOverlay } from './port-handles.js';
 import { ResizeHandlesOverlay } from './resize-handles.js';
 import { BendHandlesOverlay } from './bend-handles.js';
+import { TransformPreview } from './transform-preview.js';
 
 /** Active tool from the palette. */
 export type ToolKind =
@@ -61,10 +74,10 @@ export interface OverlayHitZone {
 
 /**
  * Narrow host surface overlays use to register pointer hit zones.
-  * Editor implements this; overlays depend on the interface, not Editor.
-  *
-  * Bend handles are managed by BendHandlesOverlay (r109+), attached via
-  * BendHandlesOverlay.attach(this) in the Editor constructor.
+ * Editor implements this; overlays depend on the interface, not Editor.
+ *
+ * Bend handles are managed by BendHandlesOverlay (r109+), attached via
+ * BendHandlesOverlay.attach(this) in the Editor constructor.
  */
 export interface OverlayHost {
   /** Register an overlay's hit zone. Returns a disposer for symmetry. */
@@ -208,6 +221,10 @@ export class Editor {
 
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
   #textEdit: TextEditState = null;
+
+  // ─── Transform Preview ──────────────────────────────────────────────────
+  /** Live transform preview for move/resize/rotation drag gestures. */
+  readonly #transformPreview: TransformPreview = new TransformPreview();
 
   get isTextEditing(): boolean {
     return this.#textEdit !== null;
@@ -398,11 +415,7 @@ export class Editor {
    * @param modifiers Keyboard modifiers
    * @returns The resolved SelectionTarget, or null on error
    */
-  resolveSelection(
-    x: number,
-    y: number,
-    modifiers: SelectionModifiers,
-  ): SelectionTarget | null {
+  resolveSelection(x: number, y: number, modifiers: SelectionModifiers): SelectionTarget | null {
     const result = this.#session.resolveSelection(x, y, modifiers);
     if (!result.ok) {
       this.#onError(result.error);
@@ -477,9 +490,7 @@ export class Editor {
     containment: 'contain' | 'intersect',
   ): void {
     const ids =
-      containment === 'contain'
-        ? this.#getContainingIds(rect)
-        : this.#getIntersectingIds(rect);
+      containment === 'contain' ? this.#getContainingIds(rect) : this.#getIntersectingIds(rect);
     this.#applySelection(new Set(ids));
   }
 
@@ -492,9 +503,7 @@ export class Editor {
     containment: 'contain' | 'intersect',
   ): void {
     const ids =
-      containment === 'contain'
-        ? this.#getContainingIds(rect)
-        : this.#getIntersectingIds(rect);
+      containment === 'contain' ? this.#getContainingIds(rect) : this.#getIntersectingIds(rect);
     const next = new Set(this.#selection);
     for (const id of ids) {
       next.delete(id);
@@ -528,7 +537,13 @@ export class Editor {
   #getIdsAtPoint(x: number, y: number): SlotmapId[] {
     const all = findAllShapesWithBounds(this.#sceneCache);
     return all
-      .filter(({ bounds }) => x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height)
+      .filter(
+        ({ bounds }) =>
+          x >= bounds.x &&
+          x <= bounds.x + bounds.width &&
+          y >= bounds.y &&
+          y <= bounds.y + bounds.height,
+      )
       .map(({ id }) => id);
   }
 
@@ -936,8 +951,19 @@ export class Editor {
       .filter(
         (
           b,
-        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number; rotation: number; flip_h: boolean; flip_v: boolean; relative: boolean } } =>
-          b.geom !== null,
+        ): b is {
+          id: SlotmapId;
+          geom: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            rotation: number;
+            flip_h: boolean;
+            flip_v: boolean;
+            relative: boolean;
+          };
+        } => b.geom !== null,
       );
 
     if (bounds.length < 2) return;
@@ -998,8 +1024,19 @@ export class Editor {
       .filter(
         (
           b,
-        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number; rotation: number; flip_h: boolean; flip_v: boolean; relative: boolean } } =>
-          b.geom !== null,
+        ): b is {
+          id: SlotmapId;
+          geom: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            rotation: number;
+            flip_h: boolean;
+            flip_v: boolean;
+            relative: boolean;
+          };
+        } => b.geom !== null,
       );
 
     if (bounds.length < 3) return;
@@ -1064,8 +1101,19 @@ export class Editor {
       .filter(
         (
           b,
-        ): b is { id: SlotmapId; geom: { x: number; y: number; width: number; height: number; rotation: number; flip_h: boolean; flip_v: boolean; relative: boolean } } =>
-          b.geom !== null,
+        ): b is {
+          id: SlotmapId;
+          geom: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            rotation: number;
+            flip_h: boolean;
+            flip_v: boolean;
+            relative: boolean;
+          };
+        } => b.geom !== null,
       );
 
     if (bounds.length < 2) return;
@@ -1190,11 +1238,7 @@ export class Editor {
         const edge = e['Edge'] as Record<string, unknown> | undefined;
         if (!edge) continue;
         const idField = edge['id'] as { idx?: number; version?: number } | undefined;
-        if (
-          idField &&
-          idField.idx === id.idx &&
-          idField.version === id.version
-        ) {
+        if (idField && idField.idx === id.idx && idField.version === id.version) {
           return edge;
         }
       }
@@ -1249,7 +1293,12 @@ export class Editor {
    * Errors from `session.insertBend` are surfaced via `#onError`. Returns
    * `Result<void, EngineError>` for callers that want to propagate explicitly.
    */
-  insertBend(edgeId: SlotmapId, segmentIndex: number, x: number, y: number): Result<void, EngineError> {
+  insertBend(
+    edgeId: SlotmapId,
+    segmentIndex: number,
+    x: number,
+    y: number,
+  ): Result<void, EngineError> {
     const result = this.#session.insertBend(edgeId, segmentIndex, x, y);
     if (!result.ok) {
       this.#onError(result.error);
@@ -2229,9 +2278,7 @@ export class Editor {
     const currentLabel = this.#getEdgeLabel(edgeId) ?? '';
 
     // Find the edge's element by data-edge-id
-    const edgeEl = this.#viewer.querySelector(
-      `[data-edge-id="${edgeId.idx}:${edgeId.version}"]`,
-    );
+    const edgeEl = this.#viewer.querySelector(`[data-edge-id="${edgeId.idx}:${edgeId.version}"]`);
     if (!edgeEl) return;
 
     const rect = edgeEl.getBoundingClientRect();
@@ -3097,6 +3144,12 @@ export class Editor {
         currentX: docPos.x,
         currentY: docPos.y,
       };
+      // Capture element for transform preview before any preview is applied
+      const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
+      const el = this.#viewer.querySelector(selector) as SVGElement | null;
+      if (el) {
+        this.#transformPreview.capture(el, id);
+      }
     }
 
     // Add drag-specific listeners (stored references for cleanup)
@@ -3148,16 +3201,15 @@ export class Editor {
     const dx = this.#dragState.currentX - this.#dragState.startX;
     const dy = this.#dragState.currentY - this.#dragState.startY;
 
-    // Apply CSS transform for visual feedback — only to the dragged shape
-    const selector = `[data-vertex-id="${this.#dragState.vertexId.idx}:${this.#dragState.vertexId.version}"]`;
-    const el = this.#viewer.querySelector(selector) as HTMLElement | null;
-    if (el) {
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
+    // Apply SVG document-space translate preview — correct at all zoom levels.
+    // TransformPreview captures original state and composes preview with it.
+    if (dx !== 0 || dy !== 0) {
+      this.#transformPreview.applyTranslate(this.#dragState.vertexId, dx, dy);
+      this.#resizeHandles.applyDragOffset(dx, dy);
     }
-    this.#resizeHandles.applyDragOffset(dx, dy);
   }
 
-  #onPointerUp(_e: PointerEvent): void {
+  #onPointerUp(e: PointerEvent): void {
     // Clean up listeners first
     this.#viewer.removeEventListener('pointermove', this.#onPointerMoveBound);
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
@@ -3165,6 +3217,17 @@ export class Editor {
 
     // Remove snap guides
     this.#clearGuides();
+
+    // pointercancel must restore preview/handles and clear drag WITHOUT committing
+    if (e.type === 'pointercancel') {
+      if (this.#dragState) {
+        this.#transformPreview.restoreAll();
+        this.#resizeHandles.applyDragOffset(0, 0);
+        this.#transformPreview.commitAll();
+        this.#dragState = null;
+      }
+      return;
+    }
 
     // Handle GROUP_DRILL_DOWN commit on mouseup
     if (this.#drillDown) {
@@ -3190,12 +3253,8 @@ export class Editor {
     const dy = this.#dragState.currentY - this.#dragState.startY;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Remove CSS transform from the dragged element
-    const selector = `[data-vertex-id="${this.#dragState.vertexId.idx}:${this.#dragState.vertexId.version}"]`;
-    const el = this.#viewer.querySelector(selector) as HTMLElement | null;
-    if (el) {
-      el.style.transform = '';
-    }
+    // Restore all transform previews (shapes and handles)
+    this.#transformPreview.restoreAll();
     this.#resizeHandles.applyDragOffset(0, 0);
 
     // Commit move if threshold exceeded
@@ -3203,6 +3262,8 @@ export class Editor {
       this.#commitMove(this.#dragState.vertexId, dx, dy);
     }
 
+    // Clean up captures after restore/commit
+    this.#transformPreview.commitAll();
     this.#dragState = null;
   }
 
@@ -3213,17 +3274,26 @@ export class Editor {
    * Dispatches a MoveVertex command using absolute geometry.
    * Clamps non-positive width/height and ignores NaN inputs.
    *
-    * The caller MAY pass only {x, y, width, height}; rotation/flip_h/flip_v
-    * will be inherited from the current scene-cache geometry of the same
-    * vertex. This preserves rotation and flips when the inspector or
-    * resize handles adjust position or size.
-    *
-    * Alternatively, the caller can pass the full CellGeometry (x, y, width, height,
-    * rotation, flip_h, flip_v, relative) to bypass the scene lookup entirely.
-    */
+   * The caller MAY pass only {x, y, width, height}; rotation/flip_h/flip_v
+   * will be inherited from the current scene-cache geometry of the same
+   * vertex. This preserves rotation and flips when the inspector or
+   * resize handles adjust position or size.
+   *
+   * Alternatively, the caller can pass the full CellGeometry (x, y, width, height,
+   * rotation, flip_h, flip_v, relative) to bypass the scene lookup entirely.
+   */
   setVertexGeometry(
     id: SlotmapId,
-    geom: { x: number; y: number; width: number; height: number; rotation?: number; flip_h?: boolean; flip_v?: boolean; relative?: boolean },
+    geom: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      rotation?: number;
+      flip_h?: boolean;
+      flip_v?: boolean;
+      relative?: boolean;
+    },
   ): void {
     // Guard: clamp/reject invalid
     if (
@@ -3238,9 +3308,7 @@ export class Editor {
     }
     // If the caller passed full geometry, use it directly (T07 path: resize overlay
     // passes rotation/flip so we skip the scene re-walk). Otherwise inherit from scene.
-    const current = geom.rotation !== undefined
-      ? null
-      : sceneGeometry(this.#sceneCache, id);
+    const current = geom.rotation !== undefined ? null : sceneGeometry(this.#sceneCache, id);
     const fullGeom =
       current !== null
         ? {
@@ -3490,8 +3558,6 @@ export class Editor {
     this.#applySelection(new Set([state.groupId]));
   }
 
-
-
   /** Get a vertex object by SlotmapId from the scene cache. */
   #getVertex(id: SlotmapId): Vertex | null {
     const variant = findShapeVariant(this.#sceneCache, id);
@@ -3622,8 +3688,14 @@ export class Editor {
     // - 'floating' (default): auto anchors
     // - 'fixed-only': both anchors fixed to Center port
     // - 'anywhere': both anchors normalized at cursor perimeter positions
-    let sourceAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } | { kind: 'normalized'; nx: number; ny: number } = { kind: 'auto' };
-    let targetAnchor: { kind: 'auto' } | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' } | { kind: 'normalized'; nx: number; ny: number } = { kind: 'auto' };
+    let sourceAnchor:
+      | { kind: 'auto' }
+      | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' }
+      | { kind: 'normalized'; nx: number; ny: number } = { kind: 'auto' };
+    let targetAnchor:
+      | { kind: 'auto' }
+      | { kind: 'fixed'; port: 'North' | 'South' | 'East' | 'West' | 'Center' }
+      | { kind: 'normalized'; nx: number; ny: number } = { kind: 'auto' };
     if (connectMode === 'fixed-only') {
       sourceAnchor = { kind: 'fixed', port: 'Center' };
       targetAnchor = { kind: 'fixed', port: 'Center' };
@@ -3632,7 +3704,10 @@ export class Editor {
       const sourceBounds = sceneGeometry(this.#sceneCache, sourceId);
       const targetBounds = sceneGeometry(this.#sceneCache, hit);
       if (sourceBounds && targetBounds) {
-        const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
+        const sourceDocPos = this.#clientToDoc(
+          this.#connectState!.sourceClientX,
+          this.#connectState!.sourceClientY,
+        );
         const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
         const sourceNorm = perimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
         const targetNorm = perimeterNormalized(targetBounds, targetDocPos.x, targetDocPos.y);
@@ -3641,12 +3716,7 @@ export class Editor {
       }
     }
 
-    const r = this.#session.connectVerticesAnchored(
-      sourceId,
-      hit,
-      sourceAnchor,
-      targetAnchor,
-    );
+    const r = this.#session.connectVerticesAnchored(sourceId, hit, sourceAnchor, targetAnchor);
     if (!r.ok) {
       this.#onError(r.error);
     } else {
@@ -3750,7 +3820,10 @@ export class Editor {
       }
 
       // Compute normalized anchors from the actual drag positions
-      const sourceDocPos = this.#clientToDoc(this.#connectState!.sourceClientX, this.#connectState!.sourceClientY);
+      const sourceDocPos = this.#clientToDoc(
+        this.#connectState!.sourceClientX,
+        this.#connectState!.sourceClientY,
+      );
       const targetDocPos = this.#clientToDoc(e.clientX, e.clientY);
 
       const sourceNorm = perimeterNormalized(sourceBounds, sourceDocPos.x, sourceDocPos.y);
@@ -3759,7 +3832,9 @@ export class Editor {
       const sourceKind = classifyAnchorFromNormalized(sourceNorm.nx, sourceNorm.ny);
       // EDGE-003: Alt held → 'anywhere' mode forces normalized anchor at cursor position
       const isAnywhere = this.#connectState!.mode === 'anywhere';
-      const targetKind = isAnywhere ? 'normalized' : classifyAnchorFromNormalized(targetNorm.nx, targetNorm.ny);
+      const targetKind = isAnywhere
+        ? 'normalized'
+        : classifyAnchorFromNormalized(targetNorm.nx, targetNorm.ny);
 
       const sourceAnchor =
         sourceKind === 'normalized'
@@ -3774,7 +3849,12 @@ export class Editor {
       this.#hidePreviewLine();
 
       // Call the anchored connect with resolved anchors
-      const r = this.#session.connectVerticesAnchored(sourceId, targetHit, sourceAnchor, targetAnchor);
+      const r = this.#session.connectVerticesAnchored(
+        sourceId,
+        targetHit,
+        sourceAnchor,
+        targetAnchor,
+      );
       if (!r.ok) {
         this.#onError(r.error);
       } else {
@@ -3785,7 +3865,14 @@ export class Editor {
       this.#connectDrag = null;
     };
 
-    this.#connectDrag = { sourceId, sourceBounds, startClientX: clientX, startClientY: clientY, moveHandler, upHandler };
+    this.#connectDrag = {
+      sourceId,
+      sourceBounds,
+      startClientX: clientX,
+      startClientY: clientY,
+      moveHandler,
+      upHandler,
+    };
     // Register pointermove only; pointerup is wired lazily after drag threshold.
     document.addEventListener('pointermove', moveHandler);
   }
@@ -4235,7 +4322,10 @@ export class Editor {
   #getDiagramBBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
     const allBounds = findAllBounds(this.#sceneCache);
     if (allBounds.length === 0) return null;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const b of allBounds) {
       if (b.x < minX) minX = b.x;
       if (b.y < minY) minY = b.y;
@@ -4364,21 +4454,21 @@ export class Editor {
         e.stopPropagation();
         const vertexId = parseSlotmapAttr(mathId);
         if (vertexId) {
-            openMathEditDialog(latex, (newLatex: string) => {
-              // Update the label via EditVertexLabel command
-              const cmd = JSON.stringify({
-                EditVertexLabel: {
-                  id: slotmapIdToField(vertexId),
-                  label: { text: newLatex },
-                },
-              });
-              const result = this.#session.executeCommand(cmd);
-              if (!result.ok) {
-                this.#onError(result.error);
-              } else {
-                this.#replay();
-              }
+          openMathEditDialog(latex, (newLatex: string) => {
+            // Update the label via EditVertexLabel command
+            const cmd = JSON.stringify({
+              EditVertexLabel: {
+                id: slotmapIdToField(vertexId),
+                label: { text: newLatex },
+              },
             });
+            const result = this.#session.executeCommand(cmd);
+            if (!result.ok) {
+              this.#onError(result.error);
+            } else {
+              this.#replay();
+            }
+          });
         }
       }
       return;
@@ -4509,10 +4599,13 @@ export class Editor {
         { label: 'Reverse', action: () => this.reverseEdge(edgeHit) },
         { label: 'Flip', action: () => this.flipEdge(edgeHit) },
         { separator: true, label: '', action: () => {} },
-        { label: 'Delete Edge', action: () => {
-          this.#session.disconnectEdge(edgeHit);
-          this.#replay();
-        }},
+        {
+          label: 'Delete Edge',
+          action: () => {
+            this.#session.disconnectEdge(edgeHit);
+            this.#replay();
+          },
+        },
       );
 
       showContextMenu(e.clientX, e.clientY, items);
@@ -4828,11 +4921,20 @@ export class Editor {
       let dx = 0;
       let dy = 0;
       switch (e.key) {
-        case 'ArrowLeft': dx = -1; break;
-        case 'ArrowRight': dx = 1; break;
-        case 'ArrowUp': dy = -1; break;
-        case 'ArrowDown': dy = 1; break;
-        default: return;
+        case 'ArrowLeft':
+          dx = -1;
+          break;
+        case 'ArrowRight':
+          dx = 1;
+          break;
+        case 'ArrowUp':
+          dy = -1;
+          break;
+        case 'ArrowDown':
+          dy = 1;
+          break;
+        default:
+          return;
       }
       e.preventDefault();
       if (this.#selection.size > 0) {
@@ -4860,11 +4962,20 @@ export class Editor {
       let dw = 0;
       let dh = 0;
       switch (e.key) {
-        case 'ArrowLeft':  dw = -1; break;
-        case 'ArrowRight': dw =  1; break;
-        case 'ArrowUp':    dh = -1; break;
-        case 'ArrowDown':  dh =  1; break;
-        default: return;
+        case 'ArrowLeft':
+          dw = -1;
+          break;
+        case 'ArrowRight':
+          dw = 1;
+          break;
+        case 'ArrowUp':
+          dh = -1;
+          break;
+        case 'ArrowDown':
+          dh = 1;
+          break;
+        default:
+          return;
       }
       if (this.#selection.size === 0) return;
       if (dw === 0 && dh === 0) return;
@@ -4940,12 +5051,7 @@ export class Editor {
    *   - When snap is off or ignoreSnap is true: `current + dir`.
    *   - When `dir === 0`: pass through.
    */
-  #nextGridCoord(
-    current: number,
-    dir: number,
-    shiftToGrid: boolean,
-    ignoreSnap: boolean,
-  ): number {
+  #nextGridCoord(current: number, dir: number, shiftToGrid: boolean, ignoreSnap: boolean): number {
     if (dir === 0) return current;
     const GRID_SIZE = 20;
     if (shiftToGrid && !ignoreSnap && this.#snapEnabled) {
@@ -4964,11 +5070,7 @@ export class Editor {
    *
    * No-op when `dw === 0 && dh === 0` or the selection is empty.
    */
-  #resizeSelection(
-    dw: number,
-    dh: number,
-    opts: { ignoreSnap?: boolean } = {},
-  ): void {
+  #resizeSelection(dw: number, dh: number, opts: { ignoreSnap?: boolean } = {}): void {
     if (this.#selection.size === 0 || (dw === 0 && dh === 0)) return;
     const { ignoreSnap = false } = opts;
     const cmds: string[] = [];
@@ -5018,5 +5120,4 @@ export class Editor {
   }
 
   // ─── Connect Anchor Helpers ─────────────────────────────────────────────────
-
 }

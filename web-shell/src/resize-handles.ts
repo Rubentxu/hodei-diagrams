@@ -11,6 +11,7 @@
 import type { SlotmapId, ScenePage } from './types.js';
 import { sceneBounds, getZoom, clientToDoc, type ShapeBounds } from './scene-bounds.js';
 import { DragSession, type DragStateBase } from './dom-drag.js';
+import { TransformPreview } from './transform-preview.js';
 import type { OverlayHost } from './editor.js';
 
 /** Resize handle positions. */
@@ -68,6 +69,9 @@ export class ResizeHandlesOverlay {
   // Overlay registration disposers for attach/detach
   #disposers: Array<() => void> = [];
 
+  // Transform preview for live resize/rotation drag previews
+  readonly #transformPreview: TransformPreview = new TransformPreview();
+
   constructor(
     viewer: HTMLElement,
     getSvgLayer: () => HTMLElement,
@@ -86,10 +90,17 @@ export class ResizeHandlesOverlay {
       threshold: 3,
       onMove: (e, state) => this.#resizeOnMove(e, state),
       onCommit: (_e, state) => {
+        // Restore preview before engine mutation so DOM matches engine state post-replay
+        this.#transformPreview.restore(state.vertexId);
         this.#setVertexGeometry(state.vertexId, state.currentGeom);
+        this.#transformPreview.commit(state.vertexId);
         state.proportional = { aspectRatio: 1, dominant: 'width', locked: false };
       },
-      onCancel: (_e, _state) => {},
+      onCancel: (_e, state) => {
+        // Restore original DOM state without engine mutation
+        this.#transformPreview.restore(state.vertexId);
+        this.#transformPreview.commit(state.vertexId);
+      },
     });
 
     // Rotation drag session (T10)
@@ -97,12 +108,19 @@ export class ResizeHandlesOverlay {
       threshold: 3,
       onMove: (e, state) => this.#rotationOnMove(e, state),
       onCommit: (_e, state) => {
+        // Restore preview before engine mutation
+        this.#transformPreview.restore(state.vertexId);
         const MIN_ANGLE = Math.PI / 180;
         if (Math.abs(state.currentAngleDelta) >= MIN_ANGLE) {
           this.#rotateVertex(state.vertexId, state.currentAngleDelta);
         }
+        this.#transformPreview.commit(state.vertexId);
       },
-      onCancel: (_e, _state) => {},
+      onCancel: (_e, state) => {
+        // Restore original DOM state without engine mutation
+        this.#transformPreview.restore(state.vertexId);
+        this.#transformPreview.commit(state.vertexId);
+      },
     });
   }
 
@@ -201,6 +219,13 @@ export class ResizeHandlesOverlay {
     clientY: number,
   ): void {
     handleEl.style.cursor = 'grabbing';
+
+    // Capture shape element for transform preview before any preview is applied
+    const shapeEl = this.#getShapeElement(vertexId);
+    if (shapeEl) {
+      this.#transformPreview.capture(shapeEl, vertexId);
+    }
+
     const startDoc = this.#clientToDoc(clientX, clientY);
     this.#resizeSession.begin({
       handle,
@@ -231,6 +256,13 @@ export class ResizeHandlesOverlay {
     clientY: number,
   ): void {
     handleEl.style.cursor = 'grabbing';
+
+    // Capture shape element for transform preview before any preview is applied
+    const shapeEl = this.#getShapeElement(vertexId);
+    if (shapeEl) {
+      this.#transformPreview.capture(shapeEl, vertexId);
+    }
+
     const { centerX, centerY, radius } = this.#rotationHandleGeometry(bounds);
     this.#rotationSession.begin({
       vertexId,
@@ -300,7 +332,7 @@ export class ResizeHandlesOverlay {
   // ─── DragSession callbacks for resize ────────────────────────────────────────
 
   #resizeOnMove(e: PointerEvent, state: ResizeDragState2): ResizeDragState2 {
-    const doc = clientToDoc(this.#getSvgLayer(), e.clientX, e.clientY);
+    const doc = this.#clientToDoc(e.clientX, e.clientY);
     const docX = doc.x;
     const docY = doc.y;
     let dx = docX - state.startDocX;
@@ -330,6 +362,21 @@ export class ResizeHandlesOverlay {
 
     const newGeom = this.#computeResizeGeometry(state.startGeom, state.handle, dx, dy);
     this.#updateHandlePositions(newGeom);
+
+    // Apply live resize preview transform to the actual shape element
+    // This uses an affine matrix that maps from original bounds to new bounds
+    this.#transformPreview.applyResize(
+      state.vertexId,
+      state.startGeom.x,
+      state.startGeom.y,
+      state.startGeom.width,
+      state.startGeom.height,
+      newGeom.x,
+      newGeom.y,
+      newGeom.width,
+      newGeom.height,
+    );
+
     state.currentGeom = newGeom;
     return state;
   }
@@ -352,6 +399,17 @@ export class ResizeHandlesOverlay {
     if (line) {
       line.setAttribute('x2', String(handleX));
       line.setAttribute('y2', String(handleY));
+    }
+
+    // Apply live rotation preview transform to the actual shape element
+    // Rotate around the document-space center point
+    if (state.currentAngleDelta !== 0) {
+      this.#transformPreview.applyRotate(
+        state.vertexId,
+        state.currentAngleDelta,
+        state.centerX,
+        state.centerY,
+      );
     }
     return state;
   }
@@ -573,7 +631,17 @@ export class ResizeHandlesOverlay {
     this.detach();
     this.#resizeSession.dispose();
     this.#rotationSession.dispose();
+    this.#transformPreview.dispose();
     this.#clearHandles(this.#getSvgLayer());
+  }
+
+  /**
+   * Get the shape element for a given vertex ID.
+   * Returns null if not found.
+   */
+  #getShapeElement(id: SlotmapId): SVGElement | null {
+    const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
+    return this.#getSvgLayer().querySelector(selector) as SVGElement | null;
   }
 
   #clearHandles(svgLayer: HTMLElement): void {
