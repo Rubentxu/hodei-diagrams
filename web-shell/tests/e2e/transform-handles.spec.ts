@@ -81,15 +81,40 @@ test.describe('Transform handles visual contract', () => {
     const { viewer, rect } = await loadAndSelectSimpleRect(page);
     const eastHandle = viewer.locator('.resize-handle[data-handle="e"]');
 
-    const beforeWidth = Number(await rect.getAttribute('width'));
     const handleBox = await eastHandle.boundingBox();
-    if (!Number.isFinite(beforeWidth) || !handleBox)
-      throw new Error('shape or east handle not visible before resize');
+    if (!handleBox) throw new Error('east handle not visible before resize');
 
+    // Read vertex idx to fetch committed geometry from WASM engine
+    const idxAttr = await rect.getAttribute('data-vertex-idx');
+    const vertexIdx = parseInt(idxAttr ?? '0');
+
+    // Fetch committed geometry BEFORE resize via __hodeiDebug.fetchSceneFresh()
+    const before = await page.evaluate((idx) => {
+      const scene = (
+        window as unknown as {
+          __hodeiDebug?: { fetchSceneFresh?: () => { pages?: Array<{ display_list?: Array<Record<string, unknown>> }> } | null };
+        }
+      ).__hodeiDebug?.fetchSceneFresh?.();
+      if (!scene?.pages?.length) return null;
+      for (const pg of scene.pages) {
+        if (!pg.display_list) continue;
+        for (const item of pg.display_list) {
+          const key = Object.keys(item)[0]!;
+          const v = item[key] as { id?: { idx?: number }; bounds?: { size?: { width?: number } } };
+          if (v?.id?.idx === idx && v?.bounds?.size?.width != null) {
+            return v.bounds.size.width;
+          }
+        }
+      }
+      return null;
+    }, vertexIdx);
+    if (before == null) throw new Error('shape not found in committed scene before resize');
+
+    const CSS_DRAG_PX = 35;
     await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(
-      handleBox.x + handleBox.width / 2 + 35,
+      handleBox.x + handleBox.width / 2 + CSS_DRAG_PX,
       handleBox.y + handleBox.height / 2,
       { steps: 5 },
     );
@@ -97,8 +122,35 @@ test.describe('Transform handles visual contract', () => {
     await page.waitForTimeout(250);
 
     await expect(viewer.locator('.resize-handle')).toHaveCount(8);
-    const afterWidth = Number(await rect.getAttribute('width'));
-    expect(afterWidth).toBeGreaterThan(beforeWidth + 15);
+
+    // Fetch committed geometry AFTER resize
+    const after = await page.evaluate((idx) => {
+      const scene = (
+        window as unknown as {
+          __hodeiDebug?: { fetchSceneFresh?: () => { pages?: Array<{ display_list?: Array<Record<string, unknown>> }> } | null };
+        }
+      ).__hodeiDebug?.fetchSceneFresh?.();
+      if (!scene?.pages?.length) return null;
+      for (const pg of scene.pages) {
+        if (!pg.display_list) continue;
+        for (const item of pg.display_list) {
+          const key = Object.keys(item)[0]!;
+          const v = item[key] as { id?: { idx?: number }; bounds?: { size?: { width?: number } } };
+          if (v?.id?.idx === idx && v?.bounds?.size?.width != null) {
+            return v.bounds.size.width;
+          }
+        }
+      }
+      return null;
+    }, vertexIdx);
+    if (after == null) throw new Error('shape not found in committed scene after resize');
+
+    // The doc-space delta = CSS drag px × (viewBoxW / svgRectW).
+    // At zoom=1 where viewBoxW ≈ svgRectW, scale ≈ 1 and delta ≈ CSS_DRAG_PX.
+    // Tightened assertion: exact delta ±2 doc units (not loose `> before+15`).
+    const TOLERANCE = 2;
+    const delta = after - before;
+    expect(delta).toBeCloseTo(CSS_DRAG_PX, TOLERANCE);
   });
 
   test('single-shape selection shows a rotation handle and dragging it rotates the shape', async ({
