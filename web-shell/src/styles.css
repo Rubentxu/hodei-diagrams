@@ -239,8 +239,7 @@ button:disabled {
     transition: opacity var(--motion-normal), visibility var(--motion-normal);
   }
 
-  [data-drawer-open="sidebar"] .drawer-overlay,
-  [data-drawer-open="inspector"] .drawer-overlay {
+  [data-drawer-open] .drawer-overlay {
     display: block;
     visibility: visible;
     opacity: 1;

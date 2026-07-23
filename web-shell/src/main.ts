@@ -546,45 +546,37 @@ async function bootstrap(): Promise<void> {
     appRoot?.setAttribute('data-hud-density', state.hudDensity);
   });
 
-  // R3: Wire responsive drawers to WorkbenchController overlay state
-  // Inspector drawer: opened via inspectorToggleBtn
-  const inspectorDrawer = new DrawerController({
-    drawer: 'inspector',
-    drawerEl: inspector.container,
-    triggerEl: ui.inspectorToggleBtn,
-    closeBtn: inspector.closeBtn,
-    overlayEl: ui.drawerOverlay,
-  });
+  // R3: Wire responsive drawers via compact helper
+  function setupDrawer(
+    drawer: 'inspector' | 'sidebar',
+    drawerEl: HTMLElement,
+    triggerEl: HTMLElement | null,
+    closeBtn: HTMLButtonElement,
+  ): DrawerController {
+    const ctrl = new DrawerController({
+      drawer,
+      drawerEl,
+      triggerEl,
+      closeBtn,
+      overlayEl: ui.drawerOverlay,
+    });
+    if (triggerEl) triggerEl.addEventListener('click', () => ctrl.toggle());
+    return ctrl;
+  }
 
-  // Sidebar drawer: opened via sidebar collapse btn (at mobile it acts as drawer trigger)
-  const sidebarDrawer = new DrawerController({
-    drawer: 'sidebar',
-    drawerEl: ui.sidebar,
-    triggerEl: ui.sidebarCollapseBtn,
-    closeBtn: ui.sidebarCollapseBtn,
-    overlayEl: ui.drawerOverlay,
-  });
+  const inspectorDrawer = setupDrawer(
+    'inspector',
+    inspector.container,
+    ui.inspectorToggleBtn,
+    inspector.closeBtn,
+  );
 
-  // Wire inspectorToggleBtn click to inspector drawer
-  ui.inspectorToggleBtn.addEventListener('click', () => {
-    inspectorDrawer.toggle();
-  });
-
-  // Wire sidebar collapse btn to sidebar drawer (at mobile)
-  ui.sidebarCollapseBtn.addEventListener('click', () => {
-    sidebarDrawer.toggle();
-  });
-
-  // Sync WorkbenchController overlay state with drawer state
-  workbenchController.subscribe((state) => {
-    if (state.overlayActive === 'inspector') {
-      inspectorDrawer.open();
-    } else if (state.overlayActive === 'sidebar') {
-      sidebarDrawer.open();
-    } else {
-      DrawerController.closeAll();
-    }
-  });
+  const sidebarDrawer = setupDrawer(
+    'sidebar',
+    ui.sidebar,
+    ui.sidebarCollapseBtn,
+    ui.sidebarCollapseBtn,
+  );
 
   // R1b: Wire buildDockLayers into .dock-mode-layers container
   const dockLayersContainer = ui.sidebar.querySelector('.dock-mode-layers') as HTMLElement | null;
