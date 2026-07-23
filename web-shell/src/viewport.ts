@@ -121,6 +121,10 @@ export class Viewport {
    * @param svgRect Bounding rect of the SVG element (from getBoundingClientRect)
    */
   clientToDoc(clientX: number, clientY: number, svgRect: DOMRect): Point {
+    // W1: guard against NaN inputs and zero zoom
+    if (Number.isNaN(clientX) || Number.isNaN(clientY) || this.zoom === 0) {
+      return { x: 0, y: 0 };
+    }
     const scaleX = this.width / svgRect.width;
     const scaleY = this.height / svgRect.height;
     return {
@@ -138,6 +142,10 @@ export class Viewport {
    * @param svgRect Bounding rect of the SVG element
    */
   docToClient(docX: number, docY: number, svgRect: DOMRect): Point {
+    // W1: guard against NaN inputs and zero zoom
+    if (Number.isNaN(docX) || Number.isNaN(docY) || this.zoom === 0) {
+      return { x: 0, y: 0 };
+    }
     const scaleX = this.width / svgRect.width;
     const scaleY = this.height / svgRect.height;
     return {
@@ -182,13 +190,22 @@ export class Viewport {
       };
     }
 
-    // Scale factor from old zoom to new zoom
-    const scaleX = this.width / (svgRect?.width ?? this.width);
-    const scaleY = this.height / (svgRect?.height ?? this.height);
+    // W2: When svgRect.width ≠ viewport.width, use the correct scale factor.
+    // Derivation:
+    //   cursorDoc.x = panX + (cursorX - svgRect.left) * this.width / (this.zoom * svgRect.width)
+    //   After zoom to newZoom:
+    //     cursorDoc.x = newPanX + (cursorX - svgRect.left) * this.width / (newZoom * svgRect.width)
+    //   Solving for newPanX:
+    //     newPanX = cursorDoc.x - (cursorX - svgRect.left) * this.width / (newZoom * svgRect.width)
+    //              = cursorDoc.x - (cursorX - svgRect.left) / newZoom * (this.width / svgRect.width)
+    //   The scale factor is this.width / svgRect.width (not svgRect.width / this.width).
+    const scaleX = svgRect ? this.width / svgRect.width : 1;
+    const scaleY = svgRect ? this.height / svgRect.height : 1;
 
     // New pan such that cursorDoc is still at cursorClient after zoom
-    const newPanX = cursorDoc.x - cx / clamped * (1 / scaleX);
-    const newPanY = cursorDoc.y - cy / clamped * (1 / scaleY);
+    // Note: includes svgRect.left/top offset correction (was missing in original formula)
+    const newPanX = cursorDoc.x - (cx - (svgRect?.left ?? 0)) * scaleX / clamped;
+    const newPanY = cursorDoc.y - (cy - (svgRect?.top ?? 0)) * scaleY / clamped;
 
     return new Viewport(newPanX, newPanY, clamped, this.width, this.height);
   }

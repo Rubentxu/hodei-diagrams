@@ -268,4 +268,109 @@ describe('Viewport', () => {
       expect(MAX_ZOOM).toBe(10.0);
     });
   });
+
+  // ─── W1: NaN / zero edge cases ───────────────────────────────────────────
+  describe('W1: clientToDoc edge cases', () => {
+    it('returns {x:0, y:0} when clientX is NaN', () => {
+      const vp = new Viewport(0, 0, 1.0, 800, 600);
+      const rect = makeRect(0, 0, 800, 600);
+      const result = vp.clientToDoc(NaN, 300, rect);
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+    });
+
+    it('returns {x:0, y:0} when clientY is NaN', () => {
+      const vp = new Viewport(0, 0, 1.0, 800, 600);
+      const rect = makeRect(0, 0, 800, 600);
+      const result = vp.clientToDoc(400, NaN, rect);
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+    });
+
+    it('returns {x:0, y:0} when zoom is 0', () => {
+      const vp = new Viewport(0, 0, 0, 800, 600);
+      const rect = makeRect(0, 0, 800, 600);
+      const result = vp.clientToDoc(400, 300, rect);
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+    });
+  });
+
+  describe('W1: docToClient edge cases', () => {
+    it('returns {x:0, y:0} when docX is NaN', () => {
+      const vp = new Viewport(0, 0, 1.0, 800, 600);
+      const rect = makeRect(0, 0, 800, 600);
+      const result = vp.docToClient(NaN, 300, rect);
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+    });
+
+    it('returns {x:0, y:0} when docY is NaN', () => {
+      const vp = new Viewport(0, 0, 1.0, 800, 600);
+      const rect = makeRect(0, 0, 800, 600);
+      const result = vp.docToClient(400, NaN, rect);
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+    });
+
+    it('returns {x:0, y:0} when zoom is 0', () => {
+      const vp = new Viewport(0, 0, 0, 800, 600);
+      const rect = makeRect(0, 0, 800, 600);
+      const result = vp.docToClient(100, 200, rect);
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+    });
+  });
+
+  // ─── W2: withZoom when svgRect.width ≠ viewport.width ────────────────────
+  describe('W2: withZoom formula when svgRect differs from viewport', () => {
+    it('preserves cursor document point when svgRect.width ≠ viewport.width', () => {
+      // viewport: 1000 wide, svg element: 800 wide (CSS-scaled scenario)
+      const vp = new Viewport(0, 0, 1.0, 1000, 600);
+      const rect = makeRect(0, 0, 800, 600); // svg is narrower due to CSS scaling
+
+      const cursorX = 200;
+      const cursorY = 300;
+
+      // Zoom from 1.0 to 2.0 at cursor position
+      const newVp = vp.withZoom(2.0, cursorX, cursorY, rect);
+
+      // The document point under cursor must be preserved
+      const docBefore = vp.clientToDoc(cursorX, cursorY, rect);
+      const docAfter = newVp.clientToDoc(cursorX, cursorY, rect);
+
+      expect(docAfter.x).toBeCloseTo(docBefore.x, 9);
+      expect(docAfter.y).toBeCloseTo(docBefore.y, 9);
+    });
+
+    it('roundtrip doc→client→doc at non-1.0 zoom with mismatched svgRect', () => {
+      const vp = new Viewport(100, 200, 2.0, 1000, 800);
+      // svg element is physically 800x640 (scaled down by CSS)
+      const rect = makeRect(0, 0, 800, 640);
+
+      const docPoint = { x: 300, y: 400 };
+      const client = vp.docToClient(docPoint.x, docPoint.y, rect);
+      const back = vp.clientToDoc(client.x, client.y, rect);
+
+      expect(back.x).toBeCloseTo(docPoint.x, 9);
+      expect(back.y).toBeCloseTo(docPoint.y, 9);
+    });
+
+    it('withZoom preserves point with non-zero svgRect.left', () => {
+      // Simulate SVG not at browser origin (e.g., inside a positioned container)
+      const vp = new Viewport(0, 0, 1.0, 1000, 600);
+      const rect = makeRect(100, 50, 800, 600); // svgRect.left = 100, svgRect.top = 50
+
+      const cursorX = 200;
+      const cursorY = 300;
+
+      const newVp = vp.withZoom(2.0, cursorX, cursorY, rect);
+
+      const docBefore = vp.clientToDoc(cursorX, cursorY, rect);
+      const docAfter = newVp.clientToDoc(cursorX, cursorY, rect);
+
+      expect(docAfter.x).toBeCloseTo(docBefore.x, 9);
+      expect(docAfter.y).toBeCloseTo(docBefore.y, 9);
+    });
+  });
 });

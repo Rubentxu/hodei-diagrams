@@ -12,6 +12,7 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
+import { Viewport } from './viewport.js';
 import {
   sceneGeometry,
   sceneBounds,
@@ -206,6 +207,8 @@ export class Editor {
   #resetZoom: (() => void) | null = null;
   #pan: ((_dx: number, _dy: number) => void) | null = null;
   #abortController: AbortController | null = null;
+  // ─── Viewport for infinite canvas pan/drag ─────────────────────────────────
+  readonly #viewport: Viewport | undefined;
 
   // ─── Stencil Drag Preview ────────────────────────────────────────────────
   #stencilPreviewEl: SVGGElement | null = null;
@@ -287,6 +290,7 @@ export class Editor {
     onSelectionChange?: SelectionChangeCallback,
     onToolChange?: ToolChangeCallback,
     getZoom?: () => number,
+    viewport?: Viewport,
   ) {
     this.#session = session;
     this.#viewer = viewer;
@@ -295,6 +299,7 @@ export class Editor {
     this.#onSelectionChange = onSelectionChange ?? (() => {});
     this.#onToolChange = onToolChange ?? (() => {});
     this.#getZoom = getZoom ?? (() => 1);
+    this.#viewport = viewport;
 
     // Initialize port handles overlay
     this.#portHandles = new PortHandlesOverlay(viewer, () => this.#sceneCache, session);
@@ -2869,6 +2874,29 @@ export class Editor {
     this.#replay();
   }
 
+  // ─── Viewport pan-drag ─────────────────────────────────────────────────────
+
+  #panDrag: { startX: number; startY: number } | null = null;
+
+  #startPanDrag(e: PointerEvent, x: number, y: number): void {
+    if (!this.#viewport) return;
+    this.#panDrag = { startX: x, startY: y };
+    this.#viewer.setPointerCapture(e.pointerId);
+  }
+
+  #updatePanDrag(x: number, y: number): void {
+    if (!this.#panDrag || !this.#viewport) return;
+    const dx = x - this.#panDrag.startX;
+    const dy = y - this.#panDrag.startY;
+    this.#viewport.withPan(dx, dy);
+    this.#panDrag.startX = x;
+    this.#panDrag.startY = y;
+  }
+
+  #endPanDrag(): void {
+    this.#panDrag = null;
+  }
+
   /** Cancel any active marquee without selecting. */
   #cancelMarquee(): void {
     this.#marquee = null;
@@ -3122,8 +3150,16 @@ export class Editor {
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
         this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
       } else {
-        // Plain click on empty: clear selection
-        this.clearSelection();
+        // Plain click on empty: clear selection or start pan-drag
+        if (this.#viewport) {
+          const docPos = this.#clientToDoc(e.clientX, e.clientY);
+          this.#startPanDrag(e, docPos.x, docPos.y);
+          this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+          this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+          this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+        } else {
+          this.clearSelection();
+        }
       }
       return;
     }
@@ -3222,6 +3258,12 @@ export class Editor {
       return;
     }
 
+    // Handle viewport pan-drag
+    if (this.#panDrag) {
+      this.#updatePanDrag(docPos.x, docPos.y);
+      return;
+    }
+
     // Handle shape dragging
     if (!this.#dragState) return;
 
@@ -3287,6 +3329,12 @@ export class Editor {
     // Handle move-area end (MOVE-016)
     if (this.#moveArea) {
       this.#endMoveArea();
+      return;
+    }
+
+    // Handle viewport pan-drag end
+    if (this.#panDrag) {
+      this.#endPanDrag();
       return;
     }
 

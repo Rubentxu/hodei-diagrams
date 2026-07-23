@@ -1027,6 +1027,7 @@ async function bootstrap(): Promise<void> {
     onSelectionChange,
     onToolChange,
     () => zoomPan?.getZoom() ?? 1,
+    zoomPan?.viewport,
   );
   activeEditor.attach();
 
