@@ -306,6 +306,47 @@ export function clientToDoc(
 }
 
 /**
+ * Convert document-space coordinates to browser client coordinates.
+ * Exact inverse of `clientToDoc` — the two functions are perfect inverses
+ * when applied to the same DOM state (same viewBox, same zoom CSS transform).
+ *
+ * Canonical implementation — editor, port-handles, resize-handles,
+ * bend-handles, and any future overlay MUST use this for doc→client
+ * conversions. Inlining the math is a debt marker.
+ *
+ * @param viewer The diagram viewer element
+ * @param docX   Document-space X coordinate
+ * @param docY   Document-space Y coordinate
+ * @returns Client-space point {x, y}
+ */
+export function docToClient(
+  viewer: HTMLElement,
+  docX: number,
+  docY: number,
+): { x: number; y: number } {
+  const rect = viewer.getBoundingClientRect();
+  const zoom = getZoom(viewer);
+  const svg = viewer.querySelector('svg');
+  if (svg) {
+    const viewBox = svg.getAttribute('viewBox');
+    if (viewBox) {
+      const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+      if (parts.length === 4) {
+        const [vbX, vbY, vbW, vbH] = parts as [number, number, number, number];
+        const svgRect = svg.getBoundingClientRect();
+        const scaleX = vbW / svgRect.width;
+        const scaleY = vbH / svgRect.height;
+        return {
+          x: svgRect.left + (docX - vbX) / scaleX,
+          y: svgRect.top + (docY - vbY) / scaleY,
+        };
+      }
+    }
+  }
+  return { x: docX * zoom + rect.left, y: docY * zoom + rect.top };
+}
+
+/**
  * Compute normalized (0-1) anchor coordinates from shape bounds and a document-space point.
  * Projects the point onto the rectangle perimeter.
  * Returns {nx: 0.5, ny: 0.5} when the point is at the shape center (avoids NaN from
