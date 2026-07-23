@@ -2065,10 +2065,6 @@ button:disabled {
   color: var(--text);
 }
 
-.bottom-spacer {
-  flex: 1;
-}
-
 .diagnostics-area {
   display: flex;
   align-items: center;
