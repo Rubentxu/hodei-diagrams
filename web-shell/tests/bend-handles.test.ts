@@ -163,12 +163,11 @@ describe('BendHandlesOverlay', () => {
   it('attach() registers a .bend-handle hit zone on the host', () => {
     const overlay = new BendHandlesOverlay(
       viewer as unknown as HTMLElement,
-      viewer,
       () => [],
       session as unknown as DiagramEngineSession,
       (x, y) => ({ x, y }),
       (msg) => {},
-      () => {},
+      (edgeId, _bendIndex) => {},
     );
     overlay.attach(host);
     expect(host.zoneCount).toBe(1);
@@ -179,12 +178,11 @@ describe('BendHandlesOverlay', () => {
   it('detach() removes the registered hit zone', () => {
     const overlay = new BendHandlesOverlay(
       viewer as unknown as HTMLElement,
-      viewer,
       () => [],
       session as unknown as DiagramEngineSession,
       (x, y) => ({ x, y }),
       (msg) => {},
-      () => {},
+      (edgeId, _bendIndex) => {},
     );
     overlay.attach(host);
     expect(host.zoneCount).toBe(1);
@@ -198,12 +196,11 @@ describe('BendHandlesOverlay', () => {
     const edgeId: SlotmapId = { idx: 10, version: 0 };
     const overlay = new BendHandlesOverlay(
       viewer as unknown as HTMLElement,
-      viewer,
       () => makeSceneWithEdge(edgeId),
       session as unknown as DiagramEngineSession,
       (x, y) => ({ x, y }),
       (msg) => {},
-      () => {},
+      (edgeId, _bendIndex) => {},
     );
     overlay.attach(host);
 
@@ -223,12 +220,11 @@ describe('BendHandlesOverlay', () => {
     const edgeId: SlotmapId = { idx: 10, version: 0 };
     const overlay = new BendHandlesOverlay(
       viewer as unknown as HTMLElement,
-      viewer,
       () => makeSceneWithEdge(edgeId),
       session as unknown as DiagramEngineSession,
       (x, y) => ({ x, y }),
       (msg) => {},
-      () => {},
+      (edgeId, _bendIndex) => {},
     );
     overlay.attach(host);
     overlay.render(edgeId);
@@ -245,12 +241,11 @@ describe('BendHandlesOverlay', () => {
   it('beginFromEvent returns false for elements not matching .bend-handle', () => {
     const overlay = new BendHandlesOverlay(
       viewer as unknown as HTMLElement,
-      viewer,
       () => [],
       session as unknown as DiagramEngineSession,
       (x, y) => ({ x, y }),
       (msg) => {},
-      () => {},
+      (edgeId, _bendIndex) => {},
     );
     overlay.attach(host);
 
@@ -266,12 +261,11 @@ describe('BendHandlesOverlay', () => {
     const edgeId: SlotmapId = { idx: 10, version: 0 };
     const overlay = new BendHandlesOverlay(
       viewer as unknown as HTMLElement,
-      viewer,
       () => makeSceneWithEdge(edgeId),
       session as unknown as DiagramEngineSession,
       (x, y) => ({ x, y }),
       (msg) => {},
-      () => {},
+      (edgeId, _bendIndex) => {},
     );
     overlay.attach(host);
     overlay.render(edgeId);
@@ -297,12 +291,11 @@ describe('BendHandlesOverlay', () => {
     const edgeId: SlotmapId = { idx: 10, version: 0 };
     const overlay = new BendHandlesOverlay(
       viewer as unknown as HTMLElement,
-      viewer,
       () => makeSceneWithEdge(edgeId),
       session as unknown as DiagramEngineSession,
       (x, y) => ({ x, y }),
       (msg) => {},
-      () => {},
+      (edgeId, _bendIndex) => {},
     );
     overlay.attach(host);
     overlay.render(edgeId);

@@ -2894,6 +2894,11 @@ export class Editor {
     this.#viewport = this.#viewport.withPan(newPanX, newPanY);
     this.#panDrag.startX = x;
     this.#panDrag.startY = y;
+    // Apply the updated viewport to the SVG element
+    const svg = this.#viewer.querySelector('svg') as SVGSVGElement | null;
+    if (svg) {
+      this.#viewport.applyToSvgElement(svg);
+    }
   }
 
   #endPanDrag(): void {

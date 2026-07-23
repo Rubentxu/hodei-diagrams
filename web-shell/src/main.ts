@@ -1268,10 +1268,11 @@ async function bootstrap(): Promise<void> {
     ui.saveButton.disabled = false;
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
 
-    zoomPan?.resetView();
-    ui.zoomDisplay.textContent = '100%';
-    ui.hud.setZoom(100);
-    ui.canvasContainer.style.setProperty('--zoom', '1');
+    // Fit viewport to content with 10% padding on scene load (initial viewport heuristic)
+    zoomPan?.fitToView(0.1);
+    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
+    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+    ui.canvasContainer.style.setProperty('--zoom', String(zoomPan?.getZoom() ?? 1));
   }
 
   // ─── 7. Page switch handler ───────────────────────────────────────────────

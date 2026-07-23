@@ -54,20 +54,28 @@ describe('renderer', () => {
     expect(div.innerHTML).toBe('');
   });
 
-  it('panBy mutates transform additively while preserving zoom', () => {
+  it('panBy mutates viewBox additively while preserving zoom', () => {
     const container = createDiv();
     const viewer = createDiv();
     container.appendChild(viewer);
 
+    // Create an SVG so the viewport has something to apply to
+    viewer.innerHTML = '<svg viewBox="0 0 800 600"></svg>';
+
     const zoomPan = setupZoomPan(container, viewer);
 
-    // panBy(10, 0) then panBy(5, 0) yields translate(15, 0) at scale(1)
+    // panBy(10, 0) then panBy(5, 0) yields panX=15, panY=0 at zoom=1
+    // viewport applies to SVG viewBox: "panX panY viewW viewH"
     zoomPan.panBy(10, 0);
-    expect(container.style.transform).toContain('translate(10px, 0px)');
-    expect(container.style.transform).toContain('scale(1)');
+    const svg1 = viewer.querySelector('svg');
+    expect(svg1).not.toBeNull();
+    // At zoom 1, viewW=800, viewH=600, so viewBox should be "10 0 800 600"
+    expect(svg1!.getAttribute('viewBox')).toContain('10');
 
     zoomPan.panBy(5, 0);
-    expect(container.style.transform).toContain('translate(15px, 0px)');
-    expect(container.style.transform).toContain('scale(1)');
+    const svg2 = viewer.querySelector('svg');
+    expect(svg2).not.toBeNull();
+    // Cumulative pan: 15
+    expect(svg2!.getAttribute('viewBox')).toContain('15');
   });
 });
