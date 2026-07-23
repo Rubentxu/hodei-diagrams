@@ -39,24 +39,16 @@ test.describe('R2c HUD Density Migration', () => {
     }
   });
 
-  // ── CSS attribute presence ─────────────────────────────────────────────────
+  // ── CSS attribute presence + HUD item density-tag presence + hud-page removal ──
 
-  test('data-hud-density is set on #app at startup', async ({ page }) => {
+  test('R2c startup: compact, all default HUD items tagged, hud-page absent', async ({ page }) => {
     await waitForAppReady(page);
     const app = page.locator('#app');
-    await expect(app).toHaveAttribute('data-hud-density', /^(compact|full)$/);
-  });
 
-  test('compact at startup (no interaction state active)', async ({ page }) => {
-    await waitForAppReady(page);
-    const app = page.locator('#app');
+    // #app starts in compact mode
     await expect(app).toHaveAttribute('data-hud-density', 'compact');
-  });
 
-  // ── HUD item density-tag presence ─────────────────────────────────────────────
-
-  test('default HUD items have data-hud-density-item="default"', async ({ page }) => {
-    await waitForAppReady(page);
+    // All default HUD items have data-hud-density-item="default"
     const defaults = [
       '[data-testid="hud-selection"]',
       '[data-testid="hud-snap"]',
@@ -69,39 +61,30 @@ test.describe('R2c HUD Density Migration', () => {
     for (const sel of defaults) {
       const el = page.locator(sel).first();
       await expect(el).toBeAttached();
-      // Walk up to find the hud-item parent with data-hud-density-item
       const parent = el.locator('..');
       await expect(parent).toHaveAttribute('data-hud-density-item', 'default');
     }
-  });
 
-  test('hud-geometry item is present and shows "—" when nothing selected', async ({ page }) => {
-    await waitForAppReady(page);
+    // hud-geometry shows "—" before selection
     const geo = page.locator('[data-testid="hud-geometry"]');
-    await expect(geo).toBeVisible();
     await expect(geo).toHaveText('—');
+
+    // hud-page removed from HUD strip (now in bottom-bar tabs)
+    await expect(app.locator('[data-testid="hud-page"]')).toHaveCount(0);
   });
 
-  test('hud-mode moved to toolbar (data-hud-mode alias preserved)', async ({ page }) => {
+  // ── hud-mode relocated to toolbar (spec-required alias) ───────────────────────
+
+  test('hud-mode in toolbar with data-hud-mode alias preserved', async ({ page }) => {
     await waitForAppReady(page);
     // The mode indicator is now in the contextual toolbar.
     // data-hud-mode selector works (backward-compatible alias).
-    // It lives inside the toolbar, which is hidden when no selection (contextual).
     const modeInToolbar = page.locator('[data-testid="hud-mode"]');
-    // Selector resolves and finds the element in DOM
     await expect(modeInToolbar).toBeAttached();
     await expect(modeInToolbar).toHaveText('Edit');
-    // It is inside the toolbar
+    // It lives inside the toolbar
     const toolbar = page.locator('[data-testid="toolbar"]');
     await expect(toolbar).toContainText('Edit');
-  });
-
-  test('hud-page is removed from HUD strip', async ({ page }) => {
-    await waitForAppReady(page);
-    // page info lives in the bottom-bar page-tabs, not in the HUD strip
-    const hudStrip = page.locator('[data-testid="hud"]');
-    const hudPageItems = hudStrip.locator('[data-testid="hud-page"]');
-    await expect(hudPageItems).toHaveCount(0);
   });
 
   // ── CSS-driven compact/full toggle ──────────────────────────────────────────
