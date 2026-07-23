@@ -5,7 +5,19 @@ Para rationale de decisiones, ver `docs/adr/`.
 
 ## Estado Actual
 
-**v0.105.0 — Fix MoveVertex payload (rotation/flip preservado) shipped. Cubertura 550 E2E + 220 unit + 947 cargo.**
+**v0.112.0 — Workbench redesign (R1a→R1b→R1c→R2a→R2b→R2c→R2d→R3) shipped. Mobile responsive drawers + HUD density + navbar toolbar + sidebar rail + history panel.**
+
+El workbench rediseñado cubre:
+- R1a: Controller foundation (`EditorState`, `DensityContext`, event bus, `waitForAppReady`)
+- R1b: Sidebar rail + main layout restructuring
+- R1c: History panel + CSS E2E stabilization
+- R2a: Navbar toolbar — 44px single-row, contextual density
+- R2b: InteractionState seam — `DisposableSet` listener, `resolveSelection` bridge
+- R2c: HUD density migration — CSS-driven density items, `hud-geometry`, toolbar `hud-mode` alias
+- R2d: Bottom-left cluster — remove full-width grid, bottom bar
+- R3: Responsive drawer system — mobile slide-in drawers with focus trap, Escape, outside-click, aria-modal/role=dialog, `prefers-reduced-motion`
+
+**v0.111.0 — BendHandlesOverlay extraction + clientToDoc dedup (v0.109.0), port-handles DragSession (v0.108.0), transform handles structural cleanup (v0.107.0, v0.106.0).**
 - **Bug crítico del usuario** (post-v0.104.0): drag, inspector position, y resize handles silenciosamente no hacían nada porque `MoveVertex` payload omitía `rotation/flip_h/flip_v`. La E2E suite pasaba por la razón equivocada (no verificaba que la x cambiara).
 - Fix: `#findOriginalGeometry` ahora devuelve la geometría completa; `#buildMoveVertexCmd` y la facade `setVertexGeometry` propagan los 8 campos. Regression test `tests/e2e/move-vertex-rotation.spec.ts` que sí verifica el cambio de x.
 - La rotación por Ctrl+R / Shift+R / H / V ya funcionaba (usa `RotateVertex` payload, no `MoveVertex`).
@@ -369,20 +381,32 @@ Triage by frequency of use and test cost; aim for batches of 10–20 specs per r
   - E2E: 1 new spec in `tests/e2e/move-resize-modifiers-move-016.spec.ts` continuing the move-resize-modifiers family.
   - Release: tagged `v0.104.0` (annotated) + GitHub release notes.
 
+### Workbench Redesign (v0.106.0–v0.111.0, R1a→R3)
+
+Complete UI restructuring from the 2026-07-xx workbench epic. All slices merged via trunk-based SDDK.
+
+- **v0.106.0 — Transform handles structural cleanup**: `refactor/transform-handles-r106` (PR #193, #194).
+  - 12 structural findings resolved; `SHAPE_KEYS` now includes `'Group'` (single-selected Groups render 8 resize + 1 rotation handle)
+  - 3 new modules: `dom-drag.ts` (DragSession<T> pointer lifecycle), `scene-bounds.ts` (canonical SHAPE_KEYS + sceneBounds + sceneGeometry), OverlayHitZone registry on `Editor`
+  - 21 atomic commits on `refactor/transform-handles-r107`
+- **v0.107.0 — Transform handles structural cleanup (r107 follow-up)**: `refactor/transform-handles-r107` (PR #195, #196, #197).
+  - `port-handles.ts` DragSession<T> migration; OverlayHost OCP refactor; `clientToDoc` dedup
+- **v0.108.0 — BendHandlesOverlay extraction + clientToDoc dedup**: `refactor/bend-handles-extraction-and-client-to-doc-r109` (PR #197).
+- **v0.109.0 — Engine bend support (perimeter-inclusive PathElement)**: `feat/engine-bend-support-r110` (PR #198, #200). ADR-0083 added.
+- **v0.110.0 — Port-handles DragSession + OverlayHost OCP**: `refactor/port-handles-drag-session-and-overlay-ocp-r108` (PR #196).
+- **v0.111.0 — Workbench redesign (R3 responsive drawers)**: PRs #202/#204/#206/#208/#210/#212/#214/#216.
+  - R1a: Controller foundation (`EditorState`, `DensityContext`, event bus, `waitForAppReady`) — PR #202
+  - R1b: Sidebar rail + main layout restructuring — PR #204
+  - R1c: History panel + CSS E2E stabilization — PR #206
+  - R2a: Navbar toolbar — 44px single-row, contextual density — PR #208
+  - R2b: InteractionState seam — `DisposableSet` listener, `resolveSelection` bridge — PR #210
+  - R2c: HUD density migration — CSS-driven density items, `hud-geometry`, toolbar `hud-mode` alias — PR #212
+  - R2d: Bottom-left cluster — remove full-width grid, bottom bar — PR #214
+  - R3: Responsive drawer system — mobile slide-in drawers with focus trap, Escape, outside-click, aria-modal/role=dialog, `prefers-reduced-motion` via CSS — PR #216 (feat/workbench-r3-responsive-drawers)
+
 ### In Progress
 
-- **v0.107.0 — transform handles structural cleanup**: `refactor/transform-handles-r107` (pending PR merge + tag).
-  - 12 structural findings resolved (F1–F12; F13 deferred to r108 as out-of-scope)
-  - 1 latent bug fixed: `SHAPE_KEYS` now includes `'Group'`, so single-selected Groups render 8 resize + 1 rotation handle
-  - 3 new modules: `dom-drag.ts` (DragSession<T> pointer lifecycle), `scene-bounds.ts` (canonical SHAPE_KEYS + sceneBounds + sceneGeometry), OverlayHitZone registry on `Editor`
-  - Net LOC delta: +769 / −431 (target was −350; off by +1,119 — concentrated in editor.ts +184 and resize-handles.ts +105)
-  - Tests: 245 unit (+25 new: dom-drag 12 + scene-bounds 11 + editor 2) + 22 E2E (all pass)
-  - 21 atomic commits on `refactor/transform-handles-r107` (incl. 2 correction cycles + 1 cleanup pass)
-  - **Deferred**: ADRs 0083/0084/0085 not committed — `docs/` is gitignored and ADRs described a non-existent API; correct contracts saved to engram (`sddk/refactor-transform-handles-r107/api-contracts`)
-  - **r108 follow-ups (ponytail: markers in code)**:
-    - `port-handles.ts:56`: DragSession<T> migration deferred — port FSM still owns manual listeners
-    - `editor.ts:2910`: `#registerOverlayHitZone` hard-private + Editor ctor hardcodes zones — OCP-friendly refactor needed for future overlays
-  - Archive: `sddk/refactor-transform-handles-r107/archive-report.md`
+_(none — following workbench redesign completion, next batch is P0 canvas nav + P1 shape library)_
 
 ## 🎯 Recently Closed Tracks
 
@@ -490,6 +514,7 @@ Análisis exhaustivo de features restantes, ordenadas por impacto:
 | 0080 | Keyboard Shortcut Collision Resolution | UX / Interaction |
 | 0081 | Layer Model Gap Deferred | UX / Interaction |
 | 0082 | Engine-Owned Typed Selection Semantics | UX / Interaction |
+| 0083 | Perimeter-Inclusive PathElement Semantic | Routing |
 
 ## Reglas de Actualización
 
