@@ -261,6 +261,7 @@ button:disabled {
   .inspector { right: 0; width: var(--inspector-w); transform: translateX(100%); box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3); }
   [data-drawer-open="sidebar"] .sidebar,
   [data-drawer-open="inspector"] .inspector {
+    display: flex;
     transform: translateX(0);
     visibility: visible;
     opacity: 1;

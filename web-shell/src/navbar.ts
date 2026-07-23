@@ -20,6 +20,7 @@ export interface NavbarControls {
   saveBtn: HTMLButtonElement;
   zoomDisplay: HTMLSpanElement;
   inspectorToggleBtn: HTMLButtonElement;
+  sidebarToggleBtn: HTMLButtonElement;
   setDiagnosticsStatus: (_state: DiagnosticStatus, _message?: string) => void;
   toolbar: ToolbarControls;
 }
@@ -710,6 +711,16 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   });
   document.body.appendChild(inspectorToggleBtn);
 
+  // Sidebar toggle (mobile only — floating trigger for the sidebar drawer)
+  const sidebarToggleBtn = document.createElement('button');
+  sidebarToggleBtn.className = 'quick-btn mobile-panel-toggle mobile-panel-toggle--sidebar';
+  sidebarToggleBtn.textContent = '☰';
+  sidebarToggleBtn.title = 'Toggle sidebar';
+  sidebarToggleBtn.setAttribute('aria-label', 'Toggle sidebar panel');
+  sidebarToggleBtn.setAttribute('data-testid', 'sidebar-toggle');
+  sidebarToggleBtn.style.display = 'none';
+  document.body.appendChild(sidebarToggleBtn);
+
   // Restore inspector collapsed state
   try {
     if (localStorage.getItem('hodei:inspector-collapsed') === 'true') {
@@ -955,6 +966,7 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     saveBtn,
     zoomDisplay,
     inspectorToggleBtn,
+    sidebarToggleBtn,
     setDiagnosticsStatus: (state: DiagnosticStatus, message?: string) => {
       diagnosticsPill.hidden = state === 'idle';
       if (state === 'idle') return;

@@ -329,5 +329,49 @@ test.describe('R3: Responsive Drawers', () => {
       await page.waitForTimeout(200);
       await expect(sidebar).toHaveCSS('opacity', '0');
     });
+
+    test('Outside-click on drawer-overlay closes drawer and returns focus to trigger', async ({ page }) => {
+      // Open inspector drawer via button click
+      const trigger = page.locator('[data-testid="inspector-toggle"]');
+      await trigger.click();
+      await page.waitForTimeout(200);
+
+      const inspector = page.locator('[data-testid="inspector"]');
+      await expect(inspector).toHaveCSS('opacity', '1');
+
+      // Click on the drawer overlay (outside the drawer)
+      const overlay = page.locator('[data-testid="drawer-overlay"]');
+      await overlay.click({ position: { x: 10, y: 10 } }); // click near top-left of overlay
+      await page.waitForTimeout(200);
+
+      // Drawer should be closed
+      await expect(inspector).toHaveCSS('opacity', '0');
+      // Focus should return to the trigger button
+      await expect(trigger).toBeFocused();
+    });
+
+    test('DrawerController sets and removes data-drawer-open attribute via toggle', async ({ page }) => {
+      const app = page.locator('#app');
+      // Initially no drawer-open attribute
+      await expect(app).not.toHaveAttribute('data-drawer-open');
+
+      // Open inspector via toggle button - verify data-drawer-open is set by controller
+      await page.click('[data-testid="inspector-toggle"]');
+      await page.waitForTimeout(200);
+      await expect(app).toHaveAttribute('data-drawer-open', 'inspector');
+
+      // Close via toggle - verify data-drawer-open is removed by controller
+      await page.click('[data-testid="inspector-toggle"]');
+      await page.waitForTimeout(200);
+      await expect(app).not.toHaveAttribute('data-drawer-open');
+    });
+
+    test('Sidebar drawer uses scoped data-drawer-testid', async ({ page }) => {
+      // Verify both drawers have scoped testids
+      const sidebar = page.locator('[data-drawer-testid="drawer-sidebar"]');
+      const inspector = page.locator('[data-drawer-testid="drawer-inspector"]');
+      await expect(sidebar).toBeAttached();
+      await expect(inspector).toBeAttached();
+    });
   });
 });

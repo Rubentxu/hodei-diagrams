@@ -551,7 +551,7 @@ async function bootstrap(): Promise<void> {
     (c => (triggerEl?.addEventListener('click', () => c.toggle()), c))(new DrawerController({ drawer, drawerEl, triggerEl, closeBtn, overlayEl: ui.drawerOverlay }));
 
   makeDrawer('inspector', inspector.container, ui.inspectorToggleBtn, inspector.closeBtn);
-  makeDrawer('sidebar', ui.sidebar, ui.sidebarCollapseBtn, ui.sidebarCollapseBtn);
+  makeDrawer('sidebar', ui.sidebar, ui.sidebarToggleBtn, ui.sidebarCollapseBtn);
 
   // R1b: Wire buildDockLayers into .dock-mode-layers container
   const dockLayersContainer = ui.sidebar.querySelector('.dock-mode-layers') as HTMLElement | null;

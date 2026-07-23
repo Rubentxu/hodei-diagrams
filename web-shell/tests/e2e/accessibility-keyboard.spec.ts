@@ -220,25 +220,81 @@ test.describe('R3: Drawer keyboard lifecycle', () => {
     await expect(inspector).toHaveCSS('opacity', '0');
   });
 
-  test('Tab key is handled (focus trap) when inspector drawer is open', async ({ page }) => {
+  test('Tab key cycles focus within inspector drawer (focus trap)', async ({ page }) => {
     // Open inspector drawer via button click
     await page.click('[data-testid="inspector-toggle"]');
     await page.waitForTimeout(200);
 
     const inspector = page.locator('[data-testid="inspector"]');
     await expect(inspector).toHaveCSS('opacity', '1');
-    // Focus trap is implemented in DrawerController - verified via open/close behavior
-    // Tab handling tested via acceptance: Escape closes drawer, Tab cycles within
+
+    // Manually focus an element inside the drawer (since RAF focus may not have completed)
+    const firstTab = page.locator('[data-testid="inspector-tab-style"]');
+    await firstTab.focus();
+    await page.waitForTimeout(50);
+
+    // Verify focus is inside drawer
+    const initiallyInside = await page.evaluate(() => {
+      const el = document.activeElement;
+      return !!el?.closest?.('[data-testid="inspector"]');
+    });
+    expect(initiallyInside).toBe(true);
+
+    // Press Tab multiple times and verify focus stays inside the drawer
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(50);
+      const isInsideDrawer = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document || el === document.body) return false;
+        return !!el.closest?.('[data-testid="inspector"]');
+      });
+      expect(isInsideDrawer).toBe(true);
+    }
   });
 
-  test('CSS-only drawer open works (sidebar trigger not yet implemented at mobile)', async ({ page }) => {
-    // Note: sidebar drawer has no visible trigger button at mobile in current UI
-    // This test verifies CSS drawer visibility works via attribute selector
-    await page.evaluate(() => {
-      document.querySelector('#app')?.setAttribute('data-drawer-open', 'sidebar');
-    });
+  test('Shift+Tab cycles focus backward within inspector drawer (focus trap)', async ({ page }) => {
+    // Open inspector drawer via button click
+    await page.click('[data-testid="inspector-toggle"]');
     await page.waitForTimeout(200);
-    const sidebar = page.locator('[data-testid="sidebar"]');
+
+    const inspector = page.locator('[data-testid="inspector"]');
+    await expect(inspector).toHaveCSS('opacity', '1');
+
+    // Manually focus an element inside the drawer
+    const lastTab = page.locator('[data-testid="inspector-tab-arrange"]');
+    await lastTab.focus();
+    await page.waitForTimeout(50);
+
+    // Verify focus is inside drawer
+    const initiallyInside = await page.evaluate(() => {
+      const el = document.activeElement;
+      return !!el?.closest?.('[data-testid="inspector"]');
+    });
+    expect(initiallyInside).toBe(true);
+
+    // Press Shift+Tab multiple times and verify focus stays inside the drawer
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press('Shift+Tab');
+      await page.waitForTimeout(50);
+      const isInsideDrawer = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document || el === document.body) return false;
+        return !!el.closest?.('[data-testid="inspector"]');
+      });
+      expect(isInsideDrawer).toBe(true);
+    }
+  });
+
+  test('Sidebar drawer opens via sidebar-toggle button and data-drawer-testid is present', async ({ page }) => {
+    // Verify the sidebar has the scoped drawer testid
+    const sidebar = page.locator('[data-drawer-testid="drawer-sidebar"]');
+    await expect(sidebar).toBeAttached();
+
+    // Open sidebar drawer via button click (mobile viewport)
+    await page.click('[data-testid="sidebar-toggle"]');
+    await page.waitForTimeout(200);
+
     await expect(sidebar).toHaveCSS('opacity', '1');
   });
 });

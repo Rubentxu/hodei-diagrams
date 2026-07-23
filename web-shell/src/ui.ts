@@ -29,6 +29,7 @@ export interface UiElements {
   saveButton: HTMLButtonElement;
   zoomDisplay: HTMLSpanElement;
   inspectorToggleBtn: HTMLButtonElement;
+  sidebarToggleBtn: HTMLButtonElement;
   setDiagnosticsStatus: NavbarControls['setDiagnosticsStatus'];
 
   // Zone 2: Sidebar
@@ -267,6 +268,7 @@ export function buildEmptyUi(
     saveButton: navbar.saveBtn,
     zoomDisplay: navbar.zoomDisplay,
     inspectorToggleBtn: navbar.inspectorToggleBtn,
+    sidebarToggleBtn: navbar.sidebarToggleBtn,
     setDiagnosticsStatus: navbar.setDiagnosticsStatus,
 
     // Zone 2

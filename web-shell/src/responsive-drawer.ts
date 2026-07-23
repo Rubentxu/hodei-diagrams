@@ -23,6 +23,7 @@ export class DrawerController {
   private readonly boundCloseClick = () => this.close();
   private static _activeDrawers = new Set<DrawerController>();
 
+  // eslint-disable-next-line no-unused-vars -- opts is used via this.opts (TypeScript constructor property shorthand)
   constructor(private readonly opts: DrawerOptions) {}
 
   /** Close all open drawers (called by main.ts for overlay deactivation) */
