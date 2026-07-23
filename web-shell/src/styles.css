@@ -197,6 +197,11 @@ button:disabled {
   }
 }
 
+/* R3: hide inspector drawer close button on desktop — it only appears inside @media (max-width:767px) */
+.drawer-close-inspector {
+  display: none;
+}
+
 /* ─── Responsive: Mobile (<768px) ─────────────────────────────────────────── */
 /* R3: sidebar/inspector replaced with slide-in drawers (see drawer-overlay rules) */
 @media (max-width: 767px) {
@@ -268,7 +273,6 @@ button:disabled {
   }
 
   /* R3: drawer close button */
-  .drawer-close-sidebar,
   .drawer-close-inspector {
     position: absolute;
     top: 8px;

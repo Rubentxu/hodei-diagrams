@@ -221,8 +221,9 @@ test.describe('R3: Drawer keyboard lifecycle', () => {
   });
 
   test('Tab key cycles focus within inspector drawer (focus trap)', async ({ page }) => {
-    // Focus trap coverage is unit-tested in tests/ui-drawer.test.ts; this E2E
-    // proves only the algorithm wiring (keydown listener active while open).
+    // Focus-trap enforcement (constraining Tab/Shift+Tab to drawer elements) is
+    // unit-tested in tests/ui-drawer.test.ts; this E2E proves the keydown listener
+    // is wired and the drawer stays open during Tab navigation.
     await page.click('[data-testid="inspector-toggle"]');
     await page.waitForTimeout(200);
     const keydownActive = await page.evaluate(() => {
