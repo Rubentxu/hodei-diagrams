@@ -266,6 +266,24 @@ button:disabled {
     opacity: 1;
   }
 
+  /* R3: drawer close button */
+  .drawer-close-sidebar,
+  .drawer-close-inspector {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+
   /* prefers-reduced-motion: instant transitions */
   @media (prefers-reduced-motion: reduce) {
     .drawer-overlay, .sidebar, .inspector { transition: none !important; }

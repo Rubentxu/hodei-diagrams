@@ -77,25 +77,6 @@ export function buildInspector(
   closeBtn.textContent = '✕';
   closeBtn.title = 'Close inspector';
   closeBtn.setAttribute('data-testid', 'drawer-close-inspector');
-  closeBtn.style.cssText = `
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    background: transparent;
-    border: none;
-    color: var(--text-dim);
-    cursor: pointer;
-  `;
-  closeBtn.addEventListener('click', () => {
-    // The DrawerController will handle closing via its own listener
-    // This button's data-testid allows E2E tests to find it
-  });
   container.appendChild(closeBtn);
 
   // ─── Tab content panes ────────────────────────────────────────────────────
