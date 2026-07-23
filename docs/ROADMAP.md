@@ -407,6 +407,8 @@ Complete UI restructuring from the 2026-07-xx workbench epic. All slices merged 
 ### In Progress
 
 **Infinite Canvas PR1** — viewport infrastructure (viewport.ts + 24 tests + scene-bounds docToClient) — archived 2026-07-23 ✅
+**Infinite Canvas PR2** — viewport wiring + empty-drag pan + test fixes — archived 2026-07-23 ✅
+**Infinite Canvas PR3** — Rust `expand_page_if_needed()` deprecation + `fitToView(0.1)` initial viewport heuristic — archived 2026-07-23 ✅
 
 ## 🎯 Recently Closed Tracks
 
@@ -426,11 +428,11 @@ _(none — closed campaigns live in Milestones Delivered above)_
 
 | Fase | Focus | Deps | Status |
 |------|-------|------|--------|
-| **Fase 1** | Viewport state en web-shell + clientToDoc/docToClient + wheel/pan handlers + initial viewport heuristic para .drawio | Ninguno | ✅ PR1 merged |
+| **Fase 1** | Viewport state en web-shell + clientToDoc/docToClient + wheel/pan handlers + initial viewport heuristic para .drawio | Ninguno | ✅ PR1+PR2+PR3 merged |
 | **Fase 2** | Viewport culling (quadtree spatial index en Rust) | Fase 1 | 🔲 |
 | **Fase 3** | WASM memory optimization + animation frame budget | Fase 2 | 🔲 |
 
-**Branch**: `feat/infinite-canvas` — PR1 archived (viewport infrastructure), PR2 in progress
+**Branch**: `feat/infinite-canvas` — PR1/PR2/PR3 archived, ready for release
 
 **Artéfacts**:
 - `docs/adr/0084-infinite-canvas-rust-wasm-lightweight-js.md`
