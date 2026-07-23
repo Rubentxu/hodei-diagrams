@@ -2519,15 +2519,6 @@ export class Editor {
     for (const cb of this.#interactionStateListeners) cb(state);
   }
 
-  /**
-   * Public seam for external callers (main.ts) to trigger interaction-state
-   * notification after external state changes (e.g., grid visibility).
-   * Fires #notifyInteractionState so subscribers receive updated gridVisible.
-   */
-  notifyInteractionState(): void {
-    this.#notifyInteractionState();
-  }
-
   /** Refresh scene cache and re-render. Called after commands. */
   #replay(): void {
     // Refresh scene cache
