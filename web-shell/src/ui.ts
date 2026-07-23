@@ -138,9 +138,10 @@ export function buildEmptyUi(
     inspContainer.setAttribute('data-testid', 'inspector');
   }
 
-  // ─── Zone 5: Bottom bar ──────────────────────────────────────────────────
+  // ─── Zone 5: Bottom-left cluster (floating, R2d) ─────────────────────────
+  // Replaces full-width grid bottom row with a fixed-position cluster
   const bottomBar = document.createElement('div');
-  bottomBar.className = 'bottom-bar';
+  bottomBar.className = 'bottom-bar bottom-left-cluster';
   bottomBar.setAttribute('data-testid', 'bottom-bar');
 
   const pageTabContainer = document.createElement('div');
@@ -154,12 +155,7 @@ export function buildEmptyUi(
   addPageBtn.setAttribute('data-testid', 'page-tab-add');
   addPageBtn.textContent = '+';
   addPageBtn.title = 'Add page';
-
   bottomBar.appendChild(addPageBtn);
-
-  const bottomSpacer = document.createElement('div');
-  bottomSpacer.className = 'bottom-spacer';
-  bottomBar.appendChild(bottomSpacer);
 
   // Diagnostics / error area
   const errorBanner = document.createElement('div');
@@ -182,7 +178,6 @@ export function buildEmptyUi(
   diagnosticsBadge.setAttribute('data-testid', 'diagnostics-badge');
   diagnosticsBadge.hidden = true;
 
-  errorBanner.hidden = true;
   errorBanner.appendChild(errorMessage);
   errorBanner.appendChild(dismissButton);
   errorBanner.appendChild(diagnosticsBadge);
@@ -195,6 +190,10 @@ export function buildEmptyUi(
   root.appendChild(canvasContainer);
   root.appendChild(hud.container);
   root.appendChild(inspContainer);
+  // bottomBar is a floating cluster, appended to body via document.body.appendChild below
+
+  // ─── Floating bottom-left cluster (R2d) ───────────────────────────────────
+  // Append to root so it floats above the grid layout (position:fixed is viewport-relative)
   root.appendChild(bottomBar);
 
   // ─── Sidebar collapse toggle ────────────────────────────────────────────

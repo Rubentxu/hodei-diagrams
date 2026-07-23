@@ -142,10 +142,9 @@ button:disabled {
   grid-template-areas:
     'rail navbar  navbar   navbar'
     'rail sidebar canvas   inspector'
-    'rail sidebar hud      inspector'
-    'rail sidebar bottom   bottom';
+    'rail sidebar hud      inspector';
   grid-template-columns: var(--rail-w) var(--sidebar-w) 1fr var(--inspector-w);
-  grid-template-rows: var(--navbar-h) 1fr var(--hud-h) var(--bottom-h);
+  grid-template-rows: var(--navbar-h) 1fr var(--hud-h);
   overflow: hidden;
 }
 
@@ -203,13 +202,17 @@ button:disabled {
 @media (max-width: 767px) {
   #app {
     grid-template-columns: var(--rail-w) 0px 1fr 0px;
-    grid-template-rows: var(--navbar-h) 1fr 0px 0px;
+    grid-template-rows: var(--navbar-h) 1fr 0px;
   }
 
   .sidebar,
   .inspector,
-  .hud,
-  .bottom-bar {
+  .hud {
+    display: none !important;
+  }
+
+  /* Bottom cluster hidden on mobile — canvas maximized */
+  .bottom-left-cluster {
     display: none !important;
   }
 
@@ -229,11 +232,10 @@ button:disabled {
 @media (max-width: 479px) {
   /* Maximize canvas even further — hide HUD and compress navbar */
   #app {
-    grid-template-rows: var(--navbar-h) 1fr 0px 0px;
+    grid-template-rows: var(--navbar-h) 1fr 0px;
   }
 
-  .hud,
-  .bottom-bar {
+  .hud {
     display: none !important;
   }
 
@@ -1947,17 +1949,26 @@ button:disabled {
   color: var(--accent);
 }
 
-/* ─── Zone 5: Bottom Bar ──────────────────────────────────────────────────── */
+/* ─── Zone 5: Bottom-left cluster (R2d) ───────────────────────────────────── */
 .bottom-bar {
-  grid-area: bottom;
+  /* Alias class — .bottom-left-cluster has the actual styling */
+}
+
+.bottom-left-cluster {
+  position: fixed;
+  bottom: 0;
+  left: 0;
   display: flex;
   align-items: stretch;
   background: var(--bg-secondary);
   border-top: 1px solid var(--bg-surface);
+  border-right: 1px solid var(--bg-surface);
   padding: 0;
   gap: 0;
   min-height: 0;
   overflow: hidden;
+  z-index: 50;
+  border-top-right-radius: var(--radius-md);
 }
 
 .page-tabs {
@@ -2052,10 +2063,6 @@ button:disabled {
 
 .page-tab-add:hover {
   color: var(--text);
-}
-
-.bottom-spacer {
-  flex: 1;
 }
 
 .diagnostics-area {
