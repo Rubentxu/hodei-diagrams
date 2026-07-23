@@ -418,7 +418,26 @@ _(none — closed campaigns live in Milestones Delivered above)_
 - `docs/adr/0080-keyboard-shortcut-collision-resolution.md`
 - `docs/adr/0081-layer-model-gap-deferred.md` — **Resolved** (IP-F v0.91.0)
 - `docs/adr/0082-engine-owned-typed-selection-semantics.md` — **Resolved** (IP-G v0.100.0)
-- `docs/drawio-user-interaction-workflows.md`
+- `docs/adr/0084-infinite-canvas-rust-wasm-lightweight-js.md` — **Active** (ADR-0084, 2026-07-23)
+
+### Infinite Canvas + Rust/WASM Lightweight JS (ADR-0084, 2026-07-23)
+
+**Estrategia**: Canvas infinito como modelo de renderizado primario, motor pesado en Rust/WASM, cliente JS thin.
+
+| Fase | Focus | Deps | Status |
+|------|-------|------|--------|
+| **Fase 1** | Viewport state en web-shell + clientToDoc/docToClient + wheel/pan handlers + initial viewport heuristic para .drawio | Ninguno | 🔲 |
+| **Fase 2** | Viewport culling (quadtree spatial index en Rust) | Fase 1 | 🔲 |
+| **Fase 3** | WASM memory optimization + animation frame budget | Fase 2 | 🔲 |
+
+**Branch**: `feat/infinite-canvas` (pendiente de crear)
+
+**Artéfacts**:
+- `docs/adr/0084-infinite-canvas-rust-wasm-lightweight-js.md`
+
+**Nota de deprecated**: `expand_page_if_needed()` en `diagram-commands/src/payload.rs` será deprecada en Fase 1.
+
+---
 
 ## 🎯 Gaps Restantes — Post-IP-G (~100 workflows)
 
