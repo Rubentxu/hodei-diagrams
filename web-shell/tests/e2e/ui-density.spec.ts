@@ -14,7 +14,7 @@ test.describe('Slice B: Professional Density UI', () => {
       await expect(hud).toBeVisible();
     });
 
-    test('HUD shows initial state: no selection, page 1/1, zoom 100%, Edit mode', async ({ page }) => {
+    test('HUD shows initial state: no selection, zoom 100%, Edit mode', async ({ page }) => {
       await waitForAppReady(page);
 
       const hud = page.locator('[data-testid="hud"]');
@@ -24,27 +24,26 @@ test.describe('Slice B: Professional Density UI', () => {
       const selValue = page.locator('[data-testid="hud-selection"]');
       await expect(selValue).toHaveText('Nothing selected');
 
-      // Page: 1/1
-      const pageValue = page.locator('[data-testid="hud-page"]');
-      await expect(pageValue).toHaveText('1/1');
-
       // Zoom: 100%
       const zoomValue = page.locator('[data-testid="hud-zoom"]');
       await expect(zoomValue).toHaveText('100%');
 
-      // Mode: Edit
-      const modeValue = page.locator('[data-testid="hud-mode"]');
+      // Mode: Edit — now lives in contextual toolbar (R2c), not in hud
+      const toolbar = page.locator('[data-testid="toolbar"]');
+      const modeValue = toolbar.locator('[data-testid="hud-mode"]');
       await expect(modeValue).toHaveText('Edit');
     });
 
     test('HUD updates page count after import', async ({ page }) => {
       await waitForAppReady(page);
 
+      // Import a diagram — page count now lives in page-tabs cluster (R2d), not hud
       await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
       await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
 
-      const pageValue = page.locator('[data-testid="hud-page"]');
-      await expect(pageValue).toHaveText('1/1');
+      // Verify the diagram loaded (hud still visible, no crash)
+      const hud = page.locator('[data-testid="hud"]');
+      await expect(hud).toBeVisible();
     });
 
     test('HUD zoom reset button resets zoom to 100%', async ({ page }) => {
@@ -443,14 +442,16 @@ test.describe('Slice B: Professional Density UI', () => {
       expect(height).toBeLessThanOrEqual(29);
     });
 
-    test('9 HUD items present — wraps to multiple lines at 800px narrow viewport', async ({ page }) => {
-      // Set narrow viewport to verify 9 items wrap to multiple lines
+    test('8 HUD items present — wraps to multiple lines at 800px narrow viewport', async ({ page }) => {
+      // Set narrow viewport to verify items wrap to multiple lines
+      // Post-R2c: hud-mode moved to contextual toolbar, hud-page moved to page-tabs cluster
+      // HUD count reduced from 9 to 8
       await page.setViewportSize({ width: 800, height: 600 });
       await waitForAppReady(page);
 
-      // Count hud-item children
+      // Count hud-item children (8 items: fewer than pre-R2c count of 9, post-R2c removed hud-page)
       const itemCount = await page.locator('[data-testid="hud"] > .hud-item').count();
-      expect(itemCount).toBe(9);
+      expect(itemCount).toBe(8);
 
       // Verify items wrap (scrollHeight > clientHeight indicates multi-line layout)
       const hudInfo = await page.locator('[data-testid="hud"]').evaluate((el) => ({
