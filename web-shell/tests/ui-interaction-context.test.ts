@@ -139,11 +139,11 @@ describe('UI Interaction Context (R2b seam)', () => {
       const rect = viewer.querySelector('rect[data-vertex-id]')!;
       const cx = 50, cy = 40;
       const down = new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: cx, clientY: cy }); Object.defineProperty(down, 'pointerId', { value: 1 });
-      rect.dispatchEvent(down); expect(snaps[snaps.length - 1].isDragging).toBe(true);
+      rect.dispatchEvent(down); expect(snaps.at(-1)?.isDragging).toBe(true);
       const move = new MouseEvent('pointermove', { bubbles: true, clientX: cx + 5, clientY: cy + 5 }); Object.defineProperty(move, 'pointerId', { value: 1 });
-      rect.dispatchEvent(move); expect(snaps[snaps.length - 1].isDragging).toBe(true);
+      rect.dispatchEvent(move); expect(snaps.at(-1)?.isDragging).toBe(true);
       const up = new MouseEvent('pointerup', { bubbles: true, clientX: cx + 5, clientY: cy + 5 }); Object.defineProperty(up, 'pointerId', { value: 1 });
-      rect.dispatchEvent(up); expect(snaps[snaps.length - 1].isDragging).toBe(false);
+      rect.dispatchEvent(up); expect(snaps.at(-1)?.isDragging).toBe(false);
     });
 
     it('detach mid-drag fires isDragging=false', () => {
@@ -151,8 +151,8 @@ describe('UI Interaction Context (R2b seam)', () => {
       editor.onInteractionStateChange((s) => snaps.push({ isDragging: s.isDragging }));
       const rect = viewer.querySelector('rect[data-vertex-id]')!;
       const down = new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 50, clientY: 40 }); Object.defineProperty(down, 'pointerId', { value: 1 });
-      rect.dispatchEvent(down); expect(snaps[snaps.length - 1].isDragging).toBe(true);
-      editor.detach(); expect(snaps[snaps.length - 1].isDragging).toBe(false);
+      rect.dispatchEvent(down); expect(snaps.at(-1)?.isDragging).toBe(true);
+      editor.detach(); expect(snaps.at(-1)?.isDragging).toBe(false);
     });
   });
 });
