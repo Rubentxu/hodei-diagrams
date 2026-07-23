@@ -208,7 +208,7 @@ export class Editor {
   #pan: ((_dx: number, _dy: number) => void) | null = null;
   #abortController: AbortController | null = null;
   // ─── Viewport for infinite canvas pan/drag ─────────────────────────────────
-  readonly #viewport: Viewport | undefined;
+  #viewport: Viewport | undefined;
 
   // ─── Stencil Drag Preview ────────────────────────────────────────────────
   #stencilPreviewEl: SVGGElement | null = null;
@@ -2888,7 +2888,10 @@ export class Editor {
     if (!this.#panDrag || !this.#viewport) return;
     const dx = x - this.#panDrag.startX;
     const dy = y - this.#panDrag.startY;
-    this.#viewport.withPan(dx, dy);
+    // withPan takes absolute pan values, not deltas
+    const newPanX = this.#viewport.panX + dx;
+    const newPanY = this.#viewport.panY + dy;
+    this.#viewport = this.#viewport.withPan(newPanX, newPanY);
     this.#panDrag.startX = x;
     this.#panDrag.startY = y;
   }
