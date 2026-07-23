@@ -1,5 +1,7 @@
 //! SVG rendering: render scene pages to SVG strings.
 
+use std::collections::HashMap;
+
 use crate::engine::{WasmStencilProvider, with_engine, with_engine_mut};
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::SceneBuilder;
@@ -12,6 +14,8 @@ struct PageRender {
     /// the TS editor would fail to find the page.
     page_id: diagram_core::PageId,
     svg: String,
+    /// Optional page background color. `None` means white (the default).
+    background: Option<String>,
 }
 
 /// Render a single page to an SVG string.
@@ -69,11 +73,31 @@ pub fn render_pages(handle: u32) -> Result<String, JsValue> {
             .build(e.editor.model())
             .map_err(|err| Box::leak(format!("SceneError: {err:?}").into_boxed_str()) as &str)?;
 
+        // Build a map of PageId -> background color from the model.
+        let background_map: HashMap<_, _> = e
+            .editor
+            .model()
+            .pages()
+            .map(|p| {
+                let pid = p.id;
+                // page_id in scene uses the stable id; match by idx+version
+                (pid, p.background.clone())
+            })
+            .collect();
+
         let pages: Vec<PageRender> = SvgRenderer::new()
             .render_pages(&scene)
             .map_err(|err| Box::leak(format!("{err:?}").into_boxed_str()) as &str)?
             .into_iter()
-            .map(|(page_id, svg)| PageRender { page_id, svg })
+            .map(|(page_id, svg)| {
+                // Look up background; scene page_id is the same stable id as model's page id.
+                let background = background_map.get(&page_id).cloned().flatten();
+                PageRender {
+                    page_id,
+                    svg,
+                    background,
+                }
+            })
             .collect();
 
         serde_json::to_string(&pages)

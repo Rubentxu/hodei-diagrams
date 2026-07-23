@@ -16,8 +16,8 @@ use crate::payload::{
     RemoveVertexPayload, RenameLayerPayload, RenamePagePayload, ReorderPagePayload,
     ReverseEdgePayload, RotateCommand, SendBackwardPayload, SendToBackPayload,
     SetDefaultStylePayload, SetEdgeLabelOffsetPayload, SetEdgeWaypointsPayload,
-    SetLayerLockedPayload, SetLayerVisiblePayload, SetPageMathEnabledPayload,
-    SetVertexParentPayload,
+    SetLayerLockedPayload, SetLayerVisiblePayload, SetPageBackgroundPayload,
+    SetPageMathEnabledPayload, SetVertexParentPayload,
 };
 use crate::selection::{
     ClearSelectionPayload, DeselectTargetPayload, SelectTargetPayload, ToggleSelectionPayload,
@@ -90,6 +90,8 @@ pub enum Command {
     SetEdgeLabelOffset(SetEdgeLabelOffsetPayload),
     /// Set whether math typesetting is enabled on a page.
     SetPageMathEnabled(SetPageMathEnabledPayload),
+    /// Set a page's background color. `None` clears to default (white).
+    SetPageBackground(SetPageBackgroundPayload),
     /// IP-E: Set the model's default cell style (used by `AddVertex` when
     /// no explicit style is provided). `None` clears the default.
     SetDefaultStyle(SetDefaultStylePayload),
@@ -151,6 +153,7 @@ impl Command {
             Command::FlipEdge(p) => p.apply(model),
             Command::SetEdgeLabelOffset(p) => p.apply(model),
             Command::SetPageMathEnabled(p) => p.apply(model),
+            Command::SetPageBackground(p) => p.apply(model),
             Command::SetDefaultStyle(p) => p.apply(model),
             Command::AddLayer(p) => p.apply(model),
             Command::RemoveLayer(p) => p.apply(model),
@@ -200,6 +203,7 @@ impl Command {
             Command::SetVertexParent(p) => p.undo(model),
             Command::SetEdgeLabelOffset(p) => p.undo(model),
             Command::SetPageMathEnabled(p) => p.undo(model),
+            Command::SetPageBackground(p) => p.undo(model),
             Command::SetDefaultStyle(p) => p.undo(model),
             Command::AddLayer(p) => p.undo(model),
             Command::RemoveLayer(p) => p.undo(model),

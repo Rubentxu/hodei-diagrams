@@ -18,6 +18,8 @@ export interface PageRender {
   slotmapId: PageSlotId;
   name: string;
   svg: string;
+  /** Page background color (hex string) or null if default (white). */
+  background: string | null;
 }
 
 // WasmModule mirrors the wasm-pack exports from diagram-wasm.

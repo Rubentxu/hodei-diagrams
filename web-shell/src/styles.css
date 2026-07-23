@@ -2097,6 +2097,16 @@ button:disabled {
   color: var(--error);
 }
 
+/* Page tab color swatch (8px circle, left of page name) */
+.page-tab-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
 .page-tab-rename-input {
   background: var(--bg-primary);
   border: 1px solid var(--accent);

@@ -339,6 +339,7 @@ export interface PageTabCallbacks {
   // IP-D: page tab right-click menu (rename/duplicate/reorder)
   onDuplicate: (_pageId: number) => void;
   onMove: (_pageId: number, _direction: 'left' | 'right') => void;
+  onSetColor: (_pageId: number, _color: string) => void;
 }
 
 /** Update page tabs in the bottom bar. */
@@ -353,6 +354,16 @@ export function populatePageTabs(
     const tab = document.createElement('div');
     tab.className = 'page-tab' + (i === activeIndex ? ' active' : '');
     tab.setAttribute('data-testid', `page-tab-${i}`);
+
+    // Color swatch (left of page name)
+    const swatch = document.createElement('span');
+    swatch.className = 'page-tab-swatch';
+    swatch.setAttribute('aria-hidden', 'true');
+    // Use page background color if set; CSS fallback handles null (accent)
+    if (page.background) {
+      swatch.style.background = page.background;
+    }
+    tab.appendChild(swatch);
 
     // Tab name (clickable, double-click to rename)
     const tabName = document.createElement('button');
@@ -492,6 +503,29 @@ function tabRightClickHandler(
   });
 
   items.push({ separator: true, label: '', action: () => {} });
+
+  // Set Page Color — opens a native color picker
+  items.push({
+    label: 'Set Page Color',
+    action: () => {
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = '#ffffff';
+      input.style.position = 'absolute';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.focus();
+      input.click();
+      input.addEventListener('input', () => {
+        callbacks.onSetColor(pageId, input.value);
+        document.body.removeChild(input);
+      });
+      input.addEventListener('change', () => {
+        callbacks.onSetColor(pageId, input.value);
+        document.body.removeChild(input);
+      });
+    },
+  });
 
   items.push({
     label: 'Delete',

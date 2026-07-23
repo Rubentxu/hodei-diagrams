@@ -1799,6 +1799,70 @@ impl SetPageMathEnabledPayload {
     }
 }
 
+// ─── SetPageBackground ────────────────────────────────────────────────────────
+
+/// Payload for setting a page's background color.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetPageBackgroundPayload {
+    /// The ID of the page to modify.
+    pub page_id: PageId,
+    /// The new background color (hex string). `None` clears to default (white).
+    pub background: Option<String>,
+    /// The previous background color. Populated by `apply`.
+    #[serde(skip)]
+    pub prev_background: Option<Option<String>>,
+    /// Whether this command has been applied.
+    #[serde(skip)]
+    applied: bool,
+}
+
+impl SetPageBackgroundPayload {
+    /// Create a new payload for setting page background color.
+    pub fn new(page_id: PageId, background: Option<String>) -> Self {
+        Self {
+            page_id,
+            background,
+            prev_background: None,
+            applied: false,
+        }
+    }
+
+    /// Apply the set-page-background operation.
+    pub fn apply(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        let page = model
+            .store
+            .page_mut(self.page_id)
+            .ok_or(CommandError::PageNotFound(self.page_id))?;
+
+        // Capture previous value
+        self.prev_background = Some(page.background.clone());
+
+        // Apply new value
+        page.background = self.background.clone();
+        self.applied = true;
+
+        Ok(())
+    }
+
+    /// Undo the set-page-background operation.
+    pub fn undo(&mut self, model: &mut DiagramModel) -> CommandResult<()> {
+        if !self.applied {
+            return Err(CommandError::NotApplied);
+        }
+        let prev = self
+            .prev_background
+            .as_ref()
+            .ok_or(CommandError::NotApplied)?;
+        let page = model
+            .store
+            .page_mut(self.page_id)
+            .ok_or(CommandError::PageNotFound(self.page_id))?;
+        page.background = prev.clone();
+        self.applied = false;
+        Ok(())
+    }
+}
+
 /// Payload for connecting two vertices with an edge (Phase 0 interactive edge creation).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectVerticesCommand {

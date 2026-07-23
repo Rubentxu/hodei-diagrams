@@ -1010,6 +1010,7 @@ async function bootstrap(): Promise<void> {
       onDelete: handlePageDelete,
       onDuplicate: handlePageDuplicate,
       onMove: handlePageMove,
+      onSetColor: handlePageSetColor,
     });
     ui.toolbar.setMode('Edit');
     ui.saveButton.disabled = false;
@@ -1230,6 +1231,7 @@ async function bootstrap(): Promise<void> {
         onDelete: handlePageDelete,
         onDuplicate: handlePageDuplicate,
         onMove: handlePageMove,
+        onSetColor: handlePageSetColor,
       });
     }
 
@@ -1282,6 +1284,7 @@ async function bootstrap(): Promise<void> {
       onDelete: handlePageDelete,
       onDuplicate: handlePageDuplicate,
       onMove: handlePageMove,
+      onSetColor: handlePageSetColor,
     });
   }
 
@@ -1433,6 +1436,27 @@ async function bootstrap(): Promise<void> {
       return;
     }
     activeEditorIdx = activeEditor.activePageIdx;
+    refreshPageTabs();
+  }
+
+  /** Set a page's background color (triggered by "Set Page Color" context menu). */
+  function handlePageSetColor(pageIdNum: number, color: string): void {
+    if (!activeSession) return;
+    const target = activePages.find((p) => p.pageId === (pageIdNum as PageToken));
+    if (!target) return;
+    const cmd = JSON.stringify({
+      SetPageBackground: {
+        page_id: target.slotmapId,
+        background: color,
+      },
+    });
+    const r = activeSession.executeCommand(cmd);
+    if (!r.ok) {
+      showError(ui.errorBanner, ui.errorMessage, 'Set page color failed: ' + r.error);
+      return;
+    }
+    // Update local background so swatch updates immediately without re-render
+    target.background = color;
     refreshPageTabs();
   }
 

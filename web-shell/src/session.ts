@@ -114,11 +114,14 @@ export class DiagramEngineSession {
         this.svgCache.set(pageId, entry['svg'] as string);
         // Use name or default
         const name = typeof entry['name'] === 'string' ? entry['name'] : 'Page ' + (i + 1);
+        // background is null when not set (white page)
+        const background = typeof entry['background'] === 'string' ? entry['background'] : null;
         pages.push({
           pageId,
           slotmapId,
           name,
           svg: entry['svg'] as string,
+          background,
         });
       }
       return ok(pages);
@@ -378,6 +381,7 @@ export class DiagramEngineSession {
         slotmapId: page.page_id,
         name: page.name,
         svg,
+        background: null, // zero-copy path; background not available without render_pages round-trip
       };
     });
     return ok(pages);
