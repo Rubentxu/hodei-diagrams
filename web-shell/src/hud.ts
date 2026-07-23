@@ -16,7 +16,6 @@ export type LoadingState = { wasm: boolean; stencil: boolean };
 export interface HudControls {
   container: HTMLElement;
   setSelection: (_label: string) => void;
-  setPage: (_current: number, _total: number) => void;
   setZoom: (_percent: number) => void;
   setMode: (_mode: 'Edit' | 'Read Only' | 'Present') => void;
   onZoomClick: (_handler: () => void) => void;
@@ -26,6 +25,7 @@ export interface HudControls {
   setSelectionCount: (_n: number) => void;
   setSaveStatus: (_status: SaveStatus) => void;
   setLoading: (_state: LoadingState) => void;
+  setGeometry: (_w: number, _h: number) => void;
 }
 
 export function buildHud(): HudControls {
@@ -36,6 +36,7 @@ export function buildHud(): HudControls {
   // ─── Selection info ────────────────────────────────────────────────────────
   const selItem = document.createElement('div');
   selItem.className = 'hud-item hud-primary';
+  selItem.setAttribute('data-hud-density-item', 'default');
 
   const selLabel = document.createElement('span');
   selLabel.className = 'hud-label';
@@ -53,6 +54,7 @@ export function buildHud(): HudControls {
   // ─── Loading indicator (ephemeral) ─────────────────────────────────────────
   const loadingItem = document.createElement('div');
   loadingItem.className = 'hud-item hud-loading';
+  loadingItem.setAttribute('data-hud-density-item', 'contextual');
   loadingItem.setAttribute('aria-live', 'polite');
   loadingItem.setAttribute('data-testid', 'hud-loading');
   loadingItem.style.display = 'none';
@@ -76,6 +78,7 @@ export function buildHud(): HudControls {
   // ─── Snap indicator ────────────────────────────────────────────────────────
   const snapItem = document.createElement('div');
   snapItem.className = 'hud-item hud-snap';
+  snapItem.setAttribute('data-hud-density-item', 'default');
 
   const snapLabel = document.createElement('span');
   snapLabel.className = 'hud-label';
@@ -93,6 +96,7 @@ export function buildHud(): HudControls {
   // ─── Grid indicator ───────────────────────────────────────────────────────
   const gridItem = document.createElement('div');
   gridItem.className = 'hud-item hud-grid';
+  gridItem.setAttribute('data-hud-density-item', 'default');
 
   const gridLabel = document.createElement('span');
   gridLabel.className = 'hud-label';
@@ -107,11 +111,10 @@ export function buildHud(): HudControls {
   gridItem.appendChild(gridValue);
   container.appendChild(gridItem);
 
-  // ─── Cursor position + selection count ──────────────────────────────────────
-  // Single compact "cursor" item showing X / Y, plus selection count.
-  // Kept narrow so all HUD items fit in a 28px row at 1280px viewport.
+  // ─── Cursor position ──────────────────────────────────────────────────────
   const cursorItem = document.createElement('div');
   cursorItem.className = 'hud-item hud-cursor';
+  cursorItem.setAttribute('data-hud-density-item', 'default');
 
   const cursorLabel = document.createElement('span');
   cursorLabel.className = 'hud-label';
@@ -131,22 +134,23 @@ export function buildHud(): HudControls {
   sep1.className = 'hud-sep';
   container.appendChild(sep1);
 
-  // ─── Page info ─────────────────────────────────────────────────────────────
-  const pageItem = document.createElement('div');
-  pageItem.className = 'hud-item hud-page';
+  // ─── Geometry (R2c: shows W × H of selected shape) ─────────────────────────
+  const geometryItem = document.createElement('div');
+  geometryItem.className = 'hud-item hud-geometry';
+  geometryItem.setAttribute('data-hud-density-item', 'default');
 
-  const pageLabel = document.createElement('span');
-  pageLabel.className = 'hud-label';
-  pageLabel.textContent = 'Page:';
+  const geometryLabel = document.createElement('span');
+  geometryLabel.className = 'hud-label';
+  geometryLabel.textContent = 'Size:';
 
-  const pageValue = document.createElement('span');
-  pageValue.className = 'hud-value';
-  pageValue.setAttribute('data-testid', 'hud-page');
-  pageValue.textContent = '1/1';
+  const geometryValue = document.createElement('span');
+  geometryValue.className = 'hud-value';
+  geometryValue.setAttribute('data-testid', 'hud-geometry');
+  geometryValue.textContent = '—';
 
-  pageItem.appendChild(pageLabel);
-  pageItem.appendChild(pageValue);
-  container.appendChild(pageItem);
+  geometryItem.appendChild(geometryLabel);
+  geometryItem.appendChild(geometryValue);
+  container.appendChild(geometryItem);
 
   // ─── Separator ────────────────────────────────────────────────────────────
   const sep2 = document.createElement('div');
@@ -156,6 +160,7 @@ export function buildHud(): HudControls {
   // ─── Zoom ─────────────────────────────────────────────────────────────────
   const zoomItem = document.createElement('div');
   zoomItem.className = 'hud-item';
+  zoomItem.setAttribute('data-hud-density-item', 'default');
 
   const zoomLabel = document.createElement('span');
   zoomLabel.className = 'hud-label';
@@ -176,26 +181,10 @@ export function buildHud(): HudControls {
   spacer.className = 'hud-spacer';
   container.appendChild(spacer);
 
-  // ─── Mode ─────────────────────────────────────────────────────────────────
-  const modeItem = document.createElement('div');
-  modeItem.className = 'hud-item';
-
-  const modeLabel = document.createElement('span');
-  modeLabel.className = 'hud-label';
-  modeLabel.textContent = 'Mode:';
-
-  const modeValue = document.createElement('span');
-  modeValue.className = 'hud-value';
-  modeValue.setAttribute('data-testid', 'hud-mode');
-  modeValue.textContent = 'Edit';
-
-  modeItem.appendChild(modeLabel);
-  modeItem.appendChild(modeValue);
-  container.appendChild(modeItem);
-
   // ─── Save-status indicator (persistent, right side) ─────────────────────────
   const saveStatusItem = document.createElement('div');
   saveStatusItem.className = 'hud-item hud-save-status';
+  saveStatusItem.setAttribute('data-hud-density-item', 'default');
 
   const saveStatusLabel = document.createElement('span');
   saveStatusLabel.className = 'hud-label';
@@ -227,14 +216,12 @@ export function buildHud(): HudControls {
         selItem.classList.remove('hud-item--empty');
       }
     },
-    setPage: (current: number, total: number) => {
-      pageValue.textContent = `${current}/${total}`;
-    },
     setZoom: (percent: number) => {
       zoomBtn.textContent = `${Math.round(percent)}%`;
     },
-    setMode: (mode: 'Edit' | 'Read Only' | 'Present') => {
-      modeValue.textContent = mode;
+    setMode: (_mode: 'Edit' | 'Read Only' | 'Present') => {
+      // R2c: mode indicator moved to contextual toolbar (navbar.ts).
+      // Kept as no-op here for backward compatibility with existing callers.
     },
     onZoomClick: (handler: () => void) => {
       zoomClickHandler = handler;
@@ -278,6 +265,13 @@ export function buildHud(): HudControls {
         loadingValue.textContent = 'Stencils...';
       } else {
         loadingValue.textContent = '';
+      }
+    },
+    setGeometry: (w: number, h: number) => {
+      if (w <= 0 || h <= 0) {
+        geometryValue.textContent = '—';
+      } else {
+        geometryValue.textContent = `${Math.round(w)}×${Math.round(h)}`;
       }
     },
   };

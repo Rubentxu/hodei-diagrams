@@ -538,6 +538,13 @@ async function bootstrap(): Promise<void> {
     ui.setDockMode(state.dockMode);
   });
 
+  // R2c: Mirror hudDensity state to data-hud-density attribute on #app.
+  // CSS rules drive individual item visibility — no JS toggles per item.
+  const appRoot = document.getElementById('app');
+  workbenchController.subscribe((state) => {
+    appRoot?.setAttribute('data-hud-density', state.hudDensity);
+  });
+
   // R1b: Wire buildDockLayers into .dock-mode-layers container
   const dockLayersContainer = ui.sidebar.querySelector('.dock-mode-layers') as HTMLElement | null;
   if (dockLayersContainer && activeSession) {
@@ -626,6 +633,8 @@ async function bootstrap(): Promise<void> {
   // R2a: Initialize app attributes at startup
   const appEl = document.getElementById('app');
   appEl?.setAttribute('data-context-toolbar', 'inactive');
+  // R2c: Initialize data-hud-density from controller's initial state (compact)
+  appEl?.setAttribute('data-hud-density', workbenchController.getState().hudDensity);
 
   // Make hud accessible to module-level save functions
   hud = ui.hud;
@@ -656,10 +665,17 @@ async function bootstrap(): Promise<void> {
     setGridVisible(visible);
     gridMenuItem?.classList.toggle('has-checkmark', visible);
     ui.hud.setGrid(visible);
-    // R2b-FIX: augment last-seen 3-field IS with gridVisible and push to controller
-    if (lastInteractionState) {
-      workbenchController.updateHudDensity({ ...lastInteractionState, gridVisible: visible });
-    }
+    // R2c: Push gridVisible to controller using last-seen interaction state from
+    // the editor seam (or defaults if no interaction has happened yet). This keeps
+    // the editor API limited to its disposable listener and avoids reading fields
+    // that don't belong on the controller's read-only WorkbenchState.
+    const last = lastInteractionState ?? { isDragging: false, snapEnabled: false, isEditing: false };
+    workbenchController.updateHudDensity({
+      isDragging: last.isDragging,
+      snapEnabled: last.snapEnabled,
+      gridVisible: visible,
+      isEditing: last.isEditing,
+    });
   }
 
   gridMenuItem?.addEventListener('click', () => {
@@ -905,6 +921,32 @@ async function bootstrap(): Promise<void> {
       ui.hud.setSelection(getSelectionLabel(ids, sceneData));
       // Update HUD selection count
       ui.hud.setSelectionCount(ids.length);
+      // Update HUD geometry (R2c: W×H of first selected shape)
+      let geoW = 0, geoH = 0;
+      if (ids.length === 1) {
+        const id = ids[0]!;
+        for (const page of sceneData) {
+          for (const elem of page.display_list) {
+            const e = elem as Record<string, unknown>;
+            for (const key of ['Rect', 'RoundedRect', 'Ellipse'] as const) {
+              const variant = e[key] as Record<string, unknown> | undefined;
+              if (!variant) continue;
+              const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+              if (!idField) continue;
+              if (idField.idx === id.idx && idField.version === id.version) {
+                const bounds = variant['bounds'] as
+                  | { origin?: Record<string, number>; size?: Record<string, number> }
+                  | undefined;
+                if (bounds?.size) {
+                  geoW = bounds.size['width'] ?? 0;
+                  geoH = bounds.size['height'] ?? 0;
+                }
+              }
+            }
+          }
+        }
+      }
+      ui.hud.setGeometry(geoW, geoH);
       // Update toolbar buttons
       ui.toolbar.update(ids);
     }
@@ -961,8 +1003,7 @@ async function bootstrap(): Promise<void> {
       onDuplicate: handlePageDuplicate,
       onMove: handlePageMove,
     });
-    ui.hud.setPage(1, activePages.length);
-    ui.hud.setMode('Edit');
+    ui.toolbar.setMode('Edit');
     ui.saveButton.disabled = false;
   }
 
@@ -1184,8 +1225,7 @@ async function bootstrap(): Promise<void> {
       });
     }
 
-    ui.hud.setPage(1, activePages.length);
-    ui.hud.setMode('Edit');
+    ui.toolbar.setMode('Edit');
     ui.saveButton.disabled = false;
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
 
@@ -1210,8 +1250,6 @@ async function bootstrap(): Promise<void> {
           activeEditor.refreshScene();
           refreshMathOverlay();
         }
-        // Update HUD page info
-        ui.hud.setPage(idx + 1, activePages.length);
         // Reset zoom on page switch
         zoomPan?.resetView();
         ui.zoomDisplay.textContent = '100%';
@@ -1237,8 +1275,6 @@ async function bootstrap(): Promise<void> {
       onDuplicate: handlePageDuplicate,
       onMove: handlePageMove,
     });
-    // Update HUD page info
-    ui.hud.setPage(idx + 1, activePages.length);
   }
 
   /** Add a new page. */
@@ -1273,7 +1309,6 @@ async function bootstrap(): Promise<void> {
         mountSvg(ui.viewer, svg);
         refreshMathOverlay();
       }
-      ui.hud.setPage(newIdx + 1, activePages.length);
     }
     zoomPan?.resetView();
     ui.zoomDisplay.textContent = '100%';
@@ -1342,7 +1377,6 @@ async function bootstrap(): Promise<void> {
         refreshMathOverlay();
       }
     }
-    ui.hud.setPage(newIdx + 1, activePages.length);
     zoomPan?.resetView();
     ui.zoomDisplay.textContent = '100%';
     ui.hud.setZoom(100);
@@ -1374,7 +1408,6 @@ async function bootstrap(): Promise<void> {
       if (svg) mountSvg(ui.viewer, svg);
       refreshMathOverlay();
     }
-    ui.hud.setPage(activeEditorIdx + 1, activePages.length);
   }
 
   /** Move the selected page left or right using the engine reorder command. */
@@ -2101,9 +2134,8 @@ async function bootstrap(): Promise<void> {
     ui.canvasContainer.style.setProperty('--zoom', '1');
   });
 
-  // ─── 14.6. Initialize HUD page info ────────────────────────────────────────
-  ui.hud.setPage(1, 1);
-  ui.hud.setMode('Edit');
+  // ─── 14.6. Initialize HUD mode indicator ───────────────────────────────────
+  ui.toolbar.setMode('Edit');
   ui.canvasContainer.style.setProperty('--zoom', '1');
 
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
