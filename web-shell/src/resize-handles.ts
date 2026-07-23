@@ -388,15 +388,14 @@ export class ResizeHandlesOverlay {
     state.currentAngleDelta = this.#normalizeAngleDelta(angle - state.startAngle);
 
     const handleAngle = state.startAngle + state.currentAngleDelta;
-    const handleX = state.centerX + Math.cos(handleAngle) * state.radius;
-    const handleY = state.centerY + Math.sin(handleAngle) * state.radius;
-    const handle = this.#getSvgLayer().querySelector('.rotation-handle') as SVGCircleElement | null;
-    if (handle) {
-      handle.setAttribute('cx', String(handleX));
-      handle.setAttribute('cy', String(handleY));
-    }
+    // Handle circle is a child of the rotated shape <g> at fixed local offset (0, -radius).
+    // Its visual position is: center + R_handleAngle × (0, -radius).
+    // Do NOT update cx,cy here — the group's CSS rotation moves it automatically.
     const line = this.#getSvgLayer().querySelector('.rotation-handle-link') as SVGLineElement | null;
     if (line) {
+      // Line endpoint in document space = center + R_handleAngle × (0, -radius)
+      const handleX = state.centerX + Math.sin(handleAngle) * state.radius;
+      const handleY = state.centerY - Math.cos(handleAngle) * state.radius;
       line.setAttribute('x2', String(handleX));
       line.setAttribute('y2', String(handleY));
     }
@@ -416,22 +415,14 @@ export class ResizeHandlesOverlay {
 
   /** Create the rotation handle above the selected shape. */
   #createRotationHandle(vertexId: SlotmapId, bounds: ShapeBounds): void {
-    const { centerX, handleX, handleY } = this.#rotationHandleGeometry(bounds);
+    const { centerX, centerY, radius } = this.#rotationHandleGeometry(bounds);
 
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('class', 'rotation-handle-link');
-    line.setAttribute('x1', String(centerX));
-    line.setAttribute('y1', String(bounds.y));
-    line.setAttribute('x2', String(handleX));
-    line.setAttribute('y2', String(handleY));
-    line.setAttribute('stroke', '#4a9eff');
-    line.setAttribute('stroke-width', '1.5');
-    line.setAttribute('stroke-dasharray', '4 3');
-    line.style.pointerEvents = 'none';
-
+    // Circle goes INSIDE the shape's <g> wrapper at local offset (0, -radius).
+    // The group's CSS rotation will move it to the correct visual position automatically.
+    // Local coords: cx=0 (centerX), cy=-radius (top of shape in local space).
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', String(handleX));
-    circle.setAttribute('cy', String(handleY));
+    circle.setAttribute('cx', '0');
+    circle.setAttribute('cy', String(-radius));
     circle.setAttribute('r', '6');
     circle.setAttribute('class', 'rotation-handle');
     circle.setAttribute('data-testid', 'rotation-handle');
@@ -442,6 +433,19 @@ export class ResizeHandlesOverlay {
     circle.setAttribute('stroke-width', '1.5');
     circle.style.cursor = 'grab';
     circle.style.pointerEvents = 'all';
+
+    // Dashed line stays at SVG layer level; its endpoint is in document space.
+    // Initial endpoint at handleAngle=0: center + R_0 × (0, -radius) = (centerX, centerY - radius)
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('class', 'rotation-handle-link');
+    line.setAttribute('x1', String(centerX));
+    line.setAttribute('y1', String(centerY));
+    line.setAttribute('x2', String(centerX));
+    line.setAttribute('y2', String(centerY - radius));
+    line.setAttribute('stroke', '#4a9eff');
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke-dasharray', '4 3');
+    line.style.pointerEvents = 'none';
 
     const svgLayer = this.#getSvgLayer();
     svgLayer.appendChild(line);
