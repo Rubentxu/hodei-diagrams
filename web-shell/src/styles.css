@@ -1266,13 +1266,32 @@ button:disabled {
   color: var(--text);
 }
 
+/* ─── R2c: HUD density-driven visibility ────────────────────────────────────── */
+/*
+ * [data-hud-density="compact|full"] on #app drives item visibility.
+ * Items tagged data-hud-density-item="contextual" are hidden in compact mode.
+ * Items tagged data-hud-density-item="default" are always visible.
+ * No JS toggles individual item visibility — CSS only.
+ */
+
+/* Compact: hide contextual HUD items */
+#app[data-hud-density="compact"] [data-hud-density-item="contextual"] {
+  display: none;
+}
+
+/* Full: all HUD items visible (default behavior) */
+#app[data-hud-density="full"] [data-hud-density-item="contextual"] {
+  display: flex;
+}
+
 /* ─── HUD new item selectors (C2) ──────────────────────────────────────────── */
 .hud-snap,
 .hud-grid,
 .hud-cursor,
 .hud-count,
 .hud-save-status,
-.hud-loading {
+.hud-loading,
+.hud-geometry {
   display: flex;
   align-items: center;
   gap: var(--xs);

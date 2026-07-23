@@ -29,6 +29,7 @@ export interface ToolbarControls {
   container: HTMLElement;
   setEditor(_editor: Editor): void;
   update(_selection: readonly SlotmapId[]): void;
+  setMode(_mode: 'Edit' | 'Read Only' | 'Present'): void;
 }
 
 export function buildNavbar(session: DiagramEngineSession): NavbarControls {
@@ -756,6 +757,18 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     return sep;
   }
 
+  // R2c: Mode indicator — lives in the contextual toolbar for compact-mode visibility.
+  // Backward-compatible alias: data-hud-density-item="contextual" on the element
+  // so CSS can also control it via #app[data-hud-density] rules.
+  const modeIndicator = document.createElement('span');
+  modeIndicator.className = 'toolbar-btn';
+  modeIndicator.setAttribute('data-testid', 'hud-mode');
+  modeIndicator.setAttribute('data-hud-density-item', 'contextual');
+  modeIndicator.style.pointerEvents = 'none';
+  modeIndicator.style.fontSize = '11px';
+  modeIndicator.style.color = 'var(--text-dim)';
+  modeIndicator.textContent = 'Edit';
+
   // Fill color button (input type=color styled as swatch)
   const fillInput = document.createElement('input');
   fillInput.type = 'color';
@@ -869,7 +882,7 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     activeEditor.sendToBack();
   });
 
-  // Assemble toolbar in order: fill, stroke, sep, bold, italic, sep, delete, front, back
+  // Assemble toolbar in order: fill, stroke, sep, bold, italic, sep, delete, front, back, mode
   toolbarContainer.appendChild(fillInput);
   toolbarContainer.appendChild(strokeInput);
   toolbarContainer.appendChild(makeToolbarSep());
@@ -879,6 +892,8 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   toolbarContainer.appendChild(deleteBtn);
   toolbarContainer.appendChild(frontBtn);
   toolbarContainer.appendChild(backBtn);
+  toolbarContainer.appendChild(makeToolbarSep());
+  toolbarContainer.appendChild(modeIndicator);
 
   // R2: Toolbar is inside navbar-top-row, not appended separately
   navbarTopRow.appendChild(toolbarContainer);
@@ -926,6 +941,9 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
         boldBtn.classList.remove('--active');
         italicBtn.classList.remove('--active');
       }
+    },
+    setMode(mode: 'Edit' | 'Read Only' | 'Present'): void {
+      modeIndicator.textContent = mode;
     },
   };
 
