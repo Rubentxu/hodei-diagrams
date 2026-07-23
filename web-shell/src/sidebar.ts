@@ -160,6 +160,8 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   const container = document.createElement('div');
   container.className = 'sidebar';
   container.setAttribute('data-testid', 'sidebar');
+  // R3: drawer-specific identifier (separate from legacy 'sidebar' testid)
+  container.setAttribute('data-drawer-testid', 'drawer-sidebar');
   // R1c: Observable dock mode state marker for E2E testing
   container.setAttribute('data-dock-mode', 'shapes');
 
@@ -177,6 +179,8 @@ export function buildSidebar(stencilManager?: StencilLibraryManager): SidebarCon
   collapseBtn.textContent = '◀';
   collapseBtn.title = 'Collapse sidebar';
   collapseBtn.setAttribute('data-testid', 'sidebar-collapse-btn');
+  // R3: drawer close button identifier
+  collapseBtn.setAttribute('data-drawer-testid', 'drawer-close-sidebar');
   header.appendChild(collapseBtn);
 
   container.appendChild(header);

@@ -28,6 +28,7 @@ import { EMPTY_METADATA } from './types.js';
 import { VersionStore } from './version-store.js';
 import { HistoryPanel } from './history-panel.js';
 import { WorkbenchController } from './workbench-controller.js';
+import { DrawerController } from './responsive-drawer.js';
 import { buildDockLayers } from './dock-layers.js';
 import { runMathOverlay } from './math/math-overlay.js';
 import { openMathInsertDialog } from './math/math-dialog.js';
@@ -544,6 +545,13 @@ async function bootstrap(): Promise<void> {
   workbenchController.subscribe((state) => {
     appRoot?.setAttribute('data-hud-density', state.hudDensity);
   });
+
+  // R3: Wire responsive drawers via single-line lambda (used twice)
+  const makeDrawer = (drawer: 'inspector' | 'sidebar', drawerEl: HTMLElement, triggerEl: HTMLElement | null, closeBtn: HTMLButtonElement) =>
+    (c => (triggerEl?.addEventListener('click', () => c.toggle()), c))(new DrawerController({ drawer, drawerEl, triggerEl, closeBtn, overlayEl: ui.drawerOverlay }));
+
+  makeDrawer('inspector', inspector.container, ui.inspectorToggleBtn, inspector.closeBtn);
+  makeDrawer('sidebar', ui.sidebar, ui.sidebarToggleBtn, ui.sidebarCollapseBtn);
 
   // R1b: Wire buildDockLayers into .dock-mode-layers container
   const dockLayersContainer = ui.sidebar.querySelector('.dock-mode-layers') as HTMLElement | null;
