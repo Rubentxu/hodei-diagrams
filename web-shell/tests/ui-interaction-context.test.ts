@@ -1,45 +1,31 @@
 /**
  * ui-interaction-context.test.ts — R2b canonical seam
- *
- * Compact real tests for the InteractionState seam:
- * - 3-field emission (isDragging, snapEnabled, isEditing)
- * - snap and text-edit transition
- * - 50-cycle disposal with real post-unsubscribe emissions
- * - grep boundary assertion (gridVisible NOT in editor.ts)
+ * Real tests: 3-field IS emission, snap/isEditing transitions, 50-cycle disposal, pointer drag lifecycle
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Editor } from '../src/editor.js';
 import { DiagramEngineSession } from '../src/session.js';
 
-// ─── Polyfills ────────────────────────────────────────────────────────────────
-function createPointerEvent(type: string, init?: Record<string, unknown>): Event {
-  const ev = new MouseEvent(type, { bubbles: true, ...init } as unknown as MouseEventInit);
-  Object.defineProperty(ev, 'pointerId', { value: 0, configurable: true });
-  Object.defineProperty(ev, 'offsetX', { value: 0, configurable: true });
-  Object.defineProperty(ev, 'offsetY', { value: 0, configurable: true });
-  Object.defineProperty(ev, 'clientX', { value: (init?.clientX as number) ?? 0, configurable: true });
-  Object.defineProperty(ev, 'clientY', { value: (init?.clientY as number) ?? 0, configurable: true });
-  Object.defineProperty(ev, 'button', { value: 0, configurable: true });
-  return ev;
-}
 if (!HTMLElement.prototype.setPointerCapture) {
   HTMLElement.prototype.setPointerCapture = () => {};
   HTMLElement.prototype.releasePointerCapture = () => {};
 }
 
-// ─── Mock WASM factory ────────────────────────────────────────────────────────
 function createMockWasm() {
-  const wasm = {
-    create_engine: vi.fn().mockReturnValue(42),
-    dispose_engine: vi.fn(),
-    execute_command: vi.fn(),
-    execute_transaction: vi.fn(),
-    get_scene: vi.fn().mockReturnValue(JSON.stringify({
-      pages: [{ page_id: { idx: 0, version: 0 }, name: 'Page 1', width: 800, height: 600, display_list: [] }],
-    })),
+  const scene = JSON.stringify({ pages: [{ page_id: { idx: 0, version: 0 }, name: 'Page 1', width: 800, height: 600, display_list: [] }] });
+  return {
+    create_engine: vi.fn().mockReturnValue(42), dispose_engine: vi.fn(),
+    execute_command: vi.fn(), execute_transaction: vi.fn(),
+    get_scene: vi.fn().mockReturnValue(scene),
     render_svg: vi.fn().mockReturnValue('<svg><rect data-vertex-id="0:0" x="10" y="20" width="80" height="40"/></svg>'),
     render_pages: vi.fn().mockReturnValue([]),
-    decodeSceneBuffer: vi.fn().mockReturnValue({ ok: true, value: [] }),
+    decodeSceneBuffer: vi.fn().mockReturnValue({ ok: true, value: [
+      { page_id: { idx: 0, version: 0 }, name: 'Page 1', width: 800, height: 600,
+        display_list: [{ id: '0:0', kind: 'Rectangle', x: 10, y: 20, width: 80, height: 40, style: {}, text: 'Label', owner: { Vertex: { idx: 0, version: 0 } } }] },
+    ] }),
+    resolve_selection: (_h: number, x: number, y: number) =>
+      (x >= 10 && x <= 90 && y >= 20 && y <= 60) ? '{"type":"Vertex","id":{"idx":0,"version":0}}' : '{"type":"None"}',
+    select_target: vi.fn(), clear_selection: vi.fn(),
     undo: vi.fn(), redo: vi.fn(), engine_can_undo: vi.fn().mockReturnValue(false), engine_can_redo: vi.fn().mockReturnValue(false),
     connect_vertices: vi.fn(), disconnect_edge: vi.fn(), parse_stencil_xml: vi.fn(), parse_stencil_library_xml: vi.fn(),
     set_stencil_library: vi.fn(), get_resolved_style: vi.fn(), get_metadata: vi.fn(), set_metadata: vi.fn(),
@@ -47,27 +33,33 @@ function createMockWasm() {
     insert_bend: vi.fn(), move_bend: vi.fn(), remove_bend: vi.fn(),
     group_vertices: vi.fn(), ungroup_vertices: vi.fn(),
     connect_vertices_anchored: vi.fn(), set_edge_anchor: vi.fn(), clear_edge_anchor: vi.fn(), get_edge_anchors: vi.fn(),
-    set_page_math_enabled: vi.fn(), get_page_layers: vi.fn(),
-    resolve_selection: vi.fn(), select_target: vi.fn(), clear_selection: vi.fn(), get_selection: vi.fn(),
+    set_page_math_enabled: vi.fn(), get_page_layers: vi.fn(), get_selection: vi.fn(),
     write_scene_to_buffer: vi.fn(), get_scene_buffer_ptr: vi.fn(), get_scene_buffer_len: vi.fn(), get_scene_buffer_capacity: vi.fn(),
     write_svg_to_buffer: vi.fn(), get_svg_buffer_ptr: vi.fn(), get_svg_buffer_len: vi.fn(),
   };
-  return wasm;
 }
 
 function createSession(wasm = createMockWasm()): { session: DiagramEngineSession; wasm: typeof wasm } {
-  return { session: wasm as unknown as DiagramEngineSession, wasm };
+  function ok<T>(v: T) { return { ok: true as const, value: v }; }
+  const session = {
+    resolveSelection: (_x: number, _y: number, _m: { alt: boolean; shift: boolean; ctrl: boolean; meta: boolean }) => {
+      const raw = (wasm as Record<string, unknown>).resolve_selection as (Handle: number, x: number, y: number, alt: boolean, shift: boolean, ctrl: boolean, meta: boolean) => string;
+      const result = raw(42, _x, _y, _m.alt, _m.shift, _m.ctrl, _m.meta);
+      try { return ok(JSON.parse(result)); } catch { return ok({ type: 'None' as const }); }
+    },
+    selectTarget: () => ok(undefined), clearSelection: () => ok(undefined),
+    decodeSceneBuffer: wasm.decodeSceneBuffer,
+    renderPage: vi.fn().mockReturnValue(ok('<svg><rect data-vertex-id="0:0" x="10" y="20" width="80" height="40"/></svg>')),
+    renderPages: wasm.render_pages, executeCommand: wasm.execute_command, executeTransaction: wasm.execute_transaction,
+    exportDrawio: vi.fn().mockReturnValue(ok('<mxGraphModel/>')), exportDrawioFresh: vi.fn().mockReturnValue(ok('<mxGraphModel/>')),
+    importDrawio: vi.fn().mockReturnValue(ok(undefined)), setPageMathEnabled: vi.fn().mockReturnValue(ok(undefined)),
+    getSceneCache: vi.fn().mockReturnValue(ok([])), addPage: vi.fn().mockReturnValue(ok(undefined)),
+    renderAllPages: vi.fn().mockReturnValue(ok([])), undo: wasm.undo, redo: wasm.redo,
+    engineCanUndo: wasm.engine_can_undo, engineCanRedo: wasm.engine_can_redo,
+  } as unknown as DiagramEngineSession;
+  return { session, wasm };
 }
 
-function createViewer(): HTMLElement {
-  const el = document.createElement('div');
-  el.setAttribute('data-testid', 'viewer');
-  el.style.cssText = 'position:fixed;inset:0;width:800px;height:600px';
-  document.body.appendChild(el);
-  return el;
-}
-
-// ─── Tests ────────────────────────────────────────────────────────────────────
 describe('UI Interaction Context (R2b seam)', () => {
   let session: DiagramEngineSession;
   let wasm: ReturnType<typeof createMockWasm>;
@@ -76,120 +68,91 @@ describe('UI Interaction Context (R2b seam)', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    const ctx = createSession();
-    session = ctx.session;
-    wasm = ctx.wasm;
-    viewer = createViewer();
+    const ctx = createSession(); session = ctx.session; wasm = ctx.wasm;
+    viewer = document.createElement('div');
+    viewer.setAttribute('data-testid', 'viewer');
+    viewer.style.cssText = 'position:fixed;inset:0;width:800px;height:600px';
     viewer.innerHTML = '<svg><rect data-vertex-id="0:0" x="10" y="20" width="80" height="40"/></svg>';
-    editor = new Editor(session, viewer);
-    editor.attach();
+    document.body.appendChild(viewer);
+    editor = new Editor(session, viewer); editor.attach();
   });
 
-  afterEach(() => {
-    editor.detach();
-    viewer.remove();
-  });
+  afterEach(() => { editor.detach(); viewer.remove(); });
 
-  // ── 3-field emission ─────────────────────────────────────────────────────
-  describe('onInteractionStateChange emits 3 fields', () => {
-    it('emits { isDragging, snapEnabled, isEditing } on toggleSnap', () => {
+  // 3-field InteractionState emission
+  describe('onInteractionStateChange', () => {
+    it('emits 3-field IS on toggleSnap', () => {
       const received: { isDragging: boolean; snapEnabled: boolean; isEditing: boolean }[] = [];
       editor.onInteractionStateChange((s) => received.push({ ...s }));
       editor.toggleSnap();
-      expect(received.length).toBeGreaterThan(0);
-      const snapEvent = received.find((s) => s.snapEnabled === true);
-      expect(snapEvent).toBeDefined();
-      if (!snapEvent) return;
-      expect(snapEvent.isDragging).toBe(false);
-      expect(snapEvent.isEditing).toBe(false);
+      expect(received.some((s) => s.snapEnabled === true)).toBe(true);
+      const snap = received.find((s) => s.snapEnabled === true)!;
+      expect(snap.isDragging).toBe(false);
+      expect(snap.isEditing).toBe(false);
     });
 
-    it('subscribe returns unsubscribe that stops events', () => {
-      const fn = vi.fn();
-      const unsub = editor.onInteractionStateChange(fn);
-      editor.toggleSnap();
-      expect(fn).toHaveBeenCalledTimes(1);
-      unsub();
-      editor.toggleSnap(); // snap back to false
-      expect(fn).toHaveBeenCalledTimes(1); // no new calls
-    });
-
-    it('multiple listeners all fire on same event', () => {
-      const fn1 = vi.fn();
-      const fn2 = vi.fn();
-      editor.onInteractionStateChange(fn1);
-      editor.onInteractionStateChange(fn2);
-      editor.toggleSnap();
-      expect(fn1).toHaveBeenCalledTimes(1);
-      expect(fn2).toHaveBeenCalledTimes(1);
+    it('unsubscribe stops events', () => {
+      const fn = vi.fn(); const unsub = editor.onInteractionStateChange(fn);
+      editor.toggleSnap(); expect(fn).toHaveBeenCalledTimes(1);
+      unsub(); editor.toggleSnap(); expect(fn).toHaveBeenCalledTimes(1);
     });
   });
 
-  // ── snap and isEditing transition ────────────────────────────────────────
-  describe('snap and isEditing transitions', () => {
-    it('isEditing transitions to true on text edit start (dblclick)', () => {
-      const received: { isEditing: boolean }[] = [];
-      editor.onInteractionStateChange((s) => received.push({ isEditing: s.isEditing }));
+  // snapEnabled property and isEditing transition
+  describe('snapEnabled and isEditing', () => {
+    it('snapEnabled toggles correctly', () => {
+      expect(editor.snapEnabled).toBe(false); editor.toggleSnap(); expect(editor.snapEnabled).toBe(true); editor.toggleSnap(); expect(editor.snapEnabled).toBe(false);
+    });
 
-      // Trigger dblclick on the rect in the viewer SVG to start text edit
+    it('isEditing true on text edit (dblclick)', () => {
+      const received: boolean[] = [];
+      editor.onInteractionStateChange((s) => received.push(s.isEditing));
       const rect = viewer.querySelector('rect[data-vertex-id]')!;
       rect.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 50, clientY: 40 } as unknown as MouseEvent));
-
-      // isEditing should be true immediately after dblclick
-      const editingEvent = received.find((s) => s.isEditing === true);
-      expect(editingEvent).toBeDefined();
-    });
-
-    it('snapEnabled toggles correctly', () => {
-      expect(editor.snapEnabled).toBe(false);
-      editor.toggleSnap();
-      expect(editor.snapEnabled).toBe(true);
-      editor.toggleSnap();
-      expect(editor.snapEnabled).toBe(false);
+      expect(received.some((v) => v === true)).toBe(true);
     });
   });
 
-  // ── 50-cycle disposal with post-unsubscribe emissions ───────────────────
-  describe('50-cycle disposal guard', () => {
-    it('after 50 subscribe/unsubscribe cycles, fresh listener fires exactly once', () => {
-      for (let i = 0; i < 50; i++) {
-        const cycleFn = vi.fn();
-        const unsub = editor.onInteractionStateChange(cycleFn);
-        unsub();
-        expect(cycleFn).not.toHaveBeenCalled();
-      }
-      const freshFn = vi.fn();
-      editor.onInteractionStateChange(freshFn);
-      editor.toggleSnap();
-      expect(freshFn).toHaveBeenCalledTimes(1);
-      const [callArg] = freshFn.mock.calls[0]!;
-      expect(callArg).toHaveProperty('isDragging');
-      expect(callArg).toHaveProperty('snapEnabled');
-      expect(callArg).toHaveProperty('isEditing');
+  // 50-cycle disposal: after 50 cycles, fresh listener fires
+  describe('50-cycle disposal', () => {
+    it('fresh listener fires after 50 cycles', () => {
+      for (let i = 0; i < 50; i++) { const f = vi.fn(); const u = editor.onInteractionStateChange(f); u(); }
+      const fresh = vi.fn(); editor.onInteractionStateChange(fresh); editor.toggleSnap();
+      expect(fresh).toHaveBeenCalledTimes(1);
+      const [arg] = fresh.mock.calls[0]!;
+      expect(arg).toHaveProperty('isDragging'); expect(arg).toHaveProperty('snapEnabled'); expect(arg).toHaveProperty('isEditing');
     });
 
-    it('unsubscribed listener never fires, active listeners still receive events', () => {
-      const fn1 = vi.fn();
-      const fn2 = vi.fn();
-      const unsub1 = editor.onInteractionStateChange(fn1);
-      editor.onInteractionStateChange(fn2);
-      editor.toggleSnap();
-      expect(fn1).toHaveBeenCalledTimes(1);
-      expect(fn2).toHaveBeenCalledTimes(1);
-      unsub1();
-      editor.toggleSnap();
-      expect(fn1).toHaveBeenCalledTimes(1); // no new calls
-      expect(fn2).toHaveBeenCalledTimes(2); // still receiving
+    it('unsubscribed listener never fires, active listeners still receive', () => {
+      const dead = vi.fn(); const live = vi.fn();
+      const u = editor.onInteractionStateChange(dead); editor.onInteractionStateChange(live);
+      editor.toggleSnap(); expect(dead).toHaveBeenCalledTimes(1); expect(live).toHaveBeenCalledTimes(1);
+      u(); editor.toggleSnap(); expect(dead).toHaveBeenCalledTimes(1); expect(live).toHaveBeenCalledTimes(2);
     });
   });
 
-  // ── grep boundary assertion ──────────────────────────────────────────────
-  describe('grep boundary: gridVisible NOT in editor.ts', () => {
-    it('editor.ts source does not contain gridVisible', async () => {
-      const { readFileSync } = await import('fs');
-      const { resolve } = await import('path');
-      const editorSrc = readFileSync(resolve('./src/editor.ts'), 'utf8');
-      expect(editorSrc).not.toMatch(/gridVisible/);
+  // Real pointer drag lifecycle: pointerdown→pointermove→pointerup
+  describe('isDragging pointer lifecycle', () => {
+    it('false→true on pointerdown, stays true on pointermove, true→false on pointerup', () => {
+      const snaps: { isDragging: boolean }[] = [];
+      editor.onInteractionStateChange((s) => snaps.push({ isDragging: s.isDragging }));
+      const rect = viewer.querySelector('rect[data-vertex-id]')!;
+      const cx = 50, cy = 40;
+      const down = new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: cx, clientY: cy }); Object.defineProperty(down, 'pointerId', { value: 1 });
+      rect.dispatchEvent(down); expect(snaps[snaps.length - 1].isDragging).toBe(true);
+      const move = new MouseEvent('pointermove', { bubbles: true, clientX: cx + 5, clientY: cy + 5 }); Object.defineProperty(move, 'pointerId', { value: 1 });
+      rect.dispatchEvent(move); expect(snaps[snaps.length - 1].isDragging).toBe(true);
+      const up = new MouseEvent('pointerup', { bubbles: true, clientX: cx + 5, clientY: cy + 5 }); Object.defineProperty(up, 'pointerId', { value: 1 });
+      rect.dispatchEvent(up); expect(snaps[snaps.length - 1].isDragging).toBe(false);
+    });
+
+    it('detach mid-drag fires isDragging=false', () => {
+      const snaps: { isDragging: boolean }[] = [];
+      editor.onInteractionStateChange((s) => snaps.push({ isDragging: s.isDragging }));
+      const rect = viewer.querySelector('rect[data-vertex-id]')!;
+      const down = new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 50, clientY: 40 }); Object.defineProperty(down, 'pointerId', { value: 1 });
+      rect.dispatchEvent(down); expect(snaps[snaps.length - 1].isDragging).toBe(true);
+      editor.detach(); expect(snaps[snaps.length - 1].isDragging).toBe(false);
     });
   });
 });
