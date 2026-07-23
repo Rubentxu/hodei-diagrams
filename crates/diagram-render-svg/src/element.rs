@@ -170,21 +170,46 @@ fn compute_transform(
     )
 }
 
+/// Wrap inner SVG in a `<g data-vertex-id="..." transform="...">` group.
+///
+/// This separates the rotation/flip transform from the shape element itself,
+/// allowing overlay handles (resize/rotation) to be injected as children of the
+/// group and automatically inherit the shape's transform.
+fn wrap_shape_transform(
+    inner: String,
+    bounds: &diagram_core::geometry::Rect,
+    rotation: f64,
+    flip_h: bool,
+    flip_v: bool,
+    vid: String,
+    indent: usize,
+) -> String {
+    let xform = compute_transform(bounds, rotation, flip_h, flip_v);
+    if xform.is_empty() {
+        // No transform — inject vid into inner element and return as-is
+        // Inner ends with ".../>" — insert vid before the closing
+        if vid.is_empty() {
+            return inner;
+        }
+        // Replace the final "/>" with " vid/>"
+        let with_vid = inner.replace("/>", &format!("{vid}/>"));
+        return with_vid;
+    }
+    let ind = make_indent(indent);
+    format!("{}<g{}{}>\n{}\n{}{}</g>", ind, vid, xform, inner, ind, ind)
+}
+
 fn rect_to_svg(r: &RectElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
     let style = shape_style_defaults(&r.style, AttrContext::Shape, defs);
     let vid = vid_attr(&r.id);
-    let xform = compute_transform(&r.bounds, r.rotation, r.flip_h, r.flip_v);
-    format!(
-        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}{}/>",
-        ind,
-        r.bounds.origin.x,
-        r.bounds.origin.y,
-        r.bounds.size.width,
-        r.bounds.size.height,
-        vid,
-        xform,
-        style
+    // Inner rect WITHOUT vid or transform — both go on the wrapper group
+    let inner = format!(
+        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}/>",
+        ind, r.bounds.origin.x, r.bounds.origin.y, r.bounds.size.width, r.bounds.size.height, style
+    );
+    wrap_shape_transform(
+        inner, &r.bounds, r.rotation, r.flip_h, r.flip_v, vid, indent,
     )
 }
 
@@ -192,9 +217,8 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, defs: &mut DefsManager, indent: u
     let ind = make_indent(indent);
     let style = shape_style_defaults(&r.style, AttrContext::Shape, defs);
     let vid = vid_attr(&r.id);
-    let xform = compute_transform(&r.bounds, r.rotation, r.flip_h, r.flip_v);
-    format!(
-        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\"{}{}{}/>",
+    let inner = format!(
+        "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" ry=\"{}\"{}/>",
         ind,
         r.bounds.origin.x,
         r.bounds.origin.y,
@@ -202,9 +226,10 @@ fn rounded_rect_to_svg(r: &RoundedRectElement, defs: &mut DefsManager, indent: u
         r.bounds.size.height,
         r.radius,
         r.radius,
-        vid,
-        xform,
         style
+    );
+    wrap_shape_transform(
+        inner, &r.bounds, r.rotation, r.flip_h, r.flip_v, vid, indent,
     )
 }
 
@@ -216,10 +241,12 @@ fn ellipse_to_svg(e: &EllipseElement, defs: &mut DefsManager, indent: usize) -> 
     let cy = e.bounds.origin.y + e.bounds.size.height / 2.0;
     let rx = e.bounds.size.width / 2.0;
     let ry = e.bounds.size.height / 2.0;
-    let xform = compute_transform(&e.bounds, e.rotation, e.flip_h, e.flip_v);
-    format!(
-        "{}<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"{}{}{}/>",
-        ind, cx, cy, rx, ry, vid, xform, style
+    let inner = format!(
+        "{}<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"{}/>",
+        ind, cx, cy, rx, ry, style
+    );
+    wrap_shape_transform(
+        inner, &e.bounds, e.rotation, e.flip_h, e.flip_v, vid, indent,
     )
 }
 
@@ -243,10 +270,9 @@ fn diamond_to_svg(d: &DiamondElement, defs: &mut DefsManager, indent: usize) -> 
         x,
         y + h / 2.0 // left
     );
-    let xform = compute_transform(&d.bounds, d.rotation, d.flip_h, d.flip_v);
-    format!(
-        "{}<polygon points=\"{}\"{}{}{}/>",
-        ind, points, vid, xform, style
+    let inner = format!("{}<polygon points=\"{}\"{}/>", ind, points, style);
+    wrap_shape_transform(
+        inner, &d.bounds, d.rotation, d.flip_h, d.flip_v, vid, indent,
     )
 }
 
@@ -268,10 +294,9 @@ fn triangle_to_svg(t: &TriangleElement, defs: &mut DefsManager, indent: usize) -
         x,
         y + h // bottom-left
     );
-    let xform = compute_transform(&t.bounds, t.rotation, t.flip_h, t.flip_v);
-    format!(
-        "{}<polygon points=\"{}\"{}{}{}/>",
-        ind, points, vid, xform, style
+    let inner = format!("{}<polygon points=\"{}\"{}/>", ind, points, style);
+    wrap_shape_transform(
+        inner, &t.bounds, t.rotation, t.flip_h, t.flip_v, vid, indent,
     )
 }
 
@@ -299,10 +324,9 @@ fn hexagon_to_svg(h: &HexagonElement, defs: &mut DefsManager, indent: usize) -> 
         x,
         y + h_h / 4.0 // upper-left
     );
-    let xform = compute_transform(&h.bounds, h.rotation, h.flip_h, h.flip_v);
-    format!(
-        "{}<polygon points=\"{}\"{}{}{}/>",
-        ind, points, vid, xform, style
+    let inner = format!("{}<polygon points=\"{}\"{}/>", ind, points, style);
+    wrap_shape_transform(
+        inner, &h.bounds, h.rotation, h.flip_h, h.flip_v, vid, indent,
     )
 }
 
@@ -336,8 +360,10 @@ fn cylinder_to_svg(c: &CylinderElement, defs: &mut DefsManager, indent: usize) -
         x,
         y + h - ry // bottom-left
     );
-    let xform = compute_transform(&c.bounds, c.rotation, c.flip_h, c.flip_v);
-    format!("{}<path d=\"{}\"{}{}{}/>", ind, path, vid, xform, style)
+    let inner = format!("{}<path d=\"{}\"{}/>", ind, path, style);
+    wrap_shape_transform(
+        inner, &c.bounds, c.rotation, c.flip_h, c.flip_v, vid, indent,
+    )
 }
 
 fn cloud_to_svg(c: &CloudElement, defs: &mut DefsManager, indent: usize) -> String {
@@ -384,8 +410,10 @@ fn cloud_to_svg(c: &CloudElement, defs: &mut DefsManager, indent: usize) -> Stri
         x + w * 0.25,
         y + h * 0.7 // bump 4
     );
-    let xform = compute_transform(&c.bounds, c.rotation, c.flip_h, c.flip_v);
-    format!("{}<path d=\"{}\"{}{}{}/>", ind, path, vid, xform, style)
+    let inner = format!("{}<path d=\"{}\"{}/>", ind, path, style);
+    wrap_shape_transform(
+        inner, &c.bounds, c.rotation, c.flip_h, c.flip_v, vid, indent,
+    )
 }
 
 fn parallelogram_to_svg(p: &ParallelogramElement, defs: &mut DefsManager, indent: usize) -> String {
@@ -409,10 +437,9 @@ fn parallelogram_to_svg(p: &ParallelogramElement, defs: &mut DefsManager, indent
         x,
         y + h // bottom-left
     );
-    let xform = compute_transform(&p.bounds, p.rotation, p.flip_h, p.flip_v);
-    format!(
-        "{}<polygon points=\"{}\"{}{}{}/>",
-        ind, points, vid, xform, style
+    let inner = format!("{}<polygon points=\"{}\"{}/>", ind, points, style);
+    wrap_shape_transform(
+        inner, &p.bounds, p.rotation, p.flip_h, p.flip_v, vid, indent,
     )
 }
 
@@ -437,10 +464,9 @@ fn trapezoid_to_svg(t: &TrapezoidElement, defs: &mut DefsManager, indent: usize)
         x,
         y + h // bottom-left
     );
-    let xform = compute_transform(&t.bounds, t.rotation, t.flip_h, t.flip_v);
-    format!(
-        "{}<polygon points=\"{}\"{}{}{}/>",
-        ind, points, vid, xform, style
+    let inner = format!("{}<polygon points=\"{}\"{}/>", ind, points, style);
+    wrap_shape_transform(
+        inner, &t.bounds, t.rotation, t.flip_h, t.flip_v, vid, indent,
     )
 }
 
@@ -460,10 +486,9 @@ fn polygon_to_svg(p: &PolygonElement, defs: &mut DefsManager, indent: usize) -> 
         points.join(" ")
     };
 
-    let xform = compute_transform(&p.bounds, p.rotation, p.flip_h, p.flip_v);
-    format!(
-        "{}<polygon points=\"{}\"{}{}{}/>",
-        ind, points_str, vid, xform, style
+    let inner = format!("{}<polygon points=\"{}\"{}/>", ind, points_str, style);
+    wrap_shape_transform(
+        inner, &p.bounds, p.rotation, p.flip_h, p.flip_v, vid, indent,
     )
 }
 
@@ -618,7 +643,6 @@ fn catmull_rom_to_bezier(points: &[diagram_core::geometry::Point]) -> String {
 fn stencil_to_svg(s: &StencilElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
     let vid = vid_attr(&s.id);
-    let xform = compute_transform(&s.bounds, s.rotation, s.flip_h, s.flip_v);
 
     // Build SVG path d-string from background + foreground commands
     let bg_d = build_path_d(&s.background, s.bounds.size.width, s.bounds.size.height);
@@ -627,36 +651,28 @@ fn stencil_to_svg(s: &StencilElement, defs: &mut DefsManager, indent: usize) -> 
     let bg_style = shape_style_defaults(&s.style, AttrContext::Shape, defs);
     let fg_style = style_to_attrs(&s.style, AttrContext::Shape, defs);
 
-    let mut parts = Vec::new();
+    let mut inner_parts = Vec::new();
 
     if !bg_d.is_empty() {
-        parts.push(format!("{}<path d=\"{}\"{}{}/>", ind, bg_d, vid, bg_style));
+        inner_parts.push(format!("{}<path d=\"{}\"{}/>", ind, bg_d, bg_style));
     }
     if !fg_d.is_empty() {
-        parts.push(format!("{}<path d=\"{}\"{}{}/>", ind, fg_d, vid, fg_style));
+        inner_parts.push(format!("{}<path d=\"{}\"{}/>", ind, fg_d, fg_style));
     }
 
-    // Wrap in a group with transform
-    if parts.is_empty() {
-        String::new()
-    } else if xform.is_empty() {
-        parts.join("\n")
-    } else {
-        let mut result = format!("{}<g{}>", ind, xform);
-        for part in &parts {
-            result.push('\n');
-            result.push_str(part);
-        }
-        result.push('\n');
-        result.push_str(&format!("{}</g>", ind));
-        result
+    if inner_parts.is_empty() {
+        return String::new();
     }
+
+    let inner = inner_parts.join("\n");
+    wrap_shape_transform(
+        inner, &s.bounds, s.rotation, s.flip_h, s.flip_v, vid, indent,
+    )
 }
 
 fn image_to_svg(img: &ImageElement, defs: &mut DefsManager, indent: usize) -> String {
     let ind = make_indent(indent);
     let vid = vid_attr(&img.id);
-    let xform = compute_transform(&img.bounds, img.rotation, img.flip_h, img.flip_v);
     let x = img.bounds.origin.x;
     let y = img.bounds.origin.y;
     let w = img.bounds.size.width;
@@ -674,43 +690,43 @@ fn image_to_svg(img: &ImageElement, defs: &mut DefsManager, indent: usize) -> St
             (escaped, par)
         }
         None => {
-            // Placeholder rect when no image source
+            // Placeholder rect when no image source — wrap with transform helper
             let style = shape_style_defaults(&img.style, AttrContext::Shape, defs);
-            return format!(
-                "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}{} fill=\"none\" stroke=\"#ccc\" stroke-dasharray=\"4 2\"/>",
-                ind, x, y, w, h, vid, style, xform
+            let inner = format!(
+                "{}<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{} fill=\"none\" stroke=\"#ccc\" stroke-dasharray=\"4 2\"/>",
+                ind, x, y, w, h, style
+            );
+            return wrap_shape_transform(
+                inner,
+                &img.bounds,
+                img.rotation,
+                img.flip_h,
+                img.flip_v,
+                vid,
+                indent,
             );
         }
     };
 
-    if xform.is_empty() {
-        format!(
-            "{}<image href=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}/>",
-            ind,
-            href,
-            x,
-            y,
-            w,
-            h,
-            vid,
-            aspect_ratio_attr(aspect_ratio)
-        )
-    } else {
-        format!(
-            "{}<g{}>\n{}<image href=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}{}/>\n{}</g>",
-            ind,
-            xform,
-            ind,
-            href,
-            x,
-            y,
-            w,
-            h,
-            vid,
-            aspect_ratio_attr(aspect_ratio),
-            ind
-        )
-    }
+    let inner = format!(
+        "{}<image href=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{}/>",
+        ind,
+        href,
+        x,
+        y,
+        w,
+        h,
+        aspect_ratio_attr(aspect_ratio)
+    );
+    wrap_shape_transform(
+        inner,
+        &img.bounds,
+        img.rotation,
+        img.flip_h,
+        img.flip_v,
+        vid,
+        indent,
+    )
 }
 
 fn aspect_ratio_attr(par: &str) -> String {

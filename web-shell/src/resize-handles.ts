@@ -203,7 +203,7 @@ export class ResizeHandlesOverlay {
     circle.style.cursor = this.#cursorForPosition(pos);
     circle.style.pointerEvents = 'all';
 
-    this.#getSvgLayer().appendChild(circle);
+    this.#appendToShapeGroup(circle, vertexId);
   }
 
   /**
@@ -445,7 +445,7 @@ export class ResizeHandlesOverlay {
 
     const svgLayer = this.#getSvgLayer();
     svgLayer.appendChild(line);
-    svgLayer.appendChild(circle);
+    this.#appendToShapeGroup(circle, vertexId);
   }
 
   /** Geometry for the rotation handle in document coordinates. */
@@ -642,6 +642,20 @@ export class ResizeHandlesOverlay {
   #getShapeElement(id: SlotmapId): SVGElement | null {
     const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
     return this.#getSvgLayer().querySelector(selector) as SVGElement | null;
+  }
+
+  /**
+   * Append an SVG element to the shape's <g data-vertex-id="..."> wrapper group.
+   * Falls back to the SVG layer if the wrapper is not found (e.g. pre-wrap shapes).
+   */
+  #appendToShapeGroup(el: SVGElement, vertexId: SlotmapId): void {
+    const group = this.#getShapeElement(vertexId);
+    if (group) {
+      group.appendChild(el);
+    } else {
+      // Fallback for shapes that haven't been wrapped yet
+      this.#getSvgLayer().appendChild(el);
+    }
   }
 
   #clearHandles(svgLayer: HTMLElement): void {
