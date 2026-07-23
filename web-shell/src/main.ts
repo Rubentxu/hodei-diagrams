@@ -665,14 +665,16 @@ async function bootstrap(): Promise<void> {
     setGridVisible(visible);
     gridMenuItem?.classList.toggle('has-checkmark', visible);
     ui.hud.setGrid(visible);
-    // R2c: Always push gridVisible to controller using current interaction state.
-    // Use controller state directly so grid toggle works even before first interaction.
-    const state = workbenchController.getState();
+    // R2c: Push gridVisible to controller using last-seen interaction state from
+    // the editor seam (or defaults if no interaction has happened yet). This keeps
+    // the editor API limited to its disposable listener and avoids reading fields
+    // that don't belong on the controller's read-only WorkbenchState.
+    const last = lastInteractionState ?? { isDragging: false, snapEnabled: false, isEditing: false };
     workbenchController.updateHudDensity({
-      isDragging: false,
-      snapEnabled: state.snapEnabled,
+      isDragging: last.isDragging,
+      snapEnabled: last.snapEnabled,
       gridVisible: visible,
-      isEditing: state.isEditing,
+      isEditing: last.isEditing,
     });
   }
 
