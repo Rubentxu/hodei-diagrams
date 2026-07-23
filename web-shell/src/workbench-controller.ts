@@ -6,7 +6,7 @@ import type { Result } from './types.js';
 
 export type DockMode = 'shapes' | 'layers' | 'history';
 export type Breakpoint = 'desktop' | 'tablet' | 'mobile';
-export type HudDensity = 'default' | 'contextual';
+export type HudDensity = 'compact' | 'full';
 export type OverlayType = 'sidebar' | 'inspector' | null;
 
 export interface WorkbenchState {
@@ -37,7 +37,7 @@ export function isWorkbenchState(obj: unknown): obj is WorkbenchState {
   return (
     ['shapes', 'layers', 'history'].includes(s.dockMode) &&
     ['desktop', 'tablet', 'mobile'].includes(s.breakpoint) &&
-    ['default', 'contextual'].includes(s.hudDensity) &&
+    ['compact', 'full'].includes(s.hudDensity) &&
     ['sidebar', 'inspector', null].includes(s.overlayActive) &&
     typeof s.panelVisibility === 'object' && s.panelVisibility !== null &&
     typeof s.panelVisibility.sidebar === 'boolean' &&
@@ -53,7 +53,7 @@ export function assertControllerBoundary(state: WorkbenchState): void {
 export class WorkbenchController {
   private readonly _state: WorkbenchState = {
     dockMode: 'shapes', panelVisibility: { sidebar: true, inspector: false },
-    breakpoint: 'desktop', hudDensity: 'default', overlayActive: null,
+    breakpoint: 'desktop', hudDensity: 'compact', overlayActive: null,
   };
   private readonly _listeners = new Set<WorkbenchListener>();
 
@@ -78,7 +78,7 @@ export class WorkbenchController {
   // ── LayoutContext-derived state ────────────────────────────────────────────
   updateHudDensity(ctx: LayoutContext): void {
     const active = ctx.isDragging || ctx.snapEnabled || ctx.gridVisible || ctx.isEditing;
-    const next: HudDensity = active ? 'contextual' : 'default';
+    const next: HudDensity = active ? 'full' : 'compact';
     if (this._state.hudDensity !== next) { this._state.hudDensity = next; this._notify(); }
   }
 

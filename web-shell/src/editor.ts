@@ -216,8 +216,8 @@ export class Editor {
   #cursorMoveRafId: number | null = null;
 
   // ─── Interaction State Callback (R2b: HUD density seam) ───────────────────
-  /** Fires when isDragging or isTextEditing transitions. Disposable, supports multiple listeners. */
-  #interactionStateListeners = new Set<(state: { isDragging: boolean; isTextEditing: boolean }) => void>();
+  /** Fires on isDragging | snapEnabled | isTextEditing transitions. Disposable, multi-listener. */
+  #interactionStateListeners = new Set<(state: { isDragging: boolean; snapEnabled: boolean; isEditing: boolean }) => void>();
 
   // ─── Snap ────────────────────────────────────────────────────────────────
   #snapEnabled: boolean = false;
@@ -1687,12 +1687,12 @@ export class Editor {
   // ─── Interaction State Callback (R2b HUD density seam) ────────────────────────
 
   /**
-   * Register a callback that fires when isDragging or isTextEditing transitions.
-   * This is the single read-only seam between the Editor and HUD density logic.
+   * Register a callback that fires when isDragging, snapEnabled, or isTextEditing transitions.
+   * This is the read-only seam between the Editor and HUD density logic.
    * Returns an unsubscribe function. Supports multiple listeners (Set pattern).
    */
   onInteractionStateChange(
-    cb: (state: { isDragging: boolean; isTextEditing: boolean }) => void,
+    cb: (state: { isDragging: boolean; snapEnabled: boolean; isEditing: boolean }) => void,
   ): () => void {
     this.#interactionStateListeners.add(cb);
     return () => { this.#interactionStateListeners.delete(cb); };
@@ -1702,7 +1702,8 @@ export class Editor {
   #notifyInteractionState(): void {
     const state = {
       isDragging: this.#dragState !== null || this.#moveArea !== null,
-      isTextEditing: this.#textEdit !== null,
+      snapEnabled: this.#snapEnabled,
+      isEditing: this.#textEdit !== null,
     };
     for (const cb of this.#interactionStateListeners) cb(state);
   }
@@ -2504,6 +2505,7 @@ export class Editor {
   /** Toggle snap-to-grid and snap-to-shape on/off. */
   toggleSnap(): void {
     this.#snapEnabled = !this.#snapEnabled;
+    this.#notifyInteractionState();
     this.#onStateChange?.();
   }
 
@@ -2514,7 +2516,10 @@ export class Editor {
 
   /** Set snap enabled state. */
   setSnapEnabled(enabled: boolean): void {
-    this.#snapEnabled = enabled;
+    if (this.#snapEnabled !== enabled) {
+      this.#snapEnabled = enabled;
+      this.#notifyInteractionState();
+    }
   }
 
   /** Refresh scene cache and re-render. Called after commands. */

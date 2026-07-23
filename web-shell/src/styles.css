@@ -1309,10 +1309,11 @@ button:disabled {
   animation: spin 0.8s linear infinite;
 }
 
-/* ─── HUD density tiers (R2b) ──────────────────────────────────────────────── */
-/* 'default': hide tertiary items (cursor XY) to reduce visual noise */
-/* 'contextual': show all items during active interaction */
-[data-hud-tier='default'] .hud-cursor {
+/* ─── HUD density tiers (R2b Approach 1) ─────────────────────────────────── */
+/* data-hud-density is set on #app by controller subscriber */
+/* 'compact': only essential items visible (default items) */
+/* 'full': all items visible (default + contextual) */
+[data-hud-density='compact'] .hud-item[data-hud-density-item='contextual'] {
   display: none;
 }
 

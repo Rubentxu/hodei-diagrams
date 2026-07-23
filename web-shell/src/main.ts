@@ -621,12 +621,14 @@ async function bootstrap(): Promise<void> {
   // R2a: Initialize app attributes at startup
   const appEl = document.getElementById('app');
   appEl?.setAttribute('data-context-toolbar', 'inactive');
+  // R2b: Also set data-hud-density on #app for CSS-driven item visibility
+  appEl?.setAttribute('data-hud-density', 'compact');
 
   // Make hud accessible to module-level save functions
   hud = ui.hud;
 
-  // R2b: Initialize HUD density to default at startup
-  ui.hud.setTier('default');
+  // R2b: Initialize HUD density to compact at startup
+  ui.hud.setDensity('compact');
 
   // Start loading stencil libraries — HUD is now ready to receive callbacks
   stencilManager.startAutoLoad();
@@ -965,7 +967,7 @@ async function bootstrap(): Promise<void> {
       onMove: handlePageMove,
     });
     ui.hud.setPage(1, activePages.length);
-    ui.hud.setMode('Edit');
+    ui.toolbar.setModeAlias('Edit');
     ui.saveButton.disabled = false;
   }
 
@@ -1025,20 +1027,23 @@ async function bootstrap(): Promise<void> {
 
   activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
 
-  // R2b: Wire editor interaction state → controller → HUD tier
-  activeEditor.onInteractionStateChange((state) => {
+  // R2b: Wire editor interaction state → controller → HUD density
+  // Store unsubscribe for teardown
+  const unsubInteractionState = activeEditor.onInteractionStateChange((state) => {
     workbenchController.updateHudDensity({
       hasSelection: false, // maintained by onSelectionChange
       isDragging: state.isDragging,
-      snapEnabled: activeEditor?.snapEnabled ?? false,
+      snapEnabled: state.snapEnabled,
       gridVisible: ui.canvasContainer.classList.contains('show-grid'),
-      isEditing: state.isTextEditing,
+      isEditing: state.isEditing,
     });
   });
 
-  // R2b: Subscribe controller hudDensity → HUD setTier
-  workbenchController.subscribe((state) => {
-    ui.hud.setTier(state.hudDensity);
+  // R2b: Subscribe controller hudDensity → set data-hud-density on #app + HUD
+  const unsubController = workbenchController.subscribe((state) => {
+    const appEl = document.getElementById('app');
+    appEl?.setAttribute('data-hud-density', state.hudDensity);
+    ui.hud.setDensity(state.hudDensity);
   });
 
   // Snap menu wiring
@@ -1193,7 +1198,7 @@ async function bootstrap(): Promise<void> {
     }
 
     ui.hud.setPage(1, activePages.length);
-    ui.hud.setMode('Edit');
+    ui.toolbar.setModeAlias('Edit');
     ui.saveButton.disabled = false;
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
 
@@ -2111,7 +2116,7 @@ async function bootstrap(): Promise<void> {
 
   // ─── 14.6. Initialize HUD page info ────────────────────────────────────────
   ui.hud.setPage(1, 1);
-  ui.hud.setMode('Edit');
+  ui.toolbar.setModeAlias('Edit');
   ui.canvasContainer.style.setProperty('--zoom', '1');
 
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
@@ -2275,6 +2280,12 @@ async function bootstrap(): Promise<void> {
   (window as unknown as Record<string, unknown>).__hodei = {
     manualSaveVersion,
   };
+
+  // ─── 15.6. R2b teardown: unsubscribe interaction state and controller ─────────
+  window.addEventListener('beforeunload', () => {
+    unsubInteractionState();
+    unsubController();
+  });
 }
 
 bootstrap().catch((e) => {

@@ -760,42 +760,75 @@ test.describe('R2a: Navbar 44px + Contextual Toolbar', () => {
   });
 });
 
-// R2b: HUD density tiers
-test.describe('HUD Density Tiers (R2b)', () => {
-  test('HUD starts with default tier (data-hud-tier="default")', async ({ page }) => {
+// R2b: HUD density tiers (Approach 1: data-hud-density on #app, compact/full)
+test.describe('HUD Density Tiers (R2b Approach 1)', () => {
+  test('app starts with compact density (data-hud-density="compact")', async ({ page }) => {
     await waitForAppReady(page);
 
-    const hud = page.locator('[data-testid="hud"]');
-    await expect(hud).toBeVisible();
-    await expect(hud).toHaveAttribute('data-hud-tier', 'default');
+    const app = page.locator('#app');
+    await expect(app).toBeVisible();
+    await expect(app).toHaveAttribute('data-hud-density', 'compact');
   });
 
-  test('HUD default tier hides cursor item via CSS', async ({ page }) => {
+  test('compact mode hides contextual HUD items via CSS', async ({ page }) => {
     await waitForAppReady(page);
 
-    const hud = page.locator('[data-testid="hud"]');
-    // Default tier should hide cursor item
-    const cursorItem = hud.locator('.hud-cursor');
-    await expect(cursorItem).toHaveCSS('display', 'none');
+    const app = page.locator('#app');
+    // In compact mode, contextual items should be hidden
+    await expect(app).toHaveAttribute('data-hud-density', 'compact');
+    // Verify snap, grid, cursor items are hidden (they have data-hud-density-item='contextual')
+    const snapItem = page.locator('[data-testid="hud-snap"]');
+    await expect(snapItem).toHaveCSS('display', 'none');
   });
 
-  test('HUD density switches to contextual during drag', async ({ page }) => {
+  test('app switches to full density when snap is toggled on', async ({ page }) => {
     await waitForAppReady(page);
 
-    // Import a diagram with a shape
-    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
-    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+    const app = page.locator('#app');
 
+    // Initial: compact
+    await expect(app).toHaveAttribute('data-hud-density', 'compact');
+
+    // Enable snap via View > Snap menu
+    await page.evaluate(() => {
+      const snapItem = document.getElementById('menu-item-snap');
+      if (snapItem) (snapItem as HTMLElement).click();
+    });
+    await page.waitForTimeout(200);
+
+    // After snap enabled: full
+    await expect(app).toHaveAttribute('data-hud-density', 'full');
+
+    // Disable snap
+    await page.evaluate(() => {
+      const snapItem = document.getElementById('menu-item-snap');
+      if (snapItem) (snapItem as HTMLElement).click();
+    });
+    await page.waitForTimeout(200);
+
+    // After snap disabled: back to compact
+    await expect(app).toHaveAttribute('data-hud-density', 'compact');
+  });
+
+  test('selector migration: data-hud-density attribute is set on #app', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Verify data-hud-density is on #app (not on HUD element)
+    const app = page.locator('#app');
     const hud = page.locator('[data-testid="hud"]');
 
-    // Initial state should be default
-    await expect(hud).toHaveAttribute('data-hud-tier', 'default');
+    await expect(app).toHaveAttribute('data-hud-density', 'compact');
+    // HUD element should NOT have data-hud-tier (old attribute)
+    await expect(hud).not.toHaveAttribute('data-hud-tier');
+    await expect(hud).not.toHaveAttribute('data-hud-density');
+  });
 
-    // Verify HUD transitions to contextual when interaction state is active
-    // Note: Full drag E2E test is limited by JSDOM setPointerCapture behavior.
-    // The unit test (editor.test.ts) and ui-controller.test.ts verify the
-    // interaction state -> HUD tier wiring. Here we verify the data-hud-tier
-    // attribute exists and is set to 'default' at rest.
-    await expect(hud).toHaveAttribute('data-hud-tier', 'default');
+  test('hud-mode alias is present in toolbar (relocated from HUD)', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // hud-mode should now be in the toolbar
+    const modeDisplay = page.locator('[data-testid="hud-mode"]');
+    await expect(modeDisplay).toBeVisible();
+    await expect(modeDisplay).toHaveText('Edit');
   });
 });

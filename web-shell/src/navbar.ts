@@ -29,6 +29,8 @@ export interface ToolbarControls {
   container: HTMLElement;
   setEditor(_editor: Editor): void;
   update(_selection: readonly SlotmapId[]): void;
+  /** R2b: Alias for hud-mode — mode display relocated from HUD to contextual toolbar */
+  setModeAlias(_mode: 'Edit' | 'Read Only' | 'Present'): void;
 }
 
 export function buildNavbar(session: DiagramEngineSession): NavbarControls {
@@ -869,7 +871,14 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
     activeEditor.sendToBack();
   });
 
-  // Assemble toolbar in order: fill, stroke, sep, bold, italic, sep, delete, front, back
+  // Mode display (relocated from HUD per R2b) — aliased as hud-mode
+  const modeSep = makeToolbarSep();
+  const modeDisplay = document.createElement('span');
+  modeDisplay.className = 'toolbar-mode';
+  modeDisplay.setAttribute('data-testid', 'hud-mode');
+  modeDisplay.textContent = 'Edit';
+
+  // Assemble toolbar in order: fill, stroke, sep, bold, italic, sep, delete, front, back, sep, mode
   toolbarContainer.appendChild(fillInput);
   toolbarContainer.appendChild(strokeInput);
   toolbarContainer.appendChild(makeToolbarSep());
@@ -879,6 +888,8 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   toolbarContainer.appendChild(deleteBtn);
   toolbarContainer.appendChild(frontBtn);
   toolbarContainer.appendChild(backBtn);
+  toolbarContainer.appendChild(modeSep);
+  toolbarContainer.appendChild(modeDisplay);
 
   // R2: Toolbar is inside navbar-top-row, not appended separately
   navbarTopRow.appendChild(toolbarContainer);
@@ -886,7 +897,7 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   // Append the single navbar row to the container
   container.appendChild(navbarTopRow);
 
-  // Toolbar controls object
+    // Toolbar controls object
   const toolbarControls: ToolbarControls = {
     container: toolbarContainer,
     setEditor(editor: Editor): void {
@@ -926,6 +937,9 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
         boldBtn.classList.remove('--active');
         italicBtn.classList.remove('--active');
       }
+    },
+    setModeAlias(mode: 'Edit' | 'Read Only' | 'Present'): void {
+      modeDisplay.textContent = mode;
     },
   };
 
