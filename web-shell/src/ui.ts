@@ -84,6 +84,9 @@ export interface UiElements {
   sidebar: HTMLElement;
   dockHistory: HTMLElement;
   setDockMode: (_mode: DockMode) => void;
+
+  // R3: Drawer overlay
+  drawerOverlay: HTMLElement;
 }
 
 /**
@@ -195,6 +198,13 @@ export function buildEmptyUi(
   // ─── Floating bottom-left cluster (R2d) ───────────────────────────────────
   // Append to root so it floats above the grid layout (position:fixed is viewport-relative)
   root.appendChild(bottomBar);
+
+  // ─── R3: Drawer overlay (backdrop for mobile drawers) ───────────────────
+  const drawerOverlay = document.createElement('div');
+  drawerOverlay.className = 'drawer-overlay';
+  drawerOverlay.setAttribute('data-testid', 'drawer-overlay');
+  drawerOverlay.setAttribute('aria-hidden', 'true');
+  root.appendChild(drawerOverlay);
 
   // ─── Sidebar collapse toggle ────────────────────────────────────────────
   sidebar.collapseBtn.addEventListener('click', () => {
@@ -312,6 +322,9 @@ export function buildEmptyUi(
     sidebar: sidebar.container,
     dockHistory: sidebar.dockHistory,
     setDockMode: sidebar.setDockMode,
+
+    // R3: Drawer overlay (shared backdrop for mobile drawers)
+    drawerOverlay,
   };
 }
 

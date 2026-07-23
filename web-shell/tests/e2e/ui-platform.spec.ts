@@ -225,3 +225,109 @@ test.describe('Slice C: Platform Surface UI', () => {
     });
   });
 });
+
+// ─── R3: Responsive Drawer Tests ───────────────────────────────────────────────
+
+test.describe('R3: Responsive Drawers', () => {
+  test.describe('Drawer visibility at mobile breakpoint', () => {
+    test.beforeEach(async ({ page }) => {
+      await waitForAppReady(page);
+      // Set mobile viewport
+      await page.setViewportSize({ width: 375, height: 667 });
+    });
+
+    test('sidebar drawer is hidden by default at mobile', async ({ page }) => {
+      const sidebar = page.locator('[data-testid="sidebar"]');
+      await expect(sidebar).toHaveCSS('transform', 'matrix(1, 0, 0, 1, -220, 0)');
+      await expect(sidebar).toHaveCSS('opacity', '0');
+    });
+
+    test('inspector drawer is hidden by default at mobile', async ({ page }) => {
+      const inspector = page.locator('[data-testid="inspector"]');
+      await expect(inspector).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 230, 0)');
+      await expect(inspector).toHaveCSS('opacity', '0');
+    });
+
+    test('drawer overlay is hidden by default at mobile', async ({ page }) => {
+      const overlay = page.locator('[data-testid="drawer-overlay"]');
+      await expect(overlay).toHaveCSS('opacity', '0');
+    });
+  });
+
+  test.describe('Mutual exclusion', () => {
+    test.beforeEach(async ({ page }) => {
+      await waitForAppReady(page);
+      await page.setViewportSize({ width: 375, height: 667 });
+    });
+
+    test('opening sidebar closes inspector (and vice versa)', async ({ page }) => {
+      // Open sidebar via data attribute (simulating DrawerController.open())
+      await page.evaluate(() => {
+        document.querySelector('#app')?.setAttribute('data-drawer-open', 'sidebar');
+      });
+      await page.waitForTimeout(300);
+      const sidebar = page.locator('[data-testid="sidebar"]');
+      await expect(sidebar).toHaveCSS('opacity', '1');
+
+      // Opening inspector should close sidebar
+      await page.evaluate(() => {
+        document.querySelector('#app')?.setAttribute('data-drawer-open', 'inspector');
+      });
+      await page.waitForTimeout(300);
+      await expect(sidebar).toHaveCSS('opacity', '0');
+      const inspector = page.locator('[data-testid="inspector"]');
+      await expect(inspector).toHaveCSS('opacity', '1');
+    });
+  });
+
+  test.describe('Drawer focus lifecycle', () => {
+    test.beforeEach(async ({ page }) => {
+      await waitForAppReady(page);
+      await page.setViewportSize({ width: 375, height: 667 });
+    });
+
+    test('inspector drawer opens with role="dialog" and aria-modal via button click', async ({ page }) => {
+      // Click inspector toggle button to open drawer (this triggers DrawerController)
+      await page.click('[data-testid="inspector-toggle"]');
+      await page.waitForTimeout(200);
+      const inspector = page.locator('[data-testid="inspector"]');
+      await expect(inspector).toHaveAttribute('role', 'dialog');
+      await expect(inspector).toHaveAttribute('aria-modal', 'true');
+    });
+
+    test('inspector toggle closes drawer and clears accessibility attributes', async ({ page }) => {
+      // Open inspector drawer
+      await page.click('[data-testid="inspector-toggle"]');
+      await page.waitForTimeout(200);
+      const inspector = page.locator('[data-testid="inspector"]');
+      await expect(inspector).toHaveCSS('opacity', '1');
+      await expect(inspector).toHaveAttribute('role', 'dialog');
+
+      // Toggle again to close
+      await page.click('[data-testid="inspector-toggle"]');
+      await page.waitForTimeout(200);
+      await expect(inspector).toHaveCSS('opacity', '0');
+      await expect(inspector).not.toHaveAttribute('role');
+      await expect(inspector).not.toHaveAttribute('aria-modal');
+    });
+
+    test('CSS-driven drawer visibility works for sidebar', async ({ page }) => {
+      // Directly set data attribute to test CSS drawer visibility
+      // (sidebar trigger button not yet implemented at mobile)
+      await page.evaluate(() => {
+        document.querySelector('#app')?.setAttribute('data-drawer-open', 'sidebar');
+      });
+      await page.waitForTimeout(200);
+      const sidebar = page.locator('[data-testid="sidebar"]');
+      // CSS-driven visibility should work
+      await expect(sidebar).toHaveCSS('opacity', '1');
+
+      // Remove attribute to close
+      await page.evaluate(() => {
+        document.querySelector('#app')?.removeAttribute('data-drawer-open');
+      });
+      await page.waitForTimeout(200);
+      await expect(sidebar).toHaveCSS('opacity', '0');
+    });
+  });
+});

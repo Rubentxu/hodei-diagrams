@@ -13,6 +13,7 @@ import { ARRANGE_ICONS } from './icon.js';
 
 export interface InspectorControls {
   container: HTMLElement;
+  closeBtn: HTMLButtonElement; // R3: close button for drawer
   setEditor(_editor: Editor): void;
   setSelectionSize(_count: number): void;
   update(
@@ -43,6 +44,8 @@ export function buildInspector(
   const container = document.createElement('div');
   container.className = 'inspector';
   container.setAttribute('data-testid', 'inspector');
+  // R3: drawer-specific identifier (separate from legacy 'inspector' testid)
+  container.setAttribute('data-drawer-testid', 'drawer-inspector');
 
   // ─── Tab bar ──────────────────────────────────────────────────────────────
   const tabBar = document.createElement('div');
@@ -67,6 +70,33 @@ export function buildInspector(
   tabBar.appendChild(textTab);
   tabBar.appendChild(arrangeTab);
   container.appendChild(tabBar);
+
+  // R3: Close button for inspector drawer
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'drawer-close-inspector';
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Close inspector';
+  closeBtn.setAttribute('data-testid', 'drawer-close-inspector');
+  closeBtn.style.cssText = `
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+  `;
+  closeBtn.addEventListener('click', () => {
+    // The DrawerController will handle closing via its own listener
+    // This button's data-testid allows E2E tests to find it
+  });
+  container.appendChild(closeBtn);
 
   // ─── Tab content panes ────────────────────────────────────────────────────
   // Style pane
@@ -1695,7 +1725,7 @@ export function buildInspector(
   // Initial state: no selection
   update([], [], 0);
 
-  return { container, setEditor, setSelectionSize, update };
+  return { container, closeBtn, setEditor, setSelectionSize, update };
 }
 
 // ─── Field group helper ───────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import { EMPTY_METADATA } from './types.js';
 import { VersionStore } from './version-store.js';
 import { HistoryPanel } from './history-panel.js';
 import { WorkbenchController } from './workbench-controller.js';
+import { DrawerController } from './responsive-drawer.js';
 import { buildDockLayers } from './dock-layers.js';
 import { runMathOverlay } from './math/math-overlay.js';
 import { openMathInsertDialog } from './math/math-dialog.js';
@@ -543,6 +544,46 @@ async function bootstrap(): Promise<void> {
   const appRoot = document.getElementById('app');
   workbenchController.subscribe((state) => {
     appRoot?.setAttribute('data-hud-density', state.hudDensity);
+  });
+
+  // R3: Wire responsive drawers to WorkbenchController overlay state
+  // Inspector drawer: opened via inspectorToggleBtn
+  const inspectorDrawer = new DrawerController({
+    drawer: 'inspector',
+    drawerEl: inspector.container,
+    triggerEl: ui.inspectorToggleBtn,
+    closeBtn: inspector.closeBtn,
+    overlayEl: ui.drawerOverlay,
+  });
+
+  // Sidebar drawer: opened via sidebar collapse btn (at mobile it acts as drawer trigger)
+  const sidebarDrawer = new DrawerController({
+    drawer: 'sidebar',
+    drawerEl: ui.sidebar,
+    triggerEl: ui.sidebarCollapseBtn,
+    closeBtn: ui.sidebarCollapseBtn,
+    overlayEl: ui.drawerOverlay,
+  });
+
+  // Wire inspectorToggleBtn click to inspector drawer
+  ui.inspectorToggleBtn.addEventListener('click', () => {
+    inspectorDrawer.toggle();
+  });
+
+  // Wire sidebar collapse btn to sidebar drawer (at mobile)
+  ui.sidebarCollapseBtn.addEventListener('click', () => {
+    sidebarDrawer.toggle();
+  });
+
+  // Sync WorkbenchController overlay state with drawer state
+  workbenchController.subscribe((state) => {
+    if (state.overlayActive === 'inspector') {
+      inspectorDrawer.open();
+    } else if (state.overlayActive === 'sidebar') {
+      sidebarDrawer.open();
+    } else {
+      DrawerController.closeAll();
+    }
   });
 
   // R1b: Wire buildDockLayers into .dock-mode-layers container

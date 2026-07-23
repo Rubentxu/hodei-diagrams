@@ -198,22 +198,21 @@ button:disabled {
 }
 
 /* ─── Responsive: Mobile (<768px) ─────────────────────────────────────────── */
-/* Both sidebar and inspector hidden; canvas maximized */
+/* R3: sidebar/inspector replaced with slide-in drawers (see drawer-overlay rules) */
 @media (max-width: 767px) {
   #app {
     grid-template-columns: var(--rail-w) 0px 1fr 0px;
     grid-template-rows: var(--navbar-h) 1fr 0px;
   }
 
-  .sidebar,
-  .inspector,
+  /* HUD hidden at mobile (not a drawer) */
   .hud {
     display: none !important;
   }
 
-  /* Bottom cluster hidden on mobile — canvas maximized */
+  /* Bottom cluster (page tabs, error banner) always reachable */
   .bottom-left-cluster {
-    display: none !important;
+    display: flex !important;
   }
 
   /* Canvas expands to fill */
@@ -225,6 +224,82 @@ button:disabled {
   /* Floating toggle buttons for mobile panels */
   .mobile-panel-toggle {
     display: flex !important;
+  }
+
+  /* ─── R3: Responsive Drawer System ─────────────────────────────────────── */
+  /* Drawer overlay: semi-transparent backdrop, blocks canvas interaction */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 90;
+    display: none;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity var(--motion-normal), visibility var(--motion-normal);
+  }
+
+  [data-drawer-open="sidebar"] .drawer-overlay,
+  [data-drawer-open="inspector"] .drawer-overlay {
+    display: block;
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* Sidebar as slide-in drawer at mobile */
+  .sidebar {
+    position: fixed;
+    top: var(--navbar-h);
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    z-index: 95;
+    transform: translateX(-100%);
+    visibility: hidden;
+    opacity: 0;
+    transition: transform var(--motion-normal), visibility var(--motion-normal), opacity var(--motion-normal);
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.3);
+  }
+
+  [data-drawer-open="sidebar"] .sidebar {
+    transform: translateX(0);
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* Inspector as slide-in drawer at mobile */
+  .inspector {
+    position: fixed;
+    top: var(--navbar-h);
+    right: 0;
+    bottom: 0;
+    width: var(--inspector-w);
+    z-index: 95;
+    transform: translateX(100%);
+    visibility: hidden;
+    opacity: 0;
+    transition: transform var(--motion-normal), visibility var(--motion-normal), opacity var(--motion-normal);
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+  }
+
+  [data-drawer-open="inspector"] .inspector {
+    transform: translateX(0);
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* Bottom cluster always reachable at mobile (not display:none) */
+  .bottom-left-cluster {
+    display: flex !important;
+  }
+
+  /* prefers-reduced-motion: instant transitions */
+  @media (max-width: 767px) {
+    .drawer-overlay,
+    .sidebar,
+    .inspector {
+      transition: none !important;
+    }
   }
 }
 
@@ -655,6 +730,7 @@ button:disabled {
   flex-direction: column;
   overflow-y: auto;
   transition: opacity var(--motion-normal);
+  position: relative; /* R3: for close button positioning */
 }
 
 .sidebar.collapsed {
@@ -1363,6 +1439,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  position: relative; /* R3: for close button positioning */
 }
 
 .inspector-tabs {
