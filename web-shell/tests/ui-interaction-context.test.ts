@@ -154,5 +154,58 @@ describe('UI Interaction Context (R2b seam)', () => {
       rect.dispatchEvent(down); expect(snaps.at(-1)?.isDragging).toBe(true);
       editor.detach(); expect(snaps.at(-1)?.isDragging).toBe(false);
     });
+
+    // R2b-FIX: pointercancel clears moveArea/drag state and emits compact state
+    it('pointercancel after pointerdown clears dragState and emits isDragging=false', () => {
+      const snaps: { isDragging: boolean }[] = [];
+      editor.onInteractionStateChange((s) => snaps.push({ isDragging: s.isDragging }));
+      const rect = viewer.querySelector('rect[data-vertex-id]')!;
+      const cx = 50, cy = 40;
+      // Start a drag
+      const down = new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: cx, clientY: cy }); Object.defineProperty(down, 'pointerId', { value: 1 });
+      rect.dispatchEvent(down);
+      expect(snaps.at(-1)?.isDragging).toBe(true);
+      // Trigger pointercancel (not pointerup)
+      const cancel = new MouseEvent('pointercancel', { bubbles: true, clientX: cx + 3, clientY: cy + 3 }); Object.defineProperty(cancel, 'pointerId', { value: 1 });
+      rect.dispatchEvent(cancel);
+      // After pointercancel, isDragging should be false (compact state)
+      expect(snaps.at(-1)?.isDragging).toBe(false);
+    });
+  });
+
+  // R2b-FIX: grid toggle must update density through main via notifyInteractionState
+  describe('notifyInteractionState public seam', () => {
+    it('notifyInteractionState() emits current state', () => {
+      const received: { isDragging: boolean; snapEnabled: boolean; isEditing: boolean }[] = [];
+      editor.onInteractionStateChange((s) => received.push({ ...s }));
+      // Initial state (nothing happened yet) - call notifyInteractionState
+      editor.notifyInteractionState();
+      expect(received.length).toBeGreaterThan(0);
+      const last = received[received.length - 1]!;
+      expect(last.isDragging).toBe(false);
+      expect(last.snapEnabled).toBe(false);
+      expect(last.isEditing).toBe(false);
+    });
+
+    it('notifyInteractionState() called after toggleSnap reflects snapEnabled change', () => {
+      const received: { snapEnabled: boolean }[] = [];
+      editor.onInteractionStateChange((s) => received.push({ snapEnabled: s.snapEnabled }));
+      editor.toggleSnap(); // snapEnabled becomes true
+      editor.notifyInteractionState(); // should emit with snapEnabled=true
+      const snapTrue = received.find((r) => r.snapEnabled === true);
+      expect(snapTrue).toBeDefined();
+    });
+  });
+
+  // R2b-FIX: detach clears moveArea state (moveArea is internal, verify via isDragging)
+  describe('detach lifecycle', () => {
+    it('detach when no drag active emits isDragging=false', () => {
+      const snaps: { isDragging: boolean }[] = [];
+      editor.onInteractionStateChange((s) => snaps.push({ isDragging: s.isDragging }));
+      // No drag started, just detach
+      editor.detach();
+      // Should emit compact state (isDragging=false)
+      expect(snaps.at(-1)?.isDragging).toBe(false);
+    });
   });
 });

@@ -1830,6 +1830,8 @@ export class Editor {
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
     this.#dragState = null;
+    // R2b-FIX: also clear moveArea on detach
+    this.#moveArea = null;
     this.#notifyInteractionState();
     this.#bendDrag = null;
     this.#cancelMarquee();
@@ -2515,6 +2517,15 @@ export class Editor {
       isEditing: this.#textEdit !== null,
     };
     for (const cb of this.#interactionStateListeners) cb(state);
+  }
+
+  /**
+   * Public seam for external callers (main.ts) to trigger interaction-state
+   * notification after external state changes (e.g., grid visibility).
+   * Fires #notifyInteractionState so subscribers receive updated gridVisible.
+   */
+  notifyInteractionState(): void {
+    this.#notifyInteractionState();
   }
 
   /** Refresh scene cache and re-render. Called after commands. */
@@ -3253,13 +3264,20 @@ export class Editor {
 
     // pointercancel must restore preview/handles and clear drag WITHOUT committing
     if (e.type === 'pointercancel') {
+      let needsNotify = false;
       if (this.#dragState) {
         this.#transformPreview.restoreAll();
         this.#resizeHandles.applyDragOffset(0, 0);
         this.#transformPreview.commitAll();
         this.#dragState = null;
-        this.#notifyInteractionState();
+        needsNotify = true;
       }
+      // R2b-FIX: also clear moveArea state on pointercancel
+      if (this.#moveArea) {
+        this.#moveArea = null;
+        needsNotify = true;
+      }
+      if (needsNotify) this.#notifyInteractionState();
       return;
     }
 
@@ -3792,6 +3810,8 @@ export class Editor {
     const sourceCenterX = sourceBounds.x + sourceBounds.width / 2;
     const sourceCenterY = sourceBounds.y + sourceBounds.height / 2;
     this.#showPreviewLine(sourceCenterX, sourceCenterY);
+    // R2b-FIX: emit initial interaction state so HUD density updates on edge-hit drag-start
+    this.#notifyInteractionState();
 
     const DRAG_THRESHOLD_PX = 5;
     let dragActivated = false;

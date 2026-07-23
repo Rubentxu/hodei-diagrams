@@ -654,6 +654,8 @@ async function bootstrap(): Promise<void> {
     setGridVisible(visible);
     gridMenuItem?.classList.toggle('has-checkmark', visible);
     ui.hud.setGrid(visible);
+    // R2b-FIX: notify interaction state so HUD density updates through the seam
+    activeEditor?.notifyInteractionState();
   }
 
   gridMenuItem?.addEventListener('click', () => {
