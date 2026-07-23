@@ -24,6 +24,7 @@ import {
   perimeterNormalized,
   classifyAnchorFromNormalized,
   clientToDoc,
+  SHAPE_KEYS,
 } from './scene-bounds.js';
 import { showContextMenu, type ContextMenuItem } from './context-menu.js';
 import { openMathEditDialog } from './math/math-dialog.js';
@@ -205,6 +206,7 @@ export class Editor {
   #zoomOut: (() => void) | null = null;
   #resetZoom: (() => void) | null = null;
   #pan: ((_dx: number, _dy: number) => void) | null = null;
+  #setPan: ((_x: number, _y: number) => void) | null = null;
   #abortController: AbortController | null = null;
 
   // ─── Stencil Drag Preview ────────────────────────────────────────────────
@@ -240,11 +242,34 @@ export class Editor {
     zoomOut?: () => void;
     resetZoom?: () => void;
     pan?: (_dx: number, _dy: number) => void;
+    setPan?: (_x: number, _y: number) => void;
   }): void {
     if (opts.zoomIn) this.#zoomIn = opts.zoomIn;
     if (opts.zoomOut) this.#zoomOut = opts.zoomOut;
     if (opts.resetZoom) this.#resetZoom = opts.resetZoom;
     if (opts.pan) this.#pan = opts.pan;
+    if (opts.setPan) this.#setPan = opts.setPan;
+  }
+
+  /** Get the current zoom level (1.0 = 100%). */
+  zoom(): number {
+    return this.#getZoom();
+  }
+
+  /**
+   * Set the absolute pan offset in CSS pixels.
+   * Used by the Find dialog to scroll matched shapes into view.
+   */
+  setPan(x: number, y: number): void {
+    this.#setPan?.(x, y);
+  }
+
+  /**
+   * Returns the viewer DOM element.
+   * Used by the Find dialog for viewport calculations.
+   */
+  viewerElement(): HTMLElement {
+    return this.#viewer;
   }
 
   // ─── Edge / Bend Editing ───────────────────────────────────────────────────
@@ -2259,6 +2284,54 @@ export class Editor {
       }
     }
     return null;
+  }
+
+  /**
+   * Get all shapes across all pages with their labels and geometry.
+   * Used by the Find dialog (Ctrl+F) to search shapes by label.
+   *
+   * Returns shapes from all pages; the find dialog operates across the
+   * entire diagram, not just the active page.
+   */
+  getAllShapesWithLabels(): Array<{
+    id: SlotmapId;
+    label: string | null;
+    bounds: { x: number; y: number; width: number; height: number };
+    pageIdx: number;
+  }> {
+    const results: Array<{
+      id: SlotmapId;
+      label: string | null;
+      bounds: { x: number; y: number; width: number; height: number };
+      pageIdx: number;
+    }> = [];
+
+    for (let pageIdx = 0; pageIdx < this.#sceneCache.length; pageIdx++) {
+      const page = this.#sceneCache[pageIdx];
+      if (!page) continue;
+      for (const elem of page.display_list) {
+        const e = elem as Record<string, unknown>;
+        // Check each shape key
+        for (const key of SHAPE_KEYS) {
+          const variant = e[key] as Record<string, unknown> | undefined;
+          if (!variant || typeof variant !== 'object') continue;
+          const idField = variant['id'] as { idx?: number; version?: number } | undefined;
+          if (!idField || typeof idField.idx !== 'number') continue;
+          const id: SlotmapId = { idx: idField.idx!, version: idField.version ?? 0 };
+          // Get label
+          const label = this.#getVertexLabel(id);
+          // Get bounds from geometry
+          const geom = variant['geometry'] as Record<string, unknown> | undefined;
+          if (!geom) continue;
+          const x = geom['x'] as number ?? 0;
+          const y = geom['y'] as number ?? 0;
+          const w = geom['width'] as number ?? 0;
+          const h = geom['height'] as number ?? 0;
+          results.push({ id, label, bounds: { x, y, width: w, height: h }, pageIdx });
+        }
+      }
+    }
+    return results;
   }
 
   /** Dispatch an EditEdgeLabel command to the engine. */

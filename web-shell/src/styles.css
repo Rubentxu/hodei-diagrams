@@ -2430,6 +2430,76 @@ body.presentation-mode .page-tab.active {
   font-style: italic;
 }
 
+/* ─── Find Dialog ──────────────────────────────────────────────────────────── */
+
+.find-dialog {
+  min-width: 320px;
+  max-width: 400px;
+}
+
+.find-dialog-body {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--md);
+}
+
+.find-input {
+  flex: 1;
+  padding: var(--sm) var(--md);
+  border: 1px solid var(--bg-surface);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color var(--motion-fast);
+}
+
+.find-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.find-count {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: right;
+}
+
+.find-dialog-footer {
+  justify-content: space-between;
+}
+
+.dialog-btn {
+  padding: var(--sm) var(--md);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background var(--motion-fast), color var(--motion-fast);
+  cursor: pointer;
+}
+
+.find-prev,
+.find-next {
+  background: transparent;
+  border: 1px solid var(--bg-surface);
+  color: var(--text-dim);
+}
+
+.find-prev:hover:not(:disabled),
+.find-next:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text);
+}
+
+.find-prev:disabled,
+.find-next:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ─── Slice C: Menu item disabled/grayed state ─────────────────────────────── */
 .menu-item.disabled-item {
   opacity: 0.4;

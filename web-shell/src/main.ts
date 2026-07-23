@@ -33,6 +33,7 @@ import { buildDockLayers } from './dock-layers.js';
 import { runMathOverlay } from './math/math-overlay.js';
 import { openMathInsertDialog } from './math/math-dialog.js';
 import { showEditXmlDialog } from './edit-xml-dialog.js';
+import { showFindDialog } from './find-dialog.js';
 import './styles.css';
 
 let activeSession: DiagramEngineSession | null = null;
@@ -814,6 +815,14 @@ async function bootstrap(): Promise<void> {
     if (e.key === 'Escape' && isPresentationMode) {
       exitPresentationMode();
     }
+    // Ctrl+F / Cmd+F — open find dialog
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      // Don't capture when focused on an input (find dialog input handles its own keyboard)
+      const tag = (e.target as HTMLElement | null)?.tagName ?? '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      if (activeEditor) showFindDialog(activeEditor);
+    }
   });
 
   // ─── 4.6. Mount Version History panel in Zone 2 sidebar (Task 3.5) ───────
@@ -1047,6 +1056,7 @@ async function bootstrap(): Promise<void> {
       ui.zoomDisplay.textContent = '100%';
     },
     pan: (dx, dy) => zoomPan?.panBy(dx, dy),
+    setPan: (x, y) => zoomPan?.setPan(x, y),
   });
 
   // Zoom menu item wiring (View > Zoom In/Out/Reset)
