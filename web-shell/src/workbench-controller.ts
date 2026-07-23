@@ -75,13 +75,14 @@ export class WorkbenchController {
     this._notify();
   }
 
-  // ── LayoutContext-derived state ────────────────────────────────────────────
-  updateHudDensity(ctx: LayoutContext): void {
+  // ── DensityContext-derived state (4 fields, no hasSelection) ───────────────
+  updateHudDensity(ctx: Omit<LayoutContext, 'hasSelection'>): void {
     const full = ctx.isDragging || ctx.snapEnabled || ctx.gridVisible || ctx.isEditing;
     const next: HudDensity = full ? 'full' : 'compact';
     if (this._state.hudDensity !== next) { this._state.hudDensity = next; this._notify(); }
   }
 
+  // ── Full LayoutContext for updateContextualToolbar (includes hasSelection) ──
   updateContextualToolbar(ctx: LayoutContext): void {
     const root = document.getElementById('app');
     root?.setAttribute('data-context-toolbar', ctx.hasSelection ? 'active' : 'inactive');

@@ -40,6 +40,11 @@ let activeEditor: Editor | null = null;
 let activeEditorIdx = 0;
 let zoomPan: ReturnType<typeof setupZoomPan> | null = null;
 
+// ─── R2b: interaction-state lifecycle (dispose on beforeunload) ────────────────
+let unsubInteractionState: (() => void) | null = null;
+// Last-seen 3-field interaction state from editor seam (for grid toggle augmentation)
+let lastInteractionState: { isDragging: boolean; snapEnabled: boolean; isEditing: boolean } | null = null;
+
 // ─── Version history state ─────────────────────────────────────────────────────
 const versionStore = new VersionStore();
 let manualSaveCounter = 0;
@@ -651,6 +656,10 @@ async function bootstrap(): Promise<void> {
     setGridVisible(visible);
     gridMenuItem?.classList.toggle('has-checkmark', visible);
     ui.hud.setGrid(visible);
+    // R2b-FIX: augment last-seen 3-field IS with gridVisible and push to controller
+    if (lastInteractionState) {
+      workbenchController.updateHudDensity({ ...lastInteractionState, gridVisible: visible });
+    }
   }
 
   gridMenuItem?.addEventListener('click', () => {
@@ -1012,6 +1021,17 @@ async function bootstrap(): Promise<void> {
   });
 
   activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
+
+  // R2b: Wire editor interaction state → controller HUD density
+  unsubInteractionState = activeEditor.onInteractionStateChange((state) => {
+    lastInteractionState = { isDragging: state.isDragging, snapEnabled: state.snapEnabled, isEditing: state.isEditing };
+    workbenchController.updateHudDensity({
+      isDragging: state.isDragging,
+      snapEnabled: state.snapEnabled,
+      gridVisible: ui.canvasContainer.classList.contains('show-grid'),
+      isEditing: state.isEditing,
+    });
+  });
 
   // Snap menu wiring
   const snapMenuItem = document.getElementById('menu-item-snap');
@@ -2255,4 +2275,9 @@ bootstrap().catch((e) => {
   if (root) {
     root.textContent = 'Fatal: ' + (e instanceof Error ? e.message : String(e));
   }
+});
+
+// R2b: Dispose interaction-state subscription on page unload
+window.addEventListener('beforeunload', () => {
+  unsubInteractionState?.();
 });

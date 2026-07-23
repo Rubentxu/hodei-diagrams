@@ -48,26 +48,26 @@ describe('WorkbenchController', () => {
     expect(controller.getState().panelVisibility).toEqual({ sidebar: true, inspector: false });
   });
 
-  // task 1.1.6: updateHudDensity
+  // task 1.1.6: updateHudDensity — 4-field DensityContext (no hasSelection)
   describe('updateHudDensity', () => {
     it('compact when idle', () => {
-      controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: false, gridVisible: false, isEditing: false });
+      controller.updateHudDensity({ isDragging: false, snapEnabled: false, gridVisible: false, isEditing: false });
       expect(controller.getState().hudDensity).toBe('compact');
     });
     it('full when dragging', () => {
-      controller.updateHudDensity({ hasSelection: false, isDragging: true, snapEnabled: false, gridVisible: false, isEditing: false });
+      controller.updateHudDensity({ isDragging: true, snapEnabled: false, gridVisible: false, isEditing: false });
       expect(controller.getState().hudDensity).toBe('full');
     });
     it('full when snapEnabled', () => {
-      controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: true, gridVisible: false, isEditing: false });
+      controller.updateHudDensity({ isDragging: false, snapEnabled: true, gridVisible: false, isEditing: false });
       expect(controller.getState().hudDensity).toBe('full');
     });
     it('full when gridVisible', () => {
-      controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: false, gridVisible: true, isEditing: false });
+      controller.updateHudDensity({ isDragging: false, snapEnabled: false, gridVisible: true, isEditing: false });
       expect(controller.getState().hudDensity).toBe('full');
     });
     it('full when isEditing', () => {
-      controller.updateHudDensity({ hasSelection: false, isDragging: false, snapEnabled: false, gridVisible: false, isEditing: true });
+      controller.updateHudDensity({ isDragging: false, snapEnabled: false, gridVisible: false, isEditing: true });
       expect(controller.getState().hudDensity).toBe('full');
     });
   });
