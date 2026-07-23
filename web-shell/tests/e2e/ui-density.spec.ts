@@ -760,3 +760,70 @@ test.describe('R2a: Navbar 44px + Contextual Toolbar', () => {
     await expect(toolbar).toHaveCSS('display', 'none');
   });
 });
+
+test.describe('R2d: Bottom-Left Cluster', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('cluster remains usable — page tabs and zoom reachable bottom-left, no full-width bottom bar', async ({ page }) => {
+    // Verify no full-width bottom bar exists as grid row
+    const bottomBar = page.locator('.bottom-bar, .bottom-left-cluster');
+    await expect(bottomBar).toBeAttached();
+
+    // Verify the cluster has position: fixed (floating)
+    const position = await bottomBar.evaluate((el) => window.getComputedStyle(el).position);
+    expect(position).toBe('fixed');
+
+    // Verify page-tabs is inside the cluster and visible
+    const pageTabs = page.locator('[data-testid="page-tabs"]');
+    await expect(pageTabs).toBeAttached();
+
+    // Verify page-tab-add is inside the cluster
+    const addBtn = page.locator('[data-testid="page-tab-add"]');
+    await expect(addBtn).toBeAttached();
+
+    // Verify zoom-display is reachable (in navbar area)
+    const zoomDisplay = page.locator('[data-testid="zoom-display"]');
+    await expect(zoomDisplay).toBeAttached();
+
+    // Verify error-banner is in the cluster (hidden by default)
+    const errorBanner = page.locator('[data-testid="error-banner"]');
+    await expect(errorBanner).toBeAttached();
+    await expect(errorBanner).toBeHidden();
+
+    // Verify diagnostics-badge is in the cluster (hidden by default)
+    const diagnosticsBadge = page.locator('[data-testid="diagnostics-badge"]');
+    await expect(diagnosticsBadge).toBeAttached();
+    await expect(diagnosticsBadge).toBeHidden();
+
+    // Verify error-message and dismiss-error are inside error-banner
+    await expect(errorBanner.locator('[data-testid="error-message"]')).toBeAttached();
+    await expect(errorBanner.locator('[data-testid="dismiss-error"]')).toBeAttached();
+  });
+
+  test('bottom-bar alias resolves on the floating cluster', async ({ page }) => {
+    // The data-testid="bottom-bar" should resolve on the cluster
+    const bottomBar = page.locator('[data-testid="bottom-bar"]');
+    await expect(bottomBar).toBeAttached();
+
+    // It should also have the bottom-left-cluster class
+    await expect(bottomBar).toHaveClass(/bottom-left-cluster/);
+
+    // It should be position fixed
+    const position = await bottomBar.evaluate((el) => window.getComputedStyle(el).position);
+    expect(position).toBe('fixed');
+  });
+
+  test('no full-width grid bottom row — canvas takes full width', async ({ page }) => {
+    // The canvas should not be displaced by a bottom grid row
+    const canvas = page.locator('[data-testid="canvas-container"]');
+    await expect(canvas).toBeVisible();
+
+    // Verify bottom-left cluster is floating (fixed position)
+    const cluster = page.locator('.bottom-left-cluster');
+    await expect(cluster).toBeAttached();
+    const position = await cluster.evaluate((el) => window.getComputedStyle(el).position);
+    expect(position).toBe('fixed');
+  });
+});
