@@ -288,11 +288,6 @@ button:disabled {
     opacity: 1;
   }
 
-  /* Bottom cluster always reachable at mobile (not display:none) */
-  .bottom-left-cluster {
-    display: flex !important;
-  }
-
   /* prefers-reduced-motion: instant transitions */
   @media (max-width: 767px) {
     .drawer-overlay,

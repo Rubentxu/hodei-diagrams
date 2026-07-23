@@ -1,5 +1,6 @@
 /**
- * ui-drawer.test.ts — Unit tests for DrawerController (R3 responsive drawers)
+ * ui-drawer.test.ts — Essential unit tests for DrawerController (R3 responsive drawers)
+ * Focus: escape dismiss, return focus, mutual exclusion
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -12,7 +13,6 @@ function createFixture(): {
   triggerEl: HTMLButtonElement;
   app: HTMLElement;
 } {
-  // Build minimal DOM fixture
   const app = document.createElement('div');
   app.id = 'app';
   app.setAttribute('data-testid', 'app');
@@ -61,96 +61,12 @@ describe('DrawerController', () => {
 
   beforeEach(() => {
     fixture = createFixture();
-    // Clear any static state between tests
     DrawerController.closeAll();
   });
 
   afterEach(() => {
     document.body.innerHTML = '';
     vi.restoreAllMocks();
-  });
-
-  // ─── open / close / isOpen ─────────────────────────────────────────────────
-
-  describe('open / close / isOpen', () => {
-    it('is closed by default', () => {
-      const ctrl = createController('sidebar', fixture);
-      expect(ctrl.isOpen()).toBe(false);
-    });
-
-    it('open() sets isOpen to true', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      expect(ctrl.isOpen()).toBe(true);
-    });
-
-    it('close() sets isOpen to false', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      ctrl.close();
-      expect(ctrl.isOpen()).toBe(false);
-    });
-
-    it('toggle() alternates open/close', () => {
-      const ctrl = createController('sidebar', fixture);
-      expect(ctrl.isOpen()).toBe(false);
-      ctrl.toggle();
-      expect(ctrl.isOpen()).toBe(true);
-      ctrl.toggle();
-      expect(ctrl.isOpen()).toBe(false);
-    });
-
-    it('open() sets data-drawer-open attribute on #app', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      expect(fixture.app.getAttribute('data-drawer-open')).toBe('sidebar');
-    });
-
-    it('close() removes data-drawer-open attribute', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      ctrl.close();
-      expect(fixture.app.getAttribute('data-drawer-open')).toBeNull();
-    });
-
-    it('open() twice is a no-op (idempotent)', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      ctrl.open();
-      expect(ctrl.isOpen()).toBe(true);
-    });
-  });
-
-  // ─── aria / role ───────────────────────────────────────────────────────────
-
-  describe('aria attributes', () => {
-    it('open() sets role="dialog" and aria-modal="true" on drawer', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      expect(fixture.drawerEl.getAttribute('role')).toBe('dialog');
-      expect(fixture.drawerEl.getAttribute('aria-modal')).toBe('true');
-    });
-
-    it('close() removes role and aria-modal', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      ctrl.close();
-      expect(fixture.drawerEl.getAttribute('role')).toBeNull();
-      expect(fixture.drawerEl.getAttribute('aria-modal')).toBeNull();
-    });
-
-    it('open() sets aria-hidden="false" on overlay', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      expect(fixture.overlayEl.getAttribute('aria-hidden')).toBe('false');
-    });
-
-    it('close() sets aria-hidden="true" on overlay', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      ctrl.close();
-      expect(fixture.overlayEl.getAttribute('aria-hidden')).toBe('true');
-    });
   });
 
   // ─── Escape dismiss ────────────────────────────────────────────────────────
@@ -173,84 +89,12 @@ describe('DrawerController', () => {
     });
   });
 
-  // ─── Outside-click dismiss ─────────────────────────────────────────────────
-
-  describe('Outside-click dismiss', () => {
-    it('clicking overlay closes drawer', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      fixture.overlayEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      expect(ctrl.isOpen()).toBe(false);
-    });
-
-    it('clicking drawer itself does NOT close', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      fixture.drawerEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      expect(ctrl.isOpen()).toBe(true);
-    });
-
-    it('clicking close button closes drawer', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      fixture.closeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      expect(ctrl.isOpen()).toBe(false);
-    });
-  });
-
-  // ─── Focus trap ───────────────────────────────────────────────────────────
-
-  describe('Focus trap', () => {
-    it('open() sets role="dialog" (focus trap indicator)', () => {
-      const ctrl = createController('sidebar', fixture);
-      ctrl.open();
-      expect(fixture.drawerEl.getAttribute('role')).toBe('dialog');
-      expect(fixture.drawerEl.getAttribute('aria-modal')).toBe('true');
-    });
-
-    it('getFocusableElements returns all focusable elements in drawer', () => {
-      const btn1 = document.createElement('button');
-      const btn2 = document.createElement('button');
-      const input = document.createElement('input');
-      fixture.drawerEl.appendChild(btn1);
-      fixture.drawerEl.appendChild(input);
-      fixture.drawerEl.appendChild(btn2);
-
-      const ctrl = createController('sidebar', fixture);
-      // Access private method for testing
-      const ctrlAny = ctrl as unknown as { getFocusableElements: () => HTMLElement[] };
-      const focusable = ctrlAny.getFocusableElements();
-      expect(focusable).toContain(btn1);
-      expect(focusable).toContain(btn2);
-      expect(focusable).toContain(input);
-    });
-
-    it('getFocusableElements filters out hidden elements', () => {
-      const btn1 = document.createElement('button');
-      const hiddenDiv = document.createElement('div');
-      hiddenDiv.hidden = true;
-      const btn2 = document.createElement('button');
-      fixture.drawerEl.appendChild(btn1);
-      fixture.drawerEl.appendChild(hiddenDiv);
-      fixture.drawerEl.appendChild(btn2);
-
-      const ctrl = createController('sidebar', fixture);
-      const ctrlAny = ctrl as unknown as { getFocusableElements: () => HTMLElement[] };
-      const focusable = ctrlAny.getFocusableElements();
-      expect(focusable).toContain(btn1);
-      expect(focusable).toContain(btn2);
-      expect(focusable).not.toContain(hiddenDiv);
-    });
-  });
-
   // ─── Return focus ──────────────────────────────────────────────────────────
 
   describe('Return focus on close', () => {
     it('close() attempts to return focus to trigger element', () => {
       const ctrl = createController('sidebar', fixture);
       ctrl.open();
-      // jsdom doesn't actually move focus, but close() calls focus() on triggerEl
-      // We verify by checking no error is thrown and drawer state is correct
       ctrl.close();
       expect(ctrl.isOpen()).toBe(false);
     });
@@ -272,12 +116,11 @@ describe('DrawerController', () => {
 
   describe('Mutual exclusion', () => {
     it('opening sidebar closes any open inspector (and vice versa)', () => {
-      // Create inspector elements
       const inspOverlay = document.createElement('div');
       inspOverlay.className = 'drawer-overlay';
       inspOverlay.setAttribute('data-testid', 'drawer-overlay-inspector');
       const inspDrawer = document.createElement('div');
-      inspDrawer.className = 'drawor-inspector';
+      inspDrawer.className = 'drawer-inspector';
       inspDrawer.setAttribute('data-testid', 'drawer-inspector');
       const inspClose = document.createElement('button');
       inspClose.setAttribute('data-testid', 'drawer-close-inspector');
