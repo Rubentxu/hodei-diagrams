@@ -546,37 +546,12 @@ async function bootstrap(): Promise<void> {
     appRoot?.setAttribute('data-hud-density', state.hudDensity);
   });
 
-  // R3: Wire responsive drawers via compact helper
-  function setupDrawer(
-    drawer: 'inspector' | 'sidebar',
-    drawerEl: HTMLElement,
-    triggerEl: HTMLElement | null,
-    closeBtn: HTMLButtonElement,
-  ): DrawerController {
-    const ctrl = new DrawerController({
-      drawer,
-      drawerEl,
-      triggerEl,
-      closeBtn,
-      overlayEl: ui.drawerOverlay,
-    });
-    if (triggerEl) triggerEl.addEventListener('click', () => ctrl.toggle());
-    return ctrl;
-  }
+  // R3: Wire responsive drawers via single-line lambda (used twice)
+  const makeDrawer = (drawer: 'inspector' | 'sidebar', drawerEl: HTMLElement, triggerEl: HTMLElement | null, closeBtn: HTMLButtonElement) =>
+    (c => (triggerEl?.addEventListener('click', () => c.toggle()), c))(new DrawerController({ drawer, drawerEl, triggerEl, closeBtn, overlayEl: ui.drawerOverlay }));
 
-  const inspectorDrawer = setupDrawer(
-    'inspector',
-    inspector.container,
-    ui.inspectorToggleBtn,
-    inspector.closeBtn,
-  );
-
-  const sidebarDrawer = setupDrawer(
-    'sidebar',
-    ui.sidebar,
-    ui.sidebarCollapseBtn,
-    ui.sidebarCollapseBtn,
-  );
+  makeDrawer('inspector', inspector.container, ui.inspectorToggleBtn, inspector.closeBtn);
+  makeDrawer('sidebar', ui.sidebar, ui.sidebarCollapseBtn, ui.sidebarCollapseBtn);
 
   // R1b: Wire buildDockLayers into .dock-mode-layers container
   const dockLayersContainer = ui.sidebar.querySelector('.dock-mode-layers') as HTMLElement | null;

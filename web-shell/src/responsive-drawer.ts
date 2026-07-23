@@ -56,13 +56,6 @@ export class DrawerController {
 
   close(): void {
     if (!this._isOpen) return;
-    this._closeUnsafe();
-    DrawerController._activeDrawers.delete(this);
-  }
-
-  toggle(): void { this._isOpen ? this.close() : this.open(); }
-
-  private _closeUnsafe(): void {
     this._isOpen = false;
     document.querySelector('#app')?.removeAttribute('data-drawer-open');
     this.opts.drawerEl.removeAttribute('role');
@@ -73,7 +66,10 @@ export class DrawerController {
     this.opts.closeBtn.removeEventListener('click', this.boundCloseClick);
     const returnEl = this.opts.triggerEl ?? this.previouslyFocusedEl;
     if (returnEl && typeof returnEl.focus === 'function') returnEl.focus();
+    DrawerController._activeDrawers.delete(this);
   }
+
+  toggle(): void { this._isOpen ? this.close() : this.open(); }
 
   private getFocusableElements(): HTMLElement[] {
     const sel = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
