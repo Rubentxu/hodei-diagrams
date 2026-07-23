@@ -275,6 +275,10 @@ export class Editor {
   #styleClipboard: Record<string, unknown> | null = null;
   #defaultStyle: Record<string, unknown> | null = null;
 
+  // ─── Interaction State (R2b: HUD density seam) ─────────────────────────────
+  /** Fires on isDragging | snapEnabled | isTextEditing transitions. Disposable, multi-listener Set. */
+  #interactionStateListeners = new Set<(state: { isDragging: boolean; snapEnabled: boolean; isEditing: boolean }) => void>();
+
   constructor(
     session: DiagramEngineSession,
     viewer: HTMLElement,
@@ -1826,6 +1830,7 @@ export class Editor {
     this.#viewer.removeEventListener('pointerup', this.#onPointerUpBound);
     this.#viewer.removeEventListener('pointercancel', this.#onPointerUpBound);
     this.#dragState = null;
+    this.#notifyInteractionState();
     this.#bendDrag = null;
     this.#cancelMarquee();
     this.#cancelConnect();
@@ -2128,6 +2133,7 @@ export class Editor {
     shapeEl.setAttribute('data-editing', 'true');
 
     this.#textEdit = { vertexId, isEdge: false, input, originalLabel };
+    this.#notifyInteractionState();
 
     // Debounced label dispatch on input
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2212,6 +2218,7 @@ export class Editor {
 
     input.remove();
     this.#textEdit = null;
+    this.#notifyInteractionState();
   }
 
   /** Get the label text for a vertex from the scene cache. */
@@ -2307,6 +2314,7 @@ export class Editor {
     edgeEl.setAttribute('data-editing', 'true');
 
     this.#textEdit = { vertexId: edgeId, isEdge: true, input, originalLabel: currentLabel };
+    this.#notifyInteractionState();
 
     // Debounced label dispatch on input
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2474,6 +2482,7 @@ export class Editor {
   /** Toggle snap-to-grid and snap-to-shape on/off. */
   toggleSnap(): void {
     this.#snapEnabled = !this.#snapEnabled;
+    this.#notifyInteractionState();
     this.#onStateChange?.();
   }
 
@@ -2485,6 +2494,27 @@ export class Editor {
   /** Set snap enabled state. */
   setSnapEnabled(enabled: boolean): void {
     this.#snapEnabled = enabled;
+  }
+
+  /**
+   * Subscribe to interaction state changes: { isDragging, snapEnabled, isEditing }.
+   * Returns an unsubscribe function. Supports multiple listeners (Set pattern).
+   */
+  onInteractionStateChange(
+    cb: (state: { isDragging: boolean; snapEnabled: boolean; isEditing: boolean }) => void,
+  ): () => void {
+    this.#interactionStateListeners.add(cb);
+    return () => { this.#interactionStateListeners.delete(cb); };
+  }
+
+  /** Fire all interaction state listeners with current state. */
+  #notifyInteractionState(): void {
+    const state = {
+      isDragging: this.#dragState !== null || this.#moveArea !== null,
+      snapEnabled: this.#snapEnabled,
+      isEditing: this.#textEdit !== null,
+    };
+    for (const cb of this.#interactionStateListeners) cb(state);
   }
 
   /** Refresh scene cache and re-render. Called after commands. */
@@ -2772,6 +2802,7 @@ export class Editor {
    */
   #startMoveArea(x: number, y: number): void {
     this.#moveArea = { originX: x, originY: y, currentX: x, currentY: y };
+    this.#notifyInteractionState();
   }
 
   /** Update the move-area endpoint. */
@@ -2790,6 +2821,7 @@ export class Editor {
     if (!this.#moveArea) return;
     const { originX, originY, currentX, currentY } = this.#moveArea;
     this.#moveArea = null;
+    this.#notifyInteractionState();
     const dx = currentX - originX;
     const dy = currentY - originY;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
@@ -3144,6 +3176,7 @@ export class Editor {
         currentX: docPos.x,
         currentY: docPos.y,
       };
+      this.#notifyInteractionState();
       // Capture element for transform preview before any preview is applied
       const selector = `[data-vertex-id="${id.idx}:${id.version}"]`;
       const el = this.#viewer.querySelector(selector) as SVGElement | null;
@@ -3225,6 +3258,7 @@ export class Editor {
         this.#resizeHandles.applyDragOffset(0, 0);
         this.#transformPreview.commitAll();
         this.#dragState = null;
+        this.#notifyInteractionState();
       }
       return;
     }
@@ -3265,6 +3299,7 @@ export class Editor {
     // Clean up captures after restore/commit
     this.#transformPreview.commitAll();
     this.#dragState = null;
+    this.#notifyInteractionState();
   }
 
   // ─── Public Facade: Geometry Mutation ─────────────────────────────────────

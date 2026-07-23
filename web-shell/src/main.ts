@@ -1013,6 +1013,17 @@ async function bootstrap(): Promise<void> {
 
   activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
 
+  // R2b: Wire editor interaction state → controller HUD density
+  const unsubInteractionState = activeEditor.onInteractionStateChange((state) => {
+    workbenchController.updateHudDensity({
+      hasSelection: false, // maintained by onSelectionChange
+      isDragging: state.isDragging,
+      snapEnabled: state.snapEnabled,
+      gridVisible: ui.canvasContainer.classList.contains('show-grid'),
+      isEditing: state.isEditing,
+    });
+  });
+
   // Snap menu wiring
   const snapMenuItem = document.getElementById('menu-item-snap');
   function updateSnapCheckState(): void {
