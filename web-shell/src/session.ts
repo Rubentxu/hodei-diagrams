@@ -762,32 +762,56 @@ export class DiagramEngineSession {
     x: number,
     y: number,
     pageId?: SlotmapId,
+    opts?: {
+      /** Override geometry fields (defaults: x, y, width=80, height=80, rotation=0, flip_h=false, flip_v=false) */
+      geometry?: {
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
+        rotation?: number;
+        flip_h?: boolean;
+        flip_v?: boolean;
+      };
+      /**
+       * Style overrides applied on top of the stencil's default.
+       * SHAPE-008 (Shift): fill=#ffffff stroke=none (ignore stencil default style).
+       */
+      styleOverride?: {
+        fill?: string;
+        stroke?: string;
+      };
+    },
   ): Result<SlotmapId, EngineError> {
+    const geom = opts?.geometry;
+    const styleOverride = opts?.styleOverride;
     const cmd = JSON.stringify({
       AddVertex: {
         vertex: {
           geometry: {
-            x,
-            y,
-            width: 80,
-            height: 80,
+            x: geom?.x ?? x,
+            y: geom?.y ?? y,
+            width: geom?.width ?? 80,
+            height: geom?.height ?? 80,
             relative: false,
-            rotation: 0,
-            flip_h: false,
-            flip_v: false,
+            rotation: geom?.rotation ?? 0,
+            flip_h: geom?.flip_h ?? false,
+            flip_v: geom?.flip_v ?? false,
           },
           page_id: pageId ? slotmapIdToField(pageId) : { idx: 0, version: 0 },
           z_order: 0,
           locked: false,
           visible: true,
         },
-        style: { shape: `stencil:${library}:${name}` },
+        style: {
+          shape: `stencil:${library}:${name}`,
+          ...(styleOverride?.fill !== undefined ? { fill: styleOverride.fill } : {}),
+          ...(styleOverride?.stroke !== undefined ? { stroke: styleOverride.stroke } : {}),
+        },
       },
     });
     const r = this.executeCommand(cmd);
     if (!r.ok) return r;
-    // Note: returning the vertex ID would require engine-side ID reporting.
-    // For now, return a zero ID as a placeholder — callers use fire-and-forget.
     return ok({ idx: 0, version: 0 });
   }
 

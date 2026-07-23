@@ -3379,6 +3379,22 @@ export class Editor {
     this.#replay();
   }
 
+  /**
+   * Returns the bounding box of all shapes on the current page, or null if empty.
+   * Used by SHAPE-009 (Alt+click = insert at bottom-left).
+   */
+  getDiagramBBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    return this.#getDiagramBBox();
+  }
+
+  /**
+   * Returns the full CellGeometry (x, y, w, h, rotation, flip_h, flip_v) of a vertex.
+   * Used by SHAPE-010 (Shift+click = replace selected) for dynamic stencils.
+   */
+  getVertexGeometry(id: SlotmapId): import('./scene-bounds.js').CellGeometry | null {
+    return sceneGeometry(this.#sceneCache, id);
+  }
+
   // ─── Command Builders ─────────────────────────────────────────────────────
 
   /**

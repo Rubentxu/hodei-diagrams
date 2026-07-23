@@ -1148,24 +1148,54 @@ async function bootstrap(): Promise<void> {
   });
 
   // Dynamic stencil library shape activation (click-to-add)
+  // IP-C modifier routing for dynamic stencils:
+  //   Shift (no selection) → insert with white fill (SHAPE-008, ignore default style)
+  //   Shift (one selected) → delete + insert at same position (SHAPE-010, replace selected)
+  //   Alt (no selection)  → insert at bottom-left (SHAPE-009)
   ui.sidebar.addEventListener('stencil-shape-activate', (e) => {
-    if (!activeSession) return;
+    if (!activeSession || !activeEditor) return;
     const event = e as CustomEvent<{
       library: string;
       name: string;
       shiftKey: boolean;
       altKey: boolean;
     }>;
-    const { library, name, shiftKey: _shiftKey, altKey: _altKey } = event.detail;
-    const pageId = activeEditor?.getActivePageSlotId() ?? undefined;
-    const result = activeSession.addStencilVertex(library, name, 400, 300, pageId);
+    const { library, name, shiftKey, altKey } = event.detail;
+    const pageId = activeEditor.getActivePageSlotId() ?? undefined;
+    const selectionSize = activeEditor.selection.length;
+
+    // Default position: center of viewport
+    const DEFAULT_X = 400;
+    const DEFAULT_Y = 300;
+
+    let x = DEFAULT_X;
+    let y = DEFAULT_Y;
+    let styleOverride: { fill?: string; stroke?: string } | undefined;
+
+    if (altKey && !shiftKey) {
+      // SHAPE-009: insert at bottom-left of diagram
+      const bbox = activeEditor.getDiagramBBox();
+      if (bbox) {
+        x = bbox.minX;
+        y = bbox.maxY;
+      } else {
+        x = 40;
+        y = 40;
+      }
+    } else if (shiftKey && !altKey) {
+      // SHAPE-008: insert with white fill and no stroke (ignore stencil default)
+      styleOverride = { fill: '#ffffff', stroke: 'none' };
+    }
+
+    const result = activeSession.addStencilVertex(library, name, x, y, pageId,
+      styleOverride ? { styleOverride } : undefined);
     if (result.ok) {
-      // Re-render the scene to show the newly added vertex
-      activeEditor?.refreshScene();
-      activeEditor?.triggerReplay();
-      // Note: full modifier routing (bottom-left, replace, insert-and-connect)
-      // for dynamic stencils is a follow-up. Basic shape tools (rect, ellipse,
-      // etc.) get the full routing in Editor.#onPaletteClick.
+      // SHAPE-010: if one shape was selected, delete it (replaces the shape)
+      if (shiftKey && !altKey && selectionSize === 1) {
+        activeEditor.deleteSelection();
+      }
+      activeEditor.refreshScene();
+      activeEditor.triggerReplay();
     }
   });
 
