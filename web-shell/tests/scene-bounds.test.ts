@@ -250,38 +250,6 @@ function makePathPage(edgeId: SlotmapId, sourceId: SlotmapId, targetId: SlotmapI
   };
 }
 
-function makeMixedPage(
-  shapeId: SlotmapId,
-  edgeId: SlotmapId,
-  sourceId: SlotmapId,
-  targetId: SlotmapId,
-): ScenePage {
-  return {
-    page_id: { idx: 1, version: 1 },
-    name: 'Page 1',
-    width: 800,
-    height: 600,
-    display_list: [
-      {
-        Rect: {
-          id: { idx: shapeId.idx, version: shapeId.version },
-          bounds: {
-            origin: { x: 0, y: 0 },
-            size: { width: 100, height: 100 },
-          },
-        },
-      },
-      {
-        Line: {
-          id: { idx: edgeId.idx, version: edgeId.version },
-          source: { Vertex: { idx: sourceId.idx, version: sourceId.version } },
-          target: { Vertex: { idx: targetId.idx, version: targetId.version } },
-        },
-      },
-    ],
-  };
-}
-
 describe('findEdgeVariant', () => {
   it('returns the variant record for a Line edge', () => {
     const sourceId = makeSlotmapId(1);
