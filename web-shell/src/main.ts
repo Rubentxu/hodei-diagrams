@@ -40,6 +40,9 @@ let activeEditor: Editor | null = null;
 let activeEditorIdx = 0;
 let zoomPan: ReturnType<typeof setupZoomPan> | null = null;
 
+// ─── R2b: interaction-state lifecycle (dispose on beforeunload) ────────────────
+let unsubInteractionState: (() => void) | null = null;
+
 // ─── Version history state ─────────────────────────────────────────────────────
 const versionStore = new VersionStore();
 let manualSaveCounter = 0;
@@ -1014,9 +1017,8 @@ async function bootstrap(): Promise<void> {
   activeEditor.onCursorMove((p) => ui.hud.setCursor(p.x, p.y));
 
   // R2b: Wire editor interaction state → controller HUD density
-  const unsubInteractionState = activeEditor.onInteractionStateChange((state) => {
+  unsubInteractionState = activeEditor.onInteractionStateChange((state) => {
     workbenchController.updateHudDensity({
-      hasSelection: false, // maintained by onSelectionChange
       isDragging: state.isDragging,
       snapEnabled: state.snapEnabled,
       gridVisible: ui.canvasContainer.classList.contains('show-grid'),
@@ -2266,4 +2268,9 @@ bootstrap().catch((e) => {
   if (root) {
     root.textContent = 'Fatal: ' + (e instanceof Error ? e.message : String(e));
   }
+});
+
+// R2b: Dispose interaction-state subscription on page unload
+window.addEventListener('beforeunload', () => {
+  unsubInteractionState?.();
 });

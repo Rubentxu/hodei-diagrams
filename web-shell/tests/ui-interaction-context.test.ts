@@ -39,7 +39,7 @@ function createMockWasm() {
     })),
     render_svg: vi.fn().mockReturnValue('<svg><rect data-vertex-id="0:0" x="10" y="20" width="80" height="40"/></svg>'),
     render_pages: vi.fn().mockReturnValue([]),
-    decodeSceneBuffer: vi.fn().mockReturnValue({ ok: true, value: { pages: [], cells: [] } }),
+    decodeSceneBuffer: vi.fn().mockReturnValue({ ok: true, value: [] }),
     undo: vi.fn(), redo: vi.fn(), engine_can_undo: vi.fn().mockReturnValue(false), engine_can_redo: vi.fn().mockReturnValue(false),
     connect_vertices: vi.fn(), disconnect_edge: vi.fn(), parse_stencil_xml: vi.fn(), parse_stencil_library_xml: vi.fn(),
     set_stencil_library: vi.fn(), get_resolved_style: vi.fn(), get_metadata: vi.fn(), set_metadata: vi.fn(),
@@ -125,15 +125,19 @@ describe('UI Interaction Context (R2b seam)', () => {
     });
   });
 
-  // ── snap and text-edit transition ───────────────────────────────────────
+  // ── snap and isEditing transition ────────────────────────────────────────
   describe('snap and isEditing transitions', () => {
-    it('isEditing transitions on text edit start/end', () => {
+    it('isEditing transitions to true on text edit start (dblclick)', () => {
       const received: { isEditing: boolean }[] = [];
       editor.onInteractionStateChange((s) => received.push({ isEditing: s.isEditing }));
 
-      // Simulate text edit state by directly calling the internal transition
-      // (full text edit requires complex DOM setup, verify state machine fires)
-      expect(received.length).toBe(0);
+      // Trigger dblclick on the rect in the viewer SVG to start text edit
+      const rect = viewer.querySelector('rect[data-vertex-id]')!;
+      rect.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 50, clientY: 40 } as unknown as MouseEvent));
+
+      // isEditing should be true immediately after dblclick
+      const editingEvent = received.find((s) => s.isEditing === true);
+      expect(editingEvent).toBeDefined();
     });
 
     it('snapEnabled toggles correctly', () => {
