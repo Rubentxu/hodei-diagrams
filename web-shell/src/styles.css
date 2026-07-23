@@ -1225,20 +1225,26 @@ button:disabled {
 }
 
 /* ─── Slice B: Grid Overlay ─────────────────────────────────────────────────── */
-/* Grid rendered ON TOP of the viewer (z-index: 2) so the user sees
-   grid lines across the white page background. Pointer events pass
+/* Dot grid — modern alternative to the classic square-line grid.
+   Dots at every intersection, opacity balanced so they read as a subtle
+   texture without competing with diagram content. Pointer events pass
    through (pointer-events: none) so hit-testing still works. */
 .canvas-container.show-grid::after {
   content: '';
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+  /* Dot grid: radial-gradient draws a circle at each grid intersection.
+     Two transparent stops surround one filled stop to get a sharp dot edge.
+     background-size controls the grid density. */
+  background-image: radial-gradient(
+    circle at center,
+    var(--grid-color) 1.5px,
+    transparent 1.5px
+  );
   background-size: calc(var(--grid-cell) * var(--zoom, 1)) calc(var(--grid-cell) * var(--zoom, 1));
   pointer-events: none;
   z-index: 2;
-  opacity: 0.45;
+  opacity: 0.35;
 }
 
 .canvas-container .viewer {

@@ -550,6 +550,12 @@ impl AddVertexPayload {
         // Assign z_order = max(page) + 1 (ADR-0058 §Z-order semantics)
         let page_id = v.page_id.unwrap_or_default();
         v.z_order = model.store.max_z_order(page_id) + 1;
+
+        // Auto-expand page bounds if the new vertex exceeds them (draw.io semantics)
+        if let Some(geo) = v.geometry {
+            expand_page_if_needed(model, page_id, geo.x + geo.width, geo.y + geo.height);
+        }
+
         let id = model.store.insert_vertex(v);
         self.inserted_id = Some(id);
         self.applied = true;
@@ -691,6 +697,12 @@ impl MoveVertexPayload {
         // Apply new geometry
         vertex.geometry = Some(self.geometry);
         self.applied = true;
+
+        // Auto-expand page bounds if the vertex now exceeds them (draw.io semantics)
+        if let Some(pid) = vertex.page_id {
+            let geo = self.geometry;
+            expand_page_if_needed(model, pid, geo.x + geo.width, geo.y + geo.height);
+        }
 
         Ok(())
     }
@@ -2948,5 +2960,24 @@ impl MoveShapeToLayerPayload {
 
         self.applied = false;
         Ok(())
+    }
+}
+
+// ─── Page auto-expand helper ─────────────────────────────────────────────────
+
+/// Expand the active page size so the bounding box (right, bottom) fits,
+/// using a 5% margin (min 50 px) so shapes aren't placed flush at the edge.
+/// Only expands — never shrinks the page.
+fn expand_page_if_needed(model: &mut DiagramModel, page_id: PageId, right: f64, bottom: f64) {
+    let page = match model.store.page_mut(page_id) {
+        Some(p) => p,
+        None => return,
+    };
+    let margin = 50.0_f64.max(page.size.width.max(page.size.height) * 0.05);
+    let new_w = page.size.width.max(right + margin);
+    let new_h = page.size.height.max(bottom + margin);
+    if new_w > page.size.width || new_h > page.size.height {
+        page.size.width = new_w;
+        page.size.height = new_h;
     }
 }
