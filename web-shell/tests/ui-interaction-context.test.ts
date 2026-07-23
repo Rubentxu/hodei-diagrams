@@ -43,7 +43,7 @@ function createSession(wasm = createMockWasm()): { session: DiagramEngineSession
   function ok<T>(v: T) { return { ok: true as const, value: v }; }
   const session = {
     resolveSelection: (_x: number, _y: number, _m: { alt: boolean; shift: boolean; ctrl: boolean; meta: boolean }) => {
-      const raw = (wasm as Record<string, unknown>).resolve_selection as (Handle: number, x: number, y: number, alt: boolean, shift: boolean, ctrl: boolean, meta: boolean) => string;
+      const raw = (wasm as Record<string, unknown>).resolve_selection as (_Handle: number, _x: number, _y: number, _alt: boolean, _shift: boolean, _ctrl: boolean, _meta: boolean) => string;
       const result = raw(42, _x, _y, _m.alt, _m.shift, _m.ctrl, _m.meta);
       try { return ok(JSON.parse(result)); } catch { return ok({ type: 'None' as const }); }
     },
@@ -62,13 +62,12 @@ function createSession(wasm = createMockWasm()): { session: DiagramEngineSession
 
 describe('UI Interaction Context (R2b seam)', () => {
   let session: DiagramEngineSession;
-  let wasm: ReturnType<typeof createMockWasm>;
   let viewer: HTMLElement;
   let editor: Editor;
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    const ctx = createSession(); session = ctx.session; wasm = ctx.wasm;
+    const ctx = createSession(); session = ctx.session;
     viewer = document.createElement('div');
     viewer.setAttribute('data-testid', 'viewer');
     viewer.style.cssText = 'position:fixed;inset:0;width:800px;height:600px';

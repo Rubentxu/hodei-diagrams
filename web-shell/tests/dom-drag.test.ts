@@ -3,7 +3,7 @@ import { DragSession, DragStateBase } from '../src/dom-drag.js';
 
 // JSDOM does not provide PointerEvent; polyfill using MouseEvent
 if (typeof PointerEvent === 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   (window as any).PointerEvent = class PointerEvent extends MouseEvent {
     pointerId: number;
     pressure: number;
