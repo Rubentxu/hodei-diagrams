@@ -203,6 +203,10 @@ Sin Rust/WASM para el renderizado.
 
 ### Fase 2: Viewport culling (1-2 semanas)
 
+> **Nota de implementación (2026-07-24)**: Se usó **inline rect test** (linear scan) en lugar de quadtree.
+> El quadtree será reconsiderado cuando el benchmark muestre degradación >20% en diagrams >5000 shapes.
+> Ver `crates/diagram-render-svg/benches/culling.rs` para datos.
+
 1. **Spatial index (quadtree)** en `diagram-core` → `spatial_index.rs`
 2. **Renderer recibe `ViewportBounds`** → solo serializa shapes en viewport + margin
 3. **Dirty rect tracking** → solo re-renderiza lo que cambió

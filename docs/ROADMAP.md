@@ -429,7 +429,7 @@ _(none — closed campaigns live in Milestones Delivered above)_
 | Fase | Focus | Deps | Status |
 |------|-------|------|--------|
 | **Fase 1** | Viewport state en web-shell + clientToDoc/docToClient + wheel/pan handlers + initial viewport heuristic para .drawio | Ninguno | ✅ PR1+PR2+PR3 merged |
-| **Fase 2** | Viewport culling (quadtree spatial index en Rust) | Fase 1 | 🔲 |
+| **Fase 2** | Viewport culling (inline rect test, quadtree deferred) | Fase 1 | ✅ PR archived |
 | **Fase 3** | WASM memory optimization + animation frame budget | Fase 2 | 🔲 |
 
 **Branch**: `feat/infinite-canvas` — PR1/PR2/PR3 archived, ready for release
