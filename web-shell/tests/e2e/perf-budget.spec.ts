@@ -76,12 +76,11 @@ test.describe('Suite: perf-budget', () => {
     await expect(page.locator('[data-testid="hud"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('[data-testid="viewer"]')).toBeVisible({ timeout: 5000 });
 
-    // Hide the HUD by hiding the FPS element (simulating debug-only mode)
-    // The HUD element stays visible but the fps item is hidden via CSS or direct style
+    // Hide the FPS element using the explicit hideFrameStats method
     const hudFps = page.locator('[data-testid="hud-fps"]');
     await page.evaluate(() => {
-      const fpsEl = document.querySelector('[data-testid="hud-fps"]') as HTMLElement | null;
-      if (fpsEl) fpsEl.style.display = 'none';
+      const d = (window as unknown as { __hodeiDebug: { hideFrameStats?: () => void } }).__hodeiDebug;
+      d.hideFrameStats?.();
     });
 
     // Wait for at least one frame to be measured

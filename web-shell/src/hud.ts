@@ -36,6 +36,8 @@ export interface HudControls {
   setGeometry: (_w: number, _h: number) => void;
   setFrameStats?: (s: FrameStats) => void;
   setMemoryStats?: (s: MemoryStats) => void;
+  hideFrameStats?: () => void;
+  showFrameStats?: () => void;
 }
 
 export function buildHud(): HudControls {
@@ -314,7 +316,12 @@ export function buildHud(): HudControls {
     },
     setFrameStats: (stats: FrameStats) => {
       fpsValue.textContent = `${stats.fps.toFixed(0)} fps · ${stats.frameMs.toFixed(1)} ms`;
-      fpsItem.style.display = fpsItem.style.display === 'none' ? 'flex' : fpsItem.style.display;
+    },
+    hideFrameStats: () => {
+      fpsItem.style.display = 'none';
+    },
+    showFrameStats: () => {
+      fpsItem.style.display = 'flex';
     },
     setMemoryStats: (stats: MemoryStats) => {
       const wasmMb = stats.wasmBytes / (1024 * 1024);

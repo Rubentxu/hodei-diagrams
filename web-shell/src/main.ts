@@ -2421,6 +2421,8 @@ async function bootstrap(): Promise<void> {
       return { edgeId, fromId, toId };
     },
     getFrameStats: () => frameBudgetMonitor?.getStats() ?? { fps: 0, frameMs: 0 },
+    hideFrameStats: () => hud?.hideFrameStats?.(),
+    showFrameStats: () => hud?.showFrameStats?.(),
     getWasmMemoryBytes: () => activeSession?.getWasmMemoryBytes() ?? 0,
     getSceneBufferBytes: () => activeSession?.getSceneBufferBytes() ?? null,
     getSvgBufferBytes: () => activeSession?.getSvgBufferBytes() ?? null,
