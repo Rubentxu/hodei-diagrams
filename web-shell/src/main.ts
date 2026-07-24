@@ -1111,6 +1111,9 @@ async function bootstrap(): Promise<void> {
     pan: (dx, dy) => zoomPan?.panBy(dx, dy),
   });
 
+  // S1 trigger: after pointer-pan ends, schedule a reveal replay
+  zoomPan.onPanEnd = () => activeEditor?.schedulePanEndReplay();
+
   // Zoom menu item wiring (View > Zoom In/Out/Reset)
   const zoomInMenuItem = document.getElementById('menu-item-zoom-in');
   const zoomOutMenuItem = document.getElementById('menu-item-zoom-out');
