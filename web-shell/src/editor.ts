@@ -218,6 +218,10 @@ export class Editor {
   #cursorMoveCb: ((_p: { x: number; y: number }) => void) | null = null;
   #cursorMoveRafId: number | null = null;
 
+  // ─── Render Coalescing (rAF) ─────────────────────────────────────────────
+  #rafHandle: number | null = null;
+  #renderPending = false;
+
   // ─── Snap ────────────────────────────────────────────────────────────────
   #snapEnabled: boolean = false;
   #snapThreshold: number = 8;
@@ -1726,15 +1730,8 @@ export class Editor {
 
   /** Refresh scene cache from engine. Call after import or page switch. */
   refreshScene(): void {
-    const sceneResult = this.#session.decodeSceneBuffer();
-    if (sceneResult.ok) {
-      this.#sceneCache = sceneResult.value;
-      if (this.#sceneCache.length > 0) {
-        const page = this.#sceneCache[this.#activePageIdx];
-        if (page) {
-          this.#activePageSlotId = page.page_id;
-        }
-      }
+    if (!this.#sceneSync()) {
+      this.#onError('Failed to decode scene buffer');
     }
   }
 
@@ -2100,7 +2097,8 @@ export class Editor {
    * Called externally when state changes (e.g., from inspector via session callback).
    */
   triggerReplay(): void {
-    this.#replay();
+    if (!this.#sceneSync()) return;
+    this.#scheduleRender();
   }
 
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
@@ -2529,13 +2527,17 @@ export class Editor {
     for (const cb of this.#interactionStateListeners) cb(state);
   }
 
-  /** Refresh scene cache and re-render. Called after commands. */
-  #replay(): void {
-    // Refresh scene cache
+  // ─── Render Coalescing ──────────────────────────────────────────────────
+
+  /**
+   * Synchronously refresh scene cache from the engine.
+   * Returns `false` on decode error (caller skips render scheduling on failure).
+   */
+  #sceneSync(): boolean {
     const sceneResult = this.#session.decodeSceneBuffer();
     if (!sceneResult.ok) {
       this.#onError(sceneResult.error);
-      return;
+      return false;
     }
     this.#sceneCache = sceneResult.value;
     if (this.#sceneCache.length > 0) {
@@ -2544,6 +2546,24 @@ export class Editor {
         this.#activePageSlotId = page.page_id;
       }
     }
+    return true;
+  }
+
+  /** Schedule a coalesced render on the next rAF tick. Idempotent within a frame. */
+  #scheduleRender(): void {
+    if (this.#renderPending) return;
+    this.#renderPending = true;
+    this.#rafHandle = requestAnimationFrame(() => {
+      this.#renderPending = false;
+      this.#rafHandle = null;
+      this.#flushRender();
+    });
+  }
+
+  /** Flush the pending render: compute viewport, renderPage, innerHTML swap, viewport apply, state/selection/handles. */
+  #flushRender(): void {
+    // Guard: if detached, skip render (viewer may be gone)
+    if (this.#abortController === null) return;
 
     // Re-render the active page using renderPage with the slotmap ID index
     const page = this.#sceneCache[this.#activePageIdx];
@@ -2593,6 +2613,11 @@ export class Editor {
 
     // Re-render resize handles if a single vertex is selected
     this.#resizeHandles.render(this.#selection);
+  }
+
+  /** Refresh scene cache and re-render. Called after commands. */
+  #replay(): void {
+    this.triggerReplay();
   }
 
   // ─── Selection ────────────────────────────────────────────────────────────
