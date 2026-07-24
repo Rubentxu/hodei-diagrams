@@ -296,9 +296,22 @@ export class Viewport {
       cursorDoc = { x: this.panX + cx / this.zoom, y: this.panY + cy / this.zoom };
     }
 
-    // Compute new pan so cursorDoc stays fixed after zoom change
-    const newPanX = cursorDoc.x - cx / clamped;
-    const newPanY = cursorDoc.y - cy / clamped;
+    // Compute new pan so cursorDoc stays fixed after zoom change.
+    // When svgRect is available, use the scale-aware formula:
+    //   docPoint.x = panX + (clientX - svgRect.left) * scaleX / zoom
+    //   => newPanX = cursorDoc.x - (clientX - svgRect.left) * scaleX / newZoom
+    // When no svgRect, both terms are in viewport space (simple division).
+    let newPanX: number;
+    let newPanY: number;
+    if (svgRect) {
+      const scaleX = this.width / svgRect.width;
+      const scaleY = this.height / svgRect.height;
+      newPanX = cursorDoc.x - (cx - svgRect.left) * scaleX / clamped;
+      newPanY = cursorDoc.y - (cy - svgRect.top) * scaleY / clamped;
+    } else {
+      newPanX = cursorDoc.x - cx / clamped;
+      newPanY = cursorDoc.y - cy / clamped;
+    }
 
     const m = this as unknown as MutableViewport;
     m.zoom = clamped;

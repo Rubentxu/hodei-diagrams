@@ -23,29 +23,29 @@ test.describe('Suite IC: viewport-wheel — cursor-centered zoom', () => {
   }
 
   /**
-   * Compute doc point from client point using viewBox.
-   * boundingBox returns {x, y, width, height} where x=left, y=top in viewport coords.
+   * Compute doc point from client coordinates using SVG bounding rect.
+   * Uses svgRect.left/top (absolute page offset) for correct client-to-doc mapping.
    */
   function clientToDoc(
     clientX: number,
     clientY: number,
     vb: { panX: number; panY: number; viewW: number; viewH: number },
-    svgRect: { x: number; y: number; width: number; height: number },
+    svgRect: { left: number; top: number; width: number; height: number },
   ): { x: number; y: number } {
     const scaleX = vb.viewW / svgRect.width;
     const scaleY = vb.viewH / svgRect.height;
     return {
-      x: vb.panX + (clientX - svgRect.x) * scaleX,
-      y: vb.panY + (clientY - svgRect.y) * scaleY,
+      x: vb.panX + (clientX - svgRect.left) * scaleX,
+      y: vb.panY + (clientY - svgRect.top) * scaleY,
     };
   }
 
   /**
-   * Test 1: Wheel zoom keeps the document point under cursor fixed.
+   * Test 1: Ctrl+wheel zooms and the document point under cursor stays fixed
+   * (cursor-centered zoom). This verifies the zoomAround formula preserves the
+   * document point under the cursor.
    *
    * Verifies canvas-navigation spec: "Cursor-Centered Wheel Zoom" requirement.
-   * Formula: cursorDoc = clientToDoc(clientX, clientY, viewport) must be identical
-   * before and after zoom.
    */
   test('Ctrl+wheel at cursor → doc point under cursor unchanged', async ({ page }) => {
     await waitForAppReady(page);
@@ -56,26 +56,24 @@ test.describe('Suite IC: viewport-wheel — cursor-centered zoom', () => {
     const viewer = page.locator('[data-testid="viewer"]');
     const svg = viewer.locator('svg');
 
-    // Hover over the shape first to position cursor
-    const shape = viewer.locator('[data-vertex-id]').first();
-    await shape.hover();
+    // Hover at a position in the SVG to place cursor there
+    const svgRect = await svg.evaluate((el: SVGElement) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
+    });
+    const hoverX = svgRect.left + svgRect.width * 0.5;
+    const hoverY = svgRect.top + svgRect.height * 0.5;
 
-    // Wait for initial viewport to settle
+    await page.mouse.move(hoverX, hoverY);
     await page.waitForTimeout(300);
 
-    // Get the cursor position in client coordinates
-    const cursorX = 400;
-    const cursorY = 200;
-
     // Get initial state
-    const svgRectBefore = await svg.boundingBox();
-    expect(svgRectBefore).not.toBeNull();
+    const svgRectBefore = await svg.evaluate((el: SVGElement) => el.getBoundingClientRect());
+    expect(svgRectBefore.width).toBeGreaterThan(0);
     const viewBoxBefore = await parseViewBox(svg);
-    const docPointBefore = clientToDoc(cursorX, cursorY, viewBoxBefore, svgRectBefore!);
+    const docPointBefore = clientToDoc(hoverX, hoverY, viewBoxBefore, svgRectBefore);
 
     // Zoom in with Ctrl+wheel at cursor position
-    // Use evaluate + WheelEvent like the existing tests do
-    await viewer.hover({ position: { x: cursorX, y: cursorY } });
     await viewer.evaluate((el, { clientX, clientY }) => {
       el.dispatchEvent(new WheelEvent('wheel', {
         deltaY: -100,
@@ -85,16 +83,14 @@ test.describe('Suite IC: viewport-wheel — cursor-centered zoom', () => {
         bubbles: true,
         cancelable: true,
       }));
-    }, { clientX: cursorX, clientY: cursorY });
+    }, { clientX: hoverX, clientY: hoverY });
 
-    // Wait for zoom to settle
     await page.waitForTimeout(300);
 
     // Get new state
-    const svgRectAfter = await svg.boundingBox();
-    expect(svgRectAfter).not.toBeNull();
+    const svgRectAfter = await svg.evaluate((el: SVGElement) => el.getBoundingClientRect());
     const viewBoxAfter = await parseViewBox(svg);
-    const docPointAfter = clientToDoc(cursorX, cursorY, viewBoxAfter, svgRectAfter!);
+    const docPointAfter = clientToDoc(hoverX, hoverY, viewBoxAfter, svgRectAfter);
 
     // The doc point under cursor must be the same (tolerance 1px for rounding)
     expect(docPointAfter.x).toBeCloseTo(docPointBefore.x, 0);
@@ -145,6 +141,8 @@ test.describe('Suite IC: viewport-wheel — cursor-centered zoom', () => {
    * Test 3: Zoom clamps at MIN_ZOOM (0.1).
    *
    * Verifies canvas-navigation spec: "Zoom clamps at MIN_ZOOM" scenario.
+   * Note: plain wheel (without Ctrl/Shift) pans, not zooms. We dispatch
+   * Ctrl+wheel via evaluate to trigger zoom-out.
    */
   test('Huge wheel-down → zoom clamps at MIN_ZOOM (0.1)', async ({ page }) => {
     await waitForAppReady(page);
@@ -168,10 +166,21 @@ test.describe('Suite IC: viewport-wheel — cursor-centered zoom', () => {
       });
     };
 
-    // Zoom out many times to reach min
+    // Zoom out many times using Ctrl+wheel (zoom-out, not pan)
     await viewer.hover({ position: { x: 400, y: 200 } });
     for (let i = 0; i < 50; i++) {
-      await page.mouse.wheel(0, 100);
+      // deltaY > 0 with ctrlKey=true zooms out (delta = -0.1)
+      await viewer.evaluate(() => {
+        const el = document.querySelector('[data-testid="viewer"]')!;
+        el.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: 100,
+          ctrlKey: true,
+          clientX: 400,
+          clientY: 200,
+          bubbles: true,
+          cancelable: true,
+        }));
+      });
       await page.waitForTimeout(10);
     }
     await page.waitForTimeout(300);
