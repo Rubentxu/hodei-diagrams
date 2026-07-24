@@ -35,6 +35,9 @@ export const MAX_ZOOM = 10.0;
  * All mutation returns a new Viewport instance (pure update).
  * The `applyToSvgElement` method is the only side effect — it sets the SVG viewBox
  * to encode the full camera transform.
+ *
+ * For the shared-viewport pattern (editor + renderer share one mutable instance),
+ * the mutable methods below cast through `MutableViewport` to bypass readonly.
  */
 export class Viewport {
   /** Document-space X of the viewBox origin */
@@ -228,6 +231,81 @@ export class Viewport {
     return new Viewport(this.panX, this.panY, this.zoom, w, h);
   }
 
+  // ─── Mutable updates (for shared-viewport pattern) ────────────────────────
+
+  /**
+   * Mutate pan in-place. Used when a shared mutable Viewport reference is held
+   * by both the editor (for pan-drag) and the renderer (for applyToSvgElement).
+   * Both parties see the same mutation immediately.
+   */
+  panBy(dx: number, dy: number): void {
+    const m = this as unknown as MutableViewport;
+    m.panX = this.panX + dx;
+    m.panY = this.panY + dy;
+  }
+
+  /**
+   * Set absolute pan values in-place.
+   */
+  setPan(panX: number, panY: number): void {
+    const m = this as unknown as MutableViewport;
+    m.panX = panX;
+    m.panY = panY;
+  }
+
+  /**
+   * Mutate zoom in-place.
+   */
+  setZoom(zoom: number): void {
+    const m = this as unknown as MutableViewport;
+    m.zoom = clampZoom(zoom);
+  }
+
+  /**
+   * Mutate size in-place (e.g., on window resize).
+   */
+  setSize(w: number, h: number): void {
+    const m = this as unknown as MutableViewport;
+    m.width = w;
+    m.height = h;
+  }
+
+  /**
+   * Zoom around a cursor position, mutating in-place.
+   * Cursor point stays fixed in document space while zoom changes.
+   *
+   * @param cursorClientX  Cursor browser X (optional — defaults to viewer center)
+   * @param cursorClientY  Cursor browser Y (optional — defaults to viewer center)
+   * @param newZoom        Target zoom level (will be clamped)
+   * @param svgRect         Bounding rect of the SVG element
+   */
+  zoomAround(
+    newZoom: number,
+    cursorClientX?: number,
+    cursorClientY?: number,
+    svgRect?: DOMRect,
+  ): void {
+    const clamped = clampZoom(newZoom);
+    const cx = cursorClientX ?? this.width / 2;
+    const cy = cursorClientY ?? this.height / 2;
+
+    let cursorDoc: Point;
+    if (svgRect) {
+      cursorDoc = this.clientToDoc(cx, cy, svgRect);
+    } else {
+      cursorDoc = { x: this.panX + cx / this.zoom, y: this.panY + cy / this.zoom };
+    }
+
+    // Compute new pan so cursorDoc stays fixed after zoom change
+    const newPanX = cursorDoc.x - cx / clamped;
+    const newPanY = cursorDoc.y - cy / clamped;
+
+    const m = this as unknown as MutableViewport;
+    m.zoom = clamped;
+    m.panX = newPanX;
+    m.panY = newPanY;
+  }
+
   // ─── Rendering ──────────────────────────────────────────────────────────
 
   /**
@@ -247,6 +325,15 @@ export class Viewport {
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 }
+
+/** Mutable view of Viewport fields — used by in-place mutation methods */
+type MutableViewport = {
+  panX: number;
+  panY: number;
+  zoom: number;
+  width: number;
+  height: number;
+};
 
 /**
  * Clamp zoom to the valid range [MIN_ZOOM, MAX_ZOOM].

@@ -2888,10 +2888,8 @@ export class Editor {
     if (!this.#panDrag || !this.#viewport) return;
     const dx = x - this.#panDrag.startX;
     const dy = y - this.#panDrag.startY;
-    // withPan takes absolute pan values, not deltas
-    const newPanX = this.#viewport.panX + dx;
-    const newPanY = this.#viewport.panY + dy;
-    this.#viewport = this.#viewport.withPan(newPanX, newPanY);
+    // panBy mutates in-place so both editor and renderer see the same state
+    this.#viewport.panBy(dx, dy);
     this.#panDrag.startX = x;
     this.#panDrag.startY = y;
     // Apply the updated viewport to the SVG element
