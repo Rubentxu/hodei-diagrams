@@ -651,15 +651,41 @@ export class ResizeHandlesOverlay {
   /**
    * Append an SVG element to the shape's <g data-vertex-id="..."> wrapper group.
    * Falls back to the SVG layer if the wrapper is not found (e.g. pre-wrap shapes).
+   *
+   * SVG does not render children of primitive shape elements (<rect>, <ellipse>,
+   * <image>). When the data-vertex-id attribute is on the shape element itself
+   * (not on a wrapper <g>), we must append to the parent <g> if it exists,
+   * otherwise the handle has a zero bounding box.
+   *
+   * If shapeEl itself IS the <g data-vertex-id> group (not a child of it),
+   * append directly to that <g>.
    */
   #appendToShapeGroup(el: SVGElement, vertexId: SlotmapId): void {
-    const group = this.#getShapeElement(vertexId);
-    if (group) {
-      group.appendChild(el);
-    } else {
-      // Fallback for shapes that haven't been wrapped yet
+    const shapeEl = this.#getShapeElement(vertexId);
+    if (!shapeEl) {
       this.#getSvgLayer().appendChild(el);
+      return;
     }
+    const tagName = shapeEl.tagName.toLowerCase();
+    const isPrimitive = ['rect', 'ellipse', 'circle', 'path', 'polygon', 'polyline', 'image', 'text'].includes(tagName);
+    if (isPrimitive) {
+      // Check if parent is a <g data-vertex-id> wrapper
+      const parent = shapeEl.parentElement;
+      if (
+        parent?.tagName.toLowerCase() === 'g' &&
+        parent?.getAttribute('data-vertex-id') === `${vertexId.idx}:${vertexId.version}`
+      ) {
+        parent.appendChild(el);
+        return;
+      }
+    }
+    // If shapeEl itself is the <g data-vertex-id> group (<g data-vertex-id>),
+    // append directly to it. Otherwise fall back to SVG layer.
+    if (shapeEl.getAttribute('data-vertex-id') === `${vertexId.idx}:${vertexId.version}`) {
+      shapeEl.appendChild(el);
+      return;
+    }
+    this.#getSvgLayer().appendChild(el);
   }
 
   #clearHandles(svgLayer: HTMLElement): void {

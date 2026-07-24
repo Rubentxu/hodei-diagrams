@@ -1268,8 +1268,9 @@ async function bootstrap(): Promise<void> {
     ui.saveButton.disabled = false;
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
 
-    // Fit viewport to content with 10% padding on scene load (initial viewport heuristic)
-    zoomPan?.fitToView(0.1);
+    // Keep the default viewport (panX=0, panY=0, zoom=1.0) after import.
+    // Users can zoom/pan to navigate to content — fitToView with wrong bounds
+    // is worse than no fit-to-view at all.
     ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
     ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
     ui.canvasContainer.style.setProperty('--zoom', String(zoomPan?.getZoom() ?? 1));

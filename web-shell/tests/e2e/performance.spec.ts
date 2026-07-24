@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { waitForAppReady } from './helpers/app-ready.js';
 import { fixturePath } from './fixtures.js';
+import { getViewBox, hasZoomChanged, hasPanChanged } from './helpers/viewport-helpers.js';
 
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
@@ -95,18 +96,26 @@ test.describe('Suite L: performance', () => {
     const zoomPct = parseInt(zoomText?.replace('%', '') ?? '0', 10);
     expect(zoomPct).toBeGreaterThanOrEqual(180);
 
-    // Transform should reflect zoom
-    const transform = await canvasContainer.evaluate((el) => el.style.transform);
-    expect(transform).toContain('scale');
+    // viewBox should reflect zoom change
+    const initialViewBox = await getViewBox(page);
+    // Zoom again and check that viewBox changed
+    for (let i = 0; i < 5; i++) {
+      await canvasContainer.hover({ position: { x: 400, y: 200 } });
+      await canvasContainer.evaluate((el) => {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+      });
+    }
+    const laterViewBox = await getViewBox(page);
+    expect(hasZoomChanged(initialViewBox, laterViewBox)).toBe(true);
 
     // UI should stay responsive — entire operation under 3s
     expect(elapsed).toBeLessThan(3000);
   });
 
   /**
-   * Test 4: Pan interaction completes without visible crash and transform updates quickly
+   * Test 4: Pan interaction completes without visible crash and viewBox updates quickly
    */
-  test('Pan interaction completes without crash and transform updates quickly', async ({ page }) => {
+  test('Pan interaction completes without crash and viewBox updates quickly', async ({ page }) => {
     await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -114,8 +123,8 @@ test.describe('Suite L: performance', () => {
 
     const canvasContainer = page.locator('[data-testid="canvas-container"]');
 
-    // Get initial transform
-    const initialTransform = await canvasContainer.evaluate((el) => el.style.transform);
+    // Get initial viewBox
+    const initialViewBox = await getViewBox(page);
 
     // Start a pan: middle mouse button drag
     const viewer = page.locator('[data-testid="viewer"]');
@@ -136,10 +145,9 @@ test.describe('Suite L: performance', () => {
     await page.mouse.up({ button: 'middle' });
     await page.waitForTimeout(100);
 
-    // Transform should have changed
-    const newTransform = await canvasContainer.evaluate((el) => el.style.transform);
-    // Pan changes translate values in the transform
-    expect(newTransform).not.toBe(initialTransform);
+    // viewBox should have changed (pan)
+    const newViewBox = await getViewBox(page);
+    expect(hasPanChanged(initialViewBox, newViewBox)).toBe(true);
 
     // App should not have crashed
     await expect(page.locator('[data-testid="viewer"] svg')).toBeVisible();
