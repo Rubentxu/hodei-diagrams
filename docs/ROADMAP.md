@@ -410,7 +410,26 @@ Complete UI restructuring from the 2026-07-xx workbench epic. All slices merged 
 
 ## 🎯 Recently Closed Tracks
 
-_(none — closed campaigns live in Milestones Delivered above)_
+### Replay Coalescing + Paste Atomicity (v0.116.0) — `feat/replay-coalescing`
+
+**Problem**: `triggerReplay()` (≈57 call sites) ran render synchronously; rapid sequences of engine mutations (e.g., 50 paste ops) produced 50 consecutive renders, each ~8ms on the main thread.
+
+**Solution**: Split `#replay()` into a synchronous `#sceneSync()` (scene cache update, decode errors surfaced) and a scheduled `#scheduleRender()` (rAF coalesced). Paste refactored to `executeTransaction()` for atomic multi-vertex add with one undo entry.
+
+**Commits** (7 total on `feat/replay-coalescing`):
+
+| # | Commit | Descripción |
+|---|--------|-------------|
+| 1 | `0acdd57` | `feat(editor): split #replay into sync sceneSync + rAF render` |
+| 2 | `a9267d1` | `refactor(editor): use executeTransaction for atomic paste` |
+| 3 | `b836a59` | `fix(editor): cancel pending rAF in detach() to prevent leak` |
+| 4 | `71d0739` | `docs(web-shell): update stale comment about triggerReplay scheduling` |
+| 5 | `990995e` | `test(editor): add rAF coalescing unit tests` |
+| 6 | `99f5d74` | `test(web-shell): add E2E paste coalescing tests + render count debug API` |
+
+**Verification**: 427/427 web-shell tests ✅, 7 Rust workspace tests (new integration test for paste undo), `cargo clippy` clean, `cargo fmt` applied.
+
+**Artifacts**: `sddk/replay-coalescing/` (spec, design, tasks, apply-progress)
 
 ### Strategy Artifacts
 
@@ -534,6 +553,8 @@ Análisis exhaustivo de features restantes, ordenadas por impacto:
 | 0081 | Layer Model Gap Deferred | UX / Interaction |
 | 0082 | Engine-Owned Typed Selection Semantics | UX / Interaction |
 | 0083 | Perimeter-Inclusive PathElement Semantic | Routing |
+| 0084 | Infinite Canvas con Motor Rust/WASM y Cliente JS Ligero | Architecture |
+| 0085 | rAF Coalesced Render + Atomic Paste Transaction | Performance |
 
 ## Reglas de Actualización
 
