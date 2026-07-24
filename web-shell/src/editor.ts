@@ -671,8 +671,9 @@ export class Editor {
     if (!this.#clipboard || this.#clipboard.vertices.length === 0) return [];
 
     this.#clipboard.offset += 20;
-    const pastedIds: SlotmapId[] = [];
 
+    // Build all AddVertex commands
+    const commands: string[] = [];
     for (const vertex of this.#clipboard.vertices) {
       const newGeom = {
         x: vertex.geometry.x + this.#clipboard.offset,
@@ -680,21 +681,22 @@ export class Editor {
         width: vertex.geometry.width,
         height: vertex.geometry.height,
       };
-      const cmd = this.#buildAddVertexFromVertexCmd(vertex, newGeom);
-      const r = this.#session.executeCommand(cmd);
-      if (!r.ok) {
-        this.#onError(r.error);
-        continue;
-      }
-      // The command succeeds but we don't get back the new ID directly from executeCommand.
-      // We need to find the newly created vertex by looking at scene after replay.
-      // For now, we'll select based on position matching.
+      commands.push(this.#buildAddVertexFromVertexCmd(vertex, newGeom));
     }
 
+    // Execute atomically via session (not editor wrapper — we need to check result)
+    const result = this.#session.executeTransaction(commands);
+    if (!result.ok) {
+      this.#onError('Paste failed: ' + result.error);
+      return [];
+    }
+
+    // Atomic rollback means all-or-nothing: if we get here, all vertices were added.
+    // Now find them by position matching (scene-sync happened synchronously inside
+    // executeTransaction → its internal #replay → #sceneSync).
     this.#replay();
 
-    // Find pasted shapes by matching offset position
-    // After replay, find vertices that match clipboard positions + offset
+    const pastedIds: SlotmapId[] = [];
     for (const vertex of this.#clipboard.vertices) {
       const targetX = vertex.geometry.x + this.#clipboard.offset;
       const targetY = vertex.geometry.y + this.#clipboard.offset;
