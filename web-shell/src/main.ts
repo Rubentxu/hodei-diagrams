@@ -4,6 +4,7 @@
  * Coordinates: engine session, editor, zoom/pan, inspector, menu actions.
  */
 
+import { snapToZoom } from './viewport.js';
 import { loadWasm } from './wasm-loader.js';
 import { DiagramEngineSession } from './session.js';
 import { StencilLibraryManager } from './stencil-library-manager.js';
@@ -1031,17 +1032,19 @@ async function bootstrap(): Promise<void> {
   );
   activeEditor.attach();
 
+  /** Apply a zoom delta and snap to the nearest canonical zoom point. */
+  const applyZoomStep = (delta: number): void => {
+    const target = (zoomPan?.getZoom() ?? 1) + delta;
+    const snapped = snapToZoom(target);
+    zoomPan?.setZoom(snapped);
+    const pct = Math.round(snapped * 100);
+    ui.hud.setZoom(pct);
+    ui.zoomDisplay.textContent = `${pct}%`;
+  };
+
   activeEditor.setZoomCallbacks({
-    zoomIn: () => {
-      zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
-      ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-      ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-    },
-    zoomOut: () => {
-      zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
-      ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-      ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-    },
+    zoomIn: () => applyZoomStep(+0.2),
+    zoomOut: () => applyZoomStep(-0.2),
     resetZoom: () => {
       zoomPan?.resetView();
       ui.hud.setZoom(100);
@@ -1054,16 +1057,8 @@ async function bootstrap(): Promise<void> {
   const zoomInMenuItem = document.getElementById('menu-item-zoom-in');
   const zoomOutMenuItem = document.getElementById('menu-item-zoom-out');
   const zoomResetMenuItem = document.getElementById('menu-item-zoom-reset');
-  zoomInMenuItem?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
-    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
-  zoomOutMenuItem?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
-    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
+  zoomInMenuItem?.addEventListener('click', () => applyZoomStep(+0.2));
+  zoomOutMenuItem?.addEventListener('click', () => applyZoomStep(-0.2));
   zoomResetMenuItem?.addEventListener('click', () => {
     zoomPan?.resetView();
     ui.hud.setZoom(100);
@@ -1641,17 +1636,11 @@ async function bootstrap(): Promise<void> {
 
   // View > Zoom In
   const menuZoomIn = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(1)');
-  menuZoomIn?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
+  menuZoomIn?.addEventListener('click', () => applyZoomStep(+0.2));
 
   // View > Zoom Out
   const menuZoomOut = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(2)');
-  menuZoomOut?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
+  menuZoomOut?.addEventListener('click', () => applyZoomStep(-0.2));
 
   // View > Zoom Reset
   const menuZoomReset = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(3)');
