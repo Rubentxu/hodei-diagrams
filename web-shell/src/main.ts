@@ -2266,7 +2266,7 @@ async function bootstrap(): Promise<void> {
     frameBudgetMonitor?.stop();
   });
 
-  (window as unknown as Record<string, unknown>).__hodeiDebug = {
+  window.__hodeiDebug = {
     getScene: () => {
       const result = activeEditor?.getSceneCache();
       if (!result || !result.ok) return [];
@@ -2417,7 +2417,7 @@ async function bootstrap(): Promise<void> {
         if (!br.ok) return null;
       }
       activeEditor.refreshScene?.();
-      return { edgeId, fromId, toId };
+      return { edgeId: `${edgeId.idx}/${edgeId.version}`, fromId: `${fromId.idx}/${fromId.version}`, toId: `${toId.idx}/${toId.version}` };
     },
     getFrameStats: () => frameBudgetMonitor?.getStats() ?? { fps: 0, frameMs: 0 },
     hideFrameStats: () => hud?.hideFrameStats?.(),
