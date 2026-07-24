@@ -100,7 +100,6 @@ test.describe('Save-Status Display', () => {
     // Expose debug API to trigger auto-save early
     // The AUTO_SAVE_IDLE_MS is 30s — we use __hodeiDebug to simulate tick
     await page.evaluate(() => {
-      // @ts-expect-error debug API
       const debug = window.__hodeiDebug;
       if (debug?.manualSaveVersion) {
         // Call the actual manual save — for this test we just verify the indicator
@@ -129,7 +128,6 @@ test.describe('Save-Status Display', () => {
 
     // Trigger auto-save via debug API (simulate 30s idle tick)
     await page.evaluate(() => {
-      // @ts-expect-error debug API
       const debug = window.__hodeiDebug;
       debug?.manualSaveVersion?.();
     });
