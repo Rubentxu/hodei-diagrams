@@ -2392,8 +2392,8 @@ async function bootstrap(): Promise<void> {
       if (!cache || !cache.ok || cache.value.length === 0) return null;
       // 1. Create source + target rects via existing addRectAt
       const w = 60, h = 40;
-      (window as any).__hodeiDebug.addRectAt(x1, y1, w, h);
-      (window as any).__hodeiDebug.addRectAt(x2, y2, w, h);
+      window.__hodeiDebug!.addRectAt(x1, y1, w, h);
+      window.__hodeiDebug!.addRectAt(x2, y2, w, h);
       activeEditor.refreshScene?.();
       // 2. Read back the two new vertex ids from the scene
       const fresh = activeEditor.getSceneCache?.();
