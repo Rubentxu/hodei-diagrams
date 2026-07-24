@@ -341,7 +341,9 @@ export function buildHud(): HudControls {
         svgLabel = svgKb >= 1 ? `${svgKb.toFixed(0)} KB` : `${stats.svgBytes} B`;
       }
 
-      memoryValue.textContent = `WASM ${wasmLabel} · scene ${sceneLabel} · svg ${svgLabel}`;
+      // REQ-WASMMEM-003: disclose WASM page-retention behavior, not leak detection
+      memoryValue.textContent = `WASM ${wasmLabel} (no-shrink) · scene ${sceneLabel} · svg ${svgLabel}`;
+      memoryValue.title = 'WASM memory grows by design — WASM cannot return pages to the browser. Use this to detect unbounded growth, not expected retention.';
       memoryItem.style.display = memoryItem.style.display === 'none' ? 'flex' : memoryItem.style.display;
     },
   };

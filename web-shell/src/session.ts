@@ -569,7 +569,8 @@ export class DiagramEngineSession {
       const svg = this.wasm.render_svg(handle, BigInt(pageIdx), x, y, w, h);
       // Track SVG payload size for getSvgBufferBytes() (REQ-WASMMEM-002)
       if (svg && svg.length > 0) {
-        this.#lastSvgBufferBytes = svg.length;
+        // Use TextEncoder to get true UTF-8 byte count (svg.length is UTF-16 code units)
+        this.#lastSvgBufferBytes = new TextEncoder().encode(svg).byteLength;
       }
       // Keep cache in sync so getPage() stays reliable
       this.svgCache.set(pageIdx as PageToken, svg);
