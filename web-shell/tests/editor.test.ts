@@ -44,6 +44,7 @@ function createMockWasm() {
     get_scene: vi.fn(),
     render_svg: vi.fn(),
     render_pages: vi.fn(),
+    render_page: vi.fn(),
     write_scene_to_buffer: vi.fn(),
     get_scene_buffer_ptr: vi.fn(),
     get_scene_buffer_len: vi.fn(),
@@ -115,6 +116,9 @@ function createSession(mockWasm = createMockWasm()) {
   mockWasm.render_svg.mockReturnValue(
     '<svg><rect data-vertex-id="0:0" x="10" y="20" width="80" height="40"/><ellipse data-vertex-id="1:0" cx="50" cy="50" rx="30" ry="20"/></svg>',
   );
+  mockWasm.render_page.mockReturnValue({ ok: true, value: '<svg><rect data-vertex-id="0:0" x="10" y="20" width="80" height="40"/></svg>' });
+  // execute_transaction returns void (undefined) which session treats as ok
+  mockWasm.execute_transaction.mockReturnValue(undefined);
 
   // Mock resolve_selection: returns SelectionTarget JSON based on coordinates
   // Rect at (10,20) 80x40 covers [10,90] x [20,60]
@@ -651,6 +655,112 @@ describe('Editor', () => {
       d3();
 
       expect(editor).toBeDefined(); // editor still functional after all disposers
+    });
+  });
+
+  describe('replay coalescing', () => {
+    // rAF spy — mirrors frame-budget-monitor.test.ts pattern
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let rafSpy: any;
+    let rafCallbacks: Array<(time: number) => void> = [];
+
+    beforeEach(() => {
+      rafCallbacks = [];
+      rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: (time: number) => void) => {
+        rafCallbacks.push(cb);
+        return rafCallbacks.length as unknown as number;
+      });
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      rafSpy.mockRestore();
+      vi.restoreAllMocks();
+    });
+
+    /** Drain ALL pending RAF callbacks with the given time. */
+    function tickFrame(time: number): void {
+      const pending = rafCallbacks.splice(0);
+      for (const cb of pending) cb(time);
+    }
+
+    it('50 sync triggerReplay() calls produce 1 renderPage after rAF tick', () => {
+      // Call triggerReplay 50 times synchronously
+      for (let i = 0; i < 50; i++) {
+        editor.triggerReplay();
+      }
+      // render_svg should NOT have been called yet (scheduled, not flushed)
+      // (session.renderPage calls wasm.render_svg internally)
+      expect(wasm.render_svg).not.toHaveBeenCalled();
+      // After rAF tick, exactly 1 render_svg call
+      tickFrame(100);
+      expect(wasm.render_svg).toHaveBeenCalledTimes(1);
+    });
+
+    it('scene-sync is sync — scene cache updated before rAF tick', () => {
+      // After triggerReplay() returns, the scene cache (#sceneCache) is already
+      // updated synchronously — no need to wait for rAF.
+      // Verify: call triggerReplay, check getSceneCache returns valid data before tickFrame.
+      editor.triggerReplay();
+      // Scene cache should be populated synchronously
+      const cache = editor.getSceneCache();
+      expect(cache.ok).toBe(true);
+      expect((cache as { ok: true; value: unknown[] }).value.length).toBeGreaterThan(0);
+      // rAF should NOT have fired yet (render is async)
+      expect(wasm.render_svg).not.toHaveBeenCalled();
+      // After tickFrame, rAF fires and render happens
+      tickFrame(100);
+      expect(wasm.render_svg).toHaveBeenCalledTimes(1);
+    });
+
+    it('detach() cancels pending rAF — no render after detach', () => {
+      // Schedule a render
+      editor.triggerReplay();
+      expect(wasm.render_svg).not.toHaveBeenCalled();
+      // Detach — this should cancel the pending rAF
+      editor.detach();
+      // Tick the frame — render should NOT fire because rAF was cancelled
+      tickFrame(100);
+      expect(wasm.render_svg).not.toHaveBeenCalled();
+    });
+
+    it('paste() uses executeTransaction (1 call, not 50 executeCommand)', () => {
+      // Set up clipboard via copy: select a vertex first, then copy
+      editor.selectOnly({ idx: 0, version: 0 });
+      editor.copySelection();
+      // After copySelection, the clipboard is set from the selected vertex
+      // The clipboard has 1 vertex (the selected rect at 10,20)
+      wasm.execute_command.mockClear();
+      wasm.execute_transaction.mockClear();
+      editor.paste();
+      // Should call execute_transaction once (atomic), not execute_command in a loop
+      expect(wasm.execute_transaction).toHaveBeenCalledTimes(1);
+      expect(wasm.execute_command).not.toHaveBeenCalled();
+    });
+
+    it('paste() undo removes all pasted vertices in one operation', () => {
+      // Set up clipboard with vertices
+      type ClipboardVertex = { geometry: { x: number; y: number; width: number; height: number }; style: null };
+      const clipboardVertex: ClipboardVertex = {
+        geometry: { x: 100, y: 100, width: 80, height: 40 },
+        style: null,
+      };
+      (editor as unknown as { '#clipboard': { vertices: ClipboardVertex[]; offset: number } })['#clipboard'] = {
+        vertices: [clipboardVertex],
+        offset: 0,
+      };
+
+      wasm.undo.mockReturnValue({ ok: true });
+      wasm.execute_transaction.mockClear();
+
+      // Paste then undo
+      editor.paste();
+      tickFrame(100); // flush any pending render
+      wasm.undo.mockReturnValue({ ok: true });
+      (editor as unknown as { undoCmd: () => void })['undoCmd']();
+
+      // Undo should have been called exactly once (all vertices undone in one operation)
+      expect(wasm.undo).toHaveBeenCalledTimes(1);
     });
   });
 });

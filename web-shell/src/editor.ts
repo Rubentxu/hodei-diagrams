@@ -218,6 +218,10 @@ export class Editor {
   #cursorMoveCb: ((_p: { x: number; y: number }) => void) | null = null;
   #cursorMoveRafId: number | null = null;
 
+  // ─── Render Coalescing (rAF) ─────────────────────────────────────────────
+  #rafHandle: number | null = null;
+  #renderPending = false;
+
   // ─── Snap ────────────────────────────────────────────────────────────────
   #snapEnabled: boolean = false;
   #snapThreshold: number = 8;
@@ -667,8 +671,9 @@ export class Editor {
     if (!this.#clipboard || this.#clipboard.vertices.length === 0) return [];
 
     this.#clipboard.offset += 20;
-    const pastedIds: SlotmapId[] = [];
 
+    // Build all AddVertex commands
+    const commands: string[] = [];
     for (const vertex of this.#clipboard.vertices) {
       const newGeom = {
         x: vertex.geometry.x + this.#clipboard.offset,
@@ -676,21 +681,22 @@ export class Editor {
         width: vertex.geometry.width,
         height: vertex.geometry.height,
       };
-      const cmd = this.#buildAddVertexFromVertexCmd(vertex, newGeom);
-      const r = this.#session.executeCommand(cmd);
-      if (!r.ok) {
-        this.#onError(r.error);
-        continue;
-      }
-      // The command succeeds but we don't get back the new ID directly from executeCommand.
-      // We need to find the newly created vertex by looking at scene after replay.
-      // For now, we'll select based on position matching.
+      commands.push(this.#buildAddVertexFromVertexCmd(vertex, newGeom));
     }
 
-    this.#replay();
+    // Execute atomically via editor wrapper (D5) — returns Result so we can check ok.
+    // The wrapper calls #replay() on success, so no explicit replay needed here.
+    const result = this.executeTransaction(commands);
+    if (!result.ok) {
+      this.#onError('Paste failed: ' + result.error);
+      return [];
+    }
 
-    // Find pasted shapes by matching offset position
-    // After replay, find vertices that match clipboard positions + offset
+    // Atomic rollback means all-or-nothing: if we get here, all vertices were added.
+    // Now find them by position matching (scene-sync happened synchronously inside
+    // executeTransaction → its internal #replay → #sceneSync).
+
+    const pastedIds: SlotmapId[] = [];
     for (const vertex of this.#clipboard.vertices) {
       const targetX = vertex.geometry.x + this.#clipboard.offset;
       const targetY = vertex.geometry.y + this.#clipboard.offset;
@@ -940,13 +946,14 @@ export class Editor {
    * On success, one undo entry is pushed; on error all commands are rolled back.
    * Empty array is a no-op (no undo entry, no error).
    */
-  executeTransaction(commands: string[]): void {
+  executeTransaction(commands: string[]): Result<void, EngineError> {
     const result = this.#session.executeTransaction(commands);
     if (!result.ok) {
       this.#onError(result.error);
-      return;
+      return result;
     }
     this.#replay();
+    return result;
   }
 
   // ─── Arrange Operations ──────────────────────────────────────────────────
@@ -1726,15 +1733,8 @@ export class Editor {
 
   /** Refresh scene cache from engine. Call after import or page switch. */
   refreshScene(): void {
-    const sceneResult = this.#session.decodeSceneBuffer();
-    if (sceneResult.ok) {
-      this.#sceneCache = sceneResult.value;
-      if (this.#sceneCache.length > 0) {
-        const page = this.#sceneCache[this.#activePageIdx];
-        if (page) {
-          this.#activePageSlotId = page.page_id;
-        }
-      }
+    if (!this.#sceneSync()) {
+      this.#onError('Failed to decode scene buffer');
     }
   }
 
@@ -1833,6 +1833,12 @@ export class Editor {
 
   /** Detach event listeners from the viewer container. */
   detach(): void {
+    // Cancel any pending rAF render to prevent post-detach callbacks
+    if (this.#rafHandle !== null) {
+      cancelAnimationFrame(this.#rafHandle);
+      this.#rafHandle = null;
+    }
+    this.#renderPending = false;
     this.#abortController?.abort();
     this.#abortController = null;
     // Clean up any active drag listeners
@@ -2100,7 +2106,8 @@ export class Editor {
    * Called externally when state changes (e.g., from inspector via session callback).
    */
   triggerReplay(): void {
-    this.#replay();
+    if (!this.#sceneSync()) return;
+    this.#scheduleRender();
   }
 
   // ─── Inline Text Edit ─────────────────────────────────────────────────────
@@ -2529,13 +2536,17 @@ export class Editor {
     for (const cb of this.#interactionStateListeners) cb(state);
   }
 
-  /** Refresh scene cache and re-render. Called after commands. */
-  #replay(): void {
-    // Refresh scene cache
+  // ─── Render Coalescing ──────────────────────────────────────────────────
+
+  /**
+   * Synchronously refresh scene cache from the engine.
+   * Returns `false` on decode error (caller skips render scheduling on failure).
+   */
+  #sceneSync(): boolean {
     const sceneResult = this.#session.decodeSceneBuffer();
     if (!sceneResult.ok) {
       this.#onError(sceneResult.error);
-      return;
+      return false;
     }
     this.#sceneCache = sceneResult.value;
     if (this.#sceneCache.length > 0) {
@@ -2544,6 +2555,24 @@ export class Editor {
         this.#activePageSlotId = page.page_id;
       }
     }
+    return true;
+  }
+
+  /** Schedule a coalesced render on the next rAF tick. Idempotent within a frame. */
+  #scheduleRender(): void {
+    if (this.#renderPending) return;
+    this.#renderPending = true;
+    this.#rafHandle = requestAnimationFrame(() => {
+      this.#renderPending = false;
+      this.#rafHandle = null;
+      this.#flushRender();
+    });
+  }
+
+  /** Flush the pending render: compute viewport, renderPage, innerHTML swap, viewport apply, state/selection/handles. */
+  #flushRender(): void {
+    // Guard: if detached, skip render (viewer may be gone)
+    if (this.#abortController === null) return;
 
     // Re-render the active page using renderPage with the slotmap ID index
     const page = this.#sceneCache[this.#activePageIdx];
@@ -2593,6 +2622,11 @@ export class Editor {
 
     // Re-render resize handles if a single vertex is selected
     this.#resizeHandles.render(this.#selection);
+  }
+
+  /** Refresh scene cache and re-render. Called after commands. */
+  #replay(): void {
+    this.triggerReplay();
   }
 
   // ─── Selection ────────────────────────────────────────────────────────────
@@ -3644,9 +3678,20 @@ export class Editor {
         visible: true,
       },
     };
-    // Copy style if present
+    // Copy style if present — sanitize to only string values (Rust StyleValue is String).
+    // Any non-string value (number, boolean, null, object) would fail deserialization.
     if (vertex.style) {
-      payload.style = { ...vertex.style };
+      const sanitized: Record<string, string> = {};
+      for (const [k, v] of Object.entries(vertex.style)) {
+        if (typeof v === 'string') {
+          sanitized[k] = v;
+        } else if (v != null) {
+          sanitized[k] = String(v); // Coerce numbers, booleans to strings
+        }
+      }
+      if (Object.keys(sanitized).length > 0) {
+        payload.style = sanitized;
+      }
     }
     return JSON.stringify({ AddVertex: payload });
   }
