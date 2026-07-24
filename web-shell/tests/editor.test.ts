@@ -802,5 +802,48 @@ describe('Editor', () => {
 
       errorEditor.detach();
     });
+
+    it('S1 trigger — schedulePanEndReplay() fires triggerReplay after 150ms', () => {
+      vi.useFakeTimers();
+      const triggerSpy = vi.spyOn(editor, 'triggerReplay');
+
+      editor.schedulePanEndReplay();
+      expect(triggerSpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(149);
+      expect(triggerSpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1);
+      expect(triggerSpy).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
+    });
+
+    it('S1 trigger — rapid calls extend the debounce (trailing-edge)', () => {
+      vi.useFakeTimers();
+      const triggerSpy = vi.spyOn(editor, 'triggerReplay');
+
+      editor.schedulePanEndReplay();
+      vi.advanceTimersByTime(100);
+      editor.schedulePanEndReplay();
+      vi.advanceTimersByTime(100);
+      editor.schedulePanEndReplay();
+      vi.advanceTimersByTime(100);
+      expect(triggerSpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(150);
+      expect(triggerSpy).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
+    });
+
+    it('S1 trigger — detach() clears the pending timer', () => {
+      vi.useFakeTimers();
+      const triggerSpy = vi.spyOn(editor, 'triggerReplay');
+
+      editor.schedulePanEndReplay();
+      editor.detach();
+      vi.advanceTimersByTime(200);
+      expect(triggerSpy).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
   });
 });

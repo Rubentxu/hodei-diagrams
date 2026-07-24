@@ -222,6 +222,9 @@ export class Editor {
   #rafHandle: number | null = null;
   #renderPending = false;
 
+  // ─── Pan-End Debounce (S1 trigger) ────────────────────────────────────
+  #panEndTimer: ReturnType<typeof setTimeout> | null = null;
+
   // ─── Snap ────────────────────────────────────────────────────────────────
   #snapEnabled: boolean = false;
   #snapThreshold: number = 8;
@@ -1840,6 +1843,11 @@ export class Editor {
       cancelAnimationFrame(this.#rafHandle);
       this.#rafHandle = null;
     }
+    // Cancel any pending pan-end debounce timer (S1 trigger)
+    if (this.#panEndTimer !== null) {
+      clearTimeout(this.#panEndTimer);
+      this.#panEndTimer = null;
+    }
     this.#renderPending = false;
     this.#abortController?.abort();
     this.#abortController = null;
@@ -2960,6 +2968,22 @@ export class Editor {
 
   #endPanDrag(): void {
     this.#panDrag = null;
+    this.schedulePanEndReplay();
+  }
+
+  /**
+   * Schedule a replay after pointer-pan ends. 150ms trailing-edge debounce.
+   * Each call resets the timer. Fires triggerReplay() once when debounce expires.
+   * Public so main.ts can wire it to ZoomPanControls.onPanEnd.
+   */
+  schedulePanEndReplay(): void {
+    if (this.#panEndTimer !== null) {
+      clearTimeout(this.#panEndTimer);
+    }
+    this.#panEndTimer = setTimeout(() => {
+      this.#panEndTimer = null;
+      this.triggerReplay();
+    }, 150);
   }
 
   /** Cancel any active marquee without selecting. */
