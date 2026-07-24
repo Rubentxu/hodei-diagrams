@@ -775,9 +775,8 @@ async function bootstrap(): Promise<void> {
   });
 
   // ─── 13.6.2. Wire Extras > Performance Monitor toggle ─────────────────────
-  // Requires BOTH ?perf=1 query string AND the menu toggle per REQ-AFBUDGET-002.
-  // The ?perf=1 flag is read from URL later; we capture it via the module-level
-  // perfEnabled variable set in the debug API section below.
+  // REQ-AFBUDGET-003: "?perf=1 or the development toggle MUST enable monitoring"
+  // Either ?perf=1 OR the menu toggle alone is sufficient — no AND logic.
   const menuPerfToggle = document.querySelector('[data-testid="menu-perf-toggle"]');
   let perfToggleActive = false;
 
@@ -803,11 +802,20 @@ async function bootstrap(): Promise<void> {
     if (memoryItem) memoryItem.style.display = 'none';
   }
 
-  menuPerfToggle?.addEventListener('click', () => {
-    // ?perf=1 must be set in URL for the toggle to have any effect
-    const perfFlag = new URLSearchParams(window.location.search).get('perf') === '1';
-    if (!perfFlag) return; // perf not enabled via URL
+  // Auto-start if ?perf=1 is in URL (REQ-AFBUDGET-003: EITHER is sufficient)
+  const perfFlag = new URLSearchParams(window.location.search).get('perf') === '1';
+  if (perfFlag) {
+    perfToggleActive = true;
+    // Defer start until HUD is ready (after bootstrap)
+    requestAnimationFrame(() => {
+      startPerfMonitor();
+      startPerfPolling();
+      menuPerfToggle?.classList.add('has-checkmark');
+    });
+  }
 
+  menuPerfToggle?.addEventListener('click', () => {
+    // Toggle works regardless of ?perf=1 — either activation path is sufficient
     perfToggleActive = !perfToggleActive;
     if (perfToggleActive) {
       startPerfMonitor();
