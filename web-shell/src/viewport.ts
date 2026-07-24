@@ -30,6 +30,41 @@ export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 10.0;
 
 /**
+ * Canonical snap points for keyboard and menu zoom.
+ * Must be sorted ascending for the nearest-point algorithm.
+ */
+export const ZOOM_SNAP_POINTS: readonly number[] = Object.freeze([0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0]);
+
+/** Inclusive absolute distance threshold for snapping. */
+export const ZOOM_SNAP_THRESHOLD = 0.05;
+
+/**
+ * Snap `zoom` to the nearest entry in `points` if within inclusive `threshold`.
+ * Input is clamped to [MIN_ZOOM, MAX_ZOOM] first (NaN → 1.0 via clampZoom).
+ * Returns the target unchanged when no point is within threshold.
+ */
+export function snapToZoom(
+  zoom: number,
+  threshold: number = ZOOM_SNAP_THRESHOLD,
+  points: readonly number[] = ZOOM_SNAP_POINTS,
+): number {
+  const clamped = clampZoom(zoom);
+  let nearest = clamped;
+  let nearestDist = Infinity;
+  // Use a small epsilon to handle floating-point rounding at the boundary.
+  // e.g. Math.abs(1.05 - 1.0) === 0.050000000000000044 in JS.
+  const eps = 1e-9;
+  for (const p of points) {
+    const dist = Math.abs(clamped - p);
+    if (dist <= threshold + eps && dist < nearestDist + eps) {
+      nearestDist = dist;
+      nearest = p;
+    }
+  }
+  return nearest;
+}
+
+/**
  * Immutable viewport state for the infinite canvas.
  *
  * All mutation returns a new Viewport instance (pure update).
