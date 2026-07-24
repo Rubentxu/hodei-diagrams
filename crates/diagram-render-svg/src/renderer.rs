@@ -8,6 +8,7 @@ use crate::element::element_to_svg;
 use crate::error::RenderError;
 use crate::escape::escape_text;
 use diagram_core::geometry::{Point, Rect, Size};
+use diagram_scene::cull::DEFAULT_MARGIN;
 use diagram_scene::{
     EllipseElement, GroupElement, LineElement, PathElement, RectElement, RoundedRectElement,
     TextElement, VisualElement,
@@ -23,13 +24,21 @@ impl SvgRenderer {
     }
 
     /// Render a single page to an SVG string.
-    pub fn render(&self, scene: &Scene, page_id: PageId) -> Result<String, RenderError> {
+    ///
+    /// When `viewport` is `Some`, only elements intersecting the viewport (inflated by
+    /// `DEFAULT_MARGIN`) are rendered. When `None`, all elements are rendered.
+    pub fn render(
+        &self,
+        scene: &Scene,
+        page_id: PageId,
+        viewport: Option<Rect>,
+    ) -> Result<String, RenderError> {
         let page = scene
             .pages
             .iter()
             .find(|p| p.page_id == page_id)
             .ok_or(RenderError::PageNotFound { page_id })?;
-        Ok(self.render_page(page))
+        Ok(self.render_page(page, viewport))
     }
 
     /// Render all pages to a vector of (PageId, SVG string) pairs.
@@ -37,18 +46,19 @@ impl SvgRenderer {
     /// Each page produces an independent, self-contained SVG document.
     /// Pages are rendered in [`Scene::pages`] iteration order.
     /// Clip-path counters reset per page.
+    /// Note: `render_pages` does not apply viewport culling; use `render` for culled output.
     pub fn render_pages(&self, scene: &Scene) -> Result<Vec<(PageId, String)>, RenderError> {
         Ok(scene
             .pages
             .iter()
             .map(|page| {
-                let svg = self.render_page(page);
+                let svg = self.render_page(page, None);
                 (page.page_id, svg)
             })
             .collect())
     }
 
-    fn render_page(&self, page: &PageScene) -> String {
+    fn render_page(&self, page: &PageScene, viewport: Option<Rect>) -> String {
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
         let mut output = String::new();
@@ -74,9 +84,13 @@ impl SvgRenderer {
             view_x, view_y, view_w, view_h, bg_color
         ));
 
+        // Inflate viewport by DEFAULT_MARGIN if provided
+        let inflated_viewport = viewport.map(|vp| vp.inflate(DEFAULT_MARGIN));
+        let vp_ref = inflated_viewport.as_ref();
+
         // Walk display list — pass defs manager so elements can register gradients/filters
         for elem in &page.display_list {
-            output.push_str(&element_to_svg(elem, &mut clip, &mut defs, 1));
+            output.push_str(&element_to_svg(elem, &mut clip, &mut defs, 1, vp_ref));
             output.push('\n');
         }
 
@@ -209,7 +223,7 @@ mod tests {
     fn render_unknown_page_returns_error() {
         let scene = Scene::default();
         let renderer = SvgRenderer::new();
-        let result = renderer.render(&scene, PageId::default());
+        let result = renderer.render(&scene, PageId::default(), None);
         assert!(matches!(result, Err(RenderError::PageNotFound { .. })));
     }
 
@@ -226,7 +240,7 @@ mod tests {
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
-        let result = renderer.render(&scene, PageId::default()).unwrap();
+        let result = renderer.render(&scene, PageId::default(), None).unwrap();
         assert!(
             result.starts_with(
                 "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"none\">"
@@ -249,7 +263,7 @@ mod tests {
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
-        let result = renderer.render(&scene, PageId::default()).unwrap();
+        let result = renderer.render(&scene, PageId::default(), None).unwrap();
         assert!(result.contains("<title>Page-1</title>"));
     }
 
@@ -266,7 +280,7 @@ mod tests {
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
-        let result = renderer.render(&scene, PageId::default()).unwrap();
+        let result = renderer.render(&scene, PageId::default(), None).unwrap();
         assert!(
             result.contains("<rect x=\"0\" y=\"0\" width=\"800\" height=\"600\" fill=\"white\"/>")
         );
@@ -303,7 +317,7 @@ mod tests {
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
-        let result = renderer.render(&scene, PageId::default()).unwrap();
+        let result = renderer.render(&scene, PageId::default(), None).unwrap();
         assert!(result.contains("<rect x=\"10\" y=\"20\" width=\"80\" height=\"40\""));
         assert!(result.contains("fill=\"#dae8fc\""));
         assert!(result.contains("stroke=\"#6c8ebf\""));
@@ -336,7 +350,7 @@ mod tests {
         };
         let scene = Scene { pages: vec![page] };
         let renderer = SvgRenderer::new();
-        let result = renderer.render(&scene, PageId::default()).unwrap();
+        let result = renderer.render(&scene, PageId::default(), None).unwrap();
         assert!(
             result.contains("data-vertex-id=\""),
             "SVG should contain data-vertex-id attribute: {result}"

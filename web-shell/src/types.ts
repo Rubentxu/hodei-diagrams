@@ -28,7 +28,7 @@ export type WasmModule = {
   execute_command(_h: number, _json: string): void;
   execute_transaction(_h: number, _json: string): void;
   get_scene(_h: number): string;
-  render_svg(_h: number, _pageIdx: bigint): string;
+  render_svg(_h: number, _pageIdx: bigint, _vx: number, _vy: number, _vw: number, _vh: number): string;
   render_pages(_h: number): string;
   // ─── Zero-copy scene buffer (Phase 2 / P2-3) ────────────────────────────
   // These write/read a pre-allocated slab in WASM linear memory.
@@ -39,7 +39,7 @@ export type WasmModule = {
   get_scene_buffer_capacity(_h: number): number;
   // ─── Zero-copy SVG buffer (Phase 2 / P2-3 Phase C) ─────────────────────
   // SVG buffer path: write_svg_to_buffer + ptr/len for zero-copy reads.
-  write_svg_to_buffer(_h: number, _pageIdx: bigint): number;
+  write_svg_to_buffer(_h: number, _pageIdx: bigint, _vx: number, _vy: number, _vw: number, _vh: number): number;
   get_svg_buffer_ptr(_h: number): number;
   get_svg_buffer_len(_h: number): number;
   // ─── Zero-copy command buffer (Phase 2 / P2-3 Phase B) ───────────────

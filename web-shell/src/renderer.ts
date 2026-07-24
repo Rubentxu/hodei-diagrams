@@ -1,4 +1,5 @@
 import type { PageRender, PageToken, SlotmapId } from './types.js';
+import { Viewport } from './viewport.js';
 
 /**
  * Mount an SVG string into a container.
@@ -65,6 +66,13 @@ export interface ZoomPanControls {
   fitToView(_padding?: number): void;
   /** Pan viewport by a delta in pre-scale (pan-space) pixels. */
   panBy(_dx: number, _dy: number): void;
+  /**
+   * Re-apply the current viewport state to the SVG element.
+   * Call this after the SVG innerHTML is replaced (e.g., after mountSvg or #replay).
+   */
+  applyViewport(): void;
+  /** The underlying Viewport instance for direct manipulation. */
+  viewport: Viewport;
 }
 
 /**
@@ -77,45 +85,65 @@ export function setupZoomPan(
   container: HTMLElement,
   viewer: HTMLElement,
 ): ZoomPanControls {
-  let zoom = 1;
-  let panX = 0;
-  let panY = 0;
+  // Viewport manages zoom/pan state and applies to SVG viewBox
+  // We use Viewport.fromInitial and then sync via withZoom/withPan
+  let viewport = Viewport.fromInitial(1024, 768);
 
-  function applyTransform(): void {
-    container.style.transform = `scale(${zoom}) translate(${panX}px, ${panY}px)`;
+  // Get the SVG element (created by mountSvg)
+  function getSvg(): SVGSVGElement | null {
+    return viewer.querySelector('svg') as SVGSVGElement | null;
+  }
+
+  // Apply current viewport state to SVG viewBox
+  function applyViewport(): void {
+    const svg = getSvg();
+    if (svg) {
+      viewport.applyToSvgElement(svg);
+    }
+  }
+
+  // Initialize viewport with actual viewer dimensions and apply
+  function initViewport(): void {
+    const rect = viewer.getBoundingClientRect();
+    viewport.setSize(rect.width, rect.height);
+    applyViewport();
   }
 
   function setZoom(z: number): void {
-    zoom = Math.max(0.1, Math.min(5, z));
-    applyTransform();
+    const svg = getSvg();
+    if (!svg) return;
+    viewport.setZoom(z);
+    applyViewport();
+    container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom: viewport.zoom } }));
   }
 
   function getZoom(): number {
-    return zoom;
+    return viewport.zoom;
   }
 
   function resetView(): void {
-    zoom = 1;
-    panX = 0;
-    panY = 0;
-    applyTransform();
+    viewport.setPan(0, 0);
+    viewport.setZoom(1.0);
+    applyViewport();
+    container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom: viewport.zoom } }));
   }
 
   function setPan(x: number, y: number): void {
-    panX = x;
-    panY = y;
-    applyTransform();
+    viewport.setPan(x, y);
+    applyViewport();
   }
 
   function clientToDoc(clientX: number, clientY: number): { x: number; y: number } {
-    const rect = viewer.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) / zoom,
-      y: (clientY - rect.top) / zoom,
-    };
+    const svg = getSvg();
+    if (!svg) return { x: 0, y: 0 };
+    const rect = svg.getBoundingClientRect();
+    return viewport.clientToDoc(clientX, clientY, rect);
   }
 
   function fitToView(padding = 0.05): void {
+    const svg = getSvg();
+    if (!svg) return;
+
     // Collect all shape bounding boxes from data-vertex-id elements
     const shapeEls = viewer.querySelectorAll('[data-vertex-id]');
     if (shapeEls.length === 0) {
@@ -124,20 +152,27 @@ export function setupZoomPan(
       return;
     }
 
+    const svgRect = svg.getBoundingClientRect();
+
     // Compute union bbox of all shapes in document (SVG) coordinate space.
-    // We get screen bboxes and divide by current zoom to convert to doc coords,
-    // since the viewer transform is scale(zoom) translate(panX, panY).
+    // Use viewport's clientToDoc to properly convert client coords to doc coords.
+    // The scale factor accounts for CSS pixel size vs viewport size:
+    //   docWidth = cssWidth * (viewport.width / svgRect.width) / viewport.zoom
+    const scaleX = viewport.width / svgRect.width;
+    const scaleY = viewport.height / svgRect.height;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const el of shapeEls) {
+    for (const el of Array.from(shapeEls)) {
       const r = el.getBoundingClientRect();
-      const x = (r.left - viewer.getBoundingClientRect().left) / zoom;
-      const y = (r.top - viewer.getBoundingClientRect().top) / zoom;
-      const w = r.width / zoom;
-      const h = r.height / zoom;
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x + w > maxX) maxX = x + w;
-      if (y + h > maxY) maxY = y + h;
+      // Convert center of element to doc coords
+      const centerX = r.left + r.width / 2;
+      const centerY = r.top + r.height / 2;
+      const doc = viewport.clientToDoc(centerX, centerY, svgRect);
+      const w = r.width * scaleX / viewport.zoom;
+      const h = r.height * scaleY / viewport.zoom;
+      if (doc.x - w / 2 < minX) minX = doc.x - w / 2;
+      if (doc.y - h / 2 < minY) minY = doc.y - h / 2;
+      if (doc.x + w / 2 > maxX) maxX = doc.x + w / 2;
+      if (doc.y + h / 2 > maxY) maxY = doc.y + h / 2;
     }
 
     if (minX === Infinity) {
@@ -152,50 +187,45 @@ export function setupZoomPan(
       return;
     }
 
-    const containerRect = viewer.getBoundingClientRect();
-    const availW = containerRect.width * (1 - padding * 2);
-    const availH = containerRect.height * (1 - padding * 2);
-
-    const newZoom = Math.max(0.1, Math.min(5, Math.min(availW / contentW, availH / contentH)));
-
-    // Center content: pan so content center aligns with viewport center
-    const contentCenterX = (minX + maxX) / 2;
-    const contentCenterY = (minY + maxY) / 2;
-    const viewportCenterX = containerRect.width / 2;
-    const viewportCenterY = containerRect.height / 2;
-
-    const newPanX = viewportCenterX / newZoom - contentCenterX;
-    const newPanY = viewportCenterY / newZoom - contentCenterY;
-
-    zoom = newZoom;
-    panX = newPanX;
-    panY = newPanY;
-    applyTransform();
-    container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom } }));
+    const bounds = { x: minX, y: minY, width: contentW, height: contentH };
+    const newVp = Viewport.fromRect(bounds, viewport.width, viewport.height, padding);
+    viewport.setPan(newVp.panX, newVp.panY);
+    viewport.setZoom(newVp.zoom);
+    applyViewport();
+    container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom: viewport.zoom } }));
   }
 
   function panBy(dx: number, dy: number): void {
-    panX += dx;
-    panY += dy;
-    applyTransform();
+    viewport.panBy(dx, dy);
+    applyViewport();
   }
+
+  // Initialize viewport dimensions on setup
+  initViewport();
 
   // ─── Wheel: pan by default, Ctrl/Cmd+wheel = zoom, Shift+wheel = horizontal ──
   container.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault();
+    const svg = getSvg();
+    if (!svg) return;
+    const svgRect = svg.getBoundingClientRect();
     if (e.ctrlKey || e.metaKey) {
-      // Ctrl/Cmd + wheel → zoom
+      // Ctrl/Cmd + wheel → zoom centered on cursor
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setZoom(zoom + delta);
-      container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom } }));
+      const newZoom = viewport.zoom + delta;
+      viewport.zoomAround(newZoom, e.clientX, e.clientY, svgRect);
+      applyViewport();
+      container.dispatchEvent(new CustomEvent('zoomchange', { detail: { zoom: viewport.zoom } }));
     } else if (e.shiftKey) {
       // Shift + wheel → horizontal pan
-      panX -= e.deltaY / zoom;
-      applyTransform();
+      const dx = -e.deltaY / viewport.zoom;
+      viewport.panBy(dx, 0);
+      applyViewport();
     } else {
       // Plain wheel → vertical pan (draw.io parity)
-      panY -= e.deltaY / zoom;
-      applyTransform();
+      const dy = -e.deltaY / viewport.zoom;
+      viewport.panBy(0, dy);
+      applyViewport();
     }
   }, { passive: false });
 
@@ -212,16 +242,17 @@ export function setupZoomPan(
     isPanning = true;
     panStartX = clientX;
     panStartY = clientY;
-    panOriginX = panX;
-    panOriginY = panY;
+    panOriginX = viewport.panX;
+    panOriginY = viewport.panY;
     container.classList.add('panning');
   }
 
   function doPan(clientX: number, clientY: number): void {
     if (!isPanning) return;
-    panX = panOriginX + (clientX - panStartX) / zoom;
-    panY = panOriginY + (clientY - panStartY) / zoom;
-    applyTransform();
+    const dx = (clientX - panStartX) / viewport.zoom;
+    const dy = (clientY - panStartY) / viewport.zoom;
+    viewport.setPan(panOriginX + dx, panOriginY + dy);
+    applyViewport();
   }
 
   function endPan(): void {
@@ -296,5 +327,5 @@ export function setupZoomPan(
     if (e.button === 1) e.preventDefault();
   });
 
-  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView, panBy };
+  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView, panBy, applyViewport, viewport };
 }

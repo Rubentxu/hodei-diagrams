@@ -1,6 +1,7 @@
 //! SVG rendering: render scene pages to SVG strings.
 
 use crate::engine::{WasmStencilProvider, with_engine, with_engine_mut};
+use diagram_core::geometry::{Point, Rect, Size};
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::SceneBuilder;
 use wasm_bindgen::prelude::*;
@@ -17,6 +18,8 @@ struct PageRender {
 /// Render a single page to an SVG string.
 ///
 /// The `page_idx` is the flat `u64` index from `render_pages` page_id field.
+/// The viewport params (vx, vy, vw, vh) define the visible area for culling.
+/// When vw <= 0 or vh <= 0, no culling is applied (full render).
 ///
 /// # Errors
 ///
@@ -24,7 +27,14 @@ struct PageRender {
 /// - `SceneError: <detail>` if scene building fails
 /// - `PageNotFound: <page_idx>` if the requested page does not exist
 #[wasm_bindgen]
-pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
+pub fn render_svg(
+    handle: u32,
+    page_idx: u64,
+    vx: f64,
+    vy: f64,
+    vw: f64,
+    vh: f64,
+) -> Result<String, JsValue> {
     with_engine(handle, |e| {
         let provider = WasmStencilProvider::new(e.stencil_libraries.clone());
         let scene = SceneBuilder::new()
@@ -46,8 +56,21 @@ pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
                 Box::leak(format!("PageNotFound: {page_idx}").into_boxed_str()) as &str
             })?;
 
+        // Sentinel: vw <= 0 or vh <= 0 means no culling
+        let viewport = if vw > 0.0 && vh > 0.0 {
+            Some(Rect {
+                origin: Point { x: vx, y: vy },
+                size: Size {
+                    width: vw,
+                    height: vh,
+                },
+            })
+        } else {
+            None
+        };
+
         SvgRenderer::new()
-            .render(&scene, page.page_id)
+            .render(&scene, page.page_id, viewport)
             .map_err(|err| Box::leak(format!("{err:?}").into_boxed_str()) as &str)
     })
     .and_then(|r| r)
@@ -93,6 +116,9 @@ pub fn render_pages(handle: u32) -> Result<String, JsValue> {
 /// Returns the number of bytes written. JS then calls
 /// `get_svg_buffer_ptr` and `get_svg_buffer_len` to read the data.
 ///
+/// The viewport params (vx, vy, vw, vh) define the visible area for culling.
+/// When vw <= 0 or vh <= 0, no culling is applied (full render).
+///
 /// # Errors
 ///
 /// - `InvalidHandle` if the engine handle is invalid
@@ -100,7 +126,14 @@ pub fn render_pages(handle: u32) -> Result<String, JsValue> {
 /// - `PageNotFound: <page_idx>` if the page doesn't exist
 /// - `<render error>` if the SVG renderer fails
 #[wasm_bindgen]
-pub fn write_svg_to_buffer(handle: u32, page_idx: u64) -> Result<usize, JsValue> {
+pub fn write_svg_to_buffer(
+    handle: u32,
+    page_idx: u64,
+    vx: f64,
+    vy: f64,
+    vw: f64,
+    vh: f64,
+) -> Result<usize, JsValue> {
     with_engine_mut(handle, |e| {
         // Build scene (borrows e.editor immutably)
         let provider = WasmStencilProvider::new(e.stencil_libraries.clone());
@@ -123,9 +156,22 @@ pub fn write_svg_to_buffer(handle: u32, page_idx: u64) -> Result<usize, JsValue>
                 Box::leak(format!("PageNotFound: {page_idx}").into_boxed_str()) as &str
             })?;
 
+        // Sentinel: vw <= 0 or vh <= 0 means no culling
+        let viewport = if vw > 0.0 && vh > 0.0 {
+            Some(Rect {
+                origin: Point { x: vx, y: vy },
+                size: Size {
+                    width: vw,
+                    height: vh,
+                },
+            })
+        } else {
+            None
+        };
+
         // Render the page (produces owned String)
         let svg = SvgRenderer::new()
-            .render(&scene, page.page_id)
+            .render(&scene, page.page_id, viewport)
             .map_err(|err| Box::leak(format!("{err:?}").into_boxed_str()) as &str)?;
 
         // Write to the SVG buffer (borrows e.buffers mutably — different field, OK)

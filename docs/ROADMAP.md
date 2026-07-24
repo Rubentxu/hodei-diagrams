@@ -406,7 +406,9 @@ Complete UI restructuring from the 2026-07-xx workbench epic. All slices merged 
 
 ### In Progress
 
-_(none — following workbench redesign completion, next batch is P0 canvas nav + P1 shape library)_
+**Infinite Canvas PR1** — viewport infrastructure (viewport.ts + 24 tests + scene-bounds docToClient) — archived 2026-07-23 ✅
+**Infinite Canvas PR2** — viewport wiring + empty-drag pan + test fixes — archived 2026-07-23 ✅
+**Infinite Canvas PR3** — Rust `expand_page_if_needed()` deprecation + `fitToView(0.1)` initial viewport heuristic — archived 2026-07-23 ✅
 
 ## 🎯 Recently Closed Tracks
 
@@ -418,7 +420,26 @@ _(none — closed campaigns live in Milestones Delivered above)_
 - `docs/adr/0080-keyboard-shortcut-collision-resolution.md`
 - `docs/adr/0081-layer-model-gap-deferred.md` — **Resolved** (IP-F v0.91.0)
 - `docs/adr/0082-engine-owned-typed-selection-semantics.md` — **Resolved** (IP-G v0.100.0)
-- `docs/drawio-user-interaction-workflows.md`
+- `docs/adr/0084-infinite-canvas-rust-wasm-lightweight-js.md` — **Active** (ADR-0084, 2026-07-23)
+
+### Infinite Canvas + Rust/WASM Lightweight JS (ADR-0084, 2026-07-23)
+
+**Estrategia**: Canvas infinito como modelo de renderizado primario, motor pesado en Rust/WASM, cliente JS thin.
+
+| Fase | Focus | Deps | Status |
+|------|-------|------|--------|
+| **Fase 1** | Viewport state en web-shell + clientToDoc/docToClient + wheel/pan handlers + initial viewport heuristic para .drawio | Ninguno | ✅ PR1+PR2+PR3 merged |
+| **Fase 2** | Viewport culling (inline rect test, quadtree deferred) | Fase 1 | ✅ PR archived |
+| **Fase 3** | WASM memory optimization + animation frame budget | Fase 2 | 🔲 |
+
+**Branch**: `feat/infinite-canvas` — PR1/PR2/PR3 archived, ready for release
+
+**Artéfacts**:
+- `docs/adr/0084-infinite-canvas-rust-wasm-lightweight-js.md`
+
+**Nota de deprecated**: `expand_page_if_needed()` en `diagram-commands/src/payload.rs` será deprecada en Fase 1.
+
+---
 
 ## 🎯 Gaps Restantes — Post-IP-G (~100 workflows)
 

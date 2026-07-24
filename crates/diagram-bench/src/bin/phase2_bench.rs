@@ -60,7 +60,7 @@ fn render_all_pages(scene: &diagram_scene::Scene) -> Vec<String> {
     scene
         .pages
         .iter()
-        .map(|p| renderer.render(scene, p.page_id).expect("render"))
+        .map(|p| renderer.render(scene, p.page_id, None).expect("render"))
         .collect()
 }
 
@@ -178,7 +178,7 @@ fn bench_render_svg_buffer(name: &str, editor: &Editor, iters: u32, warmup: u32)
             // use the synchronous render path (the actual WASM render_svg_to_buffer
             // does this exact same work: builds scene, finds page, renders to String)
             let svg = SvgRenderer::new()
-                .render(&scene, page.page_id)
+                .render(&scene, page.page_id, None)
                 .expect("render");
             svg_buf.extend_from_slice(svg.as_bytes());
         }

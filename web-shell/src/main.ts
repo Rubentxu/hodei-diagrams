@@ -1027,6 +1027,7 @@ async function bootstrap(): Promise<void> {
     onSelectionChange,
     onToolChange,
     () => zoomPan?.getZoom() ?? 1,
+    zoomPan?.viewport,
   );
   activeEditor.attach();
 
@@ -1148,24 +1149,54 @@ async function bootstrap(): Promise<void> {
   });
 
   // Dynamic stencil library shape activation (click-to-add)
+  // IP-C modifier routing for dynamic stencils:
+  //   Shift (no selection) → insert with white fill (SHAPE-008, ignore default style)
+  //   Shift (one selected) → delete + insert at same position (SHAPE-010, replace selected)
+  //   Alt (no selection)  → insert at bottom-left (SHAPE-009)
   ui.sidebar.addEventListener('stencil-shape-activate', (e) => {
-    if (!activeSession) return;
+    if (!activeSession || !activeEditor) return;
     const event = e as CustomEvent<{
       library: string;
       name: string;
       shiftKey: boolean;
       altKey: boolean;
     }>;
-    const { library, name, shiftKey: _shiftKey, altKey: _altKey } = event.detail;
-    const pageId = activeEditor?.getActivePageSlotId() ?? undefined;
-    const result = activeSession.addStencilVertex(library, name, 400, 300, pageId);
+    const { library, name, shiftKey, altKey } = event.detail;
+    const pageId = activeEditor.getActivePageSlotId() ?? undefined;
+    const selectionSize = activeEditor.selection.length;
+
+    // Default position: center of viewport
+    const DEFAULT_X = 400;
+    const DEFAULT_Y = 300;
+
+    let x = DEFAULT_X;
+    let y = DEFAULT_Y;
+    let styleOverride: { fill?: string; stroke?: string } | undefined;
+
+    if (altKey && !shiftKey) {
+      // SHAPE-009: insert at bottom-left of diagram
+      const bbox = activeEditor.getDiagramBBox();
+      if (bbox) {
+        x = bbox.minX;
+        y = bbox.maxY;
+      } else {
+        x = 40;
+        y = 40;
+      }
+    } else if (shiftKey && !altKey) {
+      // SHAPE-008: insert with white fill and no stroke (ignore stencil default)
+      styleOverride = { fill: '#ffffff', stroke: 'none' };
+    }
+
+    const result = activeSession.addStencilVertex(library, name, x, y, pageId,
+      styleOverride ? { styleOverride } : undefined);
     if (result.ok) {
-      // Re-render the scene to show the newly added vertex
-      activeEditor?.refreshScene();
-      activeEditor?.triggerReplay();
-      // Note: full modifier routing (bottom-left, replace, insert-and-connect)
-      // for dynamic stencils is a follow-up. Basic shape tools (rect, ellipse,
-      // etc.) get the full routing in Editor.#onPaletteClick.
+      // SHAPE-010: if one shape was selected, delete it (replaces the shape)
+      if (shiftKey && !altKey && selectionSize === 1) {
+        activeEditor.deleteSelection();
+      }
+      activeEditor.refreshScene();
+      activeEditor.triggerReplay();
     }
   });
 
@@ -1222,7 +1253,24 @@ async function bootstrap(): Promise<void> {
       activeEditor.refreshScene();
     }
     if (activePages.length > 0) {
-      mountSvg(ui.viewer, activePages[0]!.svg);
+      // Compute initial viewport from container size for culling.
+      // This viewport will be used for the initial render so the DOM only
+      // contains shapes within the visible area (REQ-CULL-008).
+      const containerRect = ui.canvasContainer.getBoundingClientRect();
+      const viewport = { x: 0, y: 0, w: containerRect.width, h: containerRect.height };
+      const pageIdx = Number(activePages[0]!.pageId);
+      // renderPage with viewport gives culled render for the active page.
+      // renderAllPages still caches full renders for all pages (for tabs).
+      const culledResult = activeSession.renderPage(pageIdx, viewport);
+      if (culledResult.ok) {
+        mountSvg(ui.viewer, culledResult.value);
+      } else {
+        // Fallback: mount full render if culled render fails
+        mountSvg(ui.viewer, activePages[0]!.svg);
+      }
+      // Apply viewport so the viewBox reflects the current pan/zoom state.
+      // After this, zoomPan is initialized so applyViewport will work.
+      zoomPan?.applyViewport();
       refreshMathOverlay();
       populatePageTabs(ui.pageTabContainer, activePages, 0, {
         onSelect: handlePageSelect,
@@ -1237,10 +1285,12 @@ async function bootstrap(): Promise<void> {
     ui.saveButton.disabled = false;
     updateUndoRedoButtons(ui.undoButton, ui.redoButton);
 
-    zoomPan?.resetView();
-    ui.zoomDisplay.textContent = '100%';
-    ui.hud.setZoom(100);
-    ui.canvasContainer.style.setProperty('--zoom', '1');
+    // Keep the default viewport (panX=0, panY=0, zoom=1.0) after import.
+    // Users can zoom/pan to navigate to content — fitToView with wrong bounds
+    // is worse than no fit-to-view at all.
+    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
+    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
+    ui.canvasContainer.style.setProperty('--zoom', String(zoomPan?.getZoom() ?? 1));
   }
 
   // ─── 7. Page switch handler ───────────────────────────────────────────────

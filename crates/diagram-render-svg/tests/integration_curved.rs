@@ -44,7 +44,7 @@ fn curved_edge_with_three_points_uses_cubic_bezier() {
 
     let scene = page_with_element(path);
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should contain cubic Bezier command " C "
     assert!(
@@ -78,7 +78,7 @@ fn non_curved_edge_uses_line_commands() {
 
     let scene = page_with_element(path);
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should contain L commands, not C commands
     assert!(
@@ -107,7 +107,7 @@ fn curved_with_two_points_falls_back_to_line() {
 
     let scene = page_with_element(path);
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should use L (line) command, not C (curve)
     assert!(
@@ -143,7 +143,7 @@ fn curved_path_d_passes_through_all_input_points() {
 
     let scene = page_with_element(path);
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // All input X coordinates should appear in the d attribute
     // (the curve passes through them, so they appear as x coords in the path)
@@ -179,7 +179,7 @@ fn default_curved_is_none_uses_line_commands() {
 
     let scene = page_with_element(path);
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     assert!(
         result.contains(" L "),
@@ -212,7 +212,7 @@ fn curved_with_four_points_emits_multiple_c_commands() {
 
     let scene = page_with_element(path);
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should have at least 2 C commands (for 4 points = 3 segments, but first segment
     // doesn't have a preceding C, so 2 C commands total)
@@ -238,7 +238,7 @@ fn empty_path_emits_empty_d_attribute() {
 
     let scene = page_with_element(path);
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     assert!(
         result.contains("d=\"\""),

@@ -231,7 +231,7 @@ async function selectAndGetSeHandle(
   page: import('@playwright/test').Page,
   viewer: import('@playwright/test').Locator,
   vertexIdx: number,
-): Promise<DOMRect> {
+): Promise<{ x: number; y: number; width: number; height: number }> {
   const shape = viewer.locator('[data-vertex-id]').first();
   const shapeBox = await shape.boundingBox();
   expect(shapeBox).not.toBeNull();
@@ -251,7 +251,7 @@ async function selectAndGetSeHandle(
 async function performSEResizeDrag(
   page: import('@playwright/test').Page,
   vertexIdx: number,
-  handleBox: DOMRect,
+  handleBox: { x: number; y: number; width: number; height: number },
   dragX: number,
   dragY: number,
 ): Promise<{

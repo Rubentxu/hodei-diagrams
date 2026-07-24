@@ -168,7 +168,7 @@ fn remaining_style_emitted_in_lexicographic_order() {
 
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let svg = renderer.render(&scene, PageId::default()).unwrap();
+    let svg = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // glass comes before gradientColor lexicographically
     assert!(
@@ -217,8 +217,8 @@ fn render_pages_cross_instance_determinism() {
     let r1 = SvgRenderer::new();
     let r2 = SvgRenderer::new();
 
-    let svg1 = r1.render(&scene, page_id).unwrap();
-    let svg2 = r2.render(&scene, page_id).unwrap();
+    let svg1 = r1.render(&scene, page_id, None).unwrap();
+    let svg2 = r2.render(&scene, page_id, None).unwrap();
 
     assert_eq!(svg1, svg2);
 }

@@ -440,8 +440,11 @@ export class DiagramEngineSession {
    *
    * If the WASM module does not export `write_svg_to_buffer` (older builds),
    * returns `{ptr: 0, len: 0}` to signal "use String fallback".
+   *
+   * @param pageIdx - page index to render
+   * @param viewport - optional viewport rect for culling; defaults to sentinel (0,0,0,0) = full render
    */
-  writeSvgBuffer(pageIdx: number): Result<{ ptr: number; len: number }, EngineError> {
+  writeSvgBuffer(pageIdx: number, viewport?: { x: number; y: number; w: number; h: number }): Result<{ ptr: number; len: number }, EngineError> {
     const g = this.guard();
     if (!g.ok) return g;
     try {
@@ -449,7 +452,8 @@ export class DiagramEngineSession {
         return ok({ ptr: 0, len: 0 });
       }
       const handle = this.handle as number;
-      const len = this.wasm.write_svg_to_buffer(handle, BigInt(pageIdx));
+      const { x = 0, y = 0, w = 0, h = 0 } = viewport ?? {};
+      const len = this.wasm.write_svg_to_buffer(handle, BigInt(pageIdx), x, y, w, h);
       const ptr = this.wasm.get_svg_buffer_ptr(handle);
       return ok({ ptr, len });
     } catch (e) {
@@ -531,12 +535,18 @@ export class DiagramEngineSession {
     }
   }
 
-  /** Render a single page by flat index. Returns SVG string. */
-  renderPage(pageIdx: number): Result<string, EngineError> {
+  /** Render a single page by flat index. Returns SVG string.
+   *
+   * @param pageIdx - page index to render
+   * @param viewport - optional viewport rect for culling; defaults to sentinel (0,0,0,0) = full render
+   */
+  renderPage(pageIdx: number, viewport?: { x: number; y: number; w: number; h: number }): Result<string, EngineError> {
     const g = this.guard();
     if (!g.ok) return g;
     try {
-      const svg = this.wasm.render_svg(this.handle as number, BigInt(pageIdx));
+      const handle = this.handle as number;
+      const { x = 0, y = 0, w = 0, h = 0 } = viewport ?? {};
+      const svg = this.wasm.render_svg(handle, BigInt(pageIdx), x, y, w, h);
       // Keep cache in sync so getPage() stays reliable
       this.svgCache.set(pageIdx as PageToken, svg);
       return ok(svg);
@@ -762,32 +772,56 @@ export class DiagramEngineSession {
     x: number,
     y: number,
     pageId?: SlotmapId,
+    opts?: {
+      /** Override geometry fields (defaults: x, y, width=80, height=80, rotation=0, flip_h=false, flip_v=false) */
+      geometry?: {
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
+        rotation?: number;
+        flip_h?: boolean;
+        flip_v?: boolean;
+      };
+      /**
+       * Style overrides applied on top of the stencil's default.
+       * SHAPE-008 (Shift): fill=#ffffff stroke=none (ignore stencil default style).
+       */
+      styleOverride?: {
+        fill?: string;
+        stroke?: string;
+      };
+    },
   ): Result<SlotmapId, EngineError> {
+    const geom = opts?.geometry;
+    const styleOverride = opts?.styleOverride;
     const cmd = JSON.stringify({
       AddVertex: {
         vertex: {
           geometry: {
-            x,
-            y,
-            width: 80,
-            height: 80,
+            x: geom?.x ?? x,
+            y: geom?.y ?? y,
+            width: geom?.width ?? 80,
+            height: geom?.height ?? 80,
             relative: false,
-            rotation: 0,
-            flip_h: false,
-            flip_v: false,
+            rotation: geom?.rotation ?? 0,
+            flip_h: geom?.flip_h ?? false,
+            flip_v: geom?.flip_v ?? false,
           },
           page_id: pageId ? slotmapIdToField(pageId) : { idx: 0, version: 0 },
           z_order: 0,
           locked: false,
           visible: true,
         },
-        style: { shape: `stencil:${library}:${name}` },
+        style: {
+          shape: `stencil:${library}:${name}`,
+          ...(styleOverride?.fill !== undefined ? { fill: styleOverride.fill } : {}),
+          ...(styleOverride?.stroke !== undefined ? { stroke: styleOverride.stroke } : {}),
+        },
       },
     });
     const r = this.executeCommand(cmd);
     if (!r.ok) return r;
-    // Note: returning the vertex ID would require engine-side ID reporting.
-    // For now, return a zero ID as a placeholder — callers use fire-and-forget.
     return ok({ idx: 0, version: 0 });
   }
 

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { fixturePath } from './fixtures.js';
 import { waitForAppReady } from './helpers/app-ready.js';
+import { getViewBox, hasZoomChanged, parseViewBox } from './helpers/viewport-helpers.js';
 
 const SIMPLE_RECT_PATH =
   fixturePath('simple-rect.drawio');
@@ -9,9 +10,9 @@ const TWO_PAGE_PATH =
 
 test.describe('Suite C: canvas-zoom-pan', () => {
   /**
-   * Test 1: Scroll wheel on canvas → CSS transform scale changes
+   * Test 1: Scroll wheel on canvas → viewBox zoom changes
    */
-  test('Scroll wheel on canvas → CSS transform scale changes', async ({ page }) => {
+  test('Scroll wheel on canvas → viewBox zoom changes', async ({ page }) => {
     await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -19,18 +20,19 @@ test.describe('Suite C: canvas-zoom-pan', () => {
 
     const canvas = page.locator('[data-testid="canvas-container"]');
 
-    // Get initial transform
-    const initialTransform = await canvas.evaluate((el) => el.style.transform);
+    // Get initial viewBox
+    const initialViewBox = await getViewBox(page);
 
-    // Zoom in with scroll wheel
+    // Zoom in with scroll wheel (Ctrl+wheel = zoom in draw.io parity)
     await canvas.hover({ position: { x: 400, y: 200 } });
-    await page.mouse.wheel(0, -10); // scroll up = zoom in
+    await canvas.evaluate((el) => {
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+    });
     await page.waitForTimeout(200);
 
-    // Transform should have changed
-    const afterZoomTransform = await canvas.evaluate((el) => el.style.transform);
-    expect(afterZoomTransform).not.toBe(initialTransform);
-    expect(afterZoomTransform).toContain('scale(');
+    // viewBox should have changed (zoom level encoded in viewW/viewH)
+    const afterZoomViewBox = await getViewBox(page);
+    expect(hasZoomChanged(initialViewBox, afterZoomViewBox)).toBe(true);
   });
 
   /**
@@ -62,9 +64,9 @@ test.describe('Suite C: canvas-zoom-pan', () => {
   });
 
   /**
-   * Test 3: Middle-click drag on canvas → CSS translate changes
+   * Test 3: Middle-click drag on canvas → viewBox pan changes
    */
-  test('Middle-click drag on canvas → CSS translate changes', async ({ page }) => {
+  test('Middle-click drag on canvas → viewBox pan changes', async ({ page }) => {
     await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -72,8 +74,8 @@ test.describe('Suite C: canvas-zoom-pan', () => {
 
     const canvas = page.locator('[data-testid="canvas-container"]');
 
-    // Get initial transform (should be scale only, no translate)
-    const initialTransform = await canvas.evaluate((el) => el.style.transform);
+    // Get initial viewBox (panX, panY should be 0,0 at start)
+    const initialViewBox = await getViewBox(page);
 
     // Middle-click drag
     const box = await canvas.boundingBox();
@@ -83,9 +85,14 @@ test.describe('Suite C: canvas-zoom-pan', () => {
     await page.mouse.up({ button: 'middle' });
     await page.waitForTimeout(200);
 
-    // Transform should now include translate
-    const afterPanTransform = await canvas.evaluate((el) => el.style.transform);
-    expect(afterPanTransform).not.toBe(initialTransform);
+    // viewBox pan values should have changed
+    const afterPanViewBox = await getViewBox(page);
+    const before = parseViewBox(initialViewBox);
+    const after = parseViewBox(afterPanViewBox);
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    expect(before!.panX).not.toBe(after!.panX);
+    expect(before!.panY).not.toBe(after!.panY);
   });
 
   /**
@@ -208,9 +215,9 @@ test.describe('Suite C: canvas-zoom-pan', () => {
   });
 
   /**
-   * Test 9: Zoom + pan combined: zoom in, then pan → both transforms applied
+   * Test 9: Zoom + pan combined: zoom in, then pan → both viewBox changes
    */
-  test('Zoom + pan combined: zoom in, then pan → both transforms applied', async ({ page }) => {
+  test('Zoom + pan combined: zoom in, then pan → both viewBox changes', async ({ page }) => {
     await waitForAppReady(page);
 
     await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
@@ -218,15 +225,21 @@ test.describe('Suite C: canvas-zoom-pan', () => {
 
     const canvas = page.locator('[data-testid="canvas-container"]');
 
-    // Zoom in first
+    // Get initial viewBox
+    const initialViewBox = await getViewBox(page);
+
+    // Zoom in first via Ctrl+wheel
     await canvas.hover({ position: { x: 400, y: 200 } });
-    await page.mouse.wheel(0, -10);
+    await canvas.evaluate((el) => {
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, ctrlKey: true, bubbles: true, cancelable: true }));
+    });
     await page.waitForTimeout(200);
 
-    const transformAfterZoom = await canvas.evaluate((el) => el.style.transform);
-    expect(transformAfterZoom).toContain('scale(');
+    const viewBoxAfterZoom = await getViewBox(page);
+    // Zoom should have changed (viewW/viewH should be smaller)
+    expect(hasZoomChanged(initialViewBox, viewBoxAfterZoom)).toBe(true);
 
-    // Then pan
+    // Then pan via middle-click drag
     const box = await canvas.boundingBox();
     await page.mouse.move(box!.x + 400, box!.y + 200);
     await page.mouse.down({ button: 'middle' });
@@ -234,12 +247,15 @@ test.describe('Suite C: canvas-zoom-pan', () => {
     await page.mouse.up({ button: 'middle' });
     await page.waitForTimeout(200);
 
-    const transformAfterPan = await canvas.evaluate((el) => el.style.transform);
+    const viewBoxAfterPan = await getViewBox(page);
 
-    // Both scale and translate should be present
-    expect(transformAfterPan).toContain('scale(');
-    // Translate values should be different from initial (0px, 0px)
-    const hasTranslate = transformAfterPan.includes('translate') && !transformAfterPan.match(/translate\(0px,\s*0px\)/);
-    expect(hasTranslate).toBe(true);
+    // Both zoom AND pan should be different from initial
+    const before = parseViewBox(initialViewBox);
+    const afterPan = parseViewBox(viewBoxAfterPan);
+    expect(before).not.toBeNull();
+    expect(afterPan).not.toBeNull();
+    expect(before!.viewW).not.toBe(afterPan!.viewW); // zoom changed
+    expect(before!.panX).not.toBe(afterPan!.panX); // panX changed
+    expect(before!.panY).not.toBe(afterPan!.panY); // panY changed
   });
 });

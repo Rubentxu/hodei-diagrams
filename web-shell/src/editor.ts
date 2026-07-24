@@ -12,6 +12,7 @@ import type {
   SelectionModifiers,
 } from './types.js';
 import { parseSlotmapAttr, slotmapIdToField } from './types.js';
+import { Viewport } from './viewport.js';
 import {
   sceneGeometry,
   sceneBounds,
@@ -206,6 +207,8 @@ export class Editor {
   #resetZoom: (() => void) | null = null;
   #pan: ((_dx: number, _dy: number) => void) | null = null;
   #abortController: AbortController | null = null;
+  // ─── Viewport for infinite canvas pan/drag ─────────────────────────────────
+  #viewport: Viewport | undefined;
 
   // ─── Stencil Drag Preview ────────────────────────────────────────────────
   #stencilPreviewEl: SVGGElement | null = null;
@@ -287,6 +290,7 @@ export class Editor {
     onSelectionChange?: SelectionChangeCallback,
     onToolChange?: ToolChangeCallback,
     getZoom?: () => number,
+    viewport?: Viewport,
   ) {
     this.#session = session;
     this.#viewer = viewer;
@@ -295,6 +299,7 @@ export class Editor {
     this.#onSelectionChange = onSelectionChange ?? (() => {});
     this.#onToolChange = onToolChange ?? (() => {});
     this.#getZoom = getZoom ?? (() => 1);
+    this.#viewport = viewport;
 
     // Initialize port handles overlay
     this.#portHandles = new PortHandlesOverlay(viewer, () => this.#sceneCache, session);
@@ -2542,12 +2547,30 @@ export class Editor {
       return;
     }
     const pageIdx = page.page_id.idx;
-    const renderResult = this.#session.renderPage(pageIdx);
+
+    // Compute viewport rect for culling: when viewport is set, pass doc-space rect
+    // (panX, panY, width/zoom, height/zoom). Sentinel (0,0,0,0) when not set.
+    let viewport: { x: number; y: number; w: number; h: number } | undefined;
+    if (this.#viewport) {
+      viewport = {
+        x: this.#viewport.panX,
+        y: this.#viewport.panY,
+        w: this.#viewport.width / this.#viewport.zoom,
+        h: this.#viewport.height / this.#viewport.zoom,
+      };
+    }
+
+    const renderResult = this.#session.renderPage(pageIdx, viewport);
     if (!renderResult.ok) {
       this.#onError(renderResult.error);
       return;
     }
     this.#viewer.innerHTML = renderResult.value;
+    // Re-apply the viewport so the new SVG reflects the current pan/zoom state
+    if (this.#viewport) {
+      const svgEl = this.#viewer.querySelector('svg');
+      if (svgEl) this.#viewport.applyToSvgElement(svgEl);
+    }
     // Notify state change (e.g. for undo/redo button updates)
     this.#onStateChange();
 
@@ -2869,6 +2892,35 @@ export class Editor {
     this.#replay();
   }
 
+  // ─── Viewport pan-drag ─────────────────────────────────────────────────────
+
+  #panDrag: { startX: number; startY: number } | null = null;
+
+  #startPanDrag(e: PointerEvent, x: number, y: number): void {
+    if (!this.#viewport) return;
+    this.#panDrag = { startX: x, startY: y };
+    this.#viewer.setPointerCapture(e.pointerId);
+  }
+
+  #updatePanDrag(x: number, y: number): void {
+    if (!this.#panDrag || !this.#viewport) return;
+    const dx = x - this.#panDrag.startX;
+    const dy = y - this.#panDrag.startY;
+    // panBy mutates in-place so both editor and renderer see the same state
+    this.#viewport.panBy(dx, dy);
+    this.#panDrag.startX = x;
+    this.#panDrag.startY = y;
+    // Apply the updated viewport to the SVG element
+    const svg = this.#viewer.querySelector('svg') as SVGSVGElement | null;
+    if (svg) {
+      this.#viewport.applyToSvgElement(svg);
+    }
+  }
+
+  #endPanDrag(): void {
+    this.#panDrag = null;
+  }
+
   /** Cancel any active marquee without selecting. */
   #cancelMarquee(): void {
     this.#marquee = null;
@@ -3122,8 +3174,16 @@ export class Editor {
         this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
         this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
       } else {
-        // Plain click on empty: clear selection
-        this.clearSelection();
+        // Plain click on empty: clear selection or start pan-drag
+        if (this.#viewport) {
+          const docPos = this.#clientToDoc(e.clientX, e.clientY);
+          this.#startPanDrag(e, docPos.x, docPos.y);
+          this.#viewer.addEventListener('pointermove', this.#onPointerMoveBound);
+          this.#viewer.addEventListener('pointerup', this.#onPointerUpBound);
+          this.#viewer.addEventListener('pointercancel', this.#onPointerUpBound);
+        } else {
+          this.clearSelection();
+        }
       }
       return;
     }
@@ -3222,6 +3282,12 @@ export class Editor {
       return;
     }
 
+    // Handle viewport pan-drag
+    if (this.#panDrag) {
+      this.#updatePanDrag(docPos.x, docPos.y);
+      return;
+    }
+
     // Handle shape dragging
     if (!this.#dragState) return;
 
@@ -3287,6 +3353,12 @@ export class Editor {
     // Handle move-area end (MOVE-016)
     if (this.#moveArea) {
       this.#endMoveArea();
+      return;
+    }
+
+    // Handle viewport pan-drag end
+    if (this.#panDrag) {
+      this.#endPanDrag();
       return;
     }
 
@@ -3377,6 +3449,22 @@ export class Editor {
           };
     this.#session.executeCommands([this.#buildMoveVertexCmd(id, fullGeom)]);
     this.#replay();
+  }
+
+  /**
+   * Returns the bounding box of all shapes on the current page, or null if empty.
+   * Used by SHAPE-009 (Alt+click = insert at bottom-left).
+   */
+  getDiagramBBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    return this.#getDiagramBBox();
+  }
+
+  /**
+   * Returns the full CellGeometry (x, y, w, h, rotation, flip_h, flip_v) of a vertex.
+   * Used by SHAPE-010 (Shift+click = replace selected) for dynamic stencils.
+   */
+  getVertexGeometry(id: SlotmapId): import('./scene-bounds.js').CellGeometry | null {
+    return sceneGeometry(this.#sceneCache, id);
   }
 
   // ─── Command Builders ─────────────────────────────────────────────────────

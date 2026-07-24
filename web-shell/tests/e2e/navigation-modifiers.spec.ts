@@ -15,17 +15,24 @@
  */
 import { test, expect } from '@playwright/test';
 import { waitForAppReady } from './helpers/app-ready.js';
+import { fixturePath } from './fixtures.js';
+import { getViewBox, hasPanChanged, parseViewBox } from './helpers/viewport-helpers.js';
+
+const SIMPLE_RECT_PATH = fixturePath('simple-rect.drawio');
 
 test.describe('Suite IP-A: Navigation Modifiers', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await waitForAppReady(page);
+    // Load a file so we have an SVG with a viewBox to test against
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
   });
 
   test('NAV-002: plain wheel pans vertically (not zoom)', async ({ page }) => {
-    // Read initial transform
+    // Read initial viewBox
     const container = page.locator('.canvas-container');
-    const before = await container.evaluate((el) => el.style.transform);
+    const before = await getViewBox(page);
 
     // Wheel down (deltaY > 0) should pan, not zoom
     await container.hover();
@@ -33,14 +40,16 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
 
     await page.waitForTimeout(200);
 
-    const after = await container.evaluate((el) => el.style.transform);
+    const after = await getViewBox(page);
 
-    // Transform should have changed
-    expect(after).not.toBe(before);
-
-    // Zoom value should NOT have changed (still 1 = scale(1))
-    // If wheel zoomed, scale would be different from 1
-    expect(after).toContain('scale(1)');
+    // viewBox should have changed (pan, not zoom)
+    expect(hasPanChanged(before, after)).toBe(true);
+    // Zoom should NOT have changed
+    const beforeParsed = parseViewBox(before);
+    const afterParsed = parseViewBox(after);
+    expect(beforeParsed).not.toBeNull();
+    expect(afterParsed).not.toBeNull();
+    expect(beforeParsed!.viewW).toBe(afterParsed!.viewW);
   });
 
   test('NAV-009: Ctrl+wheel zooms (explicit modifier)', async ({ page }) => {
@@ -71,7 +80,7 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
 
   test('NAV-003: Shift+wheel pans horizontally', async ({ page }) => {
     const container = page.locator('.canvas-container');
-    const before = await container.evaluate((el) => el.style.transform);
+    const before = await getViewBox(page);
 
     await container.hover();
 
@@ -87,10 +96,14 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
 
     await page.waitForTimeout(200);
 
-    const after = await container.evaluate((el) => el.style.transform);
-    expect(after).not.toBe(before);
+    const after = await getViewBox(page);
+    expect(hasPanChanged(before, after)).toBe(true);
     // Zoom should not change
-    expect(after).toContain('scale(1)');
+    const beforeParsed = parseViewBox(before);
+    const afterParsed = parseViewBox(after);
+    expect(beforeParsed).not.toBeNull();
+    expect(afterParsed).not.toBeNull();
+    expect(beforeParsed!.viewW).toBe(afterParsed!.viewW);
   });
 
   test('NAV-007: Home key resets view to 100%', async ({ page }) => {
@@ -121,7 +134,7 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
 
   test('NAV-005: Space+drag pans the canvas', async ({ page }) => {
     const container = page.locator('.canvas-container');
-    const before = await container.evaluate((el) => el.style.transform);
+    const before = await getViewBox(page);
 
     // Press and hold Space
     await page.keyboard.down('Space');
@@ -145,19 +158,19 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
     // Release Space
     await page.keyboard.up('Space');
 
-    const after = await container.evaluate((el) => el.style.transform);
-    expect(after).not.toBe(before);
+    const after = await getViewBox(page);
+    expect(hasPanChanged(before, after)).toBe(true);
   });
 
   test('NAV-004a: right-click drag pans the canvas', async ({ page }) => {
     const container = page.locator('.canvas-container');
 
-    // Establish a known transform via wheel pan
+    // Establish a known viewBox via wheel pan
     await container.hover();
     await page.mouse.wheel(0, 100);
     await page.waitForTimeout(100);
-    const before = await container.evaluate((el) => el.style.transform);
-    expect(before).not.toBe('');
+    const before = await getViewBox(page);
+    expect(before).not.toBeNull();
 
     // Right-button drag via direct event dispatch
     await container.evaluate((el) => {
@@ -177,8 +190,8 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
     });
     await page.waitForTimeout(100);
 
-    const after = await container.evaluate((el) => el.style.transform);
-    expect(after).not.toBe(before);
+    const after = await getViewBox(page);
+    expect(hasPanChanged(before, after)).toBe(true);
   });
 
   test('NAV-004b: right-click without drag still opens context menu', async ({ page }) => {
@@ -200,18 +213,22 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
     await container.click();
     await page.waitForTimeout(100);
 
-    const before = await container.evaluate((el) => el.style.transform);
+    const before = await getViewBox(page);
 
     // ArrowRight on empty canvas should pan viewport
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(100);
 
-    const after = await container.evaluate((el) => el.style.transform);
+    const after = await getViewBox(page);
 
-    // Transform should have changed
-    expect(after).not.toBe(before);
+    // viewBox should have changed (pan, not zoom)
+    expect(hasPanChanged(before, after)).toBe(true);
     // Zoom should NOT have changed
-    expect(after).toContain('scale(1)');
+    const beforeParsed = parseViewBox(before);
+    const afterParsed = parseViewBox(after);
+    expect(beforeParsed).not.toBeNull();
+    expect(afterParsed).not.toBeNull();
+    expect(beforeParsed!.viewW).toBe(afterParsed!.viewW);
   });
 
   test('NAV-006 Shift: arrow with Shift pans by larger step', async ({ page }) => {
@@ -221,54 +238,50 @@ test.describe('Suite IP-A: Navigation Modifiers', () => {
     await container.click();
     await page.waitForTimeout(100);
 
-    // First, get the base pan delta (1px)
+    // First, get the base pan delta
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(100);
-    const afterBase = await container.evaluate((el) => el.style.transform);
+    const afterBase = await getViewBox(page);
 
     // Now test Shift+ArrowRight (10px)
     await page.keyboard.press('Shift+ArrowRight');
     await page.waitForTimeout(100);
-    const afterShift = await container.evaluate((el) => el.style.transform);
+    const afterShift = await getViewBox(page);
 
     // Shift should produce a larger delta than base
-    expect(afterShift).not.toBe(afterBase);
-    // Both should still have scale(1) unchanged
-    expect(afterBase).toContain('scale(1)');
-    expect(afterShift).toContain('scale(1)');
+    expect(hasPanChanged(afterBase, afterShift)).toBe(true);
+    // Both should still have same zoom (viewW unchanged)
+    const baseParsed = parseViewBox(afterBase);
+    const shiftParsed = parseViewBox(afterShift);
+    expect(baseParsed).not.toBeNull();
+    expect(shiftParsed).not.toBeNull();
+    expect(baseParsed!.viewW).toBe(shiftParsed!.viewW);
   });
 
   test('NAV-006 nudge-no-regression: arrow with selection nudges and does NOT pan', async ({ page }) => {
     const container = page.locator('.canvas-container');
 
-    // Insert a shape first so we have something to select
-    await page.evaluate(() => {
-      // Trigger shape insertion via the sidebar or keyboard shortcut
-      // We'll use the insert shape via keyboard if available
-      // For now, let's dispatch a shape insert command
-      const event = new CustomEvent('insert-shape', { detail: { shape: 'rectangle' } });
-      document.dispatchEvent(event);
-    });
-
-    // Wait for shape to potentially be inserted
-    await page.waitForTimeout(200);
-
-    // Focus container and ensure no shape is selected first (clear selection)
+    // Focus container first
     await container.click();
     await page.keyboard.press('Escape');
     await page.waitForTimeout(100);
 
-    // Now get the initial transform before any arrow press
-    const before = await container.evaluate((el) => el.style.transform);
+    // Now get the initial viewBox before any arrow press
+    const before = await getViewBox(page);
 
     // Press ArrowRight - with no selection this should PAN
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(100);
 
-    const after = await container.evaluate((el) => el.style.transform);
+    const after = await getViewBox(page);
 
     // No selection case: canvas should have panned
-    expect(after).not.toBe(before);
-    expect(after).toContain('scale(1)');
+    expect(hasPanChanged(before, after)).toBe(true);
+    // Zoom should NOT have changed
+    const beforeParsed = parseViewBox(before);
+    const afterParsed = parseViewBox(after);
+    expect(beforeParsed).not.toBeNull();
+    expect(afterParsed).not.toBeNull();
+    expect(beforeParsed!.viewW).toBe(afterParsed!.viewW);
   });
 });
