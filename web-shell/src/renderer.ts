@@ -57,7 +57,7 @@ export interface ZoomPanControls {
   resetView(): void;
   /** Set pan offset in CSS pixels. */
   setPan(_x: number, _y: number): void;
-  /** Convert screen client coordinates to document-space coordinates. */
+  /** Convert screen client coordinates to document space coordinates. */
   clientToDoc(_clientX: number, _clientY: number): { x: number; y: number };
   /**
    * Zoom and pan so all shapes fit within the viewport.
@@ -73,6 +73,8 @@ export interface ZoomPanControls {
   applyViewport(): void;
   /** The underlying Viewport instance for direct manipulation. */
   viewport: Viewport;
+  /** Called when a pointer-pan gesture ends. Used to trigger S1 reveal. */
+  onPanEnd?: () => void;
 }
 
 /**
@@ -237,6 +239,12 @@ export function setupZoomPan(
   let panOriginY = 0;
   let spacePressed = false;
   let rightClickMoved = false;
+  // S1 trigger: mutable callback holder so returned object property and closure share ref
+  const panEndCallback = { current: undefined as (() => void) | undefined };
+  function noopPanEnd(): void {}
+  function getPanEndCallback(): () => void {
+    return panEndCallback.current ?? noopPanEnd;
+  }
 
   function startPan(clientX: number, clientY: number): void {
     isPanning = true;
@@ -258,6 +266,7 @@ export function setupZoomPan(
   function endPan(): void {
     isPanning = false;
     container.classList.remove('panning');
+    getPanEndCallback()();
   }
 
   // Track Space key for Space+drag pan
@@ -327,5 +336,10 @@ export function setupZoomPan(
     if (e.button === 1) e.preventDefault();
   });
 
-  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView, panBy, applyViewport, viewport };
+  const ctrl: ZoomPanControls = {
+    setZoom, getZoom, resetView, setPan, clientToDoc, fitToView, panBy, applyViewport, viewport,
+    get onPanEnd() { return panEndCallback.current ?? noopPanEnd; },
+    set onPanEnd(fn: () => void) { panEndCallback.current = fn; },
+  };
+  return ctrl;
 }
