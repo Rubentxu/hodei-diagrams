@@ -2,14 +2,20 @@
 //!
 //! Run with: `cargo bench -p diagram-render-svg culling`
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use diagram_core::geometry::{Point, Rect, Size};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use diagram_core::VertexId;
+use diagram_core::geometry::{Point, Rect, Size};
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::{PageId, RectElement, ResolvedStyle, Scene, VisualElement};
 
 fn make_rect(x: f64, y: f64, w: f64, h: f64) -> Rect {
-    Rect { origin: Point { x, y }, size: Size { width: w, height: h } }
+    Rect {
+        origin: Point { x, y },
+        size: Size {
+            width: w,
+            height: h,
+        },
+    }
 }
 
 fn make_rect_elem(x: f64, y: f64, w: f64, h: f64) -> VisualElement {
@@ -49,10 +55,7 @@ fn bench_culling(c: &mut Criterion) {
     let viewport = make_rect(0.0, 0.0, 1000.0, 1000.0); // Small viewport
 
     // Pre-build scenes so we measure render time, not scene construction
-    let scenes: Vec<_> = counts
-        .iter()
-        .map(|&c| make_scene(c, spread))
-        .collect();
+    let scenes: Vec<_> = counts.iter().map(|&c| make_scene(c, spread)).collect();
 
     let mut group = c.benchmark_group("render_svg_culled");
 
