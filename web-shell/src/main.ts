@@ -715,9 +715,8 @@ async function bootstrap(): Promise<void> {
     const currentlyEnabled = page?.math_enabled ?? false;
     const result = activeSession.setPageMathEnabled(pageIdx, !currentlyEnabled);
     if (result.ok) {
-      // Toggle the checkmark immediately using the value we just applied.
-      // Reading it back from the scene cache would be racy because the
-      // editor's triggerReplay() is rAF-scheduled.
+      // Toggle the checkmark immediately using the value we just applied
+      // (the engine state change is already committed; no need to read back).
       mathModeMenuItem?.classList.toggle('has-checkmark', !currentlyEnabled);
       refreshMathOverlay();
       requestAnimationFrame(syncMathModeCheckmark);
