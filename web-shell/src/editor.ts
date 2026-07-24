@@ -233,6 +233,11 @@ export class Editor {
     return this.#textEdit !== null;
   }
 
+  /** Expose the viewport for E2E tests and diagnostics (REQ-ZOOMSNAP-005). */
+  getViewport(): Viewport | undefined {
+    return this.#viewport;
+  }
+
   // ─── Group Drill-Down FSM ────────────────────────────────────────────────
   /** Tracks the pending group drill-down state entered via Alt+click on a group. */
   #drillDown: { groupId: SlotmapId; groupElement: Element } | null = null;

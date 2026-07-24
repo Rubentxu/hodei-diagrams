@@ -105,9 +105,9 @@ test.describe('Suite: zoom-snap', () => {
     // Set initial zoom to 0.8 via debug surface
     // 0.8 + 0.2 = 1.0, which is exactly a snap point
     await page.evaluate(() => {
-      const editor = (window as unknown as { __hodeiDebug: { getEditor: () => { viewport: { setZoom: (z: number) => void } } } }).__hodeiDebug.getEditor();
-      if (editor && editor.viewport) {
-        editor.viewport.setZoom(0.8);
+      const editor = (window as unknown as { __hodeiDebug: { getEditor: () => { getViewport: () => { setZoom: (z: number) => void } } } }).__hodeiDebug.getEditor();
+      if (editor && editor.getViewport) {
+        editor.getViewport().setZoom(0.8);
       }
     });
     await page.waitForTimeout(200);
