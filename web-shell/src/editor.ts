@@ -1843,6 +1843,11 @@ export class Editor {
       cancelAnimationFrame(this.#rafHandle);
       this.#rafHandle = null;
     }
+    // Cancel any pending pan-end debounce timer (S1 trigger)
+    if (this.#panEndTimer !== null) {
+      clearTimeout(this.#panEndTimer);
+      this.#panEndTimer = null;
+    }
     this.#renderPending = false;
     this.#abortController?.abort();
     this.#abortController = null;
