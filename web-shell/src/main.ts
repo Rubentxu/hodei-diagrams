@@ -2186,6 +2186,9 @@ async function bootstrap(): Promise<void> {
   ui.canvasContainer.style.setProperty('--zoom', '1');
 
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
+  // Temporary shim: FrameBudgetMonitor will be created in Task 5
+  const frameBudgetMonitor = { getStats: () => ({ fps: 0, frameMs: 0 }) };
+
   (window as unknown as Record<string, unknown>).__hodeiDebug = {
     getScene: () => {
       const result = activeEditor?.getSceneCache();
@@ -2339,6 +2342,10 @@ async function bootstrap(): Promise<void> {
       activeEditor.refreshScene?.();
       return { edgeId, fromId, toId };
     },
+    getFrameStats: () => frameBudgetMonitor.getStats(),
+    getWasmMemoryBytes: () => activeSession?.getWasmMemoryBytes() ?? 0,
+    getSceneBufferBytes: () => activeSession?.getSceneBufferBytes() ?? null,
+    getSvgBufferBytes: () => activeSession?.getSvgBufferBytes() ?? null,
     manualSaveVersion,
   };
 
