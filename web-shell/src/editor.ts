@@ -684,8 +684,9 @@ export class Editor {
       commands.push(this.#buildAddVertexFromVertexCmd(vertex, newGeom));
     }
 
-    // Execute atomically via session (not editor wrapper — we need to check result)
-    const result = this.#session.executeTransaction(commands);
+    // Execute atomically via editor wrapper (D5) — returns Result so we can check ok.
+    // The wrapper calls #replay() on success, so no explicit replay needed here.
+    const result = this.executeTransaction(commands);
     if (!result.ok) {
       this.#onError('Paste failed: ' + result.error);
       return [];
@@ -694,7 +695,6 @@ export class Editor {
     // Atomic rollback means all-or-nothing: if we get here, all vertices were added.
     // Now find them by position matching (scene-sync happened synchronously inside
     // executeTransaction → its internal #replay → #sceneSync).
-    this.#replay();
 
     const pastedIds: SlotmapId[] = [];
     for (const vertex of this.#clipboard.vertices) {
@@ -946,13 +946,14 @@ export class Editor {
    * On success, one undo entry is pushed; on error all commands are rolled back.
    * Empty array is a no-op (no undo entry, no error).
    */
-  executeTransaction(commands: string[]): void {
+  executeTransaction(commands: string[]): Result<void, EngineError> {
     const result = this.#session.executeTransaction(commands);
     if (!result.ok) {
       this.#onError(result.error);
-      return;
+      return result;
     }
     this.#replay();
+    return result;
   }
 
   // ─── Arrange Operations ──────────────────────────────────────────────────
@@ -3677,9 +3678,20 @@ export class Editor {
         visible: true,
       },
     };
-    // Copy style if present
+    // Copy style if present — sanitize to only string values (Rust StyleValue is String).
+    // Any non-string value (number, boolean, null, object) would fail deserialization.
     if (vertex.style) {
-      payload.style = { ...vertex.style };
+      const sanitized: Record<string, string> = {};
+      for (const [k, v] of Object.entries(vertex.style)) {
+        if (typeof v === 'string') {
+          sanitized[k] = v;
+        } else if (v != null) {
+          sanitized[k] = String(v); // Coerce numbers, booleans to strings
+        }
+      }
+      if (Object.keys(sanitized).length > 0) {
+        payload.style = sanitized;
+      }
     }
     return JSON.stringify({ AddVertex: payload });
   }
