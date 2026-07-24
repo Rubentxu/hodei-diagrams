@@ -5,6 +5,7 @@
  */
 
 import { snapToZoom } from './viewport.js';
+import { FrameBudgetMonitor } from './frame-budget-monitor.js';
 import { loadWasm } from './wasm-loader.js';
 import { DiagramEngineSession } from './session.js';
 import { StencilLibraryManager } from './stencil-library-manager.js';
@@ -2186,8 +2187,7 @@ async function bootstrap(): Promise<void> {
   ui.canvasContainer.style.setProperty('--zoom', '1');
 
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
-  // Temporary shim: FrameBudgetMonitor will be created in Task 5
-  const frameBudgetMonitor = { getStats: () => ({ fps: 0, frameMs: 0 }) };
+  const frameBudgetMonitor = new FrameBudgetMonitor();
 
   (window as unknown as Record<string, unknown>).__hodeiDebug = {
     getScene: () => {
