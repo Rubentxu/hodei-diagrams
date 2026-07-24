@@ -213,9 +213,20 @@ Sin Rust/WASM para el renderizado.
 
 ### Fase 3: Performance & polish (continuo)
 
-- WASM memory optimization (zero-copy buffers para commands/events)
-- Animation frame budget monitoring
-- Zoom snap points (fit, 100%, 50%, etc.)
+> **Implementación completada (v0.115.0, 2026-07-24)** — branch `feat/infinite-canvas-phase3-perf-polish`
+
+| Feature | Commit | Descripción |
+|---------|--------|-------------|
+| Zoom snap points | `545b0a8` | `ZOOM_SNAP_POINTS = [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]`, `snapToZoom()` con threshold ±0.05 |
+| Zoom snap wiring | `f697025` | `applyZoomStep` helper unifica 4 sites: Ctrl++/Ctrl+- y 2 menu items |
+| WASM memory tracking | `3f281a5` | `getWasmMemoryBytes()`, `getSceneBufferBytes()`, `getSvgBufferBytes()` en `session.ts` |
+| Debug surface | `ae2ee18` | `__hodeiDebug.getFrameStats()`, `.getWasmMemoryBytes()`, `.getSceneBufferBytes()`, `.getSvgBufferBytes()` |
+| FrameBudgetMonitor | `2969030` | RAF loop con EMA smoothing (α=0.1), throttle 4Hz, sin `useFakeTimers` (OOM crash workaround) |
+| HUD slots | `73e4e8d` | `FrameStats`/`MemoryStats` interfaces, `setFrameStats?`/`setMemoryStats?` opcionales |
+| ?perf=1 activation | `03d1a36` | `frameBudgetMonitor.start()` + polling 1Hz via `setInterval`, cleanup on `beforeunload` |
+| E2E suite | `cc84223` | 10 tests en 3 specs: `perf-budget.spec.ts`, `zoom-snap.spec.ts`, `wasm-memory.spec.ts` |
+
+**E2E results**: 10/10 green, `npx tsc --noEmit` clean (pre-existing `addRectAt` gap unrelated)
 
 ---
 
