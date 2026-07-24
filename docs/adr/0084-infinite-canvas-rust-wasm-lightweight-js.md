@@ -1,6 +1,7 @@
 # ADR-0084: Infinite Canvas con Motor Rust/WASM y Cliente JS Ligero
 
-**Estado**: propuesta
+**Estado**: aceptada
+**Implementación**: Phase 1+2+3 shipped as v0.115.0
 **Fecha**: 2026-07-23
 **Decisor**: Haizea + equipo
 
