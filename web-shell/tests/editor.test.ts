@@ -705,7 +705,7 @@ describe('Editor', () => {
       // Scene cache should be populated synchronously
       const cache = editor.getSceneCache();
       expect(cache.ok).toBe(true);
-      expect(cache.value.length).toBeGreaterThan(0);
+      expect((cache as { ok: true; value: unknown[] }).value.length).toBeGreaterThan(0);
       // rAF should NOT have fired yet (render is async)
       expect(wasm.render_svg).not.toHaveBeenCalled();
       // After tickFrame, rAF fires and render happens

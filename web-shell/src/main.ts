@@ -2427,6 +2427,22 @@ async function bootstrap(): Promise<void> {
     getSvgBufferBytes: () => activeSession?.getSvgBufferBytes() ?? null,
     frameBudgetMonitor,
     manualSaveVersion,
+    pasteFiftyVertices: () => {
+      if (!activeEditor || !activeSession) return [];
+      // Build a 50-vertex clipboard directly
+      const clipboard: import('./types.js').Vertex[] = [];
+      for (let i = 0; i < 50; i++) {
+        clipboard.push({
+          geometry: { x: 10 + (i % 10) * 100, y: 10 + Math.floor(i / 10) * 60, width: 80, height: 40 },
+          style: {},
+        });
+      }
+      // Access editor internals to set clipboard (test-only debug method)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (activeEditor as any)['#clipboard'] = { vertices: clipboard, offset: 0 };
+      return activeEditor.paste();
+    },
+    getRenderCount: () => activeSession?.getRenderCount() ?? 0,
   };
 
   // ─── 15.5. Expose manual save for console-driven testing ────────────────────

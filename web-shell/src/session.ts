@@ -21,6 +21,8 @@ export class DiagramEngineSession {
   private disposed: boolean;
   #lastSceneBufferBytes: number | null = null;
   #lastSvgBufferBytes: number | null = null;
+  /** Counter incremented each time renderPage is called. Exposed via debug APIs. */
+  #renderCount = 0;
 
   private constructor(wasm: WasmModule, handle: EngineHandle) {
     this.wasm = wasm;
@@ -73,6 +75,11 @@ export class DiagramEngineSession {
   /** Last SVG-buffer payload bytes; null before first render. */
   getSvgBufferBytes(): number | null {
     return this.#lastSvgBufferBytes;
+  }
+
+  /** Returns the number of times renderPage has been called on this session. */
+  getRenderCount(): number {
+    return this.#renderCount;
   }
 
   importDrawio(xml: string): Result<void, EngineError> {
@@ -561,6 +568,7 @@ export class DiagramEngineSession {
    * @param viewport - optional viewport rect for culling; defaults to sentinel (0,0,0,0) = full render
    */
   renderPage(pageIdx: number, viewport?: { x: number; y: number; w: number; h: number }): Result<string, EngineError> {
+    this.#renderCount++;
     const g = this.guard();
     if (!g.ok) return g;
     try {

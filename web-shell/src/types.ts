@@ -347,6 +347,10 @@ export interface HodeiDebug {
   getSvgBufferBytes: () => number | null;
   frameBudgetMonitor: unknown;
   manualSaveVersion: () => Promise<void>;
+  /** Paste 50 vertices from a synthetic clipboard and return the pasted IDs. */
+  pasteFiftyVertices: () => SlotmapId[];
+  /** Return the number of renderPage calls since page load. */
+  getRenderCount: () => number;
 }
 
 declare global {
