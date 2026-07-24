@@ -567,6 +567,10 @@ export class DiagramEngineSession {
       const handle = this.handle as number;
       const { x = 0, y = 0, w = 0, h = 0 } = viewport ?? {};
       const svg = this.wasm.render_svg(handle, BigInt(pageIdx), x, y, w, h);
+      // Track SVG payload size for getSvgBufferBytes() (REQ-WASMMEM-002)
+      if (svg && svg.length > 0) {
+        this.#lastSvgBufferBytes = svg.length;
+      }
       // Keep cache in sync so getPage() stays reliable
       this.svgCache.set(pageIdx as PageToken, svg);
       return ok(svg);
