@@ -122,7 +122,7 @@ test.describe('viewport-culling', () => {
     // Add a shape at (2000, 2000) — far outside initial viewport
     // This uses doc-space coordinates directly
     const added = await page.evaluate(() => {
-      const debug = (window as unknown as Record<string, unknown>).__hodeiDebug;
+      const debug = (window as any).__hodeiDebug;
       if (!debug) return false;
       const result = debug.addRectAt?.(2000, 2000, 50, 50);
       return result === true;
@@ -168,7 +168,7 @@ test.describe('viewport-culling', () => {
     // Trigger a full re-render by adding a shape that forces editor.#replay()
     // Add a shape inside the viewport so it appears in DOM
     const added = await page.evaluate(() => {
-      const debug = (window as unknown as Record<string, unknown>).__hodeiDebug;
+      const debug = (window as any).__hodeiDebug;
       if (!debug) return false;
       // Add shape inside viewport at (50, 50)
       const result = debug.addRectAt?.(50, 50, 80, 40);

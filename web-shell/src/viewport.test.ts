@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Viewport, clampZoom, MIN_ZOOM, MAX_ZOOM, type Point } from './viewport.js';
+import { Viewport, clampZoom, MIN_ZOOM, MAX_ZOOM, snapToZoom, ZOOM_SNAP_POINTS, type Point } from './viewport.js';
 
 const EPS = 1e-9;
 
@@ -319,6 +319,46 @@ describe('Viewport', () => {
       const result = vp.docToClient(100, 200, rect);
       expect(result.x).toBe(0);
       expect(result.y).toBe(0);
+    });
+  });
+
+  // ─── ZOOM_SNAP_POINTS and snapToZoom ─────────────────────────────────────
+  describe('ZOOM_SNAP_POINTS', () => {
+    it('contains the canonical values', () => {
+      expect(ZOOM_SNAP_POINTS).toEqual([0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0]);
+    });
+
+    it('is frozen', () => {
+      expect(Object.isFrozen(ZOOM_SNAP_POINTS)).toBe(true);
+    });
+  });
+
+  describe('snapToZoom', () => {
+    it('snapToZoom(1.04) returns 1.0 (within threshold)', () => {
+      expect(snapToZoom(1.04)).toBeCloseTo(1.0, 5);
+    });
+
+    it('snapToZoom(1.06) returns 1.06 (outside threshold)', () => {
+      expect(snapToZoom(1.06)).toBeCloseTo(1.06, 5);
+    });
+
+    it('snapToZoom of exact snap point returns the point', () => {
+      // Test all snap points are unchanged
+      for (const point of ZOOM_SNAP_POINTS) {
+        expect(snapToZoom(point)).toBeCloseTo(point, 5);
+      }
+    });
+
+    it('snapToZoom(1.95, 0.05, [1.0, 2.0, 4.0]) returns 2.0', () => {
+      expect(snapToZoom(1.95, 0.05, [1.0, 2.0, 4.0])).toBeCloseTo(2.0, 5);
+    });
+
+    it('snapToZoom(1.05) returns 1.0 (exact threshold boundary)', () => {
+      expect(snapToZoom(1.05)).toBeCloseTo(1.0, 5);
+    });
+
+    it('snapToZoom(-1.0) returns MIN_ZOOM (clamping)', () => {
+      expect(snapToZoom(-1.0)).toBeCloseTo(MIN_ZOOM, 5);
     });
   });
 

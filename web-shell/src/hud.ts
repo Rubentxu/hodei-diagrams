@@ -10,8 +10,16 @@
  * Monospace font, subtle text, minimal visual weight.
  */
 
+import type { FrameStats } from './frame-budget-monitor.js';
+
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'auto-saved';
 export type LoadingState = { wasm: boolean; stencil: boolean };
+
+export interface MemoryStats {
+  wasmBytes: number;
+  sceneBytes: number | null;
+  svgBytes: number | null;
+}
 
 export interface HudControls {
   container: HTMLElement;
@@ -26,6 +34,10 @@ export interface HudControls {
   setSaveStatus: (_status: SaveStatus) => void;
   setLoading: (_state: LoadingState) => void;
   setGeometry: (_w: number, _h: number) => void;
+  setFrameStats?: (s: FrameStats) => void;
+  setMemoryStats?: (s: MemoryStats) => void;
+  hideFrameStats?: () => void;
+  showFrameStats?: () => void;
 }
 
 export function buildHud(): HudControls {
@@ -199,6 +211,34 @@ export function buildHud(): HudControls {
   saveStatusItem.appendChild(saveStatusValue);
   container.appendChild(saveStatusItem);
 
+  // ─── Frame stats (hidden by default, shown via setFrameStats) ─────────────────
+  const fpsItem = document.createElement('div');
+  fpsItem.className = 'hud-item hud-fps';
+  fpsItem.setAttribute('data-hud-density-item', 'contextual');
+  fpsItem.setAttribute('data-testid', 'hud-fps');
+  fpsItem.style.display = 'none';
+
+  const fpsValue = document.createElement('span');
+  fpsValue.className = 'hud-value';
+  fpsValue.textContent = '';
+
+  fpsItem.appendChild(fpsValue);
+  container.appendChild(fpsItem);
+
+  // ─── Memory stats (hidden by default, shown via setMemoryStats) ──────────────
+  const memoryItem = document.createElement('div');
+  memoryItem.className = 'hud-item hud-memory';
+  memoryItem.setAttribute('data-hud-density-item', 'contextual');
+  memoryItem.setAttribute('data-testid', 'hud-memory');
+  memoryItem.style.display = 'none';
+
+  const memoryValue = document.createElement('span');
+  memoryValue.className = 'hud-value';
+  memoryValue.textContent = '';
+
+  memoryItem.appendChild(memoryValue);
+  container.appendChild(memoryItem);
+
   let zoomClickHandler: (() => void) | null = null;
 
   zoomBtn.addEventListener('click', () => {
@@ -273,6 +313,38 @@ export function buildHud(): HudControls {
       } else {
         geometryValue.textContent = `${Math.round(w)}×${Math.round(h)}`;
       }
+    },
+    setFrameStats: (stats: FrameStats) => {
+      fpsValue.textContent = `${stats.fps.toFixed(0)} fps · ${stats.frameMs.toFixed(1)} ms`;
+    },
+    hideFrameStats: () => {
+      fpsItem.style.display = 'none';
+    },
+    showFrameStats: () => {
+      fpsItem.style.display = 'flex';
+    },
+    setMemoryStats: (stats: MemoryStats) => {
+      const wasmMb = stats.wasmBytes / (1024 * 1024);
+      const wasmLabel = wasmMb >= 1 ? `${wasmMb.toFixed(1)} MB` : `${(stats.wasmBytes / 1024).toFixed(0)} KB`;
+
+      // Format scene bytes if available
+      let sceneLabel = '—';
+      if (stats.sceneBytes != null && stats.sceneBytes > 0) {
+        const sceneKb = stats.sceneBytes / 1024;
+        sceneLabel = sceneKb >= 1 ? `${sceneKb.toFixed(0)} KB` : `${stats.sceneBytes} B`;
+      }
+
+      // Format SVG bytes if available
+      let svgLabel = '—';
+      if (stats.svgBytes != null && stats.svgBytes > 0) {
+        const svgKb = stats.svgBytes / 1024;
+        svgLabel = svgKb >= 1 ? `${svgKb.toFixed(0)} KB` : `${stats.svgBytes} B`;
+      }
+
+      // REQ-WASMMEM-003: disclose WASM page-retention behavior, not leak detection
+      memoryValue.textContent = `WASM ${wasmLabel} (no-shrink) · scene ${sceneLabel} · svg ${svgLabel}`;
+      memoryValue.title = 'WASM memory grows by design — WASM cannot return pages to the browser. Use this to detect unbounded growth, not expected retention.';
+      memoryItem.style.display = memoryItem.style.display === 'none' ? 'flex' : memoryItem.style.display;
     },
   };
 }

@@ -4,6 +4,8 @@
  * Coordinates: engine session, editor, zoom/pan, inspector, menu actions.
  */
 
+import { snapToZoom } from './viewport.js';
+import { FrameBudgetMonitor } from './frame-budget-monitor.js';
 import { loadWasm } from './wasm-loader.js';
 import { DiagramEngineSession } from './session.js';
 import { StencilLibraryManager } from './stencil-library-manager.js';
@@ -57,6 +59,7 @@ let last_saved_at = 0;
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let autoSavedTimer: ReturnType<typeof setTimeout> | null = null;
 let hud: HudControls | null = null;
+let frameBudgetMonitor: FrameBudgetMonitor | null = null;
 
 // ─── Grid overlay state ───────────────────────────────────────────────────────
 const GRID_LS_KEY = 'hodei:grid-visible';
@@ -647,6 +650,9 @@ async function bootstrap(): Promise<void> {
   // Make hud accessible to module-level save functions
   hud = ui.hud;
 
+  // Initialize frame budget monitor (created early so menu toggle can reference it)
+  frameBudgetMonitor = new FrameBudgetMonitor();
+
   // Start loading stencil libraries — HUD is now ready to receive callbacks
   stencilManager.startAutoLoad();
 
@@ -765,6 +771,60 @@ async function bootstrap(): Promise<void> {
       copySvgTimer = setTimeout(() => { menuCopySvg.textContent = original; }, 1500);
     } catch (err) {
       console.warn('[copy-svg] Clipboard write failed:', err);
+    }
+  });
+
+  // ─── 13.6.2. Wire Extras > Performance Monitor toggle ─────────────────────
+  // REQ-AFBUDGET-003: "?perf=1 or the development toggle MUST enable monitoring"
+  // Either ?perf=1 OR the menu toggle alone is sufficient — no AND logic.
+  const menuPerfToggle = document.querySelector('[data-testid="menu-perf-toggle"]');
+  let perfToggleActive = false;
+
+  function startPerfMonitor(): void {
+    if (!frameBudgetMonitor || frameBudgetMonitor.isRunning()) return;
+    frameBudgetMonitor.start((stats) => {
+      hud?.setFrameStats?.(stats);
+    });
+    // Show FPS and memory HUD items
+    const fpsItem = hud?.container.querySelector('[data-testid="hud-fps"]') as HTMLElement | null;
+    const memoryItem = hud?.container.querySelector('[data-testid="hud-memory"]') as HTMLElement | null;
+    if (fpsItem) fpsItem.style.display = 'flex';
+    if (memoryItem) memoryItem.style.display = 'flex';
+  }
+
+  function stopPerfMonitor(): void {
+    if (!frameBudgetMonitor) return;
+    frameBudgetMonitor.stop();
+    // Hide FPS and memory HUD items
+    const fpsItem = hud?.container.querySelector('[data-testid="hud-fps"]') as HTMLElement | null;
+    const memoryItem = hud?.container.querySelector('[data-testid="hud-memory"]') as HTMLElement | null;
+    if (fpsItem) fpsItem.style.display = 'none';
+    if (memoryItem) memoryItem.style.display = 'none';
+  }
+
+  // Auto-start if ?perf=1 is in URL (REQ-AFBUDGET-003: EITHER is sufficient)
+  const perfFlag = new URLSearchParams(window.location.search).get('perf') === '1';
+  if (perfFlag) {
+    perfToggleActive = true;
+    // Defer start until HUD is ready (after bootstrap)
+    requestAnimationFrame(() => {
+      startPerfMonitor();
+      startPerfPolling();
+      menuPerfToggle?.classList.add('has-checkmark');
+    });
+  }
+
+  menuPerfToggle?.addEventListener('click', () => {
+    // Toggle works regardless of ?perf=1 — either activation path is sufficient
+    perfToggleActive = !perfToggleActive;
+    if (perfToggleActive) {
+      startPerfMonitor();
+      startPerfPolling();
+      menuPerfToggle.classList.add('has-checkmark');
+    } else {
+      stopPerfMonitor();
+      stopPerfPolling();
+      menuPerfToggle.classList.remove('has-checkmark');
     }
   });
 
@@ -1031,17 +1091,19 @@ async function bootstrap(): Promise<void> {
   );
   activeEditor.attach();
 
+  /** Apply a zoom delta and snap to the nearest canonical zoom point. */
+  const applyZoomStep = (delta: number): void => {
+    const target = (zoomPan?.getZoom() ?? 1) + delta;
+    const snapped = snapToZoom(target);
+    zoomPan?.setZoom(snapped);
+    const pct = Math.round(snapped * 100);
+    ui.hud.setZoom(pct);
+    ui.zoomDisplay.textContent = `${pct}%`;
+  };
+
   activeEditor.setZoomCallbacks({
-    zoomIn: () => {
-      zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
-      ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-      ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-    },
-    zoomOut: () => {
-      zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
-      ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-      ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-    },
+    zoomIn: () => applyZoomStep(+0.2),
+    zoomOut: () => applyZoomStep(-0.2),
     resetZoom: () => {
       zoomPan?.resetView();
       ui.hud.setZoom(100);
@@ -1054,16 +1116,8 @@ async function bootstrap(): Promise<void> {
   const zoomInMenuItem = document.getElementById('menu-item-zoom-in');
   const zoomOutMenuItem = document.getElementById('menu-item-zoom-out');
   const zoomResetMenuItem = document.getElementById('menu-item-zoom-reset');
-  zoomInMenuItem?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
-    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
-  zoomOutMenuItem?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
-    ui.hud.setZoom((zoomPan?.getZoom() ?? 1) * 100);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
+  zoomInMenuItem?.addEventListener('click', () => applyZoomStep(+0.2));
+  zoomOutMenuItem?.addEventListener('click', () => applyZoomStep(-0.2));
   zoomResetMenuItem?.addEventListener('click', () => {
     zoomPan?.resetView();
     ui.hud.setZoom(100);
@@ -1639,27 +1693,6 @@ async function bootstrap(): Promise<void> {
     activeEditor?.selectAll();
   });
 
-  // View > Zoom In
-  const menuZoomIn = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(1)');
-  menuZoomIn?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) + 0.2);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
-
-  // View > Zoom Out
-  const menuZoomOut = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(2)');
-  menuZoomOut?.addEventListener('click', () => {
-    zoomPan?.setZoom((zoomPan?.getZoom() ?? 1) - 0.2);
-    ui.zoomDisplay.textContent = `${Math.round((zoomPan?.getZoom() ?? 1) * 100)}%`;
-  });
-
-  // View > Zoom Reset
-  const menuZoomReset = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(3)');
-  menuZoomReset?.addEventListener('click', () => {
-    zoomPan?.resetView();
-    ui.zoomDisplay.textContent = '100%';
-  });
-
   // View > Present
   const menuPresent = document.querySelector('[data-testid="menu-present"]');
   menuPresent?.addEventListener('click', () => {
@@ -2197,6 +2230,43 @@ async function bootstrap(): Promise<void> {
   ui.canvasContainer.style.setProperty('--zoom', '1');
 
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
+  // frameBudgetMonitor is already initialized at module level (line ~62)
+  // and created early in bootstrap (line ~653) so menu toggle can reference it.
+
+  // ─── 15.1. Performance monitoring requires BOTH ?perf=1 AND menu toggle ─────
+  const urlParams = new URLSearchParams(window.location.search);
+  const perfEnabled = urlParams.get('perf') === '1';
+  let perfIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  // Store whether menu toggle has been activated (requires ?perf=1)
+  let perfMenuActive = false;
+
+  // Start memory polling when menu toggle is activated
+  function startPerfPolling(): void {
+    if (perfIntervalId !== null) return; // already polling
+    perfIntervalId = setInterval(() => {
+      const memStats = {
+        wasmBytes: activeSession?.getWasmMemoryBytes() ?? 0,
+        sceneBytes: activeSession?.getSceneBufferBytes() ?? null,
+        svgBytes: activeSession?.getSvgBufferBytes() ?? null,
+      };
+      hud?.setMemoryStats?.(memStats);
+    }, 1000);
+  }
+
+  function stopPerfPolling(): void {
+    if (perfIntervalId !== null) {
+      clearInterval(perfIntervalId);
+      perfIntervalId = null;
+    }
+  }
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    if (perfIntervalId !== null) clearInterval(perfIntervalId);
+    frameBudgetMonitor?.stop();
+  });
+
   (window as unknown as Record<string, unknown>).__hodeiDebug = {
     getScene: () => {
       const result = activeEditor?.getSceneCache();
@@ -2350,6 +2420,13 @@ async function bootstrap(): Promise<void> {
       activeEditor.refreshScene?.();
       return { edgeId, fromId, toId };
     },
+    getFrameStats: () => frameBudgetMonitor?.getStats() ?? { fps: 0, frameMs: 0 },
+    hideFrameStats: () => hud?.hideFrameStats?.(),
+    showFrameStats: () => hud?.showFrameStats?.(),
+    getWasmMemoryBytes: () => activeSession?.getWasmMemoryBytes() ?? 0,
+    getSceneBufferBytes: () => activeSession?.getSceneBufferBytes() ?? null,
+    getSvgBufferBytes: () => activeSession?.getSvgBufferBytes() ?? null,
+    frameBudgetMonitor,
     manualSaveVersion,
   };
 

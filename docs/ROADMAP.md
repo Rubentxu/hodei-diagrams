@@ -406,7 +406,7 @@ Complete UI restructuring from the 2026-07-xx workbench epic. All slices merged 
 
 ### In Progress
 
-**Infinite Canvas Phase 1+2** — viewport infrastructure + viewport culling (v0.114.0) — PR #218 merged 2026-07-24 ✅
+**Infinite Canvas Phase 3** — perf polish: zoom snap + FrameBudgetMonitor + WASM memory HUD (v0.115.0) — branch `feat/infinite-canvas-phase3-perf-polish` ✅
 
 ## 🎯 Recently Closed Tracks
 
@@ -418,7 +418,7 @@ _(none — closed campaigns live in Milestones Delivered above)_
 - `docs/adr/0080-keyboard-shortcut-collision-resolution.md`
 - `docs/adr/0081-layer-model-gap-deferred.md` — **Resolved** (IP-F v0.91.0)
 - `docs/adr/0082-engine-owned-typed-selection-semantics.md` — **Resolved** (IP-G v0.100.0)
-- `docs/adr/0084-infinite-canvas-rust-wasm-lightweight-js.md` — **Phase 1+2 complete** (ADR-0084, v0.114.0, PR #218)
+- `docs/adr/0084-infinite-canvas-rust-wasm-lightweight-js.md` — **Phase 1+2+3 complete** (ADR-0084, v0.115.0)
 
 ### Infinite Canvas + Rust/WASM Lightweight JS (ADR-0084, 2026-07-23)
 
@@ -428,7 +428,7 @@ _(none — closed campaigns live in Milestones Delivered above)_
 |------|-------|------|--------|
 | **Fase 1** | Viewport state en web-shell + clientToDoc/docToClient + wheel/pan handlers + initial viewport heuristic para .drawio | Ninguno | ✅ PR1+PR2+PR3 merged |
 | **Fase 2** | Viewport culling (inline rect test, quadtree deferred) | Fase 1 | ✅ PR #218 merged (v0.114.0) |
-| **Fase 3** | WASM memory optimization + animation frame budget | Fase 2 | 🔲 |
+| **Fase 3** | WASM memory optimization + animation frame budget | Fase 2 | ✅ Complete (v0.115.0) |
 
 **Branch**: `feat/infinite-canvas` — PR1/PR2/PR3 archived, ready for release
 

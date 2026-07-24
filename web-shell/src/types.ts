@@ -83,6 +83,8 @@ export type WasmModule = {
   select_target(_h: number, _target_json: string): void;
   clear_selection(_h: number): void;
   get_selection(_h: number): string;
+  /** WebAssembly linear memory — exposed by wasm-pack --target web init(). */
+  memory?: WebAssembly.Memory;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;
@@ -327,3 +329,28 @@ export const EMPTY_METADATA: MetadataInfo = {
   created: null,
   modified: null,
 };
+
+// ─── Global type augmentation for __hodeiDebug (E2E test surface) ───────────
+
+/** Surface exposed on `window.__hodeiDebug` for E2E test access. */
+export interface HodeiDebug {
+  getScene: () => unknown;
+  fetchSceneFresh: () => unknown;
+  addRectAt: (x: number, y: number, width: number, height: number) => boolean | null;
+  addGroupAt: (x: number, y: number, width: number, height: number) => boolean | null;
+  addBentEdgeAt: (x1: number, y1: number, x2: number, y2: number, bends: Array<{ x: number; y: number }>) => { edgeId: string; fromId: string; toId: string } | null;
+  getFrameStats: () => { fps: number; frameMs: number };
+  hideFrameStats: () => void;
+  showFrameStats: () => void;
+  getWasmMemoryBytes: () => number;
+  getSceneBufferBytes: () => number | null;
+  getSvgBufferBytes: () => number | null;
+  frameBudgetMonitor: unknown;
+  manualSaveVersion: () => Promise<void>;
+}
+
+declare global {
+  interface Window {
+    __hodeiDebug?: HodeiDebug;
+  }
+}
