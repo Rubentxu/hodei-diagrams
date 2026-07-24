@@ -13,6 +13,17 @@
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'auto-saved';
 export type LoadingState = { wasm: boolean; stencil: boolean };
 
+export interface FrameStats {
+  fps: number;
+  frameMs: number;
+}
+
+export interface MemoryStats {
+  wasmBytes: number;
+  sceneBytes: number | null;
+  svgBytes: number | null;
+}
+
 export interface HudControls {
   container: HTMLElement;
   setSelection: (_label: string) => void;
@@ -26,6 +37,8 @@ export interface HudControls {
   setSaveStatus: (_status: SaveStatus) => void;
   setLoading: (_state: LoadingState) => void;
   setGeometry: (_w: number, _h: number) => void;
+  setFrameStats?: (s: FrameStats) => void;
+  setMemoryStats?: (s: MemoryStats) => void;
 }
 
 export function buildHud(): HudControls {
@@ -199,6 +212,34 @@ export function buildHud(): HudControls {
   saveStatusItem.appendChild(saveStatusValue);
   container.appendChild(saveStatusItem);
 
+  // ─── Frame stats (hidden by default, shown via setFrameStats) ─────────────────
+  const fpsItem = document.createElement('div');
+  fpsItem.className = 'hud-item hud-fps';
+  fpsItem.setAttribute('data-hud-density-item', 'contextual');
+  fpsItem.setAttribute('data-testid', 'hud-fps');
+  fpsItem.style.display = 'none';
+
+  const fpsValue = document.createElement('span');
+  fpsValue.className = 'hud-value';
+  fpsValue.textContent = '';
+
+  fpsItem.appendChild(fpsValue);
+  container.appendChild(fpsItem);
+
+  // ─── Memory stats (hidden by default, shown via setMemoryStats) ──────────────
+  const memoryItem = document.createElement('div');
+  memoryItem.className = 'hud-item hud-memory';
+  memoryItem.setAttribute('data-hud-density-item', 'contextual');
+  memoryItem.setAttribute('data-testid', 'hud-memory');
+  memoryItem.style.display = 'none';
+
+  const memoryValue = document.createElement('span');
+  memoryValue.className = 'hud-value';
+  memoryValue.textContent = '';
+
+  memoryItem.appendChild(memoryValue);
+  container.appendChild(memoryItem);
+
   let zoomClickHandler: (() => void) | null = null;
 
   zoomBtn.addEventListener('click', () => {
@@ -273,6 +314,16 @@ export function buildHud(): HudControls {
       } else {
         geometryValue.textContent = `${Math.round(w)}×${Math.round(h)}`;
       }
+    },
+    setFrameStats: (stats: FrameStats) => {
+      fpsValue.textContent = `${stats.fps.toFixed(0)} fps · ${stats.frameMs.toFixed(1)} ms`;
+      fpsItem.style.display = fpsItem.style.display === 'none' ? 'flex' : fpsItem.style.display;
+    },
+    setMemoryStats: (stats: MemoryStats) => {
+      const mb = stats.wasmBytes / (1024 * 1024);
+      const label = mb >= 1 ? `${mb.toFixed(1)} MB` : `${(stats.wasmBytes / 1024).toFixed(0)} KB`;
+      memoryValue.textContent = `WASM heap · grows by design · ${label}`;
+      memoryItem.style.display = memoryItem.style.display === 'none' ? 'flex' : memoryItem.style.display;
     },
   };
 }
