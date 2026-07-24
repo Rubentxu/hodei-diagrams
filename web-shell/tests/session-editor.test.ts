@@ -313,8 +313,8 @@ describe('renderPage', () => {
     const r = session.renderPage(0);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value).toBe('<svg><rect/></svg>');
-    // Verify BigInt was passed
-    expect(wasm.render_svg).toHaveBeenCalledWith(42, BigInt(0));
+    // Verify BigInt and viewport sentinel were passed
+    expect(wasm.render_svg).toHaveBeenCalledWith(42, BigInt(0), 0, 0, 0, 0);
   });
 
   it('returns error on disposed session', () => {

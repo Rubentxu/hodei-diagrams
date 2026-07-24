@@ -2547,7 +2547,20 @@ export class Editor {
       return;
     }
     const pageIdx = page.page_id.idx;
-    const renderResult = this.#session.renderPage(pageIdx);
+
+    // Compute viewport rect for culling: when viewport is set, pass doc-space rect
+    // (panX, panY, width/zoom, height/zoom). Sentinel (0,0,0,0) when not set.
+    let viewport: { x: number; y: number; w: number; h: number } | undefined;
+    if (this.#viewport) {
+      viewport = {
+        x: this.#viewport.panX,
+        y: this.#viewport.panY,
+        w: this.#viewport.width / this.#viewport.zoom,
+        h: this.#viewport.height / this.#viewport.zoom,
+      };
+    }
+
+    const renderResult = this.#session.renderPage(pageIdx, viewport);
     if (!renderResult.ok) {
       this.#onError(renderResult.error);
       return;
