@@ -51,7 +51,7 @@ fn group_with_clip_emits_defs_and_clip_path() {
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should contain defs block
     assert!(result.contains("<defs>"), "Expected <defs> in output");
@@ -103,7 +103,7 @@ fn group_without_clip_no_defs() {
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should contain group tag without clip-path
     assert!(result.contains("<g>"), "Expected <g> tag");
@@ -138,7 +138,7 @@ fn path_element_emits_m_l_format() {
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should contain path with M and L commands
     assert!(
@@ -209,7 +209,7 @@ fn edge_connect_line_between_vertices() {
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     assert!(
         result.contains("<line x1=\"0\" y1=\"0\" x2=\"100\" y2=\"100\""),
@@ -242,7 +242,7 @@ fn empty_defs_when_no_clipping() {
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should NOT contain defs when no clipping groups exist
     assert!(!result.contains("<defs>"), "Should not contain <defs>");
@@ -281,7 +281,7 @@ fn nested_group_with_child_vertex() {
     };
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default()).unwrap();
+    let result = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Outer group
     assert!(result.contains("<g>"), "Expected outer <g>");

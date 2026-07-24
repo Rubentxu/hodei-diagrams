@@ -36,7 +36,7 @@ fn math_label_emits_text_with_data_math_id_and_data_latex() {
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
     let svg = renderer
-        .render(&scene, Default::default())
+        .render(&scene, Default::default(), None)
         .expect("render must succeed");
 
     // Must contain the math data attributes
@@ -83,7 +83,7 @@ fn text_label_emits_no_math_attributes() {
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
     let svg = renderer
-        .render(&scene, Default::default())
+        .render(&scene, Default::default(), None)
         .expect("render must succeed");
 
     // Must NOT contain math data attributes
@@ -130,7 +130,7 @@ fn math_edge_label_emits_data_math_id() {
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
     let svg = renderer
-        .render(&scene, Default::default())
+        .render(&scene, Default::default(), None)
         .expect("render must succeed");
 
     assert!(

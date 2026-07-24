@@ -1,5 +1,6 @@
 //! Visual element to SVG conversion.
 
+use diagram_core::geometry::Rect;
 use diagram_core::{EdgeId, VertexId};
 use diagram_scene::{
     CloudElement, CylinderElement, DiamondElement, EllipseElement, EntityId, GroupElement,
@@ -63,12 +64,23 @@ fn gid_attr(id: &impl diagram_core::StableIdExt) -> String {
 /// Returns the SVG representation of the element, indented with 2 spaces per
 /// depth level. Takes a `ClipPathManager` for group clip paths and a
 /// `DefsManager` for gradients and filters.
+///
+/// When `viewport` is `Some`, elements whose bounds do not intersect the viewport
+/// are skipped (culled). The viewport should already be inflated by the desired
+/// margin by the caller.
 pub(crate) fn element_to_svg(
     elem: &VisualElement,
     clip: &mut ClipPathManager,
     defs: &mut DefsManager,
     indent: usize,
+    viewport: Option<&Rect>,
 ) -> String {
+    // Cull check: if viewport is active and element doesn't intersect → skip
+    if let Some(vp) = viewport {
+        if !diagram_scene::cull::should_include(elem, vp) {
+            return String::new();
+        }
+    }
     match elem {
         VisualElement::Rect(r) => rect_to_svg(r, defs, indent),
         VisualElement::RoundedRect(r) => rounded_rect_to_svg(r, defs, indent),
@@ -84,7 +96,7 @@ pub(crate) fn element_to_svg(
         VisualElement::Text(t) => text_to_svg(t, defs, indent),
         VisualElement::Line(l) => line_to_svg(l, defs, indent),
         VisualElement::Path(p) => path_to_svg(p, defs, indent),
-        VisualElement::Group(g) => group_to_svg(g, clip, defs, indent),
+        VisualElement::Group(g) => group_to_svg(g, clip, defs, indent, viewport),
         VisualElement::Stencil(s) => stencil_to_svg(s, defs, indent),
         VisualElement::Image(i) => image_to_svg(i, defs, indent),
         _ => String::new(),
@@ -820,15 +832,17 @@ fn group_to_svg(
     clip: &mut ClipPathManager,
     defs: &mut DefsManager,
     indent: usize,
+    viewport: Option<&Rect>,
 ) -> String {
     let ind = make_indent(indent);
     let child_indent = indent + 1;
 
-    // Render children first
+    // Render children first — filter by should_include when viewport is active
     let children_svg: Vec<String> = g
         .children
         .iter()
-        .map(|child| element_to_svg(child, clip, defs, child_indent))
+        .filter(|child| viewport.is_none_or(|vp| diagram_scene::cull::should_include(child, vp)))
+        .map(|child| element_to_svg(child, clip, defs, child_indent, viewport))
         .collect();
 
     // Render swimlane header (if any) as the first element inside the group,
@@ -1128,7 +1142,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0, None);
         assert!(result.contains("d=\"\""));
     }
 
@@ -1146,7 +1160,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0, None);
         assert!(result.contains("M 10 10 L 50 30 L 90 10"));
     }
 
@@ -1168,7 +1182,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<g>"));
         assert!(result.contains("</g>"));
         assert!(!result.contains("clip-path"));
@@ -1193,7 +1207,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0, None);
         assert!(result.contains("clip-path=\"url(#clip_0)\""));
     }
 
@@ -1230,7 +1244,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<g>"));
         assert!(result.contains("</g>"));
         assert!(result.contains("<rect"));
@@ -1283,7 +1297,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0, None);
 
         // Header rect must be emitted with x=100, y=100, w=30, h=400
         assert!(
@@ -1338,7 +1352,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0, None);
 
         // Header rect must be emitted with x=50, y=80, w=600, h=40
         assert!(
@@ -1388,7 +1402,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0, None);
 
         // Only one rect (the child)
         let rect_count = result.matches("<rect").count();
@@ -1435,7 +1449,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&group, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&group, &mut clip, &mut defs, 0, None);
 
         // The header rect must have fill=#dae8fc (inherited from pool)
         assert!(
@@ -1477,7 +1491,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&diamond, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&diamond, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
         // Diamond points should include center-top, right, center-bottom, left
@@ -1505,7 +1519,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&triangle, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&triangle, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<polygon"));
         // Triangle: top-center, bottom-right, bottom-left
         assert!(result.contains("50,0")); // top-center
@@ -1531,7 +1545,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&hexagon, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&hexagon, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -1554,7 +1568,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&cylinder, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&cylinder, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<path"));
         assert!(result.contains("d="));
     }
@@ -1577,7 +1591,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&cloud, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&cloud, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<path"));
         assert!(result.contains("d="));
     }
@@ -1600,7 +1614,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&para, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&para, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -1623,7 +1637,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&trap, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&trap, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -1653,7 +1667,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&polygon, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&polygon, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<polygon"));
         assert!(result.contains("10,10"));
         assert!(result.contains("50,10"));
@@ -1680,7 +1694,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&polygon, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&polygon, &mut clip, &mut defs, 0, None);
         assert!(result.contains("<polygon"));
         assert!(result.contains("points="));
     }
@@ -1711,7 +1725,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&stencil, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&stencil, &mut clip, &mut defs, 0, None);
         // Background path has scaled coordinates (0 * 80 = 0, 0 * 40 = 0)
         assert!(
             result.contains("M 0 0"),
@@ -1741,7 +1755,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&diamond, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&diamond, &mut clip, &mut defs, 0, None);
         // Should have default fill #dae8fc and stroke #6c8ebf
         assert!(result.contains("fill=\"#dae8fc\""));
         assert!(result.contains("stroke=\"#6c8ebf\""));
@@ -1766,7 +1780,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0, None);
         // Should contain C (cubic Bezier) commands
         assert!(
             result.contains('C'),
@@ -1792,7 +1806,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0, None);
         // Should contain L commands, not C commands
         assert!(result.contains(" L "));
         assert!(!result.contains(" C "));
@@ -1812,7 +1826,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0, None);
         // Should use L commands since only 2 points
         assert!(result.contains(" L "));
         assert!(!result.contains(" C "));
@@ -1833,7 +1847,7 @@ mod tests {
         });
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = element_to_svg(&path, &mut clip, &mut defs, 0);
+        let result = element_to_svg(&path, &mut clip, &mut defs, 0, None);
         assert!(result.contains(" L "));
         assert!(!result.contains(" C "));
     }
@@ -1894,7 +1908,7 @@ mod gid_attr_tests {
 
         let mut clip = ClipPathManager::new();
         let mut defs = DefsManager::new();
-        let result = group_to_svg(&group_elem, &mut clip, &mut defs, 0);
+        let result = group_to_svg(&group_elem, &mut clip, &mut defs, 0, None);
 
         // Assert the output contains data-group-id="idx:version"
         let expected_attr = format!("data-group-id=\"{}\"", stable_id(&real_gid));

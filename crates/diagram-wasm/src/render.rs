@@ -47,7 +47,7 @@ pub fn render_svg(handle: u32, page_idx: u64) -> Result<String, JsValue> {
             })?;
 
         SvgRenderer::new()
-            .render(&scene, page.page_id)
+            .render(&scene, page.page_id, None)
             .map_err(|err| Box::leak(format!("{err:?}").into_boxed_str()) as &str)
     })
     .and_then(|r| r)
@@ -125,7 +125,7 @@ pub fn write_svg_to_buffer(handle: u32, page_idx: u64) -> Result<usize, JsValue>
 
         // Render the page (produces owned String)
         let svg = SvgRenderer::new()
-            .render(&scene, page.page_id)
+            .render(&scene, page.page_id, None)
             .map_err(|err| Box::leak(format!("{err:?}").into_boxed_str()) as &str)?;
 
         // Write to the SVG buffer (borrows e.buffers mutably — different field, OK)

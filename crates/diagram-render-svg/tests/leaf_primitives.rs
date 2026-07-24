@@ -39,7 +39,7 @@ fn simple_rect_renders_correctly() {
 
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let svg = renderer.render(&scene, PageId::default()).unwrap();
+    let svg = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Assert output begins with correct SVG tag
     assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 827 1169\" preserveAspectRatio=\"none\">"));
@@ -69,7 +69,7 @@ fn simple_rect_renders_correctly() {
 fn empty_scene_missing_page_returns_error() {
     let scene = Scene { pages: vec![] };
     let renderer = SvgRenderer::new();
-    let result = renderer.render(&scene, PageId::default());
+    let result = renderer.render(&scene, PageId::default(), None);
     assert!(matches!(
         result,
         Err(RenderError::PageNotFound { page_id: _ })
@@ -105,7 +105,7 @@ fn rect_with_no_style_renders() {
 
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let svg = renderer.render(&scene, PageId::default()).unwrap();
+    let svg = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Should render the rect with no style attributes (but with data-vertex-id)
     assert!(svg.contains("x=\"0\""));
@@ -165,7 +165,7 @@ fn multiple_rects_render_in_order() {
 
     let scene = Scene { pages: vec![page] };
     let renderer = SvgRenderer::new();
-    let svg = renderer.render(&scene, PageId::default()).unwrap();
+    let svg = renderer.render(&scene, PageId::default(), None).unwrap();
 
     // Both rects should be present
     assert!(svg.contains("fill=\"#ff0000\""));
