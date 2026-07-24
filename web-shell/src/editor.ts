@@ -2553,6 +2553,11 @@ export class Editor {
       return;
     }
     this.#viewer.innerHTML = renderResult.value;
+    // Re-apply the viewport so the new SVG reflects the current pan/zoom state
+    if (this.#viewport) {
+      const svgEl = this.#viewer.querySelector('svg');
+      if (svgEl) this.#viewport.applyToSvgElement(svgEl);
+    }
     // Notify state change (e.g. for undo/redo button updates)
     this.#onStateChange();
 

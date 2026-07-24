@@ -1254,6 +1254,7 @@ async function bootstrap(): Promise<void> {
     }
     if (activePages.length > 0) {
       mountSvg(ui.viewer, activePages[0]!.svg);
+      zoomPan?.applyViewport();
       refreshMathOverlay();
       populatePageTabs(ui.pageTabContainer, activePages, 0, {
         onSelect: handlePageSelect,

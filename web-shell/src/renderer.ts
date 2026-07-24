@@ -66,6 +66,11 @@ export interface ZoomPanControls {
   fitToView(_padding?: number): void;
   /** Pan viewport by a delta in pre-scale (pan-space) pixels. */
   panBy(_dx: number, _dy: number): void;
+  /**
+   * Re-apply the current viewport state to the SVG element.
+   * Call this after the SVG innerHTML is replaced (e.g., after mountSvg or #replay).
+   */
+  applyViewport(): void;
   /** The underlying Viewport instance for direct manipulation. */
   viewport: Viewport;
 }
@@ -322,5 +327,5 @@ export function setupZoomPan(
     if (e.button === 1) e.preventDefault();
   });
 
-  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView, panBy, viewport };
+  return { setZoom, getZoom, resetView, setPan, clientToDoc, fitToView, panBy, applyViewport, viewport };
 }
