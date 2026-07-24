@@ -22,6 +22,12 @@ describe('FrameBudgetMonitor', () => {
     vi.restoreAllMocks();
   });
 
+  /** Drain ALL pending RAF callbacks with the given time. */
+  function tickFrame(time: number): void {
+    const pending = rafCallbacks.splice(0);
+    for (const cb of pending) cb(time);
+  }
+
   it('starts disabled and reports zeros', () => {
     const monitor = new FrameBudgetMonitor();
     expect(monitor.getStats()).toEqual({ fps: 0, frameMs: 0 });
@@ -49,9 +55,9 @@ describe('FrameBudgetMonitor', () => {
     monitor.start(onStats);
 
     // Trigger first frame
-    rafCallbacks.forEach((cb) => cb(100));
+    tickFrame(100);
     // Trigger second frame after 16ms
-    rafCallbacks.forEach((cb) => cb(116));
+    tickFrame(116);
 
     const stats = monitor.getStats();
     expect(stats.frameMs).toBeGreaterThan(0);
@@ -81,14 +87,14 @@ describe('FrameBudgetMonitor', () => {
     monitor.start(onStats);
 
     // Simulate 120Hz: frames at 8.33ms intervals
-    // After 250ms we should have at most 1 callback (250/8.33 ≈ 30 frames but only 1 HUD update)
+    // 32 frames needed: 30*8.33 = 249.9ms delta (just under 250), 31*8.33 = 258.23ms >= 250
     const FRAME_MS = 8.33;
     const HUD_INTERVAL_MS = 250;
 
-    // Advance time: 30 frames at 120Hz = ~250ms worth of frames
-    for (let i = 0; i < 30; i++) {
+    // Advance time: 32 frames at 120Hz = ~266ms (enough to trigger HUD once)
+    for (let i = 0; i < 32; i++) {
       const time = 100 + i * FRAME_MS;
-      rafCallbacks.forEach((cb) => cb(time));
+      tickFrame(time);
     }
 
     // Should have exactly 1 HUD callback (4Hz throttle)
@@ -108,7 +114,7 @@ describe('FrameBudgetMonitor', () => {
     // Advance time: 36 frames at 144Hz = ~250ms worth of frames
     for (let i = 0; i < 36; i++) {
       const time = 100 + i * FRAME_MS;
-      rafCallbacks.forEach((cb) => cb(time));
+      tickFrame(time);
     }
 
     // Should have at most 1 HUD callback (4Hz throttle)
@@ -128,7 +134,7 @@ describe('FrameBudgetMonitor', () => {
     // Advance time: 60 frames at 240Hz = ~250ms worth of frames
     for (let i = 0; i < 60; i++) {
       const time = 100 + i * FRAME_MS;
-      rafCallbacks.forEach((cb) => cb(time));
+      tickFrame(time);
     }
 
     // Should have at most 1 HUD callback (4Hz throttle)
