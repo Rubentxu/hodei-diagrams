@@ -351,6 +351,10 @@ export interface HodeiDebug {
   pasteFiftyVertices: () => SlotmapId[];
   /** Return the number of renderPage calls since page load. */
   getRenderCount: () => number;
+  /** Return the current session, or null if no session is active. */
+  getSession: () => unknown;
+  /** Return the current editor instance, or null if no editor is active. */
+  getEditor: () => unknown;
 }
 
 declare global {

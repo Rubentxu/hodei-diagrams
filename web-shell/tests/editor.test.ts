@@ -762,5 +762,45 @@ describe('Editor', () => {
       // Undo should have been called exactly once (all vertices undone in one operation)
       expect(wasm.undo).toHaveBeenCalledTimes(1);
     });
+
+    it('refreshScene() invokes #onError exactly once on decode failure (REQ-QFIX-003)', () => {
+      // Create editor with error spy passed through constructor
+      const onErrorSpy = vi.fn();
+      const errorEditor = new Editor(session, viewer, onErrorSpy);
+      errorEditor.attach();
+
+      // Mock decodeSceneBuffer to return failure
+      vi.spyOn(session, 'decodeSceneBuffer').mockReturnValue({
+        ok: false,
+        error: 'mock decode error',
+      });
+
+      errorEditor.refreshScene();
+
+      expect(onErrorSpy).toHaveBeenCalledTimes(1);
+      expect(onErrorSpy).toHaveBeenCalledWith('mock decode error');
+
+      errorEditor.detach();
+    });
+
+    it('triggerReplay() invokes #onError exactly once on decode failure (REQ-QFIX-003)', () => {
+      // Create editor with error spy passed through constructor
+      const onErrorSpy = vi.fn();
+      const errorEditor = new Editor(session, viewer, onErrorSpy);
+      errorEditor.attach();
+
+      // Mock decodeSceneBuffer to return failure
+      vi.spyOn(session, 'decodeSceneBuffer').mockReturnValue({
+        ok: false,
+        error: 'mock decode error',
+      });
+
+      errorEditor.triggerReplay();
+
+      expect(onErrorSpy).toHaveBeenCalledTimes(1);
+      expect(onErrorSpy).toHaveBeenCalledWith('mock decode error');
+
+      errorEditor.detach();
+    });
   });
 });

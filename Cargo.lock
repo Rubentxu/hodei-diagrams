@@ -712,7 +712,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-compat-testkit"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-core"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "bitflags 2.13.0",
  "chrono",
@@ -740,7 +740,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-format-drawio"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "base64",
  "diagram-core",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-layout"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "diagram-core",
  "diagram-format-drawio",
@@ -764,7 +764,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-render-svg"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "criterion",
  "diagram-core",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-render-wgpu"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "bytemuck",
  "diagram-core",
@@ -791,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-routing"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "diagram-core",
  "pathfinding",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-scene"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "diagram-core",
  "diagram-stencils",
@@ -813,7 +813,7 @@ dependencies = [
 
 [[package]]
 name = "diagram-stencils"
-version = "0.115.0"
+version = "0.116.0"
 dependencies = [
  "quick-xml 0.40.1",
  "serde",

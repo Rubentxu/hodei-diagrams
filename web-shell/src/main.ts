@@ -2266,7 +2266,7 @@ async function bootstrap(): Promise<void> {
     frameBudgetMonitor?.stop();
   });
 
-  (window as unknown as Record<string, unknown>).__hodeiDebug = {
+  window.__hodeiDebug = {
     getScene: () => {
       const result = activeEditor?.getSceneCache();
       if (!result || !result.ok) return [];
@@ -2392,8 +2392,8 @@ async function bootstrap(): Promise<void> {
       if (!cache || !cache.ok || cache.value.length === 0) return null;
       // 1. Create source + target rects via existing addRectAt
       const w = 60, h = 40;
-      (window as any).__hodeiDebug.addRectAt(x1, y1, w, h);
-      (window as any).__hodeiDebug.addRectAt(x2, y2, w, h);
+      window.__hodeiDebug!.addRectAt(x1, y1, w, h);
+      window.__hodeiDebug!.addRectAt(x2, y2, w, h);
       activeEditor.refreshScene?.();
       // 2. Read back the two new vertex ids from the scene
       const fresh = activeEditor.getSceneCache?.();
@@ -2417,7 +2417,7 @@ async function bootstrap(): Promise<void> {
         if (!br.ok) return null;
       }
       activeEditor.refreshScene?.();
-      return { edgeId, fromId, toId };
+      return { edgeId: `${edgeId.idx}/${edgeId.version}`, fromId: `${fromId.idx}/${fromId.version}`, toId: `${toId.idx}/${toId.version}` };
     },
     getFrameStats: () => frameBudgetMonitor?.getStats() ?? { fps: 0, frameMs: 0 },
     hideFrameStats: () => hud?.hideFrameStats?.(),

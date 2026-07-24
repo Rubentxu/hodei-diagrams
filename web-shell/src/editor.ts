@@ -1731,11 +1731,13 @@ export class Editor {
     this.refreshScene();
   }
 
-  /** Refresh scene cache from engine. Call after import or page switch. */
+  /**
+   * Refresh scene cache from engine. Call after import or page switch.
+   * Errors are reported by #sceneSync() with the engine-specific message;
+   * this method MUST NOT emit a second generic error.
+   */
   refreshScene(): void {
-    if (!this.#sceneSync()) {
-      this.#onError('Failed to decode scene buffer');
-    }
+    this.#sceneSync();
   }
 
   /** Get scene cache for E2E debugging. */
