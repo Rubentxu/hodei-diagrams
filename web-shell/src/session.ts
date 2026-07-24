@@ -19,6 +19,8 @@ export class DiagramEngineSession {
   private readonly wasm: WasmModule;
   private readonly handle: EngineHandle;
   private disposed: boolean;
+  #lastSceneBufferBytes: number | null = null;
+  #lastSvgBufferBytes: number | null = null;
 
   private constructor(wasm: WasmModule, handle: EngineHandle) {
     this.wasm = wasm;
@@ -55,6 +57,22 @@ export class DiagramEngineSession {
       return err('Disposed: Engine session was disposed');
     }
     return ok(undefined);
+  }
+
+  /** WASM linear-memory byte length; 0 if no memory exposed. */
+  getWasmMemoryBytes(): number {
+    const mem = (this.wasm as unknown as { memory?: WebAssembly.Memory }).memory;
+    return mem?.buffer.byteLength ?? 0;
+  }
+
+  /** Last scene-buffer payload bytes; null before first render. */
+  getSceneBufferBytes(): number | null {
+    return this.#lastSceneBufferBytes;
+  }
+
+  /** Last SVG-buffer payload bytes; null before first render. */
+  getSvgBufferBytes(): number | null {
+    return this.#lastSvgBufferBytes;
   }
 
   importDrawio(xml: string): Result<void, EngineError> {
@@ -405,6 +423,7 @@ export class DiagramEngineSession {
       const handle = this.handle as number;
       const len = this.wasm.write_scene_to_buffer(handle);
       const ptr = this.wasm.get_scene_buffer_ptr(handle);
+      if (len > 0) this.#lastSceneBufferBytes = len;
       return ok({ ptr, len });
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
@@ -455,6 +474,7 @@ export class DiagramEngineSession {
       const { x = 0, y = 0, w = 0, h = 0 } = viewport ?? {};
       const len = this.wasm.write_svg_to_buffer(handle, BigInt(pageIdx), x, y, w, h);
       const ptr = this.wasm.get_svg_buffer_ptr(handle);
+      if (len > 0) this.#lastSvgBufferBytes = len;
       return ok({ ptr, len });
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
