@@ -2189,6 +2189,33 @@ async function bootstrap(): Promise<void> {
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
   const frameBudgetMonitor = new FrameBudgetMonitor();
 
+  // ─── 15.1. Activate performance monitoring via ?perf=1 ─────────────────────
+  const urlParams = new URLSearchParams(window.location.search);
+  const perfEnabled = urlParams.get('perf') === '1';
+  let perfIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  if (perfEnabled) {
+    frameBudgetMonitor.start((stats) => {
+      ui.hud.setFrameStats?.(stats);
+    });
+
+    // Poll memory at 1Hz
+    perfIntervalId = setInterval(() => {
+      const memStats = {
+        wasmBytes: activeSession?.getWasmMemoryBytes() ?? 0,
+        sceneBytes: activeSession?.getSceneBufferBytes() ?? null,
+        svgBytes: activeSession?.getSvgBufferBytes() ?? null,
+      };
+      ui.hud.setMemoryStats?.(memStats);
+    }, 1000);
+  }
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    if (perfIntervalId !== null) clearInterval(perfIntervalId);
+    frameBudgetMonitor.stop();
+  });
+
   (window as unknown as Record<string, unknown>).__hodeiDebug = {
     getScene: () => {
       const result = activeEditor?.getSceneCache();
@@ -2346,6 +2373,7 @@ async function bootstrap(): Promise<void> {
     getWasmMemoryBytes: () => activeSession?.getWasmMemoryBytes() ?? 0,
     getSceneBufferBytes: () => activeSession?.getSceneBufferBytes() ?? null,
     getSvgBufferBytes: () => activeSession?.getSvgBufferBytes() ?? null,
+    frameBudgetMonitor,
     manualSaveVersion,
   };
 
