@@ -39,7 +39,7 @@ pub fn cull_display_list<'a>(
 mod tests {
     use super::*;
     use crate::ResolvedStyle;
-    use crate::element::{GroupElement, LineElement, RectElement};
+    use crate::element::{EntityId, GroupElement, LineElement, PathElement, RectElement};
     use diagram_core::geometry::{Point, Size};
     use diagram_core::{EdgeId, GroupId, VertexId};
 
@@ -100,20 +100,50 @@ mod tests {
         assert!(should_include(&elem, &viewport));
     }
 
+    // REQ-CULL-002: Missing or degenerate bounds — conservative inclusion
     #[test]
-    fn none_bounds_conservative() {
-        // GroupElement always has bounds (explicit field), but let's verify no panic
+    fn none_bounds_conservative_path() {
+        // PathElement with empty points has bounds() == None
+        // should_include should return true (conservative inclusion)
         let viewport = make_rect(0.0, 0.0, 10.0, 10.0);
-        let elem = VisualElement::Group(GroupElement {
-            id: GroupId::default(),
-            bounds: make_rect(0.0, 0.0, 0.0, 0.0), // empty group
+        let elem = VisualElement::Path(PathElement {
+            id: EdgeId::default(),
+            points: vec![], // empty path → bounds() returns None
             style: ResolvedStyle::default(),
-            children: vec![],
-            clip: false,
-            header: None,
         });
-        // Should not panic and returns the intersect result
-        let _ = should_include(&elem, &viewport);
+        // Should not panic and should return true (conservative)
+        assert!(should_include(&elem, &viewport));
+    }
+
+    #[test]
+    fn degenerate_1x1_at_edge_included() {
+        // Text elements return degenerate 1x1 box at anchor
+        // A 1x1 box at (150, 150) with viewport (0,0,100,100) is outside
+        let viewport = make_rect(0.0, 0.0, 100.0, 100.0);
+        let elem = VisualElement::Text(crate::element::TextElement {
+            owner: EntityId::Vertex(VertexId::default()),
+            anchor: Point { x: 150.0, y: 150.0 },
+            text: "Label".to_owned(),
+            style: ResolvedStyle::default(),
+            is_math: false,
+        });
+        // 1x1 box at (150,150) is outside viewport (0,0,100,100)
+        assert!(!should_include(&elem, &viewport));
+    }
+
+    #[test]
+    fn degenerate_1x1_intersecting_included() {
+        // Text element at (50, 50) — 1x1 box intersects viewport (0,0,100,100)
+        let viewport = make_rect(0.0, 0.0, 100.0, 100.0);
+        let elem = VisualElement::Text(crate::element::TextElement {
+            owner: EntityId::Vertex(VertexId::default()),
+            anchor: Point { x: 50.0, y: 50.0 },
+            text: "Label".to_owned(),
+            style: ResolvedStyle::default(),
+            is_math: false,
+        });
+        // 1x1 box at (50,50) to (51,51) intersects viewport
+        assert!(should_include(&elem, &viewport));
     }
 
     #[test]
@@ -157,6 +187,23 @@ mod tests {
             make_rect_elem(500.0, 500.0, 50.0, 50.0), // outside
         ];
         let culled = cull_display_list(&elems, &viewport, DEFAULT_MARGIN);
+        assert_eq!(culled.len(), 1);
+        assert_eq!(
+            culled[0].bounds().map(|b| (b.origin.x, b.origin.y)),
+            Some((10.0, 10.0))
+        );
+    }
+
+    // REQ-CULL-005: Zero margin — element clearly outside viewport is excluded
+    #[test]
+    fn zero_margin_excludes_offscreen() {
+        let viewport = make_rect(0.0, 0.0, 100.0, 100.0);
+        let elems = vec![
+            make_rect_elem(10.0, 10.0, 20.0, 20.0),   // inside
+            make_rect_elem(200.0, 200.0, 50.0, 50.0), // outside (way outside)
+        ];
+        // margin = 0.0 means no inflation
+        let culled = cull_display_list(&elems, &viewport, 0.0);
         assert_eq!(culled.len(), 1);
         assert_eq!(
             culled[0].bounds().map(|b| (b.origin.x, b.origin.y)),

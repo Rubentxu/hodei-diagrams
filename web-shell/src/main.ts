@@ -1253,7 +1253,23 @@ async function bootstrap(): Promise<void> {
       activeEditor.refreshScene();
     }
     if (activePages.length > 0) {
-      mountSvg(ui.viewer, activePages[0]!.svg);
+      // Compute initial viewport from container size for culling.
+      // This viewport will be used for the initial render so the DOM only
+      // contains shapes within the visible area (REQ-CULL-008).
+      const containerRect = ui.canvasContainer.getBoundingClientRect();
+      const viewport = { x: 0, y: 0, w: containerRect.width, h: containerRect.height };
+      const pageIdx = Number(activePages[0]!.pageId);
+      // renderPage with viewport gives culled render for the active page.
+      // renderAllPages still caches full renders for all pages (for tabs).
+      const culledResult = activeSession.renderPage(pageIdx, viewport);
+      if (culledResult.ok) {
+        mountSvg(ui.viewer, culledResult.value);
+      } else {
+        // Fallback: mount full render if culled render fails
+        mountSvg(ui.viewer, activePages[0]!.svg);
+      }
+      // Apply viewport so the viewBox reflects the current pan/zoom state.
+      // After this, zoomPan is initialized so applyViewport will work.
       zoomPan?.applyViewport();
       refreshMathOverlay();
       populatePageTabs(ui.pageTabContainer, activePages, 0, {

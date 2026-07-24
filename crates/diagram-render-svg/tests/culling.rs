@@ -142,3 +142,43 @@ fn sentinel_viewport_equiv_none() {
         "sentinel viewport should produce full render"
     );
 }
+
+/// REQ-CULL-009: Referenced definitions (clip-path) are preserved in output.
+/// When a group has clip=true, the clip-path def is generated and referenced
+/// by the group. Even if the group is partially culled, the def should be
+/// present in the output so references remain valid.
+#[test]
+fn cull_preserves_clip_path_defs() {
+    // Group with clip=true, one child inside viewport, one outside
+    let child_inside = make_rect_elem(50.0, 50.0, 30.0, 30.0);
+    let child_outside = make_rect_elem(500.0, 500.0, 30.0, 30.0);
+
+    let group = VisualElement::Group(GroupElement {
+        id: diagram_core::GroupId::default(),
+        bounds: make_rect(50.0, 50.0, 480.0, 480.0),
+        style: ResolvedStyle::default(),
+        children: vec![child_inside, child_outside],
+        clip: true, // Enable clipping — generates clip-path def
+        header: None,
+    });
+
+    let page = make_page(vec![group]);
+    let scene = make_scene(page);
+
+    let renderer = SvgRenderer::new();
+    // Viewport that shows only the inside child
+    let viewport = make_rect(0.0, 0.0, 200.0, 200.0);
+    let svg = renderer
+        .render(&scene, PageId::default(), Some(viewport))
+        .unwrap();
+
+    // The clip-path def should be present (referenced by the group)
+    assert!(
+        svg.contains("<clipPath"),
+        "clip-path def should be present when group has clip=true"
+    );
+    // The inside child should be rendered
+    assert!(svg.contains("x=\"50\""), "inside child should be rendered");
+    // The outside child should NOT be rendered
+    assert!(!svg.contains("x=\"500\""), "outside child should be culled");
+}

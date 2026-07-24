@@ -2,11 +2,12 @@
 //!
 //! Run with: `cargo bench -p diagram-render-svg culling`
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use diagram_core::VertexId;
 use diagram_core::geometry::{Point, Rect, Size};
 use diagram_render_svg::SvgRenderer;
 use diagram_scene::{PageId, RectElement, ResolvedStyle, Scene, VisualElement};
+use std::hint::black_box;
 
 fn make_rect(x: f64, y: f64, w: f64, h: f64) -> Rect {
     Rect {
