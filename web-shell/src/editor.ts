@@ -1832,6 +1832,12 @@ export class Editor {
 
   /** Detach event listeners from the viewer container. */
   detach(): void {
+    // Cancel any pending rAF render to prevent post-detach callbacks
+    if (this.#rafHandle !== null) {
+      cancelAnimationFrame(this.#rafHandle);
+      this.#rafHandle = null;
+    }
+    this.#renderPending = false;
     this.#abortController?.abort();
     this.#abortController = null;
     // Clean up any active drag listeners
