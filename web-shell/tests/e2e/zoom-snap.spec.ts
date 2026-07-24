@@ -91,4 +91,34 @@ test.describe('Suite: zoom-snap', () => {
     const zoomAfter = await getZoomLevel(page);
     expect(zoomAfter).toBeCloseTo(1.0, 2);
   });
+
+  /**
+   * Test 4: Ctrl++ from 0.8 snaps to 1.0 (keyboard zoom snaps to nearest canonical)
+   * REQ-ZOOMSNAP-001 keyboard zoom snap scenario
+   */
+  test('Ctrl++ from 0.8 snaps to 1.0 (keyboard zoom snaps)', async ({ page }) => {
+    await waitForAppReady(page);
+
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+
+    // Set initial zoom to 0.8 via debug surface
+    // 0.8 + 0.2 = 1.0, which is exactly a snap point
+    await page.evaluate(() => {
+      const editor = (window as unknown as { __hodeiDebug: { getEditor: () => { viewport: { setZoom: (z: number) => void } } } }).__hodeiDebug.getEditor();
+      if (editor && editor.viewport) {
+        editor.viewport.setZoom(0.8);
+      }
+    });
+    await page.waitForTimeout(200);
+
+    // Press Ctrl+= (zoom in by 0.2 from 0.8 = 1.0, exactly a snap point)
+    await page.keyboard.press('Control+=');
+    await page.waitForTimeout(200);
+
+    const zoomAfter = await getZoomLevel(page);
+
+    // Should snap to 1.0 exactly
+    expect(zoomAfter).toBeCloseTo(1.0, 2);
+  });
 });

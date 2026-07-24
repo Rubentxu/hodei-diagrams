@@ -124,4 +124,82 @@ test.describe('Suite: wasm-memory', () => {
     // The key point is WASM memory never shrinks by design
     expect(afterUndoBytes).toBeGreaterThanOrEqual(initialBytes);
   });
+
+  /**
+   * Test 5: getSvgBufferBytes returns positive after render
+   * REQ-WASMMEM-002 SVG payload scenario
+   */
+  test('getSvgBufferBytes returns positive after render', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Load a file to trigger a render
+    await page.setInputFiles('[data-testid="file-input"]', SIMPLE_RECT_PATH);
+    await page.waitForSelector('[data-testid="viewer"] svg', { timeout: 5000 });
+    await page.waitForTimeout(300);
+
+    // Get SVG buffer bytes via debug surface
+    const bytes = await page.evaluate(() => {
+      const session = (window as unknown as { __hodeiDebug: { getSession: () => unknown } }).__hodeiDebug.getSession();
+      if (!session) return null;
+      return (session as unknown as { getSvgBufferBytes: () => number | null }).getSvgBufferBytes();
+    });
+
+    // After render, SVG buffer should be positive
+    expect(bytes).not.toBeNull();
+    expect(bytes!).toBeGreaterThan(0);
+  });
+
+  /**
+   * Test 6: Real memory retention test — 100 undo/redo cycles on rich fixture
+   * REQ-WASMMEM-003 retained pages scenario with substantial undo history
+   */
+  test('memory does NOT shrink after 100 undo/redo cycles on rich fixture', async ({ page }) => {
+    await waitForAppReady(page);
+
+    // Create a richer fixture by adding 50 rectangles via debug surface
+    const rectCount = 50;
+    await page.evaluate((count) => {
+      const debug = (window as unknown as { __hodeiDebug: { addRectAt: (x: number, y: number, w: number, h: number) => unknown } }).__hodeiDebug;
+      for (let i = 0; i < count; i++) {
+        // Place rectangles in a grid pattern
+        const x = 50 + (i % 10) * 100;
+        const y = 50 + Math.floor(i / 10) * 60;
+        debug.addRectAt(x, y, 80, 40);
+      }
+    }, rectCount);
+
+    // Wait for scene to settle
+    await page.waitForTimeout(500);
+
+    // Record initial memory after creating shapes
+    const initialBytes = await page.evaluate(() => {
+      const session = (window as unknown as { __hodeiDebug: { getSession: () => unknown } }).__hodeiDebug.getSession();
+      if (!session) return 0;
+      return (session as unknown as { getWasmMemoryBytes: () => number }).getWasmMemoryBytes();
+    });
+
+    expect(initialBytes).toBeGreaterThan(0);
+
+    // Perform 100 undo cycles
+    for (let i = 0; i < 100; i++) {
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(10);
+    }
+
+    // Perform 100 redo cycles
+    for (let i = 0; i < 100; i++) {
+      await page.keyboard.press('Control+y');
+      await page.waitForTimeout(10);
+    }
+
+    // Get memory after undo/redo
+    const afterCyclesBytes = await page.evaluate(() => {
+      const session = (window as unknown as { __hodeiDebug: { getSession: () => unknown } }).__hodeiDebug.getSession();
+      if (!session) return 0;
+      return (session as unknown as { getWasmMemoryBytes: () => number }).getWasmMemoryBytes();
+    });
+
+    // Memory should NOT shrink after undo/redo cycles (WASM pages are retained)
+    expect(afterCyclesBytes).toBeGreaterThanOrEqual(initialBytes);
+  });
 });

@@ -581,6 +581,13 @@ export function buildNavbar(session: DiagramEngineSession): NavbarControls {
   copySvgItem.title = 'Copy the active page SVG to clipboard';
   extrasList.appendChild(copySvgItem);
 
+  const perfToggleItem = document.createElement('button');
+  perfToggleItem.className = 'menu-item';
+  perfToggleItem.textContent = 'Performance Monitor';
+  perfToggleItem.setAttribute('data-testid', 'menu-perf-toggle');
+  perfToggleItem.title = 'Toggle performance monitoring (requires ?perf=1 in URL)';
+  extrasList.appendChild(perfToggleItem);
+
   const preferencesItem = document.createElement('button');
   preferencesItem.className = 'menu-item';
   preferencesItem.textContent = 'Preferences';

@@ -59,6 +59,7 @@ let last_saved_at = 0;
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let autoSavedTimer: ReturnType<typeof setTimeout> | null = null;
 let hud: HudControls | null = null;
+let frameBudgetMonitor: FrameBudgetMonitor | null = null;
 
 // ─── Grid overlay state ───────────────────────────────────────────────────────
 const GRID_LS_KEY = 'hodei:grid-visible';
@@ -649,6 +650,9 @@ async function bootstrap(): Promise<void> {
   // Make hud accessible to module-level save functions
   hud = ui.hud;
 
+  // Initialize frame budget monitor (created early so menu toggle can reference it)
+  frameBudgetMonitor = new FrameBudgetMonitor();
+
   // Start loading stencil libraries — HUD is now ready to receive callbacks
   stencilManager.startAutoLoad();
 
@@ -767,6 +771,52 @@ async function bootstrap(): Promise<void> {
       copySvgTimer = setTimeout(() => { menuCopySvg.textContent = original; }, 1500);
     } catch (err) {
       console.warn('[copy-svg] Clipboard write failed:', err);
+    }
+  });
+
+  // ─── 13.6.2. Wire Extras > Performance Monitor toggle ─────────────────────
+  // Requires BOTH ?perf=1 query string AND the menu toggle per REQ-AFBUDGET-002.
+  // The ?perf=1 flag is read from URL later; we capture it via the module-level
+  // perfEnabled variable set in the debug API section below.
+  const menuPerfToggle = document.querySelector('[data-testid="menu-perf-toggle"]');
+  let perfToggleActive = false;
+
+  function startPerfMonitor(): void {
+    if (!frameBudgetMonitor || frameBudgetMonitor.isRunning()) return;
+    frameBudgetMonitor.start((stats) => {
+      hud?.setFrameStats?.(stats);
+    });
+    // Show FPS and memory HUD items
+    const fpsItem = hud?.container.querySelector('[data-testid="hud-fps"]') as HTMLElement | null;
+    const memoryItem = hud?.container.querySelector('[data-testid="hud-memory"]') as HTMLElement | null;
+    if (fpsItem) fpsItem.style.display = 'flex';
+    if (memoryItem) memoryItem.style.display = 'flex';
+  }
+
+  function stopPerfMonitor(): void {
+    if (!frameBudgetMonitor) return;
+    frameBudgetMonitor.stop();
+    // Hide FPS and memory HUD items
+    const fpsItem = hud?.container.querySelector('[data-testid="hud-fps"]') as HTMLElement | null;
+    const memoryItem = hud?.container.querySelector('[data-testid="hud-memory"]') as HTMLElement | null;
+    if (fpsItem) fpsItem.style.display = 'none';
+    if (memoryItem) memoryItem.style.display = 'none';
+  }
+
+  menuPerfToggle?.addEventListener('click', () => {
+    // ?perf=1 must be set in URL for the toggle to have any effect
+    const perfFlag = new URLSearchParams(window.location.search).get('perf') === '1';
+    if (!perfFlag) return; // perf not enabled via URL
+
+    perfToggleActive = !perfToggleActive;
+    if (perfToggleActive) {
+      startPerfMonitor();
+      startPerfPolling();
+      menuPerfToggle.classList.add('has-checkmark');
+    } else {
+      stopPerfMonitor();
+      stopPerfPolling();
+      menuPerfToggle.classList.remove('has-checkmark');
     }
   });
 
@@ -1635,21 +1685,6 @@ async function bootstrap(): Promise<void> {
     activeEditor?.selectAll();
   });
 
-  // View > Zoom In
-  const menuZoomIn = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(1)');
-  menuZoomIn?.addEventListener('click', () => applyZoomStep(+0.2));
-
-  // View > Zoom Out
-  const menuZoomOut = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(2)');
-  menuZoomOut?.addEventListener('click', () => applyZoomStep(-0.2));
-
-  // View > Zoom Reset
-  const menuZoomReset = document.querySelector('[data-testid="menu-view"] .menu-item:nth-child(3)');
-  menuZoomReset?.addEventListener('click', () => {
-    zoomPan?.resetView();
-    ui.zoomDisplay.textContent = '100%';
-  });
-
   // View > Present
   const menuPresent = document.querySelector('[data-testid="menu-present"]');
   menuPresent?.addEventListener('click', () => {
@@ -2187,33 +2222,41 @@ async function bootstrap(): Promise<void> {
   ui.canvasContainer.style.setProperty('--zoom', '1');
 
   // ─── 15. Expose debug API for E2E tests ───────────────────────────────────
-  const frameBudgetMonitor = new FrameBudgetMonitor();
+  // frameBudgetMonitor is already initialized at module level (line ~62)
+  // and created early in bootstrap (line ~653) so menu toggle can reference it.
 
-  // ─── 15.1. Activate performance monitoring via ?perf=1 ─────────────────────
+  // ─── 15.1. Performance monitoring requires BOTH ?perf=1 AND menu toggle ─────
   const urlParams = new URLSearchParams(window.location.search);
   const perfEnabled = urlParams.get('perf') === '1';
   let perfIntervalId: ReturnType<typeof setInterval> | null = null;
 
-  if (perfEnabled) {
-    frameBudgetMonitor.start((stats) => {
-      ui.hud.setFrameStats?.(stats);
-    });
+  // Store whether menu toggle has been activated (requires ?perf=1)
+  let perfMenuActive = false;
 
-    // Poll memory at 1Hz
+  // Start memory polling when menu toggle is activated
+  function startPerfPolling(): void {
+    if (perfIntervalId !== null) return; // already polling
     perfIntervalId = setInterval(() => {
       const memStats = {
         wasmBytes: activeSession?.getWasmMemoryBytes() ?? 0,
         sceneBytes: activeSession?.getSceneBufferBytes() ?? null,
         svgBytes: activeSession?.getSvgBufferBytes() ?? null,
       };
-      ui.hud.setMemoryStats?.(memStats);
+      hud?.setMemoryStats?.(memStats);
     }, 1000);
+  }
+
+  function stopPerfPolling(): void {
+    if (perfIntervalId !== null) {
+      clearInterval(perfIntervalId);
+      perfIntervalId = null;
+    }
   }
 
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     if (perfIntervalId !== null) clearInterval(perfIntervalId);
-    frameBudgetMonitor.stop();
+    frameBudgetMonitor?.stop();
   });
 
   (window as unknown as Record<string, unknown>).__hodeiDebug = {
@@ -2369,7 +2412,7 @@ async function bootstrap(): Promise<void> {
       activeEditor.refreshScene?.();
       return { edgeId, fromId, toId };
     },
-    getFrameStats: () => frameBudgetMonitor.getStats(),
+    getFrameStats: () => frameBudgetMonitor?.getStats() ?? { fps: 0, frameMs: 0 },
     getWasmMemoryBytes: () => activeSession?.getWasmMemoryBytes() ?? 0,
     getSceneBufferBytes: () => activeSession?.getSceneBufferBytes() ?? null,
     getSvgBufferBytes: () => activeSession?.getSvgBufferBytes() ?? null,

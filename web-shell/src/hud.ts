@@ -10,13 +10,10 @@
  * Monospace font, subtle text, minimal visual weight.
  */
 
+import type { FrameStats } from './frame-budget-monitor.js';
+
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'auto-saved';
 export type LoadingState = { wasm: boolean; stencil: boolean };
-
-export interface FrameStats {
-  fps: number;
-  frameMs: number;
-}
 
 export interface MemoryStats {
   wasmBytes: number;
@@ -320,9 +317,24 @@ export function buildHud(): HudControls {
       fpsItem.style.display = fpsItem.style.display === 'none' ? 'flex' : fpsItem.style.display;
     },
     setMemoryStats: (stats: MemoryStats) => {
-      const mb = stats.wasmBytes / (1024 * 1024);
-      const label = mb >= 1 ? `${mb.toFixed(1)} MB` : `${(stats.wasmBytes / 1024).toFixed(0)} KB`;
-      memoryValue.textContent = `WASM heap · grows by design · ${label}`;
+      const wasmMb = stats.wasmBytes / (1024 * 1024);
+      const wasmLabel = wasmMb >= 1 ? `${wasmMb.toFixed(1)} MB` : `${(stats.wasmBytes / 1024).toFixed(0)} KB`;
+
+      // Format scene bytes if available
+      let sceneLabel = '—';
+      if (stats.sceneBytes != null && stats.sceneBytes > 0) {
+        const sceneKb = stats.sceneBytes / 1024;
+        sceneLabel = sceneKb >= 1 ? `${sceneKb.toFixed(0)} KB` : `${stats.sceneBytes} B`;
+      }
+
+      // Format SVG bytes if available
+      let svgLabel = '—';
+      if (stats.svgBytes != null && stats.svgBytes > 0) {
+        const svgKb = stats.svgBytes / 1024;
+        svgLabel = svgKb >= 1 ? `${svgKb.toFixed(0)} KB` : `${stats.svgBytes} B`;
+      }
+
+      memoryValue.textContent = `WASM ${wasmLabel} · scene ${sceneLabel} · svg ${svgLabel}`;
       memoryItem.style.display = memoryItem.style.display === 'none' ? 'flex' : memoryItem.style.display;
     },
   };

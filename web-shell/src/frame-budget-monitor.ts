@@ -70,17 +70,17 @@ export class FrameBudgetMonitor {
       const deltaMs = now - this.#lastFrameTs;
       // EMA smoothing: EMA = alpha * sample + (1 - alpha) * EMA
       this.#emaFrameMs = this.#emaAlpha * deltaMs + (1 - this.#emaAlpha) * this.#emaFrameMs;
-    }
-    this.#lastFrameTs = now;
 
-    // Throttle onStatsUpdate to 4Hz (every 250ms)
-    this.#hudAccumulator += 16.67; // approximate frame time
-    if (this.#hudAccumulator >= this.#hudIntervalMs) {
-      this.#hudAccumulator = 0;
-      if (this.#onStats) {
-        this.#onStats(this.getStats());
+      // Throttle onStatsUpdate to 4Hz (every 250ms)
+      this.#hudAccumulator += deltaMs;
+      if (this.#hudAccumulator >= this.#hudIntervalMs) {
+        this.#hudAccumulator = 0;
+        if (this.#onStats) {
+          this.#onStats(this.getStats());
+        }
       }
     }
+    this.#lastFrameTs = now;
 
     this.#rafId = requestAnimationFrame(this.#tick);
   };

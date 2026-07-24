@@ -10,9 +10,11 @@ export async function loadWasm(): Promise<Result<WasmModule, EngineError>> {
     const mod = await import('./wasm/diagram_wasm.js');
     // wasm-pack --target web: default export is the async init() function
     // Named exports are the 12 WASM functions
-    await mod.default();
+    // Capture InitOutput so we can attach its `memory` to the WasmModule.
+    const initOutput = await mod.default();
 
     const wasm: WasmModule = {
+      memory: initOutput.memory,
       create_engine: mod.create_engine,
       dispose_engine: mod.dispose_engine,
       execute_command: mod.execute_command,

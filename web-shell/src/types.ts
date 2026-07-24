@@ -83,6 +83,8 @@ export type WasmModule = {
   select_target(_h: number, _target_json: string): void;
   clear_selection(_h: number): void;
   get_selection(_h: number): string;
+  /** WebAssembly linear memory — exposed by wasm-pack --target web init(). */
+  memory?: WebAssembly.Memory;
 };
 
 export const RESULT_TAG = { OK: 'ok', ERR: 'err' } as const;

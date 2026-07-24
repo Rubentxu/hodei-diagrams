@@ -74,4 +74,66 @@ describe('FrameBudgetMonitor', () => {
     monitor.stop();
     expect(monitor.isRunning()).toBe(false);
   });
+
+  it('HUD update rate is ≤4Hz at 120Hz (8.33ms frames)', () => {
+    const monitor = new FrameBudgetMonitor();
+    const onStats = vi.fn();
+    monitor.start(onStats);
+
+    // Simulate 120Hz: frames at 8.33ms intervals
+    // After 250ms we should have at most 1 callback (250/8.33 ≈ 30 frames but only 1 HUD update)
+    const FRAME_MS = 8.33;
+    const HUD_INTERVAL_MS = 250;
+
+    // Advance time: 30 frames at 120Hz = ~250ms worth of frames
+    for (let i = 0; i < 30; i++) {
+      const time = 100 + i * FRAME_MS;
+      rafCallbacks.forEach((cb) => cb(time));
+    }
+
+    // Should have exactly 1 HUD callback (4Hz throttle)
+    expect(onStats).toHaveBeenCalledTimes(1);
+
+    monitor.stop();
+  });
+
+  it('HUD update rate is ≤4Hz at 144Hz (6.94ms frames)', () => {
+    const monitor = new FrameBudgetMonitor();
+    const onStats = vi.fn();
+    monitor.start(onStats);
+
+    // Simulate 144Hz: frames at 6.94ms intervals
+    const FRAME_MS = 6.94;
+
+    // Advance time: 36 frames at 144Hz = ~250ms worth of frames
+    for (let i = 0; i < 36; i++) {
+      const time = 100 + i * FRAME_MS;
+      rafCallbacks.forEach((cb) => cb(time));
+    }
+
+    // Should have at most 1 HUD callback (4Hz throttle)
+    expect(onStats.mock.calls.length).toBeLessThanOrEqual(1);
+
+    monitor.stop();
+  });
+
+  it('HUD update rate is ≤4Hz at 240Hz (4.17ms frames)', () => {
+    const monitor = new FrameBudgetMonitor();
+    const onStats = vi.fn();
+    monitor.start(onStats);
+
+    // Simulate 240Hz: frames at 4.17ms intervals
+    const FRAME_MS = 4.17;
+
+    // Advance time: 60 frames at 240Hz = ~250ms worth of frames
+    for (let i = 0; i < 60; i++) {
+      const time = 100 + i * FRAME_MS;
+      rafCallbacks.forEach((cb) => cb(time));
+    }
+
+    // Should have at most 1 HUD callback (4Hz throttle)
+    expect(onStats.mock.calls.length).toBeLessThanOrEqual(1);
+
+    monitor.stop();
+  });
 });
