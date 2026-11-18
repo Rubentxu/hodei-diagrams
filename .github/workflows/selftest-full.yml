@@ -1,0 +1,25 @@
+name: selftest-full
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the guard
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+      - name: Validate the squash message and every commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          FORGEJO_URL: ${{ vars.FORGEJO_URL || '' }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN || '' }}
+        run: |
+          bash .github/scripts/policy-guard.sh "${{ github.event.pull_request.number }}"
