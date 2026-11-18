@@ -1,0 +1,12 @@
+name: selftest-min
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  hola:
+    runs-on: ubuntu-latest
+    steps:
+      - name: say hello
+        run: echo "hola"
